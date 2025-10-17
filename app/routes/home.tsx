@@ -1,13 +1,13 @@
 import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
+import { HomePage } from "../components/home/HomePage";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "GMS • Home" },
+    { name: "description", content: "GMS Web App – A clean, standard homepage structure built with React Router and Tailwind CSS." },
   ];
 }
 
 export default function Home() {
-  return <Welcome />;
+  return <HomePage />;
 }
