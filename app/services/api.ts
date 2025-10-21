@@ -12,7 +12,7 @@ export async function get<T>(path: string, init?: RequestInit): Promise<ApiRespo
 }
 
 export async function post<T>(path: string, body: unknown, init?: RequestInit): Promise<ApiResponse<T>> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`http://localhost:8080/api/appointments`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
     body: JSON.stringify(body),
