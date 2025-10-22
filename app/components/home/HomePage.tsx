@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AOS from "aos";
 import "aos/dist/aos.css";
+import axios from "axios";
 
 export function HomePage() {
   // Before/After slider refs and state
@@ -20,6 +21,12 @@ export function HomePage() {
   });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
+  // Real-time clock to update time slot availability (ticks every 30s)
+  const [now, setNow] = useState<Date>(new Date());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30000);
+    return () => window.clearInterval(id);
+  }, []);
 
   // Initialize AOS animations on mount
   useEffect(() => {
@@ -86,14 +93,66 @@ export function HomePage() {
 
   const today = new Date().toISOString().split("T")[0];
 
-  const timeOptions: { value: string; label: string; threshold: number }[] = [
-    { value: "7:30-9:30", label: "7:30 - 9:30", threshold: 7.5 },
-    { value: "9:30-11:30", label: "9:30 - 11:30", threshold: 9.5 },
-    { value: "13:30-15:30", label: "13:30 - 15:30", threshold: 13.5 },
-    { value: "15:30-17:30", label: "15:30 - 17:30", threshold: 15.5 },
-  ];
+  // Helpers to determine if a time slot is expired for the selected date (today)
+  const parseEndMinutes = (slot: { label: string } & { endTime?: string }) => {
+    // Prefer explicit endTime (e.g., "17:30")
+    const endRaw = (slot as any).endTime as string | undefined;
+    const label = slot.label || "";
+    let timeStr: string | undefined = endRaw;
+    if (!timeStr) {
+      // Fallback: parse the second HH:MM in label like "08:00 - 09:00"
+      const matches = label.match(/(\d{1,2}:\d{2})/g);
+      if (matches && matches.length >= 2) {
+        timeStr = matches[1];
+      } else if (matches && matches.length === 1) {
+        // In case label only has one time and implies end is the same (rare), treat it as start+0
+        timeStr = matches[0];
+      }
+    }
+    if (!timeStr) return Number.POSITIVE_INFINITY; // if unparseable, don't expire it
+    const [h, m] = timeStr.split(":").map((n) => parseInt(n, 10));
+    return h * 60 + (isNaN(m) ? 0 : m);
+  };
 
-  const handleOpenBooking = (e: React.MouseEvent) => {
+  const isSlotExpired = (slot: { label: string } & { endTime?: string }) => {
+    if (!form.bookingDate) return false;
+    if (form.bookingDate !== today) return false; // only expire for today
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const endMinutes = parseEndMinutes(slot);
+    return nowMinutes >= endMinutes;
+  };
+
+    // --- TIME SLOTS (FETCH FROM API) ---
+    const [timeOptions, setTimeOptions] = useState<
+        { timeSlotId: number; label: string; booked: number; maxCapacity: number; available: boolean }[]
+    >([]);
+
+// Gọi API khi người dùng chọn ngày
+    useEffect(() => {
+        if (!form.bookingDate) return;
+
+        const fetchTimeSlots = async () => {
+            try {
+                const res = await axios.get(`http://localhost:8080/api/appointments/time-slots?date=${form.bookingDate}`);
+                if (Array.isArray(res.data)) {
+                    // chỉ giữ khung giờ còn trống (booked < maxCapacity)
+                    const filtered = res.data.filter((slot) => slot.available && slot.booked < slot.maxCapacity);
+                    setTimeOptions(filtered);
+                } else {
+                    setTimeOptions([]);
+                }
+            } catch (err) {
+                console.error("Failed to load time slots:", err);
+                setTimeOptions([]);
+            }
+        };
+
+        fetchTimeSlots();
+    }, [form.bookingDate]);
+
+
+
+    const handleOpenBooking = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsBookingOpen(true);
   };
@@ -127,7 +186,7 @@ export function HomePage() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const validateAndSubmit = (e: React.FormEvent) => {
+  const validateAndSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let isValid = true;
     const errors: string[] = [];
@@ -155,8 +214,29 @@ export function HomePage() {
       return;
     }
 
-    alert("✅ Đặt lịch thành công!");
-    handleCloseBooking();
+    // Prevent submission if the selected time slot has just expired
+    const chosenSlot = timeOptions.find((s) => String(s.timeSlotId) === String(form.timeSlot));
+    if (chosenSlot && isSlotExpired(chosenSlot as any)) {
+      alert("Khung giờ đã hết hạn, vui lòng chọn khung giờ khác.");
+      return;
+    }
+
+    try {
+      await axios.post("http://localhost:8080/api/appointments", {
+        customerName: form.customerName,
+          phoneNumber: form.phone,
+          licensePlate: form.plateNumber,
+          appointmentDate: form.bookingDate,
+          timeSlotIndex: form.timeSlot,
+          serviceType: form.serviceType,
+          note: form.description,
+      });
+      alert("Appointment booked successfully");
+      handleCloseBooking();
+    } catch (err) {
+      console.error("Failed to submit appointment", err);
+      alert("Failed to submit");
+    }
   };
 
   const isOptionDisabled = (threshold: number) => {
@@ -225,25 +305,48 @@ export function HomePage() {
 
                         <div className="form-group">
                           <label htmlFor="timeSlot">Khung giờ *</label>
-                          <select id="timeSlot" value={form.timeSlot} onChange={handleInputChange} required style={{ borderColor: invalidFields.has("timeSlot") ? "red" : undefined }}>
-                            <option value="">-- Chọn khung giờ --</option>
-                            {timeOptions.map((opt) => (
-                              <option key={opt.value} value={opt.value} disabled={isOptionDisabled(opt.threshold)}>
-                                {opt.label}
-                              </option>
-                            ))}
-                          </select>
+                            <select
+                                id="timeSlot"
+                                value={form.timeSlot}
+                                onChange={handleInputChange}
+                                required
+                                style={{ borderColor: invalidFields.has("timeSlot") ? "red" : undefined }}
+                            >
+                                <option value="">-- Chọn khung giờ --</option>
+                                {timeOptions.length === 0 && form.bookingDate && (
+                                    <option disabled>Không còn khung giờ trống</option>
+                                )}
+                                {timeOptions.map((slot) => {
+                                    const expired = isSlotExpired(slot as any);
+                                    return (
+                                        <option
+                                            key={slot.timeSlotId}
+                                            value={slot.timeSlotId}
+                                            disabled={expired}
+                                            style={{ opacity: expired ? 0.5 : 1 }}
+                                        >
+                                            {slot.label}{expired ? " (hết hạn)" : ""}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+
                         </div>
 
                         <div className="form-group">
                           <label htmlFor="serviceType">Loại dịch vụ *</label>
-                          <select id="serviceType" value={form.serviceType} onChange={handleInputChange} required style={{ borderColor: invalidFields.has("serviceType") ? "red" : undefined }}>
-                            <option value="">-- Chọn dịch vụ --</option>
-                            <option value="Sửa chữa">Sửa chữa</option>
-                            <option value="Bảo dưỡng">Bảo dưỡng</option>
-                            <option value="Thay dầu">Thay dầu</option>
-                            <option value="Kiểm tra tổng quát">Kiểm tra tổng quát</option>
-                          </select>
+                            <select
+                                id="serviceType"
+                                value={form.serviceType}
+                                onChange={handleInputChange}
+                                required
+                                style={{ borderColor: invalidFields.has("serviceType") ? "red" : undefined }}
+                            >
+                                <option value="">-- Chọn dịch vụ --</option>
+                                <option value="SUA_CHUA">Sửa chữa</option>
+                                <option value="BAO_HANH">Bảo hành</option>
+                                <option value="SON">Sơn</option>
+                            </select>
                         </div>
 
                         <div className="form-group full">
@@ -251,24 +354,24 @@ export function HomePage() {
                           <textarea id="description" rows={3} value={form.description} onChange={handleInputChange} placeholder="Nhập mô tả thêm..."></textarea>
                         </div>
 
-                        <div className="form-group full">
-                          <label htmlFor="mediaUpload">Tải ảnh hoặc video (có thể chọn nhiều):</label>
-                          <input id="mediaUpload" type="file" accept="image/*,video/*" multiple onChange={handleMediaChange} />
-                          <div id="mediaPreview" className="media-preview">
-                            {selectedFiles.map((file, index) => {
-                              const url = URL.createObjectURL(file);
-                              const isImage = file.type.startsWith("image/");
-                              const isVideo = file.type.startsWith("video/");
-                              return (
-                                <div className="preview-item" key={index}>
-                                  {isImage && <img src={url} alt={`media-${index}`} />}
-                                  {isVideo && <video src={url} controls />}
-                                  <button type="button" className="delete-btn" onClick={() => removeFileAt(index)}>×</button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                        {/*<div className="form-group full">*/}
+                        {/*  <label htmlFor="mediaUpload">Tải ảnh hoặc video (có thể chọn nhiều):</label>*/}
+                        {/*  <input id="mediaUpload" type="file" accept="image/*,video/*" multiple onChange={handleMediaChange} />*/}
+                        {/*  <div id="mediaPreview" className="media-preview">*/}
+                        {/*    {selectedFiles.map((file, index) => {*/}
+                        {/*      const url = URL.createObjectURL(file);*/}
+                        {/*      const isImage = file.type.startsWith("image/");*/}
+                        {/*      const isVideo = file.type.startsWith("video/");*/}
+                        {/*      return (*/}
+                        {/*        <div className="preview-item" key={index}>*/}
+                        {/*          {isImage && <img src={url} alt={`media-${index}`} />}*/}
+                        {/*          {isVideo && <video src={url} controls />}*/}
+                        {/*          <button type="button" className="delete-btn" onClick={() => removeFileAt(index)}>×</button>*/}
+                        {/*        </div>*/}
+                        {/*      );*/}
+                        {/*    })}*/}
+                        {/*  </div>*/}
+                        {/*</div>*/}
                       </div>
 
                       <div className="form-btns">
