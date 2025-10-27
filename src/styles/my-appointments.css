@@ -1,0 +1,258 @@
+/* My Appointments Page Styles */
+.my-appointments-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 3rem 5%;
+  min-height: 60vh;
+}
+
+.page-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.page-header h1 {
+  font-size: 2.5rem;
+  color: #111;
+  margin-bottom: 0.5rem;
+}
+
+.page-header p {
+  color: #666;
+  font-size: 1.1rem;
+}
+
+.appointments-filters {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.7rem 1.5rem;
+  border: 2px solid #e3b52a;
+  background: transparent;
+  color: #e3b52a;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.filter-btn:hover {
+  background: rgba(227, 181, 42, 0.1);
+}
+
+.filter-btn.active {
+  background: #e3b52a;
+  color: #111;
+}
+
+/* Loading State */
+.loading-state {
+  text-align: center;
+  padding: 4rem 0;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #e3b52a;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  background: #faf9f6;
+  border-radius: 12px;
+  margin: 2rem 0;
+}
+
+.empty-state i {
+  font-size: 4rem;
+  color: #e3b52a;
+  margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+  font-size: 1.8rem;
+  color: #111;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+/* Appointments Grid */
+.appointments-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 2rem;
+}
+
+.appointment-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.appointment-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.card-header {
+  background: linear-gradient(135deg, #f4c430 0%, #e3b52a 100%);
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.appointment-id {
+  font-weight: 700;
+  color: #111;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 1.1rem;
+}
+
+.status-badge {
+  padding: 0.4rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: #fff;
+  color: #111;
+}
+
+.status-confirmed {
+  background: #dcfce7;
+  color: #065f46;
+}
+
+.status-arrived {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.status-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-completed {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+.status-overdue {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.card-body {
+  padding: 1.5rem;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 0.8rem;
+  color: #555;
+}
+
+.info-row i {
+  font-size: 1.1rem;
+  color: #e3b52a;
+  width: 20px;
+}
+
+.info-row.note {
+  padding-top: 0.8rem;
+  border-top: 1px solid #eee;
+  margin-top: 0.8rem;
+  color: #777;
+  font-style: italic;
+}
+
+.card-footer {
+  padding: 1rem 1.5rem;
+  background: #faf9f6;
+  display: flex;
+  gap: 1rem;
+}
+
+.btn-detail,
+.btn-cancel {
+  flex: 1;
+  padding: 0.6rem 1rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-detail {
+  background: #e3b52a;
+  color: #111;
+}
+
+.btn-detail:hover {
+  background: #ffd65a;
+}
+
+.btn-cancel {
+  background: transparent;
+  border: 2px solid #dc2626;
+  color: #dc2626;
+}
+
+.btn-cancel:hover {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .my-appointments-page {
+    padding: 2rem 5%;
+  }
+
+  .page-header h1 {
+    font-size: 2rem;
+  }
+
+  .appointments-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card-footer {
+    flex-direction: column;
+  }
+
+  .btn-detail,
+  .btn-cancel {
+    width: 100%;
+  }
+}
+
