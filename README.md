@@ -1,87 +1,117 @@
-# Welcome to React Router!
+# GMS Web App - Garage Management System
 
-A modern, production-ready template for building full-stack React applications using React Router.
+## Cấu trúc dự án mới (React + JavaScript)
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
+Dự án đã được chuyển đổi từ TypeScript sang JavaScript và sử dụng cấu trúc React thông thường.
 
-## Features
+### Công nghệ sử dụng
 
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
+- **React 18** - Library UI
+- **React Router v6** - Routing
+- **Zustand** - State Management
+- **Axios** - HTTP Client
+- **Bootstrap** + **Bootstrap Icons** - UI Components
+- **AOS** - Animation on Scroll
+- **Vite** - Build Tool
 
-## Getting Started
-
-### Installation
-
-Install the dependencies:
-
-```bash
-npm install
-```
-
-### Development
-
-Start the development server with HMR:
-
-```bash
-npm run dev
-```
-
-Your application will be available at `http://localhost:5173`.
-
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
-```
-
-## Deployment
-
-### Docker Deployment
-
-To build and run using Docker:
-
-```bash
-docker build -t my-app .
-
-# Run the container
-docker run -p 3000:3000 my-app
-```
-
-The containerized application can be deployed to any platform that supports Docker, including:
-
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
+### Cấu trúc thư mục
 
 ```
+gms-web-app/
+├── src/
+│   ├── components/         # Các React components
+│   │   ├── appointments/   # Components liên quan đến lịch hẹn
+│   │   ├── home/          # Homepage components
+│   │   ├── serviceTickets/ # Components phiếu dịch vụ
+│   │   └── Header.jsx     # Header component
+│   ├── layouts/           # Layout components
+│   │   └── DashboardLayout.jsx
+│   ├── pages/             # Các page components
+│   │   ├── HomePage.jsx
+│   │   ├── Appointments.jsx
+│   │   ├── ServiceTickets.jsx
+│   │   └── ServiceTicketsNew.jsx
+│   ├── services/          # API services
+│   │   └── api.js
+│   ├── store/             # Zustand stores
+│   │   └── authStore.js
+│   ├── styles/            # CSS files
+│   ├── utils/             # Utility functions
+│   ├── App.jsx            # Main App component
+│   ├── App.css            # Global styles
+│   └── main.jsx           # Entry point
+├── public/                # Static assets
+├── index.html            # HTML template
 ├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
+└── vite.config.js
+
 ```
 
-## Styling
+### Cài đặt và chạy
 
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
+```bash
+# Cài đặt dependencies
+npm install
 
----
+# Chạy development server
+npm run dev
 
-Built with ❤️ using React Router.
+# Build production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### State Management với Zustand
+
+Dự án sử dụng Zustand để quản lý state thay cho Context API:
+
+```javascript
+// Sử dụng auth store
+import useAuthStore from './store/authStore';
+
+function Component() {
+  const { user, login, logout } = useAuthStore();
+  // ...
+}
+```
+
+### Routing
+
+Dự án sử dụng React Router v6:
+
+```javascript
+// Routes được định nghĩa trong App.jsx
+<Routes>
+  <Route path="/" element={<HomePage />} />
+  <Route path="/appointments" element={<Appointments />} />
+  <Route path="/service-tickets" element={<ServiceTickets />} />
+  <Route path="/service-tickets-new" element={<ServiceTicketsNew />} />
+</Routes>
+```
+
+### API Configuration
+
+API base URL được cấu hình trong `src/utils/constants.js`:
+
+```javascript
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+```
+
+Để thay đổi API URL, tạo file `.env`:
+
+```
+VITE_API_URL=http://your-api-url/api
+```
+
+### Các tính năng chính
+
+1. **Quản lý lịch hẹn** - Xem, tạo, cập nhật lịch hẹn
+2. **Phiếu dịch vụ** - Tạo và quản lý phiếu dịch vụ
+3. **Dashboard** - Tổng quan hoạt động
+4. **Responsive Design** - Tương thích mobile
+
+## License
+
+Private Project
