@@ -3,7 +3,7 @@
     font-family: "Poppins", sans-serif;
 }
 
-body {
+.login-page {
     background-color: #c5a76d; /* màu nền nâu vàng */
     margin: 0;
     display: flex;
