@@ -7,7 +7,7 @@ const useAuthStore = create((set) => ({
   login: async (username, password) => {
     set({ loading: true });
     try {
-      // TODO: Implement API login
+     
       await new Promise((r) => setTimeout(r, 300));
       set({ 
         user: { id: '1', name: 'Demo User', role: 'Manager' },
@@ -20,7 +20,7 @@ const useAuthStore = create((set) => ({
   },
   
   logout: async () => {
-    // TODO: Implement API logout
+   
     set({ user: null });
   },
   

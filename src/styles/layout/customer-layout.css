@@ -1,11 +1,9 @@
-/* Customer Layout Styles */
 .customer-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* Header */
 .customer-header {
   background: #fff;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -114,13 +112,11 @@
   box-shadow: 0 4px 12px rgba(227, 181, 42, 0.3);
 }
 
-/* Main Content */
 .customer-main {
   flex: 1;
   width: 100%;
 }
 
-/* Footer */
 .customer-footer {
   background: linear-gradient(135deg, #1a1a1a 0%, #2c2c2c 100%);
   color: #ddd;
@@ -196,7 +192,6 @@
   color: #aaa;
 }
 
-/* Responsive */
 @media (max-width: 992px) {
   .customer-header-content {
     flex-wrap: wrap;

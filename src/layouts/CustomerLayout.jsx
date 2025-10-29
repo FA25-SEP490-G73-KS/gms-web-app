@@ -1,35 +1,13 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import '../styles/customer-layout.css';
+import Header from '../components/common/Header';
+import CustomerNav from '../components/common/customerNav';
+import '../styles/layout/customer-layout.css';
 
 export default function CustomerLayout({ children }) {
   return (
     <div className="customer-layout">
-      <header className="customer-header">
-        <div className="customer-header-content">
-          <Link to="/" className="customer-logo">
-            <img src="/image/ChatGPT Image 01_32_27 17 thg 10, 2025.png" alt="Logo Garage"/>
-            <span>Gara Hoàng Tuấn</span>
-          </Link>
-          
-          <nav className="customer-nav">
-            <Link to="/" className="nav-link">Trang chủ</Link>
-            <Link to="/services" className="nav-link">Dịch vụ</Link>
-            <Link to="/about" className="nav-link">Giới thiệu</Link>
-            <Link to="/contact" className="nav-link">Liên hệ</Link>
-          </nav>
-
-          <div className="customer-actions">
-            <Link to="/my-appointments" className="btn-outline">
-              <i className="bi bi-calendar-check"></i>
-              Lịch hẹn của tôi
-            </Link>
-            <Link to="/book-now" className="btn-primary">
-              Đặt lịch ngay
-            </Link>
-          </div>
-        </div>
-      </header>
+      <Header />
+      <CustomerNav />
 
       <main className="customer-main">
         {children}
@@ -66,7 +44,7 @@ export default function CustomerLayout({ children }) {
         </div>
         
         <div className="footer-bottom">
-          <p>&copy; 2025 Gara Hoàng Tuấn. All rights reserved.</p>
+          <p>&copy; 2025 Gara Hoàng Tuấn. All Rights Reserved.</p>
         </div>
       </footer>
     </div>

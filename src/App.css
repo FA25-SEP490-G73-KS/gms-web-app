@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300..900&display=swap');
 
 * {
   margin: 0;
@@ -7,7 +7,7 @@
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Outfit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   line-height: 1.6;
 }
 
@@ -36,7 +36,6 @@ body {
 .gms-home .hero-image-container { width:100%; height:100%; border-radius:25px; clip-path: polygon(2% 0%, 50% 13%, 98% 0%, 100% 5%, 100% 90%, 98% 95%, 72% 95%, 70% 100%, 30% 100%, 28% 95%, 2% 95%, 0% 90%, 0% 5%); background-image:url('https://unitools.vn/wp-content/uploads/2022/01/kho-khan-vat-va-cua-tho-sua-chua-o-to-1.jpg'); background-size:cover; background-position:center; background-repeat:no-repeat; }
 .gms-home .hero-btn { position:absolute; bottom:93%; left:44.5%; transform:translateX(-50%); padding:0.6rem 1.2rem; font-size:0.8rem; background-color:#f4c430; color:#111; border-radius:10px; text-decoration:none; font-weight:600; z-index:2; transition:all .3s ease; }
 .gms-home .hero-btn:hover { background-color:#ffd65a; transform:translateX(-50%) scale(1.05); }
-/* Overlay nền mờ */
 .booking-overlay {
     display: none;
     position: fixed;
@@ -48,13 +47,12 @@ body {
     overflow-y: auto;
 }
 
-/* Booking Popup (thu nhỏ gọn gàng hơn) */
 .booking-popup {
     background: #fff;
-    padding: 15px 20px; /* Giảm padding */
+    padding: 15px 20px;
     border-radius: 14px;
     width: 90vw;
-    max-width: 600px; /* Giảm chiều rộng tối đa */
+    max-width: 600px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
     animation: zoomIn 0.2s ease;
     max-height: 90vh;
@@ -69,12 +67,12 @@ body {
 
 .booking-popup h2 {
     text-align: center;
-    font-size: 1.4rem; /* Giảm font size */
+    font-size: 1.4rem; 
     margin-bottom: 12px;
     color: #1a1a1a;
 }
 
-/* Form grid */
+
 .booking-popup .form-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -93,7 +91,7 @@ body {
 }
 
 .booking-popup label {
-    font-size: 0.8rem; /* Giảm font size */
+    font-size: 0.8rem; 
     color: #333;
     font-weight: 500;
 }
@@ -101,8 +99,8 @@ body {
 .booking-popup input,
 .booking-popup textarea,
 .booking-popup select {
-    padding: 6px 10px; /* Giảm padding */
-    font-size: 0.85rem; /* Giảm font size */
+    padding: 6px 10px; 
+    font-size: 0.85rem; 
     border: 1px solid #d1d5db;
     border-radius: 6px;
     outline: none;
@@ -116,7 +114,7 @@ body {
     border-color: #f4c430;
 }
 
-/* Media preview (nếu có dùng) */
+
 .media-preview {
     display: flex;
     flex-wrap: wrap;
@@ -154,7 +152,6 @@ body {
     color: #ff4444;
 }
 
-/* Buttons */
 .booking-popup .form-btns {
     display: flex;
     gap: 8px;
@@ -162,8 +159,8 @@ body {
 }
 
 .booking-popup button {
-    padding: 8px 16px; /* Giảm padding */
-    font-size: 0.85rem; /* Giảm font size */
+    padding: 8px 16px;
+    font-size: 0.85rem;
     border: none;
     border-radius: 6px;
     cursor: pointer;
@@ -189,7 +186,6 @@ body {
     background-color: #d1d5db;
 }
 
-/* Responsive cho mobile */
 @media (max-width: 600px) {
     .booking-popup .form-grid {
         grid-template-columns: 1fr;

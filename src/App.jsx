@@ -1,20 +1,17 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import HomePage from './pages/HomePage';
-import Appointments from './pages/Appointments';
-import ServiceTickets from './pages/ServiceTickets';
-import ServiceTicketsNew from './pages/ServiceTicketsNew';
-import MyAppointments from './pages/MyAppointments';
-import './App.css';
+import HomePage from './pages/home/HomePage';
+import AboutPage from './pages/home/about';
+import ContactPage from './pages/home/contact';
+import AppointmentService from './pages/appointment/appointmentservice';
 
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/appointments" element={<Appointments />} />
-        <Route path="/service-tickets" element={<ServiceTickets />} />
-        <Route path="/service-tickets-new" element={<ServiceTicketsNew />} />
-        <Route path="/my-appointments" element={<MyAppointments />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/appointment" element={<AppointmentService />} />
       </Routes>
     </Router>
   );
