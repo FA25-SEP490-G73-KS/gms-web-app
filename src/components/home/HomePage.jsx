@@ -2,6 +2,9 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import axios from 'axios';
+import '../../styles/homepage.css';
+import '../../styles/material-symbols.css'; // css local
+
 
 export default function HomePage() {
   // Before/After slider refs and state
@@ -396,14 +399,14 @@ export default function HomePage() {
                     là một tác phẩm, được chăm chút bằng công nghệ hiện đại và tâm huyết tinh tế.
                 </p>
                 <div className="author">
-                    <img src="https://randomuser.me/api/portraits/men/75.jpg" alt="Author"/>
+                    <img src="/image/a-minimalist-logo-design-featuring-the-m_KCX4Hu-hTAOZg4Njj0hGvg_4TlY5-kYRRSPFzTnTifWGQ.jpeg" alt="Author"/>
                     <span>Hoàng Tuấn</span>
                 </div>
             </div>
 
             <div className="about-image" data-aos="fade-up">
                 <img
-                    src="https://png.pngtree.com/thumb_back/fh260/background/20230406/pngtree-auto-mechanic-working-in-garage-repair-service-maintenance-tool-station-photo-image_51090316.jpg"
+                    src="/image/aboutus.jpg"
                     alt="Construction Workers"
                 />
             </div>
@@ -440,7 +443,7 @@ export default function HomePage() {
         <div className="services-list">
           <div className="service-card" data-aos="fade-right">
             <img
-              src="https://katavina.com/uploaded/V%C3%AC%20sao%20ph%E1%BA%A3i%20b%E1%BA%A3o%20d%C6%B0%E1%BB%A1ng%20%C4%91%E1%BB%8Dnh%20k%E1%BB%B3%20cho%20xe%20%C3%B4%20t%C3%B43.jpg"
+              src="/image/baoduong-service.jpg"
               alt="Bảo dưỡng định kỳ"
             />
             <h3>Bảo dưỡng định kỳ</h3>
@@ -455,7 +458,7 @@ export default function HomePage() {
 
           <div className="service-card" data-aos="zoom-in">
             <img
-              src="https://media.istockphoto.com/id/1347150429/vi/anh/th%E1%BB%A3-m%C3%A1y-chuy%C3%AAn-nghi%E1%BB%87p-l%C3%A0m-vi%E1%BB%87c-tr%C3%AAn-%C4%91%E1%BB%99ng-c%C6%A1-c%E1%BB%A7a-chi%E1%BA%BFc-xe-trong-nh%C3%A0-%C4%91%E1%BB%83-xe.jpg?s=612x612&w=0&k=20&c=Sn1Rb95tmVhPPrwtFNjQ8c3dKIeYThJZ6uCks04uSMc="
+              src="/image/suachua-service.jpg"
               alt="Thay thế & Sửa chữa"
             />
             <h3>Thay thế & Sửa chữa</h3>
@@ -469,7 +472,7 @@ export default function HomePage() {
           </div>
 
           <div className="service-card" data-aos="fade-left">
-            <img src="https://sonseapa.com.vn/data/news/12108/cac-hinh-thuc-son-o-to.jpg" alt="Sơn & Hoàn thiện xe" />
+            <img src="/image/son-service.jpg" alt="Sơn & Hoàn thiện xe" />
             <h3>Sơn & Hoàn thiện xe</h3>
             <div className="service-detail">
               <h4>Sơn & Đánh bóng đạt chuẩn</h4>
@@ -496,10 +499,12 @@ export default function HomePage() {
           <div className="why-items">
             <div className="why-item" data-aos="fade-up" data-aos-delay="200">
               <span className="icon" aria-hidden>
-                ⚙️
+                <span className="material-symbols-outlined">
+engineering
+</span>
               </span>
-              <h3>Đội ngũ kỹ thuật viên chuyên nghiệp</h3>
-              <p>
+                <h3>Đội ngũ kỹ thuật viên chuyên nghiệp</h3>
+                <p>
                 Được đào tạo bài bản và có chứng chỉ kỹ thuật cao, mỗi nhân viên đều làm việc với tinh thần trách nhiệm
                 và niềm đam mê dành cho xe.
               </p>
@@ -507,10 +512,12 @@ export default function HomePage() {
 
             <div className="why-item" data-aos="fade-up" data-aos-delay="300">
               <span className="icon" aria-hidden>
-                ✅
+                <span className="material-symbols-outlined">
+verified_user
+</span>
               </span>
-              <h3>Chất lượng & Uy tín hàng đầu</h3>
-              <p>
+                <h3>Chất lượng & Uy tín hàng đầu</h3>
+                <p>
                 Mọi dịch vụ đều được thực hiện theo quy trình chuẩn, sử dụng linh kiện chính hãng và được bảo hành rõ
                 ràng – đảm bảo sự an tâm tuyệt đối cho khách hàng.
               </p>
@@ -518,10 +525,12 @@ export default function HomePage() {
 
             <div className="why-item" data-aos="fade-up" data-aos-delay="400">
               <span className="icon" aria-hidden>
-                🛠️
+               <span className="material-symbols-outlined">
+construction
+</span>
               </span>
-              <h3>Trang thiết bị hiện đại</h3>
-              <p>
+                <h3>Trang thiết bị hiện đại</h3>
+                <p>
                 Gara được trang bị hệ thống máy móc, công nghệ chẩn đoán và sơn hiện đại, giúp xử lý nhanh chóng –
                 chính xác – tiết kiệm chi phí.
               </p>
