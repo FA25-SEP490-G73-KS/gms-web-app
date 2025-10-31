@@ -1,5 +1,5 @@
 import CustomerLayout from '../../layouts/CustomerLayout';
-import '../../styles/pages/home.css';
+import '../../styles/pages/home/home.css';
 import { useNavigate } from 'react-router-dom';
 
 export default function HomePage() {

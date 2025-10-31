@@ -1,0 +1,112 @@
+:root { --gold: #CBB081; }
+.admin-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: #f7f7f8;
+}
+
+.admin-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 12px;
+  border-right: 1px solid #eee;
+  background: #ffffff;
+}
+
+.sidebar-breadcrumb { color: #9aa0a6; font-size: 12px; padding: 6px 8px 10px; border-bottom: 1px dashed #eee; }
+
+.admin-brand {
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.admin-brand img { height: 120px; width: auto; }
+
+.admin-nav { display: flex; flex-direction: column; gap: 6px; }
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #222;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-nav-item i { width: 18px; color: var(--gold); }
+
+.admin-nav-item:hover { background: #CBB081; color: #111; }
+.admin-nav-item:hover i { color: #111; }
+.admin-nav-item.active { background: #CBB081; color: #111; }
+.admin-nav-item.active i { color: #111; }
+
+.admin-nav-group .caret { margin-left: auto; transition: transform .2s ease; }
+.admin-nav-group .caret.rot { transform: rotate(180deg); }
+.submenu { position: relative; padding-left: 24px; display: grid; gap: 8px; }
+.submenu-line { position: absolute; top: 0; bottom: 0; left: 12px; width: 2px; background: #CBB081; border-radius: 2px; }
+.submenu-item { background: transparent; border: none; color: #444; padding: 8px 12px 8px 30px; text-align: left; border-radius: 8px; cursor: pointer; }
+.submenu-item:hover { background: rgba(203, 176, 129, 0.25); }
+
+.admin-spacer { flex: 1; }
+
+.admin-logout {
+  border: 1px solid #eee;
+  background: #fafafa;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.admin-logout { display: flex; align-items: center; justify-content: center; width: 100%; gap: 10px; font-weight: 600; }
+.admin-logout i { color: #d1293d; }
+.admin-logout:hover { background: #f0f0f2; }
+
+.admin-main {
+  padding: 20px 24px;
+}
+
+.admin-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e6e8eb;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.admin-topbar-left { display: flex; align-items: center; gap: 12px; }
+.brand-gold { color: #cbb081; font-weight: 700; }
+.brand-strong { font-weight: 800; }
+.greeting { color: #111; opacity: .9; }
+
+.admin-topbar-right { display: flex; align-items: center; gap: 20px; }
+.zalo-badge { color: #1677ff; font-weight: 800; font-size: 18px; }
+.user-name { font-weight: 600; }
+
+.admin-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+/* Page-specific styles have been moved to src/styles/pages/admin-appointments.css */
+
+

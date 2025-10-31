@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import CustomerLayout from '../../layouts/CustomerLayout'
+import CustomerLayout from '../../../layouts/CustomerLayout'
 
 export default function AppointmentService() {
   const [step, setStep] = useState(1)

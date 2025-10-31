@@ -1,5 +1,5 @@
 import CustomerLayout from '../../layouts/CustomerLayout';
-import '../../styles/pages/home.css';
+import '../../styles/pages/home/home.css';
 
 export default function AboutPage() {
   return (
