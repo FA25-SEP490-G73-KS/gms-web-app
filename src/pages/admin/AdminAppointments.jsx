@@ -1,36 +1,78 @@
 import AdminLayout from '../../layouts/AdminLayout'
 import '/src/styles/pages/admin/admin-appointments.css'
-import { useMemo, useState } from 'react'
-import { Modal, Descriptions, Tag, Dropdown } from 'antd'
+import { useMemo, useState, useEffect } from 'react'
+import { Modal, Descriptions, Tag, Dropdown, message } from 'antd'
+import { appointmentAPI } from '../../services/api'
 
 const PAGE_SIZE_OPTIONS = [6, 10, 20]
 
-const MOCK_DATA = Array.from({ length: 26 }).map((_, i) => ({
-  id: i + 1,
-  customer: 'Phạm Văn A',
-  license: '25A-123456',
-  phone: '0123456789',
-  status: ['Bị huỷ', 'Đã đến', 'Quá hạn', 'Chờ'][i % 4],
-  time: ['7:30 - 9:30', '9:30 - 11:30', '13:30 - 15:30'][i % 3],
-  date: ['12/10/2025', '11/10/2025'][i % 2]
-}))
-
 const STATUS_ITEMS = [
-  { key: 'Chờ', color: '#FFB7B7' },
-  { key: 'Bị huỷ', color: '#FF1100' },
-  { key: 'Đã đến', color: '#486FE0' },
-  { key: 'Quá hạn', color: '#E89400' },
+  { key: 'CONFIRMED', label: 'Chờ', color: '#FFB7B7' },
+  { key: 'CANCELLED', label: 'Bị huỷ', color: '#FF1100' },
+  { key: 'ARRIVED', label: 'Đã đến', color: '#486FE0' },
+  { key: 'OVERDUE', label: 'Quá hạn', color: '#E89400' },
 ]
+
+const statusMap = {
+  'CONFIRMED': 'Chờ',
+  'CANCELLED': 'Bị huỷ',
+  'ARRIVED': 'Đã đến',
+  'OVERDUE': 'Quá hạn',
+}
 
 export default function AdminAppointments() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
   const [selected, setSelected] = useState(null)
-  const [data, setData] = useState(MOCK_DATA)
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [selectedFull, setSelectedFull] = useState(null)
+
+  useEffect(() => {
+    fetchAppointments()
+  }, [])
+
+  const fetchAppointments = async () => {
+    setLoading(true)
+    const { data: response, error } = await appointmentAPI.getAll()
+    setLoading(false)
+    
+    if (error) {
+      message.error('Không thể tải dữ liệu lịch hẹn')
+      return
+    }
+    
+    if (response && response.result) {
+      const transformed = response.result.map(item => ({
+        id: item.appointmentId,
+        customer: item.customerName,
+        license: item.licensePlate,
+        phone: item.customerPhone,
+        status: statusMap[item.status] || item.status,
+        statusKey: item.status,
+        time: item.timeSlotLabel || '',
+        date: new Date(item.appointmentDate).toLocaleDateString('vi-VN'),
+        serviceType: item.serviceType,
+        note: item.note,
+      }))
+      setData(transformed)
+    }
+  }
+
+  const fetchAppointmentDetail = async (id) => {
+    const { data: response, error } = await appointmentAPI.getById(id)
+    if (error) {
+      message.error('Không thể tải chi tiết lịch hẹn')
+      return
+    }
+    if (response && response.result) {
+      setSelectedFull(response.result)
+    }
+  }
 
   const filtered = useMemo(() => {
-    if (!query) return MOCK_DATA
+    if (!query) return data
     const q = query.toLowerCase()
     return data.filter(
       (r) =>
@@ -58,15 +100,22 @@ export default function AdminAppointments() {
     }
   }
 
-  const updateStatus = (id, status) => {
-    setData((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)))
+  const updateStatus = async (id, statusKey) => {
+    const { error } = await appointmentAPI.updateStatus(id, statusKey)
+    if (error) {
+      message.error('Không thể cập nhật trạng thái')
+      return
+    }
+    message.success('Cập nhật trạng thái thành công')
+    const newStatus = statusMap[statusKey] || statusKey
+    setData((prev) => prev.map((r) => (r.id === id ? { ...r, status: newStatus, statusKey } : r)))
   }
 
   const statusMenu = (row) => ({
     items: STATUS_ITEMS.map((s) => ({
       key: s.key,
       label: (
-        <span style={{ color: s.color, fontWeight: 700 }}>{s.key}</span>
+        <span style={{ color: s.color, fontWeight: 700 }}>{s.label}</span>
       ),
       onClick: () => updateStatus(row.id, s.key),
     })),
@@ -158,7 +207,7 @@ export default function AdminAppointments() {
                     </div>
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    <i className="bi bi-eye action-eye" title="Xem" role="button" onClick={() => setSelected(r)} />
+                    <i className="bi bi-eye action-eye" title="Xem" role="button" onClick={async () => { setSelected(r); await fetchAppointmentDetail(r.id) }} />
                   </td>
                 </tr>
               ))}
@@ -188,18 +237,19 @@ export default function AdminAppointments() {
       <Modal
         title="LỊCH HẸN CHI TIẾT"
         open={!!selected}
-        onCancel={() => setSelected(null)}
+        onCancel={() => { setSelected(null); setSelectedFull(null) }}
         footer={null}
         width={720}
       >
-        {selected && (
+        {(selectedFull || selected) && (
           <>
             <Descriptions bordered column={1} size="middle">
-              <Descriptions.Item label="Tên khách hàng">{selected.customer}</Descriptions.Item>
-              <Descriptions.Item label="Số điện thoại">{selected.phone}</Descriptions.Item>
-              <Descriptions.Item label="Biển số xe">{selected.license}</Descriptions.Item>
-              <Descriptions.Item label="Ngày hẹn">{selected.date}</Descriptions.Item>
-              <Descriptions.Item label="Khung giờ">{selected.time}</Descriptions.Item>
+              <Descriptions.Item label="Tên khách hàng">{selectedFull?.customerName || selected?.customer}</Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">{selectedFull?.customerPhone || selected?.phone}</Descriptions.Item>
+              <Descriptions.Item label="Biển số xe">{selectedFull?.licensePlate || selected?.license}</Descriptions.Item>
+              <Descriptions.Item label="Ngày hẹn">{selectedFull?.appointmentDate ? new Date(selectedFull.appointmentDate).toLocaleDateString('vi-VN') : selected?.date}</Descriptions.Item>
+              <Descriptions.Item label="Khung giờ">{selectedFull?.timeSlotLabel || selected?.time}</Descriptions.Item>
+              <Descriptions.Item label="Loại dịch vụ">{selectedFull?.serviceType || selected?.serviceType}</Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
                 <Tag color={
                   selected.status === 'Bị huỷ' ? 'red' : selected.status === 'Đã đến' ? 'blue' : selected.status === 'Quá hạn' ? 'orange' : 'default'
@@ -208,14 +258,12 @@ export default function AdminAppointments() {
                 </Tag>
               </Descriptions.Item>
             </Descriptions>
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 700, marginBottom: 8 }}>Mô tả chi tiết tình trạng xe:</div>
-              <ul style={{ margin: 0 }}>
-                <li>Bóng đèn sáng yếu.</li>
-                <li>Xe ngập nước, chết máy.</li>
-                <li>v.v</li>
-              </ul>
-            </div>
+            {selectedFull?.note && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>Ghi chú:</div>
+                <div>{selectedFull.note}</div>
+              </div>
+            )}
           </>
         )}
       </Modal>

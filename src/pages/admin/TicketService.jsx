@@ -1,18 +1,11 @@
 import AdminLayout from '../../layouts/AdminLayout'
 import '/src/styles/pages/admin/ticketservice.css'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import TicketDetail from './modals/TicketDetail'
+import { serviceTicketAPI } from '../../services/api'
+import { message } from 'antd'
 
 const PAGE_SIZE_OPTIONS = [6, 10, 20]
-
-const MOCK = Array.from({ length: 28 }).map((_, i) => ({
-  id: i + 1,
-  customer: 'Phạm Văn A',
-  license: '25A-123456',
-  status: ['Chờ thanh toán', 'Đang sửa chữa', 'Chờ báo giá', 'Không duyệt', 'Huỷ'][i % 5],
-  createdAt: '13/10/2025',
-  total: [1000000, 0][i % 2],
-}))
 
 const statusClass = (s) => {
   switch (s) {
@@ -34,14 +27,43 @@ export default function TicketService() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
   const [selected, setSelected] = useState(null)
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    fetchServiceTickets()
+  }, [])
+
+  const fetchServiceTickets = async () => {
+    setLoading(true)
+    const { data: response, error } = await serviceTicketAPI.getAll()
+    setLoading(false)
+    
+    if (error) {
+      message.error('Không thể tải dữ liệu phiếu dịch vụ')
+      return
+    }
+    
+    if (response && response.result) {
+      const transformed = response.result.map(item => ({
+        id: item.serviceTicketId,
+        customer: item.customer?.fullName || 'N/A',
+        license: item.vehicle?.licensePlate || 'N/A',
+        status: 'Chờ thanh toán', // You may need to map actual status
+        createdAt: new Date().toLocaleDateString('vi-VN'),
+        total: 0, // Calculate or get from API
+      }))
+      setData(transformed)
+    }
+  }
 
   const filtered = useMemo(() => {
-    if (!query) return MOCK
+    if (!query) return data
     const q = query.toLowerCase()
-    return MOCK.filter(
+    return data.filter(
       (r) => r.customer.toLowerCase().includes(q) || r.license.toLowerCase().includes(q)
     )
-  }, [query])
+  }, [query, data])
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
   const currentPage = Math.min(page, pageCount)
@@ -114,7 +136,7 @@ export default function TicketService() {
                   <td>{r.license}</td>
                   <td><span className={statusClass(r.status)}>{r.status}</span></td>
                   <td>{r.createdAt}</td>
-                  <td>{r.total.toLocaleString('vi-VN')}</td>
+                  <td>{(r.total || 0).toLocaleString('vi-VN')}</td>
                   <td className="icon-cell">
                     <i className="bi bi-eye action-eye" title="Xem" role="button" onClick={() => setSelected(r)} />
                   </td>

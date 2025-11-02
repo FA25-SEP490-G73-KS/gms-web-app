@@ -1,23 +1,83 @@
 import AdminLayout from '../../layouts/AdminLayout'
 import '/src/styles/pages/admin/createticket.css'
-import { DatePicker, Select, Input, InputNumber, Button, Tag } from 'antd'
+import { DatePicker, Select, Input, InputNumber, Button, Tag, message } from 'antd'
 import { useState } from 'react'
+import { serviceTicketAPI } from '../../services/api'
 
 const TECHS = [
-  'HTK Ly', 'DT Huyền', 'Nguyễn Văn B', 'Phạm Đức Đạt'
+  { id: 1, name: 'HTK Ly' },
+  { id: 2, name: 'DT Huyền' },
+  { id: 3, name: 'Nguyễn Văn B' },
+  { id: 4, name: 'Phạm Đức Đạt' }
 ]
 
-const SERVICES = ['Thay thế phụ tùng', 'Sơn', 'Bảo dưỡng']
+const SERVICES = [
+  { label: 'Thay thế phụ tùng', value: 1 },
+  { label: 'Sơn', value: 2 },
+  { label: 'Bảo dưỡng', value: 3 }
+]
 
 export default function CreateTicket() {
   const [form, setForm] = useState({
     phone: '', name: '', address: '',
-    plate: '', brand: '', model: '', version: '', vin: '',
-    techs: ['HTK Ly', 'DT Huyền'], service: ['Thay thế phụ tùng'],
-    receiveDate: null, note: ''
+    plate: '', brand: '', model: '', vin: '',
+    techs: [], service: [],
+    receiveDate: null, note: '', advisorId: 1
   })
+  const [loading, setLoading] = useState(false)
 
   const onChange = (k) => (e) => setForm({ ...form, [k]: e?.target ? e.target.value : e })
+
+  const handleCreate = async () => {
+    if (!form.phone || !form.name || !form.address || !form.plate || !form.brand || !form.model) {
+      message.error('Vui lòng điền đầy đủ thông tin bắt buộc')
+      return
+    }
+
+    setLoading(true)
+    const payload = {
+      appointmentId: 0,
+      serviceTypeIds: form.service.map(s => s.value || s),
+      customer: {
+        customerId: 0,
+        fullName: form.name,
+        phone: form.phone,
+        address: form.address,
+        customerType: 'CA_NHAN',
+        loyaltyLevel: 'NORMAL'
+      },
+      vehicle: {
+        vehicleId: 0,
+        licensePlate: form.plate,
+        brandId: 0,
+        modelId: 0,
+        year: 0,
+        vin: form.vin || ''
+      },
+      advisorId: form.advisorId,
+      assignedTechnicianIds: form.techs.map(t => t.id || t),
+      receiveCondition: '',
+      note: form.note || '',
+      expectedDeliveryAt: form.receiveDate ? form.receiveDate.format('YYYY-MM-DD') : ''
+    }
+
+    const { data, error } = await serviceTicketAPI.create(payload)
+    setLoading(false)
+
+    if (error) {
+      message.error('Tạo phiếu không thành công')
+      return
+    }
+
+    message.success('Tạo phiếu dịch vụ thành công')
+    // Reset form or redirect
+    setForm({
+      phone: '', name: '', address: '',
+      plate: '', brand: '', model: '', vin: '',
+      techs: [], service: [],
+      receiveDate: null, note: '', advisorId: 1
+    })
+  }
 
   return (
     <AdminLayout>
@@ -47,7 +107,7 @@ export default function CreateTicket() {
                 mode="multiple"
                 value={form.techs}
                 onChange={(v)=>setForm({...form, techs: v})}
-                options={TECHS.map(t=>({ value:t, label:t }))}
+                options={TECHS.map(t=>({ value:t.id, label:t.name }))}
                 style={{ width:'100%' }}
                 placeholder="Chọn kỹ thuật viên"
               />
@@ -62,7 +122,7 @@ export default function CreateTicket() {
                 mode="multiple"
                 value={form.service}
                 onChange={(v)=>setForm({...form, service: v})}
-                options={SERVICES.map(s=>({ value:s, label:s }))}
+                options={SERVICES}
                 style={{ width:'100%' }}
               />
             </div>
@@ -98,9 +158,9 @@ export default function CreateTicket() {
         </div>
 
         <div className="ct-actions">
-          <Button danger>Hủy</Button>
+          <Button danger onClick={() => window.location.href = '/admin/orders'}>Hủy</Button>
           <Button>Lưu</Button>
-          <Button type="primary" style={{ background:'#22c55e' }}>Tạo phiếu</Button>
+          <Button type="primary" style={{ background:'#22c55e' }} loading={loading} onClick={handleCreate}>Tạo phiếu</Button>
         </div>
       </div>
     </AdminLayout>

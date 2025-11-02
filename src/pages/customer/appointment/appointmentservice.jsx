@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import CustomerLayout from '../../../layouts/CustomerLayout'
+import { appointmentAPI } from '../../../services/api'
+
+const SERVICE_TYPE_MAP = {
+  'Sơn': 1,
+  'Thay thế phụ tùng': 2,
+  'Bảo dưỡng': 3
+}
 
 export default function AppointmentService() {
   const [step, setStep] = useState(1)
+  const [loading, setLoading] = useState(false)
+  const [timeSlots, setTimeSlots] = useState([])
   const [form, setForm] = useState({
     phone: '',
     otp: '',
@@ -17,6 +26,53 @@ export default function AppointmentService() {
   const update = (k) => (e) => setForm({ ...form, [k]: e.target.value })
   const next = () => setStep((s) => Math.min(4, s + 1))
   const back = () => setStep((s) => Math.max(1, s - 1))
+
+  useEffect(() => {
+    if (step === 3 && form.date) {
+      fetchTimeSlots()
+    }
+  }, [form.date, step])
+
+  const fetchTimeSlots = async () => {
+    if (!form.date) return
+    const { data: response, error } = await appointmentAPI.getTimeSlots(form.date)
+    if (!error && response && response.result) {
+      const slots = response.result.filter(slot => slot.available && slot.booked < slot.maxCapacity)
+      setTimeSlots(slots.map((slot, index) => ({
+        value: index,
+        label: slot.label,
+        id: slot.timeSlotId
+      })))
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (!form.fullName || !form.license || !form.phone || !form.date || !form.time || !form.service) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc')
+      return
+    }
+
+    setLoading(true)
+    const payload = {
+      customerName: form.fullName,
+      phoneNumber: form.phone,
+      licensePlate: form.license,
+      appointmentDate: form.date,
+      timeSlotIndex: parseInt(form.time),
+      serviceType: SERVICE_TYPE_MAP[form.service] || 0,
+      note: form.note || ''
+    }
+
+    const { data: response, error } = await appointmentAPI.create(payload)
+    setLoading(false)
+
+    if (error) {
+      alert('Đặt lịch không thành công. Vui lòng thử lại.')
+      return
+    }
+
+    next()
+  }
 
   return (
     <CustomerLayout>
@@ -86,10 +142,9 @@ export default function AppointmentService() {
                   <label style={labelStyle}>Khung giờ *</label>
                   <select value={form.time} onChange={update('time')} style={inputStyle}>
                     <option value="">--Chọn khung giờ--</option>
-                    <option>08:30 - 09:30</option>
-                    <option>09:30 - 10:30</option>
-                    <option>13:30 - 15:00</option>
-                    <option>15:00 - 17:00</option>
+                    {timeSlots.map(slot => (
+                      <option key={slot.value} value={slot.value}>{slot.label}</option>
+                    ))}
                   </select>
                 </div>
                 <div style={{ gridColumn: '1 / span 2' }}>
@@ -99,7 +154,9 @@ export default function AppointmentService() {
               </div>
               <div style={rowBtns}>
                 <button style={btnGhost} onClick={back}>Quay lại</button>
-                <button style={btnPrimary} onClick={next}>Xác nhận</button>
+                <button style={btnPrimary} onClick={handleSubmit} disabled={loading}>
+                  {loading ? 'Đang xử lý...' : 'Xác nhận'}
+                </button>
               </div>
             </div>
           )}
