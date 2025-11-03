@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://ec2-54-249-213-61.ap-northeast-1.compute.amazonaws.com:8080/api';
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
 
 async function request(method, path, body, init) {
   const url = path.startsWith('http') ? path : `${BASE_URL}${path}`;
