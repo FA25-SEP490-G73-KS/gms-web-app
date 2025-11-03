@@ -43,21 +43,46 @@ export default function AdminAppointments() {
       return
     }
     
-    if (response && response.result) {
-      const transformed = response.result.map(item => ({
-        id: item.appointmentId,
-        customer: item.customerName,
-        license: item.licensePlate,
-        phone: item.customerPhone,
-        status: statusMap[item.status] || item.status,
-        statusKey: item.status,
-        time: item.timeSlotLabel || '',
-        date: new Date(item.appointmentDate).toLocaleDateString('vi-VN'),
-        serviceType: item.serviceType,
-        note: item.note,
-      }))
-      setData(transformed)
+    let resultArray = []
+    
+    if (response) {
+      if (response.result && response.result.content && Array.isArray(response.result.content)) {
+        resultArray = response.result.content
+      }
+      else if (Array.isArray(response.result)) {
+        resultArray = response.result
+      }
+      else if (Array.isArray(response.data)) {
+        resultArray = response.data
+      }
+      else if (Array.isArray(response)) {
+        resultArray = response
+      }
+      else if (Array.isArray(response.content)) {
+        resultArray = response.content
+      }
+      else if (response.result && typeof response.result === 'object') {
+        if (response.result.items && Array.isArray(response.result.items)) {
+          resultArray = response.result.items
+        } else if (response.result.data && Array.isArray(response.result.data)) {
+          resultArray = response.result.data
+        }
+      }
     }
+    
+    const transformed = resultArray.map(item => ({
+      id: item.appointmentId,
+      customer: item.customerName,
+      license: item.licensePlate,
+      phone: item.customerPhone,
+      status: statusMap[item.status] || item.status,
+      statusKey: item.status,
+      time: item.timeSlotLabel || '',
+      date: new Date(item.appointmentDate).toLocaleDateString('vi-VN'),
+      serviceType: item.serviceType,
+      note: item.note,
+    }))
+    setData(transformed)
   }
 
   const fetchAppointmentDetail = async (id) => {
