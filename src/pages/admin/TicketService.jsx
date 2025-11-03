@@ -44,17 +44,42 @@ export default function TicketService() {
       return
     }
     
-    if (response && response.result) {
-      const transformed = response.result.map(item => ({
-        id: item.serviceTicketId,
-        customer: item.customer?.fullName || 'N/A',
-        license: item.vehicle?.licensePlate || 'N/A',
-        status: 'Chờ thanh toán', // You may need to map actual status
-        createdAt: new Date().toLocaleDateString('vi-VN'),
-        total: 0, // Calculate or get from API
-      }))
-      setData(transformed)
+    let resultArray = []
+    
+    if (response) {
+      if (response.result && response.result.content && Array.isArray(response.result.content)) {
+        resultArray = response.result.content
+      }
+      else if (Array.isArray(response.result)) {
+        resultArray = response.result
+      }
+      else if (Array.isArray(response.data)) {
+        resultArray = response.data
+      }
+      else if (Array.isArray(response)) {
+        resultArray = response
+      }
+      else if (Array.isArray(response.content)) {
+        resultArray = response.content
+      }
+      else if (response.result && typeof response.result === 'object') {
+        if (response.result.items && Array.isArray(response.result.items)) {
+          resultArray = response.result.items
+        } else if (response.result.data && Array.isArray(response.result.data)) {
+          resultArray = response.result.data
+        }
+      }
     }
+    
+    const transformed = resultArray.map(item => ({
+      id: item.serviceTicketId,
+      customer: item.customer?.fullName || 'N/A',
+      license: item.vehicle?.licensePlate || 'N/A',
+      status: item.status || 'Chờ thanh toán',
+      createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+      total: item.total || 0,
+    }))
+    setData(transformed)
   }
 
   const filtered = useMemo(() => {
