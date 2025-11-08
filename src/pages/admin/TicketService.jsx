@@ -1,31 +1,31 @@
+import React, { useMemo, useState, useEffect } from 'react'
+import { Table, Input, Card, Badge, Space, message } from 'antd'
+import { EyeOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import '/src/styles/pages/admin/ticketservice.css'
-import { useMemo, useState, useEffect } from 'react'
 import TicketDetail from './modals/TicketDetail'
 import { serviceTicketAPI } from '../../services/api'
-import { message } from 'antd'
 
-const PAGE_SIZE_OPTIONS = [6, 10, 20]
+const { Search } = Input
 
-const statusClass = (s) => {
-  switch (s) {
+const getStatusConfig = (status) => {
+  switch (status) {
     case 'Huỷ':
-      return 'ts-badge danger'
+      return { status: 'error', text: status }
     case 'Đang sửa chữa':
-      return 'ts-badge info'
+      return { status: 'processing', text: status }
     case 'Chờ báo giá':
-      return 'ts-badge warn'
+      return { status: 'warning', text: status }
     case 'Không duyệt':
-      return 'ts-badge gray'
+      return { status: 'default', text: status }
     default:
-      return 'ts-badge'
+      return { status: 'success', text: status }
   }
 }
 
 export default function TicketService() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
+  const [pageSize, setPageSize] = useState(10)
   const [selected, setSelected] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -90,107 +90,106 @@ export default function TicketService() {
     )
   }, [query, data])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, pageCount)
-  const start = (currentPage - 1) * pageSize
-  const rows = filtered.slice(start, start + pageSize)
-  const go = (p) => () => setPage(Math.max(1, Math.min(pageCount, p)))
-
-  const renderPagination = () => {
-    const items = []
-    items.push(
-      <button key="prev" className="page icon" onClick={go(currentPage - 1)} disabled={currentPage === 1}>‹</button>
-    )
-    items.push(
-      <button key={1} className={`page ${currentPage === 1 ? 'active' : ''}`} onClick={go(1)}>1</button>
-    )
-    if (currentPage > 3) {
-      items.push(<span key="ldots" className="dots">…</span>)
-    }
-    const middle = [currentPage - 1, currentPage, currentPage + 1].filter((p) => p > 1 && p < pageCount)
-    middle.forEach((p) => {
-      items.push(
-        <button key={p} className={`page ${currentPage === p ? 'active' : ''}`} onClick={go(p)}>{p}</button>
+  const columns = [
+    {
+      title: 'STT',
+      dataIndex: 'index',
+      key: 'index',
+      width: 80,
+      render: (_, __, index) => {
+        const current = (page - 1) * pageSize + index + 1
+        return current < 10 ? `0${current}` : current
+      }
+    },
+    {
+      title: 'Khách Hàng',
+      dataIndex: 'customer',
+      key: 'customer',
+      width: 200
+    },
+    {
+      title: 'Biển Số Xe',
+      dataIndex: 'license',
+      key: 'license',
+      width: 150
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: (status) => <Badge {...getStatusConfig(status)} />
+    },
+    {
+      title: 'Ngày Tạo',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 150
+    },
+    {
+      title: 'Tổng Tiền',
+      dataIndex: 'total',
+      key: 'total',
+      width: 150,
+      render: (total) => `${(total || 0).toLocaleString('vi-VN')} VND`
+    },
+    {
+      title: 'Chi tiết',
+      key: 'action',
+      width: 100,
+      render: (_, record) => (
+        <Space>
+          <EyeOutlined
+            style={{ fontSize: '18px', cursor: 'pointer', color: '#1890ff' }}
+            onClick={() => setSelected(record)}
+          />
+        </Space>
       )
-    })
-    if (currentPage < pageCount - 2) {
-      items.push(<span key="rdots" className="dots">…</span>)
     }
-    if (pageCount > 1) {
-      items.push(
-        <button key={pageCount} className={`page ${currentPage === pageCount ? 'active' : ''}`} onClick={go(pageCount)}>{pageCount}</button>
-      )
-    }
-    items.push(
-      <button key="next" className="page icon" onClick={go(currentPage + 1)} disabled={currentPage === pageCount}>›</button>
-    )
-    return items
-  }
+  ]
 
   return (
     <AdminLayout>
-      <div className="admin-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <h2 style={{ margin: 0 }}>Phiếu dịch vụ gần đây:</h2>
-          <div className="search-box">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value) }} placeholder="Tìm kiếm" />
-          </div>
-        </div>
-
-        <div className="admin-table-wrap" style={{ marginTop: 14 }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Khách Hàng</th>
-                <th>Biển Số Xe</th>
-                <th>Trạng Thái</th>
-                <th>Ngày Tạo</th>
-                <th>Tổng Tiền</th>
-                <th>Chi tiết</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, idx) => (
-                <tr key={r.id}>
-                  <td>{start + idx + 1 < 10 ? `0${start + idx + 1}` : start + idx + 1}</td>
-                  <td>{r.customer}</td>
-                  <td>{r.license}</td>
-                  <td><span className={statusClass(r.status)}>{r.status}</span></td>
-                  <td>{r.createdAt}</td>
-                  <td>{(r.total || 0).toLocaleString('vi-VN')}</td>
-                  <td className="icon-cell">
-                    <i className="bi bi-eye action-eye" title="Xem" role="button" onClick={() => setSelected(r)} />
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#666' }}>Hiển thị kết quả:</span>
-            <select value={pageSize} onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)) }}>
-              {PAGE_SIZE_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-          <div className="pagination">{renderPagination()}</div>
-        </div>
-      </div>
+      <Card
+        title={<span style={{ fontSize: '20px', fontWeight: 600 }}>Phiếu dịch vụ gần đây</span>}
+        extra={
+          <Search
+            placeholder="Tìm kiếm"
+            allowClear
+            style={{ width: 300 }}
+            value={query}
+            onChange={(e) => {
+              setPage(1)
+              setQuery(e.target.value)
+            }}
+            onSearch={setQuery}
+          />
+        }
+        style={{ marginBottom: 24 }}
+      >
+        <Table
+          columns={columns}
+          dataSource={filtered.map((item, index) => ({ ...item, key: item.id, index }))}
+          loading={loading}
+          pagination={{
+            current: page,
+            pageSize: pageSize,
+            total: filtered.length,
+            showSizeChanger: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} bản ghi`,
+            onChange: (page, pageSize) => {
+              setPage(page)
+              setPageSize(pageSize)
+            },
+            onShowSizeChange: (current, size) => {
+              setPage(1)
+              setPageSize(size)
+            }
+          }}
+          size="middle"
+        />
+      </Card>
       <TicketDetail open={!!selected} onClose={() => setSelected(null)} data={selected} />
     </AdminLayout>
   )
 }
-
-

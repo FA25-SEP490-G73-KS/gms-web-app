@@ -1,0 +1,227 @@
+:root { 
+  --gold: #CBB081; 
+  --beige: #F5E6D3;
+  --dark-beige: #E8D5B7;
+}
+
+.warehouse-layout {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: #f7f7f8;
+}
+
+.warehouse-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 12px;
+  border-right: 1px solid #eee;
+  background: #fafafa;
+}
+
+.warehouse-brand {
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.warehouse-brand img { 
+  height: 80px; 
+  width: auto; 
+}
+
+.warehouse-nav { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 6px; 
+}
+
+.warehouse-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #444;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.warehouse-nav-item i { 
+  width: 18px; 
+  color: #666; 
+}
+
+.warehouse-nav-item:hover { 
+  background: var(--beige); 
+  color: #222; 
+}
+
+.warehouse-nav-item:hover i { 
+  color: #222; 
+}
+
+.warehouse-nav-item.active { 
+  background: var(--dark-beige); 
+  color: #111; 
+}
+
+.warehouse-nav-item.active i { 
+  color: #111; 
+}
+
+.warehouse-nav-group .caret { 
+  margin-left: auto; 
+  transition: transform .2s ease; 
+  font-size: 12px;
+}
+
+.warehouse-nav-group .caret.rot { 
+  transform: rotate(180deg); 
+}
+
+.submenu { 
+  position: relative; 
+  padding-left: 24px; 
+  display: grid; 
+  gap: 8px; 
+  margin-top: 4px;
+}
+
+.submenu-line { 
+  position: absolute; 
+  top: 0; 
+  bottom: 0; 
+  left: 12px; 
+  width: 2px; 
+  background: var(--dark-beige); 
+  border-radius: 2px; 
+}
+
+.submenu-item { 
+  background: transparent; 
+  border: none; 
+  color: #555; 
+  padding: 8px 12px 8px 30px; 
+  text-align: left; 
+  border-radius: 8px; 
+  cursor: pointer; 
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.submenu-item:hover { 
+  background: rgba(232, 213, 183, 0.3); 
+  color: #222;
+}
+
+.submenu-item.active {
+  background: var(--dark-beige);
+  color: #111;
+  font-weight: 600;
+}
+
+.warehouse-spacer { 
+  flex: 1; 
+}
+
+.warehouse-logout {
+  border: 1px solid #eee;
+  background: #fafafa;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  gap: 10px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.warehouse-logout i { 
+  color: #d1293d; 
+}
+
+.warehouse-logout:hover { 
+  background: #f0f0f2; 
+}
+
+.warehouse-main {
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+
+.warehouse-topbar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e6e8eb;
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 14px;
+}
+
+.warehouse-topbar-left { 
+  display: flex; 
+  align-items: center; 
+  gap: 12px; 
+}
+
+.warehouse-topbar-left img {
+  height: 40px;
+  width: auto;
+}
+
+.brand-gold { 
+  color: #cbb081; 
+  font-weight: 700; 
+}
+
+.brand-strong { 
+  font-weight: 800; 
+}
+
+.greeting { 
+  color: #111; 
+  opacity: .9; 
+}
+
+.warehouse-topbar-right { 
+  display: flex; 
+  align-items: center; 
+  gap: 20px; 
+}
+
+.zalo-badge { 
+  color: #1677ff; 
+  font-weight: 800; 
+  font-size: 18px; 
+}
+
+.user-name { 
+  font-weight: 600; 
+}
+
+.warehouse-card {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 12px;
+  padding: 16px;
+}
+
