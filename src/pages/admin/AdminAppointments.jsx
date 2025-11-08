@@ -1,10 +1,10 @@
+import React, { useMemo, useState, useEffect } from 'react'
+import { Table, Input, Card, Badge, Dropdown, Modal, Descriptions, Tag, Space, message } from 'antd'
+import { EyeOutlined, SearchOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import '/src/styles/pages/admin/admin-appointments.css'
-import { useMemo, useState, useEffect } from 'react'
-import { Modal, Descriptions, Tag, Dropdown, message } from 'antd'
 import { appointmentAPI } from '../../services/api'
 
-const PAGE_SIZE_OPTIONS = [6, 10, 20]
+const { Search } = Input
 
 const STATUS_ITEMS = [
   { key: 'CONFIRMED', label: 'Chờ', color: '#FFB7B7' },
@@ -20,10 +20,23 @@ const statusMap = {
   'OVERDUE': 'Quá hạn',
 }
 
+const getStatusConfig = (status) => {
+  switch (status) {
+    case 'Bị huỷ':
+      return { status: 'error', text: status }
+    case 'Đã đến':
+      return { status: 'success', text: status }
+    case 'Quá hạn':
+      return { status: 'warning', text: status }
+    default:
+      return { status: 'processing', text: status }
+  }
+}
+
 export default function AdminAppointments() {
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(PAGE_SIZE_OPTIONS[0])
+  const [pageSize, setPageSize] = useState(10)
   const [selected, setSelected] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -107,24 +120,6 @@ export default function AdminAppointments() {
     )
   }, [query, data])
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize))
-  const currentPage = Math.min(page, pageCount)
-  const start = (currentPage - 1) * pageSize
-  const rows = filtered.slice(start, start + pageSize)
-
-  const badgeClass = (status) => {
-    switch (status) {
-      case 'Bị huỷ':
-        return 'status-badge status-danger'
-      case 'Đã đến':
-        return 'status-badge status-success'
-      case 'Quá hạn':
-        return 'status-badge status-warning'
-      default:
-        return 'status-badge status-secondary'
-    }
-  }
-
   const updateStatus = async (id, statusKey) => {
     const { error } = await appointmentAPI.updateStatus(id, statusKey)
     if (error) {
@@ -146,119 +141,119 @@ export default function AdminAppointments() {
     })),
   })
 
-  const go = (p) => () => setPage(Math.max(1, Math.min(pageCount, p)))
-
-  const renderPagination = () => {
-    const items = []
-   
-    items.push(
-      <button key="prev" className="page icon" onClick={go(currentPage - 1)} disabled={currentPage === 1}>‹</button>
-    )
-   
-    items.push(
-      <button key={1} className={`page ${currentPage === 1 ? 'active' : ''}`} onClick={go(1)}>1</button>
-    )
-   
-    if (currentPage > 3) {
-      items.push(<span key="ldots" className="dots">…</span>)
-    }
-   
-    const middle = [currentPage - 1, currentPage, currentPage + 1]
-      .filter((p) => p > 1 && p < pageCount)
-    middle.forEach((p) => {
-      items.push(
-        <button key={p} className={`page ${currentPage === p ? 'active' : ''}`} onClick={go(p)}>{p}</button>
-      )
-    })
-    
-    if (currentPage < pageCount - 2) {
-      items.push(<span key="rdots" className="dots">…</span>)
-    }
-  
-    if (pageCount > 1) {
-      items.push(
-        <button key={pageCount} className={`page ${currentPage === pageCount ? 'active' : ''}`} onClick={go(pageCount)}>{pageCount}</button>
-      )
-    }
-   
-    items.push(
-      <button key="next" className="page icon" onClick={go(currentPage + 1)} disabled={currentPage === pageCount}>›</button>
-    )
-    return items
+  const handleViewDetail = async (record) => {
+    setSelected(record)
+    await fetchAppointmentDetail(record.id)
   }
+
+  const columns = [
+    {
+      title: 'STT',
+      dataIndex: 'index',
+      key: 'index',
+      width: 80,
+      render: (_, __, index) => {
+        const current = (page - 1) * pageSize + index + 1
+        return current < 10 ? `0${current}` : current
+      }
+    },
+    {
+      title: 'Khách Hàng',
+      dataIndex: 'customer',
+      key: 'customer',
+      width: 200
+    },
+    {
+      title: 'Biển Số Xe',
+      dataIndex: 'license',
+      key: 'license',
+      width: 150
+    },
+    {
+      title: 'Số điện thoại',
+      dataIndex: 'phone',
+      key: 'phone',
+      width: 150
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: (status, record) => (
+        <Dropdown menu={statusMenu(record)} trigger={['click']}>
+          <Badge {...getStatusConfig(status)} style={{ cursor: 'pointer' }} />
+        </Dropdown>
+      )
+    },
+    {
+      title: 'Lịch hẹn',
+      key: 'appointment',
+      width: 200,
+      render: (_, record) => (
+        <div>
+          <div>{record.time}</div>
+          <div style={{ color: '#9aa0a6', fontSize: '12px' }}>{record.date}</div>
+        </div>
+      )
+    },
+    {
+      title: 'Hành động',
+      key: 'action',
+      width: 100,
+      render: (_, record) => (
+        <Space>
+          <EyeOutlined
+            style={{ fontSize: '18px', cursor: 'pointer', color: '#1890ff' }}
+            onClick={() => handleViewDetail(record)}
+          />
+        </Space>
+      )
+    }
+  ]
 
   return (
     <AdminLayout>
-      <div className="admin-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <h2 style={{ margin: 0 }}>Lịch hẹn</h2>
-          <div className="search-box">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <input value={query} onChange={(e) => { setPage(1); setQuery(e.target.value) }} placeholder="Tìm kiếm" />
-          </div>
-        </div>
+      <Card
+        title={<span style={{ fontSize: '20px', fontWeight: 600 }}>Lịch hẹn</span>}
+        extra={
+          <Search
+            placeholder="Tìm kiếm"
+            allowClear
+            style={{ width: 300 }}
+            value={query}
+            onChange={(e) => {
+              setPage(1)
+              setQuery(e.target.value)
+            }}
+            onSearch={setQuery}
+          />
+        }
+        style={{ marginBottom: 24 }}
+      >
+        <Table
+          columns={columns}
+          dataSource={filtered.map((item, index) => ({ ...item, key: item.id, index }))}
+          loading={loading}
+          pagination={{
+            current: page,
+            pageSize: pageSize,
+            total: filtered.length,
+            showSizeChanger: true,
+            showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} bản ghi`,
+            onChange: (page, pageSize) => {
+              setPage(page)
+              setPageSize(pageSize)
+            },
+            onShowSizeChange: (current, size) => {
+              setPage(1)
+              setPageSize(size)
+            }
+          }}
+          size="middle"
+        />
+      </Card>
 
-        <div className="admin-table-wrap" style={{ marginTop: 14 }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>STT</th>
-                <th>Khách Hàng</th>
-                <th>Biển Số Xe</th>
-                <th>Số điện thoại</th>
-                <th>Trạng Thái</th>
-                <th>Lịch hẹn</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, idx) => (
-                <tr key={r.id}>
-                  <td>{start + idx + 1 < 10 ? `0${start + idx + 1}` : start + idx + 1}</td>
-                  <td>{r.customer}</td>
-                  <td>{r.license}</td>
-                  <td>{r.phone}</td>
-                  <td>
-                    <Dropdown menu={statusMenu(r)} trigger={['click']}>
-                      <span className={badgeClass(r.status)} style={{ cursor: 'pointer' }}>{r.status}</span>
-                    </Dropdown>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                      <span>{r.time}</span>
-                      <small style={{ color: '#9aa0a6' }}>{r.date}</small>
-                    </div>
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <i className="bi bi-eye action-eye" title="Xem" role="button" onClick={async () => { setSelected(r); await fetchAppointmentDetail(r.id) }} />
-                  </td>
-                </tr>
-              ))}
-              {rows.length === 0 && (
-                <tr>
-                  <td colSpan="7" style={{ textAlign: 'center', padding: 24, color: '#888' }}>Không có dữ liệu</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: '#666' }}>Hiển thị kết quả:</span>
-            <select value={pageSize} onChange={(e) => { setPage(1); setPageSize(Number(e.target.value)) }}>
-              {PAGE_SIZE_OPTIONS.map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </div>
-          <div className="pagination">
-            {renderPagination()}
-          </div>
-        </div>
-      </div>
       <Modal
         title="LỊCH HẸN CHI TIẾT"
         open={!!selected}
@@ -269,15 +264,32 @@ export default function AdminAppointments() {
         {(selectedFull || selected) && (
           <>
             <Descriptions bordered column={1} size="middle">
-              <Descriptions.Item label="Tên khách hàng">{selectedFull?.customerName || selected?.customer}</Descriptions.Item>
-              <Descriptions.Item label="Số điện thoại">{selectedFull?.customerPhone || selected?.phone}</Descriptions.Item>
-              <Descriptions.Item label="Biển số xe">{selectedFull?.licensePlate || selected?.license}</Descriptions.Item>
-              <Descriptions.Item label="Ngày hẹn">{selectedFull?.appointmentDate ? new Date(selectedFull.appointmentDate).toLocaleDateString('vi-VN') : selected?.date}</Descriptions.Item>
-              <Descriptions.Item label="Khung giờ">{selectedFull?.timeSlotLabel || selected?.time}</Descriptions.Item>
-              <Descriptions.Item label="Loại dịch vụ">{selectedFull?.serviceType || selected?.serviceType}</Descriptions.Item>
+              <Descriptions.Item label="Tên khách hàng">
+                {selectedFull?.customerName || selected?.customer}
+              </Descriptions.Item>
+              <Descriptions.Item label="Số điện thoại">
+                {selectedFull?.customerPhone || selected?.phone}
+              </Descriptions.Item>
+              <Descriptions.Item label="Biển số xe">
+                {selectedFull?.licensePlate || selected?.license}
+              </Descriptions.Item>
+              <Descriptions.Item label="Ngày hẹn">
+                {selectedFull?.appointmentDate 
+                  ? new Date(selectedFull.appointmentDate).toLocaleDateString('vi-VN') 
+                  : selected?.date}
+              </Descriptions.Item>
+              <Descriptions.Item label="Khung giờ">
+                {selectedFull?.timeSlotLabel || selected?.time}
+              </Descriptions.Item>
+              <Descriptions.Item label="Loại dịch vụ">
+                {selectedFull?.serviceType || selected?.serviceType}
+              </Descriptions.Item>
               <Descriptions.Item label="Trạng thái">
                 <Tag color={
-                  selected.status === 'Bị huỷ' ? 'red' : selected.status === 'Đã đến' ? 'blue' : selected.status === 'Quá hạn' ? 'orange' : 'default'
+                  selected.status === 'Bị huỷ' ? 'red' : 
+                  selected.status === 'Đã đến' ? 'blue' : 
+                  selected.status === 'Quá hạn' ? 'orange' : 
+                  'default'
                 }>
                   {selected.status}
                 </Tag>
@@ -295,6 +307,3 @@ export default function AdminAppointments() {
     </AdminLayout>
   )
 }
-
-
-

@@ -1,0 +1,11 @@
+.parts-list {
+  width: 100%;
+}
+
+.parts-list h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #222;
+}
+

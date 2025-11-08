@@ -1,12 +1,12 @@
-import { Modal, Row, Col, Divider, Select, InputNumber, Button, Tag, Input } from 'antd'
-import { useState } from 'react'
-import '/src/styles/pages/admin/modals/ticketdetail.css'
+import React, { useState } from 'react'
+import { Modal, Row, Col, Divider, Select, InputNumber, Button, Tag, Input, Table, Space, Form } from 'antd'
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 
 const STATUS_OPTIONS = [
-  { label: 'Còn hàng', value: 'Còn hàng', cls: 'green' },
-  { label: 'Cần hàng', value: 'Cần hàng', cls: 'blue' },
-  { label: 'Hết hàng', value: 'Hết hàng', cls: 'orange' },
-  { label: 'Không rõ', value: 'Không rõ', cls: 'gray' },
+  { label: 'Còn hàng', value: 'Còn hàng', color: 'success' },
+  { label: 'Cần hàng', value: 'Cần hàng', color: 'processing' },
+  { label: 'Hết hàng', value: 'Hết hàng', color: 'warning' },
+  { label: 'Không rõ', value: 'Không rõ', color: 'default' },
 ]
 
 const TECHS = [
@@ -17,78 +17,306 @@ const TECHS = [
 ]
 
 export default function TicketDetail({ open, onClose, data }) {
+  const [replaceItems, setReplaceItems] = useState([{ id: 1, name: 'Linh kiện A', qty: 1, status: 'Còn hàng', price: 1000000, total: 1000000 }])
+  const [paintItems, setPaintItems] = useState([{ id: 1, name: 'Linh kiện A', qty: 1, status: 'Còn hàng', price: 1000000, total: 1000000 }])
+  const [form] = Form.useForm()
+
   if (!data) return null
 
-  const headerItem = (label, value) => (
-    <div className="td-kv">
-      <div className="k">{label}</div>
-      <div className="v">{value}</div>
-    </div>
-  )
+  const getStatusTag = (status) => {
+    const option = STATUS_OPTIONS.find(opt => opt.value === status)
+    return option ? { color: option.color, text: status } : { color: 'default', text: status }
+  }
 
-  const tagColor = data.status === 'Huỷ' ? 'red' : data.status === 'Đang sửa chữa' ? 'blue' : data.status === 'Chờ báo giá' ? 'orange' : data.status === 'Không duyệt' ? 'default' : 'green'
+  const tagColor = data.status === 'Huỷ' ? 'red' : 
+                   data.status === 'Đang sửa chữa' ? 'blue' : 
+                   data.status === 'Chờ báo giá' ? 'orange' : 
+                   data.status === 'Không duyệt' ? 'default' : 'green'
 
-  const Line = ({ idx, item, onDelete }) => (
-    <div className="td-line">
-      <div className="c stt">{idx < 10 ? `0${idx}` : idx}</div>
-      <div className="c name"><Input defaultValue={item.name} size="small" placeholder="Tên linh kiện" /></div>
-      <div className="c qty"><InputNumber min={1} defaultValue={item.qty} size="small" /></div>
-      <div className="c status">
-        <Select
-          options={STATUS_OPTIONS.map((o) => ({ value: o.value, label: <span className={`pill ${o.cls}`}>{o.label}</span> }))}
-          defaultValue={STATUS_OPTIONS[0].value}
-          size="small"
-          className="status-select"
-          optionLabelProp="value"
+  const addReplace = () => {
+    setReplaceItems([...replaceItems, { 
+      id: Date.now(), 
+      name: `Linh kiện ${replaceItems.length + 1}`, 
+      qty: 1, 
+      status: 'Còn hàng',
+      price: 0,
+      total: 0
+    }])
+  }
+
+  const addPaint = () => {
+    setPaintItems([...paintItems, { 
+      id: Date.now(), 
+      name: `Linh kiện ${paintItems.length + 1}`, 
+      qty: 1, 
+      status: 'Còn hàng',
+      price: 0,
+      total: 0
+    }])
+  }
+
+  const deleteReplace = (id) => {
+    setReplaceItems(replaceItems.filter(item => item.id !== id))
+  }
+
+  const deletePaint = (id) => {
+    setPaintItems(paintItems.filter(item => item.id !== id))
+  }
+
+  const updateReplaceItem = (id, field, value) => {
+    setReplaceItems(replaceItems.map(item => {
+      if (item.id === id) {
+        const updated = { ...item, [field]: value }
+        if (field === 'qty' || field === 'price') {
+          updated.total = updated.qty * updated.price
+        }
+        return updated
+      }
+      return item
+    }))
+  }
+
+  const updatePaintItem = (id, field, value) => {
+    setPaintItems(paintItems.map(item => {
+      if (item.id === id) {
+        const updated = { ...item, [field]: value }
+        if (field === 'qty' || field === 'price') {
+          updated.total = updated.qty * updated.price
+        }
+        return updated
+      }
+      return item
+    }))
+  }
+
+  const replaceColumns = [
+    {
+      title: 'STT',
+      dataIndex: 'index',
+      key: 'index',
+      width: 60,
+      render: (_, __, index) => index + 1
+    },
+    {
+      title: 'Tên linh kiện',
+      dataIndex: 'name',
+      key: 'name',
+      render: (_, record) => (
+        <Input
+          value={record.name}
+          onChange={(e) => updateReplaceItem(record.id, 'name', e.target.value)}
+          placeholder="Tên linh kiện"
         />
-      </div>
-      <div className="c price">1.000.000</div>
-      <div className="c total">1.000.000</div>
-      <div className="c action" role="button" onClick={onDelete}>×</div>
-    </div>
-  )
+      )
+    },
+    {
+      title: 'Số lượng',
+      dataIndex: 'qty',
+      key: 'qty',
+      width: 100,
+      render: (_, record) => (
+        <InputNumber
+          min={1}
+          value={record.qty}
+          onChange={(value) => updateReplaceItem(record.id, 'qty', value)}
+        />
+      )
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: (_, record) => (
+        <Select
+          value={record.status}
+          onChange={(value) => updateReplaceItem(record.id, 'status', value)}
+          options={STATUS_OPTIONS.map(opt => ({
+            value: opt.value,
+            label: <Tag color={opt.color}>{opt.label}</Tag>
+          }))}
+          style={{ width: '100%' }}
+        />
+      )
+    },
+    {
+      title: 'Đơn giá',
+      dataIndex: 'price',
+      key: 'price',
+      width: 150,
+      render: (_, record) => (
+        <InputNumber
+          min={0}
+          value={record.price}
+          onChange={(value) => updateReplaceItem(record.id, 'price', value)}
+          formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+          parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+          style={{ width: '100%' }}
+        />
+      )
+    },
+    {
+      title: 'Thành tiền',
+      dataIndex: 'total',
+      key: 'total',
+      width: 150,
+      render: (total) => `${(total || 0).toLocaleString('vi-VN')} VND`
+    },
+    {
+      title: 'Hành động',
+      key: 'action',
+      width: 80,
+      render: (_, record) => (
+        <Button
+          type="text"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => deleteReplace(record.id)}
+        />
+      )
+    }
+  ]
 
-  const [replaceItems, setReplaceItems] = useState([{ id: 1, name: 'Linh kiện A', qty: 1 }])
-  const [paintItems, setPaintItems] = useState([{ id: 1, name: 'Linh kiện A', qty: 1 }])
-
-  const addReplace = () => setReplaceItems((arr) => [...arr, { id: Date.now(), name: `Linh kiện ${arr.length + 1}`, qty: 1 }])
-  const addPaint = () => setPaintItems((arr) => [...arr, { id: Date.now(), name: `Linh kiện ${arr.length + 1}`, qty: 1 }])
-  const delFrom = (set) => (id) => set((arr) => arr.filter((x) => x.id !== id))
+  const paintColumns = [
+    {
+      title: 'STT',
+      dataIndex: 'index',
+      key: 'index',
+      width: 60,
+      render: (_, __, index) => index + 1
+    },
+    {
+      title: 'Tên linh kiện',
+      dataIndex: 'name',
+      key: 'name',
+      render: (_, record) => (
+        <Input
+          value={record.name}
+          onChange={(e) => updatePaintItem(record.id, 'name', e.target.value)}
+          placeholder="Tên linh kiện"
+        />
+      )
+    },
+    {
+      title: 'Số lượng',
+      dataIndex: 'qty',
+      key: 'qty',
+      width: 100,
+      render: (_, record) => (
+        <InputNumber
+          min={1}
+          value={record.qty}
+          onChange={(value) => updatePaintItem(record.id, 'qty', value)}
+        />
+      )
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: (_, record) => (
+        <Select
+          value={record.status}
+          onChange={(value) => updatePaintItem(record.id, 'status', value)}
+          options={STATUS_OPTIONS.map(opt => ({
+            value: opt.value,
+            label: <Tag color={opt.color}>{opt.label}</Tag>
+          }))}
+          style={{ width: '100%' }}
+        />
+      )
+    },
+    {
+      title: 'Đơn giá',
+      dataIndex: 'price',
+      key: 'price',
+      width: 150,
+      render: (_, record) => (
+        <InputNumber
+          min={0}
+          value={record.price}
+          onChange={(value) => updatePaintItem(record.id, 'price', value)}
+          formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+          parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+          style={{ width: '100%' }}
+        />
+      )
+    },
+    {
+      title: 'Thành tiền',
+      dataIndex: 'total',
+      key: 'total',
+      width: 150,
+      render: (total) => `${(total || 0).toLocaleString('vi-VN')} VND`
+    },
+    {
+      title: 'Hành động',
+      key: 'action',
+      width: 80,
+      render: (_, record) => (
+        <Button
+          type="text"
+          danger
+          icon={<DeleteOutlined />}
+          onClick={() => deletePaint(record.id)}
+        />
+      )
+    }
+  ]
 
   return (
-    <Modal title="PHIẾU DỊCH VỤ CHI TIẾT" open={open} onCancel={onClose} footer={null} width={960}>
-      <Row gutter={16}>
+    <Modal
+      title="PHIẾU DỊCH VỤ CHI TIẾT"
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width={1200}
+    >
+      <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={12}>
-          <div className="td-box">
-            {headerItem('Tên khách hàng', 'Nguyễn Văn A')}
-            {headerItem('Số điện thoại', '0123456789')}
-            {headerItem('Loại xe', 'Mazda-v3')}
-            {headerItem('Biển số xe', data.license)}
-            {headerItem('Số khung', '1HGCM82633A123456')}
+          <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Tên khách hàng:</strong> Nguyễn Văn A
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Số điện thoại:</strong> 0123456789
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Loại xe:</strong> Mazda-v3
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Biển số xe:</strong> {data?.license}
+            </div>
+            <div>
+              <strong>Số khung:</strong> 1HGCM82633A123456
+            </div>
           </div>
         </Col>
         <Col span={12}>
-          <div className="td-box">
-            {headerItem('Nhân viên lập báo giá', 'Hoàng Văn B')}
-            {headerItem('Ngày tạo báo giá', data.createdAt)}
-            <div className="td-kv">
-              <div className="k">Kỹ thuật viên sửa chữa</div>
-              <div className="v">
-                <Select
-                  mode="multiple"
-                  showSearch
-                  placeholder="Tìm kiếm"
-                  allowClear
-                  options={TECHS.map((t) => ({ value: t, label: t }))}
-                  className="tech-select"
-                  style={{ width: '100%' }}
-                />
-              </div>
+          <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px' }}>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Nhân viên lập báo giá:</strong> Hoàng Văn B
             </div>
-            {headerItem('Loại dịch vụ', 'Thay thế phụ tùng')}
-            <div className="td-kv">
-              <div className="k">Trạng thái</div>
-              <div className="v"><Tag color={tagColor}>{data.status}</Tag></div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Ngày tạo báo giá:</strong> {data?.createdAt}
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Kỹ thuật viên sửa chữa:</strong>
+              <Select
+                mode="multiple"
+                showSearch
+                placeholder="Tìm kiếm"
+                allowClear
+                options={TECHS.map((t) => ({ value: t, label: t }))}
+                style={{ width: '100%', marginTop: '8px' }}
+              />
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <strong>Loại dịch vụ:</strong> Thay thế phụ tùng
+            </div>
+            <div>
+              <strong>Trạng thái:</strong> <Tag color={tagColor}>{data?.status}</Tag>
             </div>
           </div>
         </Col>
@@ -96,47 +324,43 @@ export default function TicketDetail({ open, onClose, data }) {
 
       <Divider orientation="left">BÁO GIÁ CHI TIẾT</Divider>
 
-      <div className="td-section">
-        <div className="td-section-title">Thay thế:</div>
-        <div className="td-head">
-          <div className="h stt">STT</div>
-          <div className="h name">Tên linh kiện</div>
-          <div className="h qty">Số lượng</div>
-          <div className="h status">Trạng thái</div>
-          <div className="h price">Đơn giá</div>
-          <div className="h total">Thành tiền</div>
-          <div className="h action"></div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <strong>Thay thế:</strong>
+          <Button type="primary" icon={<PlusOutlined />} onClick={addReplace} size="small">
+            Thêm
+          </Button>
         </div>
-        {replaceItems.map((it, i) => (
-          <Line key={it.id} idx={i + 1} item={it} onDelete={() => delFrom(setReplaceItems)(it.id)} />
-        ))}
-        <button className="td-add" onClick={addReplace}>+</button>
+        <Table
+          columns={replaceColumns}
+          dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+          pagination={false}
+          size="small"
+        />
       </div>
 
-      <div className="td-section">
-        <div className="td-section-title">Sơn:</div>
-        <div className="td-head">
-          <div className="h stt">STT</div>
-          <div className="h name">Tên linh kiện</div>
-          <div className="h qty">Số lượng</div>
-          <div className="h status">Trạng thái</div>
-          <div className="h price">Đơn giá</div>
-          <div className="h total">Thành tiền</div>
-          <div className="h action"></div>
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <strong>Sơn:</strong>
+          <Button type="primary" icon={<PlusOutlined />} onClick={addPaint} size="small">
+            Thêm
+          </Button>
         </div>
-        {paintItems.map((it, i) => (
-          <Line key={it.id} idx={i + 1} item={it} onDelete={() => delFrom(setPaintItems)(it.id)} />
-        ))}
-        <button className="td-add" onClick={addPaint}>+</button>
+        <Table
+          columns={paintColumns}
+          dataSource={paintItems.map((item, index) => ({ ...item, key: item.id, index }))}
+          pagination={false}
+          size="small"
+        />
       </div>
 
-      <div className="td-actions">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <Button danger type="primary">Gửi</Button>
-        <Button> Lưu</Button>
-        <Button type="primary" style={{ background: '#22c55e' }}>Thanh toán</Button>
+        <Button>Lưu</Button>
+        <Button type="primary" style={{ background: '#22c55e', borderColor: '#22c55e' }}>
+          Thanh toán
+        </Button>
       </div>
     </Modal>
   )
 }
-
-

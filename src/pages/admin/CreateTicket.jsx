@@ -1,8 +1,10 @@
+import React, { useState } from 'react'
+import { Form, Input, DatePicker, Select, Button, Card, Row, Col, Space, message } from 'antd'
+import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../layouts/AdminLayout'
-import '/src/styles/pages/admin/createticket.css'
-import { DatePicker, Select, Input, InputNumber, Button, Tag, message } from 'antd'
-import { useState } from 'react'
 import { serviceTicketAPI } from '../../services/api'
+
+const { TextArea } = Input
 
 const TECHS = [
   { id: 1, name: 'HTK Ly' },
@@ -18,47 +20,36 @@ const SERVICES = [
 ]
 
 export default function CreateTicket() {
-  const [form, setForm] = useState({
-    phone: '', name: '', address: '',
-    plate: '', brand: '', model: '', vin: '',
-    techs: [], service: [],
-    receiveDate: null, note: '', advisorId: 1
-  })
+  const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
-  const onChange = (k) => (e) => setForm({ ...form, [k]: e?.target ? e.target.value : e })
-
-  const handleCreate = async () => {
-    if (!form.phone || !form.name || !form.address || !form.plate || !form.brand || !form.model) {
-      message.error('Vui lòng điền đầy đủ thông tin bắt buộc')
-      return
-    }
-
+  const handleCreate = async (values) => {
     setLoading(true)
     const payload = {
       appointmentId: 0,
-      serviceTypeIds: form.service.map(s => s.value || s),
+      serviceTypeIds: values.service || [],
       customer: {
         customerId: 0,
-        fullName: form.name,
-        phone: form.phone,
-        address: form.address,
+        fullName: values.name,
+        phone: values.phone,
+        address: values.address,
         customerType: 'CA_NHAN',
         loyaltyLevel: 'NORMAL'
       },
       vehicle: {
         vehicleId: 0,
-        licensePlate: form.plate,
+        licensePlate: values.plate,
         brandId: 0,
         modelId: 0,
         year: 0,
-        vin: form.vin || ''
+        vin: values.vin || ''
       },
-      advisorId: form.advisorId,
-      assignedTechnicianIds: form.techs.map(t => t.id || t),
+      advisorId: 1,
+      assignedTechnicianIds: values.techs || [],
       receiveCondition: '',
-      note: form.note || '',
-      expectedDeliveryAt: form.receiveDate ? form.receiveDate.format('YYYY-MM-DD') : ''
+      note: values.note || '',
+      expectedDeliveryAt: values.receiveDate ? values.receiveDate.format('YYYY-MM-DD') : ''
     }
 
     const { data, error } = await serviceTicketAPI.create(payload)
@@ -70,101 +61,148 @@ export default function CreateTicket() {
     }
 
     message.success('Tạo phiếu dịch vụ thành công')
-    // Reset form or redirect
-    setForm({
-      phone: '', name: '', address: '',
-      plate: '', brand: '', model: '', vin: '',
-      techs: [], service: [],
-      receiveDate: null, note: '', advisorId: 1
-    })
+    form.resetFields()
+    navigate('/admin/orders')
   }
 
   return (
     <AdminLayout>
-      <div className="admin-card">
-        <h2 style={{ textAlign:'center', marginTop: 0 }}>PHIẾU DỊCH VỤ</h2>
+      <Card
+        title={<span style={{ fontSize: '20px', fontWeight: 600, textAlign: 'center', display: 'block' }}>PHIẾU DỊCH VỤ</span>}
+        style={{ marginBottom: 24 }}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleCreate}
+        >
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="Số điện thoại"
+                name="phone"
+                rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+              >
+                <Input placeholder="VD: 0123456789" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="Họ và tên"
+                name="name"
+                rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+              >
+                <Input placeholder="VD: Đặng Thị Huyền" />
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <div className="ct-grid">
-          <div className="ct-box">
-            <div className="ct-field">
-              <label>Số điện thoại <span className="req">*</span></label>
-              <Input value={form.phone} onChange={onChange('phone')} placeholder="VD: 0123456789" />
-            </div>
-            <div className="ct-field">
-              <label>Họ và tên <span className="req">*</span></label>
-              <Input value={form.name} onChange={onChange('name')} placeholder="VD: Đặng Thị Huyền" />
-            </div>
-            <div className="ct-field">
-              <label>Địa chỉ <span className="req">*</span></label>
-              <Input value={form.address} onChange={onChange('address')} placeholder="VD: Hòa Lạc - Hà Nội" />
-            </div>
-          </div>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="Địa chỉ"
+                name="address"
+                rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
+              >
+                <Input placeholder="VD: Hòa Lạc - Hà Nội" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="Kỹ thuật viên sửa chữa"
+                name="techs"
+              >
+                <Select
+                  mode="multiple"
+                  options={TECHS.map(t => ({ value: t.id, label: t.name }))}
+                  placeholder="Chọn kỹ thuật viên"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <div className="ct-box">
-            <div className="ct-field">
-              <label>Kỹ thuật viên sửa chữa</label>
-              <Select
-                mode="multiple"
-                value={form.techs}
-                onChange={(v)=>setForm({...form, techs: v})}
-                options={TECHS.map(t=>({ value:t.id, label:t.name }))}
-                style={{ width:'100%' }}
-                placeholder="Chọn kỹ thuật viên"
-              />
-            </div>
-            <div className="ct-field">
-              <label>Ngày nhận xe</label>
-              <DatePicker style={{ width:'100%' }} onChange={(d)=>setForm({...form, receiveDate: d})} />
-            </div>
-            <div className="ct-field">
-              <label>Loại dịch vụ</label>
-              <Select
-                mode="multiple"
-                value={form.service}
-                onChange={(v)=>setForm({...form, service: v})}
-                options={SERVICES}
-                style={{ width:'100%' }}
-              />
-            </div>
-          </div>
-        </div>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                label="Ngày nhận xe"
+                name="receiveDate"
+              >
+                <DatePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                label="Loại dịch vụ"
+                name="service"
+              >
+                <Select
+                  mode="multiple"
+                  options={SERVICES}
+                  placeholder="Chọn loại dịch vụ"
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <div className="ct-grid">
-          <div className="ct-box">
-            <div className="ct-field">
-              <label>Biển số xe <span className="req">*</span></label>
-              <Input value={form.plate} onChange={onChange('plate')} placeholder="VD: 30A-12345" suffix={<span className="caret">▾</span>} />
-            </div>
-            <div className="ct-field">
-              <label>Hãng xe <span className="req">*</span></label>
-              <Input value={form.brand} onChange={onChange('brand')} placeholder="VD: Mazda" suffix={<span className="caret">▾</span>} />
-            </div>
-            <div className="ct-field">
-              <label>Loại xe <span className="req">*</span></label>
-              <Input value={form.model} onChange={onChange('model')} placeholder="VD: Mazda 3" suffix={<span className="caret">▾</span>} />
-            </div>
-            <div className="ct-field">
-              <label>Số khung</label>
-              <Input value={form.vin} onChange={onChange('vin')} placeholder="VD: RL4XW4336B9205813" />
-            </div>
-          </div>
+          <Row gutter={16}>
+            <Col span={6}>
+              <Form.Item
+                label="Biển số xe"
+                name="plate"
+                rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
+              >
+                <Input placeholder="VD: 30A-12345" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                label="Hãng xe"
+                name="brand"
+                rules={[{ required: true, message: 'Vui lòng nhập hãng xe' }]}
+              >
+                <Input placeholder="VD: Mazda" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                label="Loại xe"
+                name="model"
+                rules={[{ required: true, message: 'Vui lòng nhập loại xe' }]}
+              >
+                <Input placeholder="VD: Mazda 3" />
+              </Form.Item>
+            </Col>
+            <Col span={6}>
+              <Form.Item
+                label="Số khung"
+                name="vin"
+              >
+                <Input placeholder="VD: RL4XW4336B9205813" />
+              </Form.Item>
+            </Col>
+          </Row>
 
-          <div className="ct-box">
-            <div className="ct-field">
-              <label>Ghi chú</label>
-              <Input.TextArea rows={8} value={form.note} onChange={onChange('note')} placeholder="VD: Xe bị xì lốp" />
-            </div>
-          </div>
-        </div>
+          <Row gutter={16}>
+            <Col span={24}>
+              <Form.Item
+                label="Ghi chú"
+                name="note"
+              >
+                <TextArea rows={4} placeholder="VD: Xe bị xì lốp" />
+              </Form.Item>
+            </Col>
+          </Row>
 
-        <div className="ct-actions">
-          <Button danger onClick={() => window.location.href = '/admin/orders'}>Hủy</Button>
-          <Button>Lưu</Button>
-          <Button type="primary" style={{ background:'#22c55e' }} loading={loading} onClick={handleCreate}>Tạo phiếu</Button>
-        </div>
-      </div>
+          <Row justify="end">
+            <Space>
+              <Button onClick={() => navigate('/admin/orders')}>Hủy</Button>
+              <Button type="primary" htmlType="submit" loading={loading} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
+                Tạo phiếu
+              </Button>
+            </Space>
+          </Row>
+        </Form>
+      </Card>
     </AdminLayout>
   )
 }
-
-
