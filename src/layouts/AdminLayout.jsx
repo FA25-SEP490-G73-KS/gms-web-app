@@ -72,7 +72,6 @@ export default function AdminLayout({ children }) {
             <span className="greeting">Xin chào!</span>
           </div>
           <div className="admin-topbar-right">
-            <span className="zalo-badge">Zalo</span>
             <i className="bi bi-bell" style={{ fontSize: 18 }}></i>
             <span className="user-name">Tên</span>
           </div>

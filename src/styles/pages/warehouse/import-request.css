@@ -1,0 +1,175 @@
+.import-request {
+  width: 100%;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #222;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box i {
+  position: absolute;
+  left: 12px;
+  color: #999;
+}
+
+.search-box input {
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 250px;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: #CBB081;
+}
+
+.table-container {
+  overflow-x: auto;
+  margin-bottom: 20px;
+}
+
+.import-request-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.import-request-table thead {
+  background: #F5E6D3;
+}
+
+.import-request-table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #222;
+  border-bottom: 2px solid #E8D5B7;
+}
+
+.import-request-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.import-request-table tbody tr:hover {
+  background: #fafafa;
+}
+
+.main-row {
+  cursor: pointer;
+}
+
+.status-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-btn.status-pending {
+  background: #bae0ff;
+  color: #1677ff;
+}
+
+.status-btn.status-imported {
+  background: #bae0ff;
+  color: #1677ff;
+}
+
+.parts-detail {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.parts-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.parts-table thead {
+  background: #fff;
+}
+
+.parts-table th {
+  padding: 10px;
+  text-align: left;
+  font-weight: 600;
+  color: #555;
+  font-size: 13px;
+  border-bottom: 1px solid #eee;
+}
+
+.parts-table td {
+  padding: 10px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.page-btn,
+.page-number {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.page-btn:hover,
+.page-number:hover {
+  background: #f5f5f5;
+}
+
+.page-number.active {
+  background: #222;
+  color: #fff;
+  border-color: #222;
+}
+
+.page-ellipsis {
+  padding: 0 4px;
+  color: #999;
+}
+
