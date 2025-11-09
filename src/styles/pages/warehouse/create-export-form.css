@@ -1,0 +1,23 @@
+.create-export-form {
+  padding: 24px;
+}
+
+.create-export-form .ant-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.create-export-form .parts-table {
+  margin-top: 16px;
+}
+
+.create-export-form .ant-table-small {
+  font-size: 13px;
+}
+
+.create-export-form .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 24px;
+}
+
