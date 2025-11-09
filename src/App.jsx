@@ -8,6 +8,7 @@ import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
 import CreateTicket from './pages/admin/CreateTicket';
 import WarehouseHome from './pages/warehouse/WarehouseHome';
+<<<<<<< Updated upstream
 import WarehouseReport from './pages/warehouse/WarehouseReport';
 import PartsList from './pages/warehouse/PartsList';
 import ImportList from './pages/warehouse/ImportList';
@@ -16,6 +17,9 @@ import CreateImportForm from './pages/warehouse/CreateImportForm';
 import ExportList from './pages/warehouse/ExportList';
 import ExportRequest from './pages/warehouse/ExportRequest';
 import CreateExportForm from './pages/warehouse/CreateExportForm';
+=======
+import ExportRequest from './pages/warehouse/ExportRequest';
+>>>>>>> Stashed changes
 
 function App() {
   return (
@@ -30,6 +34,7 @@ function App() {
         <Route path="/admin/orders" element={<TicketService />} />
         <Route path="/admin/orders/create" element={<CreateTicket />} />
         <Route path="/warehouse" element={<WarehouseHome />} />
+<<<<<<< Updated upstream
         <Route path="/warehouse/report" element={<WarehouseReport />} />
         <Route path="/warehouse/parts" element={<PartsList />} />
         <Route path="/warehouse/import/list" element={<ImportList />} />
@@ -38,6 +43,9 @@ function App() {
         <Route path="/warehouse/export/list" element={<ExportList />} />
         <Route path="/warehouse/export/request" element={<ExportRequest />} />
         <Route path="/warehouse/export/create" element={<CreateExportForm />} />
+=======
+        <Route path="/warehouse/export/request" element={<ExportRequest />} />
+>>>>>>> Stashed changes
       </Routes>
     </Router>
   );
