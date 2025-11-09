@@ -1,75 +1,3 @@
-<<<<<<< Updated upstream
-import React, { useState } from 'react'
-import { Table, Input, Card, Badge, Button } from 'antd'
-import WarehouseLayout from '../../layouts/WarehouseLayout'
-import ComponentDetailsModal from './modals/ComponentDetailsModal'
-
-const { Search } = Input
-
-export default function ExportRequest() {
-  const [selectedComponent, setSelectedComponent] = useState(null)
-  const [searchTerm, setSearchTerm] = useState('')
-
-  const exportRequests = [
-    {
-      id: 1,
-      code: 'STK-2025-000001',
-      vehicleModel: 'Mazda-v3',
-      creator: 'DT Huyền - 190',
-      createDate: '30/10/2025',
-      status: 'Chờ xác nhận'
-    },
-    {
-      id: 2,
-      code: 'STK-2025-000001',
-      vehicleModel: 'Mazda-v3',
-      creator: 'DT Huyền - 190',
-      createDate: '30/10/2025',
-      status: 'Chờ xác nhận'
-    },
-    {
-      id: 3,
-      code: 'STK-2025-000001',
-      vehicleModel: 'Mazda-v3',
-      creator: 'DT Huyền - 190',
-      createDate: '30/10/2025',
-      status: 'Xác nhận'
-    },
-    {
-      id: 4,
-      code: 'STK-2025-000001',
-      vehicleModel: 'Mazda-v3',
-      creator: 'DT Huyền - 190',
-      createDate: '30/10/2025',
-      status: 'Xác nhận'
-    }
-  ]
-
-  const getStatusConfig = (status) => {
-    if (status === 'Xác nhận') {
-      return { color: 'success', text: status }
-    }
-    if (status === 'Chờ xác nhận') {
-      return { color: 'processing', text: status }
-    }
-    return { color: 'default', text: status }
-  }
-
-  const handleViewDetails = () => {
-    setSelectedComponent({
-      name: 'Dầu máy 5W-30',
-      quantity: 5,
-      origin: 'VN',
-      importPrice: '120.000',
-      brand: 'Castrol',
-      sellingPrice: '130.000',
-      vehicleModel: 'Tất cả',
-      status: 'Còn hàng',
-      technician: 'Đặng Thị Huyền - 0123456789'
-    })
-  }
-
-=======
 import React, { useState, useEffect } from 'react'
 import { Table, Input, Card, Badge, Button, Space, message, Modal, Form, InputNumber, Switch } from 'antd'
 import { CheckCircleOutlined, DownOutlined, UpOutlined } from '@ant-design/icons'
@@ -222,21 +150,12 @@ export default function ExportRequest() {
       )
     : data
 
->>>>>>> Stashed changes
   const columns = [
     {
       title: 'STT',
       dataIndex: 'index',
       key: 'index',
       width: 80,
-<<<<<<< Updated upstream
-      render: (_, __, index) => String(index + 1).padStart(2, '0')
-    },
-    {
-      title: 'Code',
-      dataIndex: 'code',
-      key: 'code',
-=======
       render: (_, __, index) => {
         const current = (pagination.current - 1) * pagination.pageSize + index + 1
         return String(current).padStart(2, '0')
@@ -246,16 +165,12 @@ export default function ExportRequest() {
       title: 'Code',
       dataIndex: 'serviceTicketCode',
       key: 'serviceTicketCode',
->>>>>>> Stashed changes
       width: 180
     },
     {
       title: 'Dòng xe',
       dataIndex: 'vehicleModel',
       key: 'vehicleModel',
-<<<<<<< Updated upstream
-      width: 150
-=======
       width: 150,
       render: (vehicleModel, record) => {
         if (record.items && record.items.length > 0) {
@@ -264,21 +179,11 @@ export default function ExportRequest() {
         }
         return vehicleModel || 'Mazda-v3'
       }
->>>>>>> Stashed changes
     },
     {
       title: 'Người tạo',
       dataIndex: 'creator',
       key: 'creator',
-<<<<<<< Updated upstream
-      width: 180
-    },
-    {
-      title: 'Ngày tạo',
-      dataIndex: 'createDate',
-      key: 'createDate',
-      width: 150
-=======
       width: 180,
       render: () => 'DT Huyền - 190'
     },
@@ -288,16 +193,11 @@ export default function ExportRequest() {
       key: 'createdAt',
       width: 150,
       render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : '-'
->>>>>>> Stashed changes
     },
     {
       title: 'Trạng Thái',
       dataIndex: 'status',
       key: 'status',
-<<<<<<< Updated upstream
-      width: 180,
-      render: (status) => <Badge {...getStatusConfig(status)} />
-=======
       width: 200,
       render: (status, record) => (
         <Space>
@@ -357,7 +257,7 @@ export default function ExportRequest() {
       dataIndex: 'warehouseReviewStatus',
       key: 'warehouseReviewStatus',
       width: 150,
-      render: (status, record, index) => {
+      render: (status) => {
         const statusText = ITEM_STATUS_MAP[status] || 'Chờ'
         if (status === 'APPROVED') {
           return (
@@ -369,24 +269,10 @@ export default function ExportRequest() {
         }
         return <Badge {...getItemStatusConfig(status)} />
       }
->>>>>>> Stashed changes
     },
     {
       title: 'Hành động',
       key: 'action',
-<<<<<<< Updated upstream
-      width: 150,
-      render: (_, record) => (
-        <Button
-          type="primary"
-          onClick={handleViewDetails}
-          style={{
-            background: record.status === 'Chờ xác nhận' ? '#52c41a' : '#1677ff',
-            borderColor: record.status === 'Chờ xác nhận' ? '#52c41a' : '#1677ff'
-          }}
-        >
-          {record.status === 'Chờ xác nhận' ? 'Xác nhận' : 'Xem'}
-=======
       width: 120,
       render: (_, record) => (
         <Button
@@ -394,19 +280,11 @@ export default function ExportRequest() {
           onClick={() => handleReviewItem(record.quotationId || record.parentId, record)}
         >
           {record.warehouseReviewStatus === 'APPROVED' ? 'Xem' : 'Xác nhận'}
->>>>>>> Stashed changes
         </Button>
       )
     }
   ]
 
-<<<<<<< Updated upstream
-  const filteredData = exportRequests.filter(item =>
-    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.vehicleModel.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.creator.toLowerCase().includes(searchTerm.toLowerCase())
-  ).map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
-=======
   const expandedRowRender = (record) => {
     if (!record.items || record.items.length === 0) return null
 
@@ -427,7 +305,6 @@ export default function ExportRequest() {
       </div>
     )
   }
->>>>>>> Stashed changes
 
   return (
     <WarehouseLayout>
@@ -447,16 +324,6 @@ export default function ExportRequest() {
       >
         <Table
           columns={columns}
-<<<<<<< Updated upstream
-          dataSource={filteredData}
-          pagination={{
-            current: 2,
-            total: 20,
-            pageSize: 10,
-            showSizeChanger: false,
-            showTotal: (total) => `Tổng ${total} bản ghi`,
-            showQuickJumper: true
-=======
           dataSource={filteredData.map((item, index) => ({ ...item, key: item.priceQuotationId || index, index }))}
           loading={loading}
           expandable={{
@@ -488,24 +355,11 @@ export default function ExportRequest() {
               }))
             },
             hideOnSinglePage: false
->>>>>>> Stashed changes
           }}
           size="middle"
         />
       </Card>
 
-<<<<<<< Updated upstream
-      {selectedComponent && (
-        <ComponentDetailsModal
-          component={selectedComponent}
-          onClose={() => setSelectedComponent(null)}
-          onConfirm={() => {
-            console.log('Confirmed')
-            setSelectedComponent(null)
-          }}
-        />
-      )}
-=======
       <Modal
         title="ĐÁNH GIÁ LINH KIỆN"
         open={reviewModalVisible}
@@ -587,7 +441,6 @@ export default function ExportRequest() {
           </Form>
         )}
       </Modal>
->>>>>>> Stashed changes
     </WarehouseLayout>
   )
 }
