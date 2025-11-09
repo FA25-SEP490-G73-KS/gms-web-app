@@ -1,5 +1,13 @@
 import React from 'react'
-import { Modal, Form, Input, InputNumber, Select, Badge, Row, Col, Space } from 'antd'
+import Modal from 'antd/es/modal'
+import Form from 'antd/es/form'
+import Input from 'antd/es/input'
+import InputNumber from 'antd/es/input-number'
+import Select from 'antd/es/select'
+import Badge from 'antd/es/badge'
+import Row from 'antd/es/row'
+import Col from 'antd/es/col'
+import Space from 'antd/es/space'
 import { CheckCircleOutlined } from '@ant-design/icons'
 
 export default function ComponentDetailsModal({ component, onClose, onConfirm }) {

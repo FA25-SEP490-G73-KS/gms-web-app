@@ -1,40 +1,321 @@
-:root { --gold: #CBB081; --bg: #0f0f0f; }
-.home-hero { background: linear-gradient(180deg, #111 0%, #1a1a1a 100%); padding: 24px 0 36px; }
-.hero-full { max-width: 1200px; margin: 0 auto; padding: 0 5%; }
-.hero-full-img { width: 100%; height: 420px; object-fit: cover; border-radius: 18px; box-shadow: 0 10px 28px rgba(0,0,0,.35); display:block; }
-.hero-inner { max-width: 1200px; margin: 0 auto; padding: 0 5%; display: grid; grid-template-columns: 1.2fr 1.8fr; gap: 24px; align-items: center; }
-.hero-card { background: #222; border-radius: 14px; padding: 18px 20px; color: #eaeaea; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-.hero-mini-logo { height: 56px; width: auto; }
-.hero-logo-line { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
-.hero-brand { color: var(--gold); }
-.hero-brand .brand-top { font-size: 22px; font-weight: 700; line-height: 1; }
-.hero-brand .brand-bottom { font-size: 28px; font-weight: 800; line-height: 1.1; }
-.hero-bullets { color: var(--gold); font-weight: 700; margin: 10px 0 12px; display:flex; gap:8px; align-items:center; }
-.hero-contact .c-row { font-size: 14px; margin: 6px 0; color: #ddd; }
-.hero-image img { width: 100%; height: 360px; object-fit: cover; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+:root { 
+  --gold: #CBB081; 
+  --bg: #0f0f0f;
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
-.home-intro { background: #fff; padding: 28px 0; }
-.home-intro h2 { text-align:center; font-size: 18px; color:#111; margin-bottom: 14px; }
-.home-intro h2 span { color: var(--gold); }
-.intro-text { max-width: 1000px; margin: 0 auto; padding: 0 5%; color:#333; line-height:1.7; }
-.intro-text p { margin: 10px 0; }
-.intro-text .gold { color: var(--gold); font-weight: 700; }
-.intro-quote { color: var(--gold); font-style: italic; font-weight: 700; margin: 12px 0; }
+.home-hero { 
+  background: linear-gradient(180deg, #111 0%, #1a1a1a 100%); 
+  padding: 24px 0 36px; 
+  position: relative;
+}
 
-.home-services { background: #fff; padding: 24px 0 40px; }
-.home-services h3 { text-align:center; color:#111; font-size: 18px; letter-spacing: .5px; margin-bottom: 16px; }
-.service-grid { max-width: 1100px; margin: 0 auto; padding: 0 5%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-.service-card { background:#faf9f6; border-radius: 14px; overflow: hidden; box-shadow:0 6px 18px rgba(0,0,0,.08); }
-.service-card img { width: 100%; height: 220px; object-fit: cover; display:block; }
-.service-card .s-title { text-align:center; font-weight: 800; color:#111; padding: 12px; }
+.hero-full { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 0 5%; 
+}
 
-.home-contact { background: #fff; padding: 20px 0 40px; }
-.contact-box { max-width: 1100px; margin: 0 auto; padding: 0 5%; background:#faf9f6; border-radius: 12px; border: 1px solid #eee; padding: 20px; }
-.contact-box h4 { color:#111; margin-bottom: 8px; }
+.hero-full-img { 
+  width: 100%; 
+  height: 420px; 
+  object-fit: cover; 
+  border-radius: 18px; 
+  box-shadow: 0 10px 28px rgba(0,0,0,.35); 
+  display: block;
+  transition: var(--transition);
+  will-change: transform;
+}
+
+.hero-full-img:hover {
+  transform: scale(1.01);
+}
+
+.hero-inner { 
+  max-width: 1200px; 
+  margin: 0 auto; 
+  padding: 0 5%; 
+  display: grid; 
+  grid-template-columns: 1.2fr 1.8fr; 
+  gap: 24px; 
+  align-items: center; 
+}
+
+.hero-card { 
+  background: #222; 
+  border-radius: 14px; 
+  padding: 18px 20px; 
+  color: #eaeaea; 
+  box-shadow: 0 8px 24px rgba(0,0,0,.25); 
+}
+
+.hero-mini-logo { 
+  height: 56px; 
+  width: auto; 
+}
+
+.hero-logo-line { 
+  display: flex; 
+  align-items: center; 
+  gap: 14px; 
+  margin-bottom: 8px; 
+}
+
+.hero-brand { 
+  color: var(--gold); 
+}
+
+.hero-brand .brand-top { 
+  font-size: 22px; 
+  font-weight: 700; 
+  line-height: 1; 
+}
+
+.hero-brand .brand-bottom { 
+  font-size: 28px; 
+  font-weight: 800; 
+  line-height: 1.1; 
+}
+
+.hero-bullets { 
+  color: var(--gold); 
+  font-weight: 700; 
+  margin: 10px 0 12px; 
+  display: flex; 
+  gap: 8px; 
+  align-items: center; 
+}
+
+.hero-contact .c-row { 
+  font-size: 14px; 
+  margin: 6px 0; 
+  color: #ddd; 
+}
+
+.hero-image img { 
+  width: 100%; 
+  height: 360px; 
+  object-fit: cover; 
+  border-radius: 16px; 
+  box-shadow: 0 8px 24px rgba(0,0,0,.35); 
+}
+
+.home-intro { 
+  background: #fff; 
+  padding: 48px 0;
+  scroll-margin-top: 80px;
+}
+
+.home-intro h1,
+.home-intro h2 { 
+  text-align: center; 
+  font-size: clamp(20px, 4vw, 28px); 
+  color: #111; 
+  margin-bottom: 24px; 
+  line-height: 1.3;
+}
+
+.home-intro h1 span,
+.home-intro h2 span { 
+  color: var(--gold); 
+  display: block;
+  margin-bottom: 8px;
+}
+
+.intro-text { 
+  max-width: 1000px; 
+  margin: 0 auto; 
+  padding: 0 5%; 
+  color: #333; 
+  line-height: 1.8; 
+  font-size: clamp(14px, 2vw, 16px);
+}
+
+.intro-text p { 
+  margin: 16px 0; 
+}
+
+.intro-text .gold,
+.intro-text strong.gold { 
+  color: var(--gold); 
+  font-weight: 700; 
+}
+
+.intro-quote { 
+  color: var(--gold); 
+  font-style: italic; 
+  font-weight: 700; 
+  margin: 24px 0;
+  padding: 20px;
+  background: #faf9f6;
+  border-left: 4px solid var(--gold);
+  border-radius: 8px;
+  font-size: clamp(16px, 2.5vw, 20px);
+  text-align: center;
+}
+
+.home-services { 
+  background: #fff; 
+  padding: 48px 0 60px;
+  scroll-margin-top: 80px;
+}
+
+.home-services h2,
+.home-services h3 { 
+  text-align: center; 
+  color: #111; 
+  font-size: clamp(20px, 4vw, 28px); 
+  letter-spacing: .5px; 
+  margin-bottom: 32px;
+  line-height: 1.3;
+}
+
+.service-grid { 
+  max-width: 1100px; 
+  margin: 0 auto; 
+  padding: 0 5%; 
+  display: grid; 
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); 
+  gap: 24px; 
+}
+
+.service-card { 
+  background: #faf9f6; 
+  border-radius: 14px; 
+  overflow: hidden; 
+  box-shadow: 0 6px 18px rgba(0,0,0,.08); 
+  transition: var(--transition);
+  will-change: transform;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+
+.service-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(0,0,0,.15);
+  border-color: var(--gold);
+}
+
+.service-card:focus-within {
+  outline: 3px solid var(--gold);
+  outline-offset: 4px;
+}
+
+.service-card img,
+.service-image { 
+  width: 100%; 
+  height: 220px; 
+  object-fit: cover; 
+  display: block;
+  transition: var(--transition);
+}
+
+.service-card:hover .service-image {
+  transform: scale(1.05);
+}
+
+.service-card .s-title { 
+  text-align: center; 
+  font-weight: 800; 
+  color: #111; 
+  padding: 16px 12px;
+  font-size: clamp(16px, 2vw, 20px);
+  margin: 0;
+}
+
+.home-contact { 
+  background: #fff; 
+  padding: 20px 0 40px; 
+}
+
+.contact-box { 
+  max-width: 1100px; 
+  margin: 0 auto; 
+  padding: 0 5%; 
+  background: #faf9f6; 
+  border-radius: 12px; 
+  border: 1px solid #eee; 
+  padding: 20px; 
+}
+
+.contact-box h4 { 
+  color: #111; 
+  margin-bottom: 8px; 
+}
 
 @media (max-width: 960px) {
-  .hero-inner { grid-template-columns: 1fr; }
-  .hero-image img { height: 260px; }
-  .hero-full-img { height: 260px; }
-  .service-grid { grid-template-columns: 1fr; }
+  .hero-inner { 
+    grid-template-columns: 1fr; 
+  }
+  
+  .hero-image img { 
+    height: 260px; 
+  }
+  
+  .hero-full-img { 
+    height: 280px; 
+  }
+  
+  .service-grid { 
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+  
+  .home-intro {
+    padding: 32px 0;
+  }
+  
+  .home-services {
+    padding: 32px 0 48px;
+  }
+  
+  .intro-text {
+    padding: 0 4%;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-full-img {
+    height: 240px;
+    border-radius: 12px;
+  }
+  
+  .service-card img,
+  .service-image {
+    height: 200px;
+  }
+  
+  .intro-quote {
+    padding: 16px;
+    margin: 20px 0;
+  }
+  
+  .home-intro h1,
+  .home-intro h2,
+  .home-services h2,
+  .home-services h3 {
+    font-size: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .hero-full-img:hover,
+  .service-card:hover .service-image {
+    transform: none;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .home-intro,
+  .home-services {
+    background: #fafafa;
+  }
 }
