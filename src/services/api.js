@@ -53,3 +53,16 @@ export const serviceTicketAPI = {
   update: (id, data) => put(`/service-tickets/${id}`, data),
 };
 
+export const warehouseAPI = {
+  getPendingQuotations: (params) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page);
+    if (params?.size) queryParams.append('size', params.size);
+    const query = queryParams.toString();
+    return get(`/warehouse/quotations/pending${query ? `?${query}` : ''}`);
+  },
+  getQuotationById: (id) => get(`/warehouse/quotations/${id}`),
+  updateQuotationStatus: (id, status) => patch(`/warehouse/quotations/${id}/status`, { status }),
+  reviewQuotationItem: (quotationId, reviewData) => patch(`/warehouse/quotations/${quotationId}/review`, reviewData),
+};
+
