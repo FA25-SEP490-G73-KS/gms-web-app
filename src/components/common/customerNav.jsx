@@ -8,6 +8,7 @@ export default function CustomerNav() {
     { label: 'Trang chủ', to: '/#home' },
     { label: 'Giới thiệu', to: '/about' },
     { label: 'Dịch vụ', to: '/#services' },
+    { label: 'Blog', to: '/blog' },
     { label: 'Liên hệ', to: '/contact' },
   ]
 

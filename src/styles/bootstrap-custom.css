@@ -1,0 +1,9 @@
+@import 'bootstrap-icons/font/bootstrap-icons.css';
+
+/* Only import Bootstrap utilities that are actually used */
+/* If Bootstrap CSS is needed, import only specific parts */
+
+/* Bootstrap Icons are imported above */
+/* Bootstrap CSS full import is kept in main.jsx for compatibility */
+/* In production, consider using PurgeCSS to remove unused CSS */
+

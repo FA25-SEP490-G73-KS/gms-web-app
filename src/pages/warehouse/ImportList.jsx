@@ -1,5 +1,8 @@
 import React, { useState } from 'react'
-import { Table, Input, Card, Badge } from 'antd'
+import Table from 'antd/es/table'
+import Input from 'antd/es/input'
+import Card from 'antd/es/card'
+import Badge from 'antd/es/badge'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 
 const { Search } = Input
