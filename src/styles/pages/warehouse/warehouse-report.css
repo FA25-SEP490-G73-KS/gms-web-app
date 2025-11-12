@@ -1,0 +1,11 @@
+.warehouse-report {
+  width: 100%;
+}
+
+.warehouse-report h2 {
+  margin: 0 0 16px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #222;
+}
+
