@@ -7,6 +7,7 @@ import AdminHome from './pages/admin/AdminHome';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
 import CreateTicket from './pages/admin/CreateTicket';
+import Inventory from './pages/admin/Inventory';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/admin/appointments" element={<AdminAppointments />} />
         <Route path="/admin/orders" element={<TicketService />} />
         <Route path="/admin/orders/create" element={<CreateTicket />} />
+        <Route path="/admin/inventory" element={<Inventory />} />
       </Routes>
     </Router>
   );

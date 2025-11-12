@@ -38,6 +38,10 @@ export async function patch(path, body, init) {
   return request('PATCH', path, body, init);
 }
 
+export async function del(path, init) {
+  return request('DELETE', path, null, init);
+}
+
 export const appointmentAPI = {
   getAll: () => get('/appointments'),
   getById: (id) => get(`/appointments/${id}`),
@@ -51,5 +55,13 @@ export const serviceTicketAPI = {
   getById: (id) => get(`/service-tickets/${id}`),
   create: (data) => post('/service-tickets', data),
   update: (id, data) => put(`/service-tickets/${id}`, data),
+};
+
+export const inventoryAPI = {
+  getAll: () => get('/inventory'),
+  getById: (id) => get(`/inventory/${id}`),
+  create: (data) => post('/inventory', data),
+  update: (id, data) => put(`/inventory/${id}`, data),
+  delete: (id) => del(`/inventory/${id}`),
 };
 

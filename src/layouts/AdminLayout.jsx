@@ -8,8 +8,10 @@ export default function AdminLayout({ children }) {
   const [openService, setOpenService] = useState(false)
 
   const items = [
-    { key: 'dashboard', label: 'Báo cáo', to: '/admin', icon: 'bi-grid' },
+    { key: 'dashboard', label: 'Doanh thu', to: '/admin', icon: 'bi-grid' },
     { key: 'appointments', label: 'Lịch hẹn', to: '/admin/appointments', icon: 'bi-calendar3' },
+    { key: 'account', label: 'Tài khoản', to: '/admin/account', icon: 'bi-wrench' },
+    { key: 'inventory', label: 'Tồn kho', to: '/admin/inventory', icon: 'bi-box' },
   ]
 
   const isActive = (to) => location.pathname === to
