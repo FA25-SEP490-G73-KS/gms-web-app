@@ -1,8 +1,8 @@
+import React, { useMemo, useState, useEffect } from 'react'
 import AdminLayout from '../../layouts/AdminLayout'
-import '../../styles/pages/admin/inventory.css'
-import { useMemo, useState, useEffect } from 'react'
 import { inventoryAPI } from '../../services/api'
 import { message } from 'antd'
+import '../../styles/pages/admin/inventory.css'
 
 const PAGE_SIZE_OPTIONS = [6, 10, 20]
 

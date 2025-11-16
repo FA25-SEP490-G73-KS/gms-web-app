@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Table, Input, Card, Badge, Space, Button } from 'antd'
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
+import { goldTableHeader } from '../../utils/tableComponents'
 
 const { Search } = Input
 
@@ -166,6 +167,7 @@ export default function PartsList() {
             showQuickJumper: true
           }}
           size="middle"
+          components={goldTableHeader}
         />
       </Card>
     </WarehouseLayout>

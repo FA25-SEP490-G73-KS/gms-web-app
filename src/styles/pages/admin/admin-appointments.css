@@ -1,7 +1,7 @@
 .admin-table-wrap { overflow: auto; border: 1px solid #eee; border-radius: 10px; }
 .admin-table { width: 100%; border-collapse: collapse; background: #fff; }
 .admin-table thead th {
-  font-weight: 700; text-align: left; padding: 12px 14px; color: #666; background: #fafafa; border-bottom: 1px solid #eee;
+  font-weight: 700; text-align: left; padding: 12px 14px; color: #111; background: #CBB081; border-bottom: 1px solid #eee;
 }
 .admin-table tbody td { padding: 14px; border-bottom: 1px solid #f0f0f2; }
 .admin-table tbody tr:hover { background: #fcfcfd; }
@@ -38,5 +38,46 @@
 .kv .k { font-weight: 700; color: #333; }
 .kv .v { color: #111; }
 .box-note { border: 1px solid #f0f0f2; border-radius: 10px; padding: 12px; background: #fff; }
+
+/* Timeline */
+.appointment-timeline {
+  position: relative;
+  padding-left: 20px;
+}
+
+.timeline-item {
+  position: relative;
+  padding-bottom: 20px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 20px;
+  bottom: -20px;
+  width: 2px;
+  background: #e6e6e6;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffd65a;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 2px #ffd65a;
+  z-index: 1;
+}
+
+.timeline-content {
+  margin-left: 24px;
+  flex: 1;
+}
 
 

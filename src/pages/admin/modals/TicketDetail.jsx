@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Modal, Row, Col, Divider, Select, InputNumber, Button, Tag, Input, Table, Space, Form } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, CloseOutlined } from '@ant-design/icons'
+import { goldTableHeader } from '../../../utils/tableComponents'
 
 const STATUS_OPTIONS = [
   { label: 'Còn hàng', value: 'Còn hàng', color: 'success' },
@@ -272,6 +273,8 @@ export default function TicketDetail({ open, onClose, data }) {
       onCancel={onClose}
       footer={null}
       width={1200}
+      closable={true}
+      closeIcon={<CloseOutlined />}
     >
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={12}>
@@ -336,6 +339,7 @@ export default function TicketDetail({ open, onClose, data }) {
           dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
           pagination={false}
           size="small"
+          components={goldTableHeader}
         />
       </div>
 
@@ -351,6 +355,7 @@ export default function TicketDetail({ open, onClose, data }) {
           dataSource={paintItems.map((item, index) => ({ ...item, key: item.id, index }))}
           pagination={false}
           size="small"
+          components={goldTableHeader}
         />
       </div>
 

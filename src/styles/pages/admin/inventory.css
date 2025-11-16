@@ -250,3 +250,12 @@
   }
 }
 
+/* Table styles - shared with admin-appointments */
+.admin-table-wrap { overflow: auto; border: 1px solid #eee; border-radius: 10px; }
+.admin-table { width: 100%; border-collapse: collapse; background: #fff; }
+.admin-table thead th {
+  font-weight: 700; text-align: left; padding: 12px 14px; color: #111; background: #CBB081; border-bottom: 1px solid #eee;
+}
+.admin-table tbody td { padding: 14px; border-bottom: 1px solid #f0f0f2; }
+.admin-table tbody tr:hover { background: #fcfcfd; }
+

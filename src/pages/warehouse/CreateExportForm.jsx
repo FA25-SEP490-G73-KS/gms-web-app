@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Form, Input, InputNumber, Select, DatePicker, Button, Card, Row, Col, Table, Space, message, Badge } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
+import { goldTableHeader } from '../../utils/tableComponents'
 
 const { TextArea } = Input
 
@@ -270,6 +271,7 @@ export default function CreateExportForm() {
               dataSource={parts.map((part, index) => ({ ...part, index: index + 1 }))}
               pagination={false}
               size="small"
+              components={goldTableHeader}
             />
           </Card>
 
