@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Table, Input, Card, Badge } from 'antd'
 import { CheckCircleOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
+import { goldTableHeader } from '../../utils/tableComponents'
 
 const { Search } = Input
 
@@ -189,6 +190,7 @@ export default function ImportRequest() {
         pagination={false}
         size="small"
         style={{ background: '#fafafa' }}
+        components={goldTableHeader}
       />
     )
   }
@@ -233,6 +235,7 @@ export default function ImportRequest() {
             showQuickJumper: true
           }}
           size="middle"
+          components={goldTableHeader}
         />
       </Card>
     </WarehouseLayout>

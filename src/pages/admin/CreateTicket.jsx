@@ -62,147 +62,121 @@ export default function CreateTicket() {
 
     message.success('Tạo phiếu dịch vụ thành công')
     form.resetFields()
-    navigate('/admin/orders')
+    navigate('/service-advisor/orders')
   }
 
   return (
     <AdminLayout>
-      <Card
-        title={<span style={{ fontSize: '20px', fontWeight: 600, textAlign: 'center', display: 'block' }}>PHIẾU DỊCH VỤ</span>}
-        style={{ marginBottom: 24 }}
-      >
-        <Form
-          form={form}
-          layout="vertical"
-          onFinish={handleCreate}
+      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+        <Card
+          title={<span style={{ fontSize: '20px', fontWeight: 600 }}>Tạo phiếu dịch vụ</span>}
+          style={{ borderRadius: '12px' }}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="Số điện thoại"
-                name="phone"
-                rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
-              >
-                <Input placeholder="VD: 0123456789" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Họ và tên"
-                name="name"
-                rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
-              >
-                <Input placeholder="VD: Đặng Thị Huyền" />
-              </Form.Item>
-            </Col>
-          </Row>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreate}
+          >
+            <Row gutter={24}>
+              <Col span={12}>
+                <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin khách hàng</h3>
+                <Form.Item
+                  label="Số điện thoại"
+                  name="phone"
+                  rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+                >
+                  <Input placeholder="VD: 0123456789" />
+                </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="Địa chỉ"
-                name="address"
-                rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
-              >
-                <Input placeholder="VD: Hòa Lạc - Hà Nội" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Kỹ thuật viên sửa chữa"
-                name="techs"
-              >
-                <Select
-                  mode="multiple"
-                  options={TECHS.map(t => ({ value: t.id, label: t.name }))}
-                  placeholder="Chọn kỹ thuật viên"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+                <Form.Item
+                  label="Họ và tên"
+                  name="name"
+                  rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+                >
+                  <Input placeholder="VD: Đặng Thị Huyền" />
+                </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                label="Ngày nhận xe"
-                name="receiveDate"
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                label="Loại dịch vụ"
-                name="service"
-              >
-                <Select
-                  mode="multiple"
-                  options={SERVICES}
-                  placeholder="Chọn loại dịch vụ"
-                />
-              </Form.Item>
-            </Col>
-          </Row>
+                <Form.Item
+                  label="Địa chỉ"
+                  name="address"
+                  rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
+                >
+                  <Input placeholder="VD: Hòa Lạc - Hà Nội" />
+                </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={6}>
-              <Form.Item
-                label="Biển số xe"
-                name="plate"
-                rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
-              >
-                <Input placeholder="VD: 30A-12345" />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label="Hãng xe"
-                name="brand"
-                rules={[{ required: true, message: 'Vui lòng nhập hãng xe' }]}
-              >
-                <Input placeholder="VD: Mazda" />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label="Loại xe"
-                name="model"
-                rules={[{ required: true, message: 'Vui lòng nhập loại xe' }]}
-              >
-                <Input placeholder="VD: Mazda 3" />
-              </Form.Item>
-            </Col>
-            <Col span={6}>
-              <Form.Item
-                label="Số khung"
-                name="vin"
-              >
-                <Input placeholder="VD: RL4XW4336B9205813" />
-              </Form.Item>
-            </Col>
-          </Row>
+                <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin xe</h3>
+                <Form.Item
+                  label="Biển số xe"
+                  name="plate"
+                  rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
+                >
+                  <Input placeholder="VD: 30A-12345" />
+                </Form.Item>
 
-          <Row gutter={16}>
-            <Col span={24}>
-              <Form.Item
-                label="Ghi chú"
-                name="note"
-              >
-                <TextArea rows={4} placeholder="VD: Xe bị xì lốp" />
-              </Form.Item>
-            </Col>
-          </Row>
+                <Form.Item
+                  label="Hãng xe"
+                  name="brand"
+                  rules={[{ required: true, message: 'Vui lòng nhập hãng xe' }]}
+                >
+                  <Input placeholder="VD: Mazda" />
+                </Form.Item>
 
-          <Row justify="end">
-            <Space>
-              <Button onClick={() => navigate('/admin/orders')}>Hủy</Button>
-              <Button type="primary" htmlType="submit" loading={loading} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
-                Tạo phiếu
-              </Button>
-            </Space>
-          </Row>
-        </Form>
-      </Card>
+                <Form.Item
+                  label="Loại xe"
+                  name="model"
+                  rules={[{ required: true, message: 'Vui lòng nhập loại xe' }]}
+                >
+                  <Input placeholder="VD: Mazda 3" />
+                </Form.Item>
+
+                <Form.Item
+                  label="Số khung"
+                  name="vin"
+                >
+                  <Input placeholder="VD: RL4XW430089206813" />
+                </Form.Item>
+              </Col>
+
+              <Col span={12}>
+                <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
+                <Form.Item
+                  label="Kỹ thuật viên sửa chữa"
+                  name="techs"
+                >
+                  <Select
+                    mode="multiple"
+                    options={TECHS.map(t => ({ value: t.id, label: t.name }))}
+                    placeholder="Chọn kỹ thuật viên"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Ngày nhận xe"
+                  name="receiveDate"
+                >
+                  <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                </Form.Item>
+
+                <Form.Item
+                  label="Ghi chú"
+                  name="note"
+                >
+                  <TextArea rows={6} placeholder="Nhập ghi chú..." />
+                </Form.Item>
+
+                <Row justify="end" style={{ marginTop: '32px' }}>
+                  <Space>
+                    <Button onClick={() => navigate('/service-advisor/orders')}>Hủy</Button>
+                    <Button type="primary" htmlType="submit" loading={loading} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
+                      Tạo phiếu
+                    </Button>
+                  </Space>
+                </Row>
+              </Col>
+            </Row>
+          </Form>
+        </Card>
+      </div>
     </AdminLayout>
   )
 }

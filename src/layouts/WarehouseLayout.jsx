@@ -99,7 +99,7 @@ export default function WarehouseLayout({ children }) {
                   className={`submenu-item ${isActive('/warehouse/export/request') ? 'active' : ''}`}
                   onClick={() => navigate('/warehouse/export/request')}
                 >
-                  Yêu cầu xuất hàng
+                  Xác nhận báo giá
                 </button>
                 <button 
                   className={`submenu-item ${isActive('/warehouse/export/create') ? 'active' : ''}`}
