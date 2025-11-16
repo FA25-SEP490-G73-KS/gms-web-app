@@ -9,6 +9,18 @@
   display: grid;
   grid-template-columns: 240px 1fr;
   background: #f7f7f8;
+  transition: grid-template-columns 0.3s ease;
+}
+
+.warehouse-layout.sidebar-collapsed {
+  grid-template-columns: 0 1fr;
+}
+
+.warehouse-layout.sidebar-collapsed .warehouse-sidebar {
+  overflow: hidden;
+  width: 0;
+  padding: 0;
+  border: none;
 }
 
 .warehouse-sidebar {
@@ -180,42 +192,76 @@
 .warehouse-topbar-left { 
   display: flex; 
   align-items: center; 
-  gap: 12px; 
+  gap: 16px; 
 }
 
-.warehouse-topbar-left img {
-  height: 40px;
-  width: auto;
+.sidebar-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #666;
+  font-size: 18px;
+  transition: all 0.2s ease;
 }
 
-.brand-gold { 
-  color: #cbb081; 
-  font-weight: 700; 
+.sidebar-toggle-btn:hover {
+  background: #f5f5f5;
+  color: #333;
 }
 
-.brand-strong { 
-  font-weight: 800; 
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.greeting { 
-  color: #111; 
-  opacity: .9; 
+.breadcrumb-item {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.breadcrumb-separator {
+  color: #999;
+  font-size: 12px;
+}
+
+.breadcrumb-current {
+  color: #111;
+  font-weight: 600;
+  font-size: 14px;
 }
 
 .warehouse-topbar-right { 
   display: flex; 
   align-items: center; 
-  gap: 20px; 
+  gap: 12px; 
 }
 
-.zalo-badge { 
-  color: #1677ff; 
-  font-weight: 800; 
-  font-size: 18px; 
+.notification-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #666;
+  font-size: 18px;
+  transition: all 0.2s ease;
 }
 
-.user-name { 
-  font-weight: 600; 
+.notification-btn:hover {
+  background: #f5f5f5;
+  color: #333;
 }
 
 .warehouse-card {

@@ -7,6 +7,7 @@ export default function WarehouseLayout({ children }) {
   const location = useLocation()
   const [openImport, setOpenImport] = useState(location.pathname.startsWith('/warehouse/import'))
   const [openExport, setOpenExport] = useState(location.pathname.startsWith('/warehouse/export'))
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
@@ -20,8 +21,33 @@ export default function WarehouseLayout({ children }) {
     }
   }, [location.pathname])
 
+  // Breadcrumb mapping based on route
+  const getBreadcrumb = () => {
+    const path = location.pathname
+    if (path.startsWith('/warehouse/export/request')) {
+      return { parent: 'Xuất kho', current: 'Yêu cầu xuất hàng' }
+    } else if (path.startsWith('/warehouse/export/list')) {
+      return { parent: 'Xuất kho', current: 'Danh sách xuất' }
+    } else if (path.startsWith('/warehouse/export/create')) {
+      return { parent: 'Xuất kho', current: 'Tạo phiếu' }
+    } else if (path.startsWith('/warehouse/import/request')) {
+      return { parent: 'Nhập kho', current: 'Yêu cầu nhập hàng' }
+    } else if (path.startsWith('/warehouse/import/list')) {
+      return { parent: 'Nhập kho', current: 'Danh sách nhập' }
+    } else if (path.startsWith('/warehouse/import/create')) {
+      return { parent: 'Nhập kho', current: 'Tạo phiếu' }
+    } else if (path.startsWith('/warehouse/parts')) {
+      return { parent: '', current: 'Danh sách linh kiện' }
+    } else if (path.startsWith('/warehouse/report')) {
+      return { parent: '', current: 'Báo cáo' }
+    }
+    return { parent: '', current: 'Trang chủ' }
+  }
+
+  const breadcrumb = getBreadcrumb()
+
   return (
-    <div className="warehouse-layout">
+    <div className={`warehouse-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="warehouse-sidebar">
         <div className="warehouse-brand" onClick={() => navigate('/warehouse')}>
           <img src="/image/mainlogo.png" alt="Logo" />
@@ -121,14 +147,27 @@ export default function WarehouseLayout({ children }) {
       <main className="warehouse-main">
         <div className="warehouse-topbar">
           <div className="warehouse-topbar-left">
-            <img src="/image/mainlogo.png" alt="Logo" style={{ height: 40, width: 'auto' }} />
-            <span className="brand-gold">Garage</span>
-            <span className="brand-strong">Hoàng Tuấn</span>
-            <span className="greeting">Xin chào!</span>
+            <button 
+              className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
+            </button>
+            {breadcrumb.parent && (
+              <div className="breadcrumb">
+                <span className="breadcrumb-item">{breadcrumb.parent}</span>
+                <i className="bi bi-chevron-right breadcrumb-separator"></i>
+                <span className="breadcrumb-item breadcrumb-current">{breadcrumb.current}</span>
+              </div>
+            )}
+            {!breadcrumb.parent && (
+              <span className="breadcrumb-current">{breadcrumb.current}</span>
+            )}
           </div>
           <div className="warehouse-topbar-right">
-            <i className="bi bi-bell" style={{ fontSize: 18 }}></i>
-            <span className="user-name">Tên</span>
+            <button className="notification-btn">
+              <i className="bi bi-bell"></i>
+            </button>
           </div>
         </div>
         {children}
