@@ -14,6 +14,7 @@ import message from 'antd/es/message'
 import Badge from 'antd/es/badge'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
+import { goldTableHeader } from '../../utils/tableComponents'
 
 const { TextArea } = Input
 
@@ -282,6 +283,7 @@ export default function CreateExportForm() {
               dataSource={parts.map((part, index) => ({ ...part, index: index + 1 }))}
               pagination={false}
               size="small"
+              components={goldTableHeader}
             />
           </Card>
 

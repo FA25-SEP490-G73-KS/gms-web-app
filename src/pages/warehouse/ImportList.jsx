@@ -4,6 +4,7 @@ import Input from 'antd/es/input'
 import Card from 'antd/es/card'
 import Badge from 'antd/es/badge'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
+import { goldTableHeader } from '../../utils/tableComponents'
 
 const { Search } = Input
 
@@ -126,6 +127,7 @@ export default function ImportList() {
             showQuickJumper: true
           }}
           size="middle"
+          components={goldTableHeader}
         />
       </Card>
     </WarehouseLayout>

@@ -1,16 +1,5 @@
 import React, { useState } from 'react'
-import Modal from 'antd/es/modal'
-import Row from 'antd/es/row'
-import Col from 'antd/es/col'
-import Divider from 'antd/es/divider'
-import Select from 'antd/es/select'
-import InputNumber from 'antd/es/input-number'
-import Button from 'antd/es/button'
-import Tag from 'antd/es/tag'
-import Input from 'antd/es/input'
-import Table from 'antd/es/table'
-import Space from 'antd/es/space'
-import Form from 'antd/es/form'
+import { Modal, Row, Col, Divider, Select, InputNumber, Button, Tag, Input, Table, Space, Form } from 'antd'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 
 const STATUS_OPTIONS = [
