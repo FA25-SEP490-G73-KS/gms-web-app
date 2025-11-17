@@ -66,48 +66,56 @@ export default function TicketService() {
     const fallbackData = [
       {
         id: 1,
-        code: 'STK-2025-000001',
+        code: 'APT-2025-000001',
         customer: 'Phạm Văn A',
         license: '25A-123456',
-        status: 'CREATED',
-        statusKey: 'CREATED',
+        status: 'Hoàn thành',
+        statusKey: 'COMPLETED',
         createdAt: '13/10/2025',
+        deliveryDate: '13/10/2025',
+        warrantyStatus: 'pending',
         total: 0,
         rawData: {}
       },
       {
         id: 2,
-        code: 'STK-2025-000001',
+        code: 'APT-2025-000002',
         customer: 'Phạm Văn A',
         license: '25A-123456',
-        status: 'WAITING_QUOTE',
-        statusKey: 'WAITING_QUOTE',
+        status: 'Hoàn thành',
+        statusKey: 'COMPLETED',
         createdAt: '13/10/2025',
+        deliveryDate: '13/10/2025',
+        warrantyStatus: 'pending',
         total: 0,
         rawData: {}
       },
       {
         id: 3,
-        code: 'STK-2025-000001',
+        code: 'APT-2025-000003',
         customer: 'Phạm Văn A',
         license: '25A-123456',
-        status: 'WAITING_HANDOVER',
-        statusKey: 'WAITING_HANDOVER',
+        status: 'Hoàn thành',
+        statusKey: 'COMPLETED',
         createdAt: '13/10/2025',
+        deliveryDate: '13/10/2025',
+        warrantyStatus: 'done',
         total: 0,
         rawData: {}
       },
       {
         id: 4,
-        code: 'STK-2025-000001',
+        code: 'APT-2025-000004',
         customer: 'Phạm Văn A',
         license: '25A-123456',
-        status: 'CANCELLED',
-        statusKey: 'CANCELLED',
+        status: 'Hoàn thành',
+        statusKey: 'COMPLETED',
         createdAt: '13/10/2025',
+        deliveryDate: '13/10/2025',
+        warrantyStatus: 'pending',
         total: 0,
         rawData: {}
-      },
+      }
     ]
     
     if (error || !response) {
@@ -158,6 +166,8 @@ export default function TicketService() {
       status: item.status || 'CREATED',
       statusKey: item.status || 'CREATED',
       createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+      deliveryDate: item.deliveryDate ? new Date(item.deliveryDate).toLocaleDateString('vi-VN') : (item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')),
+      warrantyStatus: item.warrantyStatus || 'pending',
       total: item.total || 0,
       rawData: item
     }))
@@ -218,6 +228,68 @@ export default function TicketService() {
   const handleUpdateSuccess = () => {
     fetchServiceTickets()
   }
+
+  const historyColumns = [
+    {
+      title: 'STT',
+      key: 'index',
+      width: 80,
+      render: (_, __, index) => (
+        <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
+      )
+    },
+    {
+      title: 'Code',
+      dataIndex: 'code',
+      key: 'code',
+      width: 180,
+      render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
+    },
+    {
+      title: 'Khách Hàng',
+      dataIndex: 'customer',
+      key: 'customer',
+      width: 200
+    },
+    {
+      title: 'Biển Số Xe',
+      dataIndex: 'license',
+      key: 'license',
+      width: 150
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: () => (
+        <span style={{ color: '#22c55e', fontWeight: 600 }}>Hoàn thành</span>
+      )
+    },
+    {
+      title: 'Ngày Giao Xe',
+      dataIndex: 'deliveryDate',
+      key: 'deliveryDate',
+      width: 150
+    },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      width: 150,
+      render: (_, record) => {
+        const isDone = record.warrantyStatus === 'done'
+        return (
+          <Button
+            size="small"
+            className={`warranty-btn ${isDone ? 'done' : ''}`}
+            type="default"
+          >
+            {isDone ? 'Đã bảo hành' : 'Bảo hành'}
+          </Button>
+        )
+      }
+    }
+  ]
 
   const columns = [
     {
@@ -291,7 +363,7 @@ export default function TicketService() {
           <Row gutter={16} style={{ marginBottom: '20px' }}>
             <Col flex="auto">
               <Search
-                placeholder="Tìm kiếm theo biển số xe"
+                placeholder={isHistoryPage ? 'Tìm kiếm' : 'Tìm kiếm theo biển số xe'}
                 allowClear
                 prefix={<SearchOutlined />}
                 style={{ width: '100%', maxWidth: '400px' }}
@@ -305,7 +377,7 @@ export default function TicketService() {
             </Col>
             <Col>
               <DatePicker
-                placeholder="Ngày tạo"
+                placeholder={isHistoryPage ? 'Ngày giao xe' : 'Ngày tạo'}
                 format="DD/MM/YYYY"
                 suffixIcon={<CalendarOutlined />}
                 value={dateFilter}
@@ -339,7 +411,8 @@ export default function TicketService() {
 
         <Card style={{ borderRadius: '12px' }} bodyStyle={{ padding: 0 }}>
           <Table
-            columns={columns}
+            className={isHistoryPage ? 'history-table' : ''}
+            columns={isHistoryPage ? historyColumns : columns}
             dataSource={filtered.map((item, index) => ({ ...item, key: item.id, index }))}
             loading={loading}
             onRow={(record) => ({

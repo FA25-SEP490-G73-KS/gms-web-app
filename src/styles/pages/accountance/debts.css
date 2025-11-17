@@ -1,0 +1,95 @@
+.debts-page {
+  padding: 24px;
+  background: #f5f7fb;
+  min-height: 100vh;
+}
+
+.debts-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 20px;
+}
+
+.debts-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.debts-search {
+  width: 260px;
+}
+
+.debts-table-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+}
+
+.debts-table .ant-table-thead > tr > th {
+  background: #cbb081 !important;
+  color: #111 !important;
+  border: none !important;
+}
+
+.debts-table .ant-table-tbody > tr:nth-child(odd) > td {
+  background: #fffdf6;
+}
+
+.debts-table .ant-table-tbody > tr:hover > td {
+  background: #f5efe0 !important;
+}
+
+.debt-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar-circle {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #e9e1d1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #8a6d3b;
+}
+
+.debt-name {
+  font-weight: 600;
+  color: #111;
+}
+
+.debt-phone {
+  font-size: 12px;
+  color: #888;
+}
+
+.debts-nested {
+  padding: 16px 24px;
+  background: linear-gradient(to bottom, #faf7ef, #ffffff);
+  border-radius: 12px;
+  border: 1px solid #f1e9db;
+}
+
+.status-btn {
+  border-radius: 22px;
+  border-color: #d9d9d9 !important;
+  color: #666 !important;
+}
+
+.status-btn.active,
+.status-btn.ant-btn-primary {
+  background: #cbb081 !important;
+  border-color: #cbb081 !important;
+  color: #111 !important;
+  font-weight: 600;
+}
+

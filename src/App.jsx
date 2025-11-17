@@ -8,6 +8,12 @@ import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
 import CreateTicket from './pages/admin/CreateTicket';
 import TicketDetailPage from './pages/admin/TicketDetailPage';
+import AccountanceEmployeeList from './pages/accountance/EmployeeList';
+import AccountancePayroll from './pages/accountance/Payroll';
+import AccountanceAttendance from './pages/accountance/Attendance';
+import AccountancePlaceholder from './pages/accountance/Placeholder';
+import AccountanceDebts from './pages/accountance/Debts';
+import AccountanceMaterials from './pages/accountance/Materials';
 
 import Inventory from './pages/admin/Inventory';
 
@@ -60,6 +66,16 @@ function App() {
         <Route path="/warehouse/export/list" element={<ExportList />} />
         <Route path="/warehouse/export/request" element={<ExportRequest />} />
         <Route path="/warehouse/export/create" element={<CreateExportForm />} />
+
+        <Route path="/accountance" element={<AccountancePlaceholder title="Thống kê" />} />
+        <Route path="/accountance/finance" element={<AccountancePlaceholder title="Thu - Chi" />} />
+        <Route path="/accountance/hr/list" element={<AccountanceEmployeeList />} />
+        <Route path="/accountance/hr/attendance" element={<AccountanceAttendance />} />
+        <Route path="/accountance/hr/payroll" element={<AccountancePayroll />} />
+        <Route path="/accountance/payments" element={<AccountancePlaceholder title="Thanh toán" />} />
+        <Route path="/accountance/debts" element={<AccountanceDebts />} />
+        <Route path="/accountance/inventory" element={<AccountanceMaterials />} />
+        <Route path="/accountance/forms" element={<AccountancePlaceholder title="Tạo phiếu" />} />
 
       </Routes>
     </Router>
