@@ -1,11 +1,73 @@
-.parts-list {
-  width: 100%;
+.parts-table .ant-table {
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-.parts-list h2 {
-  margin: 0 0 16px 0;
-  font-size: 24px;
+.parts-table .ant-table-thead > tr > th {
+  background: #cbb081 !important;
+  color: #111 !important;
+  font-weight: 600 !important;
+  border: none !important;
+  padding: 12px 16px !important;
+  position: relative;
+}
+
+.parts-table .ant-table-thead > tr > th::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.parts-table .ant-table-thead > tr > th:last-child::after {
+  display: none;
+}
+
+.parts-table .ant-table-thead > tr > th:first-child {
+  border-top-left-radius: 16px;
+}
+
+.parts-table .ant-table-thead > tr > th:last-child {
+  border-top-right-radius: 16px;
+}
+
+.parts-table .ant-table-tbody > tr > td {
+  padding: 14px 16px !important;
+  border-bottom: 1px solid #f0f0f0;
+  font-weight: 500;
+}
+
+.parts-table .table-row-even {
+  background: #ffffff;
+}
+
+.parts-table .table-row-odd {
+  background: #fdf7ec;
+}
+
+.parts-table .ant-table-tbody > tr:hover > td {
+  background: #f6efe4 !important;
+}
+
+.parts-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-weight: 700;
-  color: #222;
+  font-size: 16px;
+  color: #8a6d3b;
+  margin-bottom: 16px;
+}
+
+.parts-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+  color: #8a6d3b;
+  line-height: 1;
 }
 

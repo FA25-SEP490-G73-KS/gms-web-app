@@ -672,9 +672,6 @@ export default function TicketDetailPage() {
                   </div>
                   <Space>
                     <Button onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}>Hủy</Button>
-                    <Button type="primary" onClick={handleSave} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
-                      Lưu
-                    </Button>
                     <Button 
                       type="primary" 
                       onClick={handleSendQuote}

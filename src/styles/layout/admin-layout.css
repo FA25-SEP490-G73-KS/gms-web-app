@@ -4,6 +4,32 @@
   display: grid;
   grid-template-columns: 240px 1fr;
   background: #f7f7f8;
+  transition: grid-template-columns 0.3s ease;
+}
+
+.admin-layout.sidebar-collapsed {
+  grid-template-columns: 72px 1fr;
+}
+
+.admin-layout.sidebar-collapsed .admin-sidebar {
+  width: 72px;
+  padding: 16px 8px;
+  align-items: center;
+}
+
+.admin-layout.sidebar-collapsed .admin-brand img {
+  height: 60px;
+}
+
+.admin-layout.sidebar-collapsed .admin-nav-item span,
+.admin-layout.sidebar-collapsed .submenu,
+.admin-layout.sidebar-collapsed .admin-logout span {
+  display: none;
+}
+
+.admin-layout.sidebar-collapsed .admin-nav-item {
+  justify-content: center;
+  padding: 10px 8px;
 }
 
 .admin-sidebar {
@@ -82,9 +108,9 @@
 }
 
 .admin-topbar {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   background: #ffffff;
   border: 1px solid #e6e8eb;
   border-radius: 12px;
@@ -92,14 +118,80 @@
   margin-bottom: 14px;
 }
 
-.admin-topbar-left { display: flex; align-items: center; gap: 12px; }
-.brand-gold { color: #cbb081; font-weight: 700; }
-.brand-strong { font-weight: 800; }
-.greeting { color: #111; opacity: .9; }
+.admin-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 
-.admin-topbar-right { display: flex; align-items: center; gap: 20px; }
-.zalo-badge { color: #1677ff; font-weight: 800; font-size: 18px; }
-.user-name { font-weight: 600; }
+.sidebar-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #666;
+  font-size: 18px;
+  transition: all 0.2s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb-item {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.breadcrumb-separator {
+  color: #999;
+  font-size: 12px;
+}
+
+.breadcrumb-current {
+  color: #111;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.admin-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notification-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 6px;
+  color: #666;
+  font-size: 18px;
+  transition: all 0.2s ease;
+}
+
+.notification-btn:hover {
+  background: #f5f5f5;
+  color: #333;
+}
 
 .admin-card {
   background: #fff;

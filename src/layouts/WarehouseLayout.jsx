@@ -88,12 +88,6 @@ export default function WarehouseLayout({ children }) {
                   Danh sách nhập
                 </button>
                 <button 
-                  className={`submenu-item ${isActive('/warehouse/import/request') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/import/request')}
-                >
-                  Yêu cầu nhập hàng
-                </button>
-                <button 
                   className={`submenu-item ${isActive('/warehouse/import/create') ? 'active' : ''}`}
                   onClick={() => navigate('/warehouse/import/create')}
                 >

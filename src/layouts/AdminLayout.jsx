@@ -8,6 +8,7 @@ export default function AdminLayout({ children }) {
   // Keep dropdown open if we're on any orders route
   const isOnOrdersRoute = location.pathname.startsWith('/service-advisor/orders')
   const [openService, setOpenService] = useState(isOnOrdersRoute)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   
   // Update state when route changes
   useEffect(() => {
@@ -23,8 +24,30 @@ export default function AdminLayout({ children }) {
 
   const isActive = (to) => location.pathname === to
 
+  const getBreadcrumb = () => {
+    const path = location.pathname
+    if (path.startsWith('/service-advisor/orders/create')) {
+      return { parent: 'Phiếu dịch vụ', current: 'Tạo phiếu' }
+    }
+    if (path.startsWith('/service-advisor/orders/history')) {
+      return { parent: 'Phiếu dịch vụ', current: 'Lịch sử sửa chữa' }
+    }
+    if (path.startsWith('/service-advisor/orders')) {
+      return { parent: 'Phiếu dịch vụ', current: 'Danh sách phiếu' }
+    }
+    if (path.startsWith('/service-advisor/appointments')) {
+      return { parent: '', current: 'Lịch hẹn' }
+    }
+    if (path.startsWith('/service-advisor/warranty')) {
+      return { parent: '', current: 'Bảo hành' }
+    }
+    return { parent: '', current: 'Trang chủ' }
+  }
+
+  const breadcrumb = getBreadcrumb()
+
   return (
-    <div className="admin-layout">
+    <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="admin-sidebar">
 
         <div className="admin-brand" onClick={() => navigate('/service-advisor')}>
@@ -103,16 +126,26 @@ export default function AdminLayout({ children }) {
       <main className="admin-main">
         <div className="admin-topbar">
           <div className="admin-topbar-left">
-            <span className="brand-gold">Garage</span>
-            <span className="brand-strong">Hoàng Tuấn</span>
-            <span className="greeting">Xin chào!</span>
+            <button
+              className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
+              onClick={() => setSidebarCollapsed((prev) => !prev)}
+            >
+              <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
+            </button>
+            {breadcrumb.parent ? (
+              <div className="breadcrumb">
+                <span className="breadcrumb-item">{breadcrumb.parent}</span>
+                <i className="bi bi-chevron-right breadcrumb-separator"></i>
+                <span className="breadcrumb-item breadcrumb-current">{breadcrumb.current}</span>
+              </div>
+            ) : (
+              <span className="breadcrumb-current">{breadcrumb.current}</span>
+            )}
           </div>
           <div className="admin-topbar-right">
-            <i className="bi bi-bell" style={{ fontSize: 18 }}></i>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-              <span className="user-name" style={{ fontWeight: 600, color: '#111', marginBottom: '2px' }}>Nguyễn Văn A</span>
-              <span style={{ fontSize: '12px', color: '#666' }}>0123456789</span>
-            </div>
+            <button className="notification-btn">
+              <i className="bi bi-bell"></i>
+            </button>
           </div>
         </div>
         {children}
