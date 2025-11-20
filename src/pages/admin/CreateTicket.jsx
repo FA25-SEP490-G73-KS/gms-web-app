@@ -1,8 +1,10 @@
 import React, { useState } from 'react'
 import { Form, Input, DatePicker, Select, Button, Card, Row, Col, Space, message } from 'antd'
+import { CloseOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../layouts/AdminLayout'
 import { serviceTicketAPI } from '../../services/api'
+import '../../styles/pages/admin/createticket.css'
 
 const { TextArea } = Input
 
@@ -22,13 +24,34 @@ const SERVICES = [
 export default function CreateTicket() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
+  const [selectedServices, setSelectedServices] = useState([])
+  const [selectKey, setSelectKey] = useState(0)
   const navigate = useNavigate()
+
+  const handleServiceSelect = (value) => {
+    if (!value) return
+    
+    const service = SERVICES.find(s => s.value === value)
+    if (service) {
+      // Kiểm tra xem dịch vụ đã được chọn chưa
+      const isAlreadySelected = selectedServices.some(s => s.value === value)
+      if (!isAlreadySelected) {
+        setSelectedServices([...selectedServices, { ...service, id: `${service.value}-${Date.now()}` }])
+        // Reset Select để tránh giữ giá trị
+        setSelectKey(prev => prev + 1)
+      }
+    }
+  }
+
+  const handleRemoveService = (id) => {
+    setSelectedServices(selectedServices.filter(s => s.id !== id))
+  }
 
   const handleCreate = async (values) => {
     setLoading(true)
     const payload = {
       appointmentId: 0,
-      serviceTypeIds: values.service || [],
+      serviceTypeIds: selectedServices.map(s => s.value),
       customer: {
         customerId: 0,
         fullName: values.name,
@@ -62,12 +85,13 @@ export default function CreateTicket() {
 
     message.success('Tạo phiếu dịch vụ thành công')
     form.resetFields()
+    setSelectedServices([])
     navigate('/service-advisor/orders')
   }
 
   return (
     <AdminLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <Card
           title={<span style={{ fontSize: '20px', fontWeight: 600 }}>Tạo phiếu dịch vụ</span>}
           style={{ borderRadius: '12px' }}
@@ -76,6 +100,7 @@ export default function CreateTicket() {
             form={form}
             layout="vertical"
             onFinish={handleCreate}
+            className="create-ticket-form"
           >
             <Row gutter={24}>
               <Col span={12}>
@@ -139,6 +164,97 @@ export default function CreateTicket() {
 
               <Col span={12}>
                 <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
+                <Form.Item
+                  label="Loại dịch vụ"
+                  name="service"
+                >
+                  <div style={{ position: 'relative' }}>
+                    <div
+                      style={{
+                        minHeight: '40px',
+                        padding: '8px 12px',
+                        background: '#f5f5f5',
+                        borderRadius: '8px',
+                        border: '1px solid #d9d9d9',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        gap: '8px'
+                      }}
+                    >
+                      {selectedServices.map((service) => (
+                        <div
+                          key={service.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px',
+                            background: '#e8e8e8',
+                            borderRadius: '6px',
+                            padding: '4px 8px',
+                            height: '28px'
+                          }}
+                        >
+                          <span style={{ fontSize: '14px', color: '#333', whiteSpace: 'nowrap' }}>
+                            {service.label}
+                          </span>
+                          <CloseOutlined
+                            style={{
+                              fontSize: '12px',
+                              color: '#666',
+                              cursor: 'pointer',
+                              marginLeft: '2px'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemoveService(service.id)
+                            }}
+                          />
+                        </div>
+                      ))}
+                      <div style={{ flex: 1, minWidth: '150px' }}>
+                        <Select
+                          key={selectKey}
+                          placeholder={selectedServices.length === 0 ? "Chọn loại dịch vụ" : ""}
+                          style={{ 
+                            width: '100%'
+                          }}
+                          className="service-type-select"
+                          value={null}
+                          onChange={handleServiceSelect}
+                          options={SERVICES.filter(s => !selectedServices.some(ss => ss.value === s.value))}
+                          showSearch
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          bordered={false}
+                          dropdownStyle={{ zIndex: 1050 }}
+                          allowClear={false}
+                        />
+                        <style>{`
+                          .service-type-select .ant-select-selector {
+                            border: none !important;
+                            background: transparent !important;
+                            box-shadow: none !important;
+                            padding: 0 !important;
+                            height: auto !important;
+                          }
+                          .service-type-select .ant-select-selection-placeholder {
+                            color: #999;
+                          }
+                          .service-type-select:hover .ant-select-selector {
+                            border: none !important;
+                          }
+                          .service-type-select.ant-select-focused .ant-select-selector {
+                            border: none !important;
+                            box-shadow: none !important;
+                          }
+                        `}</style>
+                      </div>
+                    </div>
+                  </div>
+                </Form.Item>
+
                 <Form.Item
                   label="Kỹ thuật viên sửa chữa"
                   name="techs"

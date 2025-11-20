@@ -342,7 +342,7 @@ export default function ExportRequest() {
 
   return (
     <WarehouseLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
             Xác nhận báo giá

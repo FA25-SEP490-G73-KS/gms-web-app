@@ -1,8 +1,11 @@
 import React, { useMemo, useState, useEffect } from 'react'
+import { Input, message } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import { inventoryAPI } from '../../services/api'
-import { message } from 'antd'
 import '../../styles/pages/admin/inventory.css'
+
+const { Search } = Input
 
 const PAGE_SIZE_OPTIONS = [6, 10, 20]
 
@@ -309,16 +312,18 @@ export default function Inventory() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <h2 style={{ margin: 0 }}>Chi tiết hàng tồn kho</h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div className="search-box">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" stroke="#888" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                <input 
-                  value={query} 
-                  onChange={(e) => { setPage(1); setQuery(e.target.value) }} 
-                  placeholder="Tìm kiếm" 
-                />
-              </div>
+              <Search
+                placeholder="Tìm kiếm"
+                allowClear
+                prefix={<SearchOutlined />}
+                style={{ width: '100%', maxWidth: '400px' }}
+                value={query}
+                onChange={(e) => {
+                  setPage(1)
+                  setQuery(e.target.value)
+                }}
+                onSearch={setQuery}
+              />
               <button className="menu-dots">
                 <i className="bi bi-three-dots-vertical" />
               </button>

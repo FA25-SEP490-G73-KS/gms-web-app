@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import useAuthStore from '../store/authStore'
 import '../styles/layout/warehouse-layout.css'
 
 export default function WarehouseLayout({ children }) {
@@ -8,6 +9,9 @@ export default function WarehouseLayout({ children }) {
   const [openImport, setOpenImport] = useState(location.pathname.startsWith('/warehouse/import'))
   const [openExport, setOpenExport] = useState(location.pathname.startsWith('/warehouse/export'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef(null)
+  const { user, logout } = useAuthStore()
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
@@ -21,21 +25,35 @@ export default function WarehouseLayout({ children }) {
     }
   }, [location.pathname])
 
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
+
   // Breadcrumb mapping based on route
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/warehouse/export/request')) {
+    if (path.startsWith('/warehouse/ticket/create')) {
+      return { parent: '', current: 'Tạo phiếu' }
+    } else if (path.startsWith('/warehouse/export/request')) {
       return { parent: 'Xuất kho', current: 'Yêu cầu xuất hàng' }
     } else if (path.startsWith('/warehouse/export/list')) {
       return { parent: 'Xuất kho', current: 'Danh sách xuất' }
-    } else if (path.startsWith('/warehouse/export/create')) {
-      return { parent: 'Xuất kho', current: 'Tạo phiếu' }
     } else if (path.startsWith('/warehouse/import/request')) {
       return { parent: 'Nhập kho', current: 'Yêu cầu nhập hàng' }
     } else if (path.startsWith('/warehouse/import/list')) {
       return { parent: 'Nhập kho', current: 'Danh sách nhập' }
-    } else if (path.startsWith('/warehouse/import/create')) {
-      return { parent: 'Nhập kho', current: 'Tạo phiếu' }
     } else if (path.startsWith('/warehouse/parts')) {
       return { parent: '', current: 'Danh sách linh kiện' }
     } else if (path.startsWith('/warehouse/report')) {
@@ -48,8 +66,38 @@ export default function WarehouseLayout({ children }) {
 
   return (
     <div className={`warehouse-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {/* Header - Full width, no margin/padding */}
+      <header className="warehouse-header">
+        <div className="warehouse-header-content">
+          <div className="warehouse-topbar-left">
+            <button 
+              className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
+            </button>
+            <div className="breadcrumb-divider"></div>
+            {breadcrumb.parent ? (
+              <div className="breadcrumb">
+                <span className="breadcrumb-item">{breadcrumb.parent}</span>
+                <span className="breadcrumb-separator">&gt;</span>
+                <span className="breadcrumb-current">{breadcrumb.current}</span>
+              </div>
+            ) : (
+              <span className="breadcrumb-current">{breadcrumb.current}</span>
+            )}
+          </div>
+          <div className="warehouse-topbar-right">
+            <button className="notification-btn">
+              <i className="bi bi-bell"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/warehouse')}>
+        <div className="warehouse-brand" onClick={() => navigate('/warehouse')} style={{ marginTop: '57px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">
@@ -69,6 +117,14 @@ export default function WarehouseLayout({ children }) {
             <span>Danh sách linh kiện</span>
           </button>
 
+          <button
+            className={`warehouse-nav-item ${isActive('/warehouse/ticket/create') ? 'active' : ''}`}
+            onClick={() => navigate('/warehouse/ticket/create')}
+          >
+            <i className="bi bi-file-earmark-plus" />
+            <span>Tạo phiếu</span>
+          </button>
+
           <div className={`warehouse-nav-group ${openImport ? 'open' : ''}`}>
             <button
               className={`warehouse-nav-item ${isActiveParent('/warehouse/import') ? 'active' : ''}`}
@@ -86,12 +142,6 @@ export default function WarehouseLayout({ children }) {
                   onClick={() => navigate('/warehouse/import/list')}
                 >
                   Danh sách nhập
-                </button>
-                <button 
-                  className={`submenu-item ${isActive('/warehouse/import/create') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/import/create')}
-                >
-                  Tạo phiếu
                 </button>
               </div>
             )}
@@ -121,50 +171,83 @@ export default function WarehouseLayout({ children }) {
                 >
                   Xác nhận báo giá
                 </button>
-                <button 
-                  className={`submenu-item ${isActive('/warehouse/export/create') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/export/create')}
-                >
-                  Tạo phiếu
-                </button>
               </div>
             )}
           </div>
         </nav>
         <div className="warehouse-spacer" />
-        <button className="warehouse-logout" onClick={() => navigate('/')}> 
-          <i className="bi bi-box-arrow-right" />
-          <span>Đăng xuất</span>
-        </button>
+        
+        {/* User Info with Dropdown */}
+        <div className="warehouse-user-menu" ref={userMenuRef} style={{ position: 'relative' }}>
+          <button 
+            className="warehouse-user-info" 
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #eee',
+              borderRadius: '10px',
+              background: '#fafafa',
+              cursor: 'pointer',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              alignItems: 'center'
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
+              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {user?.phone || '0123456789'}
+            </div>
+          </button>
+          
+          {showUserMenu && (
+            <div className="warehouse-user-dropdown" style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: 0,
+              right: 0,
+              marginBottom: '8px',
+              background: '#fff',
+              border: '1px solid #e6e8eb',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              overflow: 'hidden'
+            }}>
+              <button
+                className="warehouse-logout"
+                onClick={handleLogout}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontWeight: 600,
+                  color: '#d1293d',
+                  fontSize: '14px'
+                }}
+              >
+                <i className="bi bi-box-arrow-right" />
+                <span>Đăng xuất</span>
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
 
+      {/* Main Content */}
       <main className="warehouse-main">
-        <div className="warehouse-topbar">
-          <div className="warehouse-topbar-left">
-            <button 
-              className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
-            </button>
-            {breadcrumb.parent && (
-              <div className="breadcrumb">
-                <span className="breadcrumb-item">{breadcrumb.parent}</span>
-                <i className="bi bi-chevron-right breadcrumb-separator"></i>
-                <span className="breadcrumb-item breadcrumb-current">{breadcrumb.current}</span>
-              </div>
-            )}
-            {!breadcrumb.parent && (
-              <span className="breadcrumb-current">{breadcrumb.current}</span>
-            )}
-          </div>
-          <div className="warehouse-topbar-right">
-            <button className="notification-btn">
-              <i className="bi bi-bell"></i>
-            </button>
-          </div>
+        <div className="warehouse-content">
+          {children}
         </div>
-        {children}
       </main>
     </div>
   )

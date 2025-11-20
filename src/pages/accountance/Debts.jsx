@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Table, Input, Button, Space, Tag } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { SearchOutlined, RightOutlined, DownOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/accountance/debts.css'
@@ -158,21 +158,19 @@ export default function Debts() {
         )
       }
     },
-    {
-      title: '',
-      key: 'action',
-      width: 60,
-      render: (_, record) => (
-        <Button type="text" onClick={() => setExpandedRowKeys([record.key.toString()])}>
-          <i className="bi bi-chevron-down" />
-        </Button>
-      )
-    }
   ]
 
   const expandedRowRender = (record) => {
     const detailColumns = [
-      { title: 'STT', dataIndex: 'id', key: 'id', width: 70 },
+      { 
+        title: 'STT', 
+        key: 'index', 
+        width: 70,
+        align: 'center',
+        render: (_, __, index) => (
+          <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
+        )
+      },
       { title: 'Code', dataIndex: 'code', key: 'code', width: 160 },
       { title: 'Ngày lập', dataIndex: 'createdAt', key: 'createdAt', width: 140 },
       {
@@ -180,6 +178,7 @@ export default function Debts() {
         dataIndex: 'total',
         key: 'total',
         width: 140,
+        align: 'right',
         render: (value) => value.toLocaleString('vi-VN')
       },
       {
@@ -187,16 +186,52 @@ export default function Debts() {
         dataIndex: 'remain',
         key: 'remain',
         width: 140,
+        align: 'right',
         render: (value) => value.toLocaleString('vi-VN')
       },
       { title: 'Hẹn trả', dataIndex: 'dueDate', key: 'dueDate', width: 140 },
       {
-        title: 'Xác nhận thanh toán',
-        dataIndex: 'status',
-        key: 'status',
+        title: 'Hành động',
+        key: 'action',
         width: 200,
-        render: (value) => {
-          const config = detailStatusConfig[value] || detailStatusConfig.warning
+        render: (_, detailRecord) => {
+          // Hiển thị 2 nút nếu còn nợ (remain > 0)
+          if (detailRecord.remain > 0) {
+            return (
+              <Space>
+                <Button
+                  type="primary"
+                  style={{
+                    background: '#22c55e',
+                    borderColor: '#22c55e',
+                    borderRadius: '6px',
+                    fontWeight: 600
+                  }}
+                  onClick={() => {
+                    console.log('Thanh toán:', detailRecord)
+                  }}
+                >
+                  Thanh toán
+                </Button>
+                <Button
+                  style={{
+                    background: '#f97316',
+                    borderColor: '#f97316',
+                    color: '#fff',
+                    borderRadius: '6px',
+                    fontWeight: 600
+                  }}
+                  onClick={() => {
+                    console.log('Gửi:', detailRecord)
+                  }}
+                >
+                  Gửi
+                </Button>
+              </Space>
+            )
+          }
+          // Nếu đã thanh toán hết, hiển thị tag
+          const config = detailStatusConfig[detailRecord.status] || detailStatusConfig.warning
           return (
             <Tag
               style={{
@@ -219,7 +254,7 @@ export default function Debts() {
       <div className="debts-nested">
         <Table
           columns={detailColumns}
-          dataSource={record.details.map((item) => ({ ...item, key: item.id }))}
+          dataSource={record.details.map((item, index) => ({ ...item, key: item.id, index }))}
           pagination={false}
           components={goldTableHeader}
           locale={{
@@ -268,7 +303,16 @@ export default function Debts() {
             expandable={{
               expandedRowRender,
               expandedRowKeys,
-              onExpandedRowsChange: (keys) => setExpandedRowKeys(keys)
+              onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
+              expandIcon: ({ expanded, onExpand, record }) => (
+                <Button
+                  type="text"
+                  onClick={(e) => onExpand(record, e)}
+                  style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {expanded ? <DownOutlined /> : <RightOutlined />}
+                </Button>
+              )
             }}
             pagination={{
               pageSize: 10,

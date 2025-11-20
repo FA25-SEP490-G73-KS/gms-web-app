@@ -13,6 +13,71 @@ body {
   line-height: 1.6;
 }
 
+/* Search Input - Clean border around */
+.ant-input-search {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+}
+
+.ant-input-search .ant-input,
+.ant-input-search .ant-input-group-wrapper .ant-input {
+  border: 1px solid #3b82f6 !important;
+  border-right: none !important;
+  border-radius: 8px 0 0 8px !important;
+  box-shadow: none !important;
+  padding: 8px 12px !important;
+  height: 40px !important;
+  transition: border-color 0.2s !important;
+}
+
+.ant-input-search .ant-input:focus,
+.ant-input-search .ant-input-focused,
+.ant-input-search .ant-input-group-wrapper .ant-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: none !important;
+}
+
+.ant-input-search .ant-input-group-addon {
+  border: 1px solid #3b82f6 !important;
+  border-left: none !important;
+  border-radius: 0 8px 8px 0 !important;
+  background: #fff !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.ant-input-search .ant-input-group-addon .ant-input-search-button {
+  border: none !important;
+  border-radius: 0 8px 8px 0 !important;
+  background: transparent !important;
+  height: 40px !important;
+  width: 40px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: background-color 0.2s !important;
+}
+
+.ant-input-search .ant-input-group-addon .ant-input-search-button:hover {
+  background: #f5f5f5 !important;
+}
+
+.ant-input-search:hover .ant-input,
+.ant-input-search:hover .ant-input-group-addon {
+  border-color: #3b82f6 !important;
+}
+
+.ant-input-search .ant-input-group-addon .anticon,
+.ant-input-search .ant-input-prefix .anticon {
+  color: #666 !important;
+  font-size: 16px !important;
+}
+
+.ant-input-search .ant-input-prefix {
+  margin-right: 8px !important;
+}
+
 
 .container-balanced {
   max-width: 1400px;
