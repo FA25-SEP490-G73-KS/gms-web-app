@@ -489,7 +489,7 @@ export default function TicketDetailPage() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Button 
             type="text" 
@@ -672,9 +672,6 @@ export default function TicketDetailPage() {
                   </div>
                   <Space>
                     <Button onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}>Hủy</Button>
-                    <Button type="primary" onClick={handleSave} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
-                      Lưu
-                    </Button>
                     <Button 
                       type="primary" 
                       onClick={handleSendQuote}

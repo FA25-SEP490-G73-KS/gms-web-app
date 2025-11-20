@@ -3,25 +3,18 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 import '../styles/layout/warehouse-layout.css'
 
-export default function WarehouseLayout({ children }) {
+export default function AccountanceLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [openImport, setOpenImport] = useState(location.pathname.startsWith('/warehouse/import'))
-  const [openExport, setOpenExport] = useState(location.pathname.startsWith('/warehouse/export'))
+  const [openHR, setOpenHR] = useState(location.pathname.startsWith('/accountance/hr'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
   const { user, logout } = useAuthStore()
 
-  const isActive = (to) => location.pathname === to
-  const isActiveParent = (path) => location.pathname.startsWith(path)
-
   useEffect(() => {
-    if (location.pathname.startsWith('/warehouse/import')) {
-      setOpenImport(true)
-    }
-    if (location.pathname.startsWith('/warehouse/export')) {
-      setOpenExport(true)
+    if (location.pathname.startsWith('/accountance/hr')) {
+      setOpenHR(true)
     }
   }, [location.pathname])
 
@@ -41,25 +34,39 @@ export default function WarehouseLayout({ children }) {
     navigate('/login')
   }
 
-  // Breadcrumb mapping based on route
+  const isActive = (to) => location.pathname === to
+  const isActiveParent = (path) => location.pathname.startsWith(path)
+
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/warehouse/ticket/create')) {
-      return { parent: '', current: 'Tạo phiếu' }
-    } else if (path.startsWith('/warehouse/export/request')) {
-      return { parent: 'Xuất kho', current: 'Yêu cầu xuất hàng' }
-    } else if (path.startsWith('/warehouse/export/list')) {
-      return { parent: 'Xuất kho', current: 'Danh sách xuất' }
-    } else if (path.startsWith('/warehouse/import/request')) {
-      return { parent: 'Nhập kho', current: 'Yêu cầu nhập hàng' }
-    } else if (path.startsWith('/warehouse/import/list')) {
-      return { parent: 'Nhập kho', current: 'Danh sách nhập' }
-    } else if (path.startsWith('/warehouse/parts')) {
-      return { parent: '', current: 'Danh sách linh kiện' }
-    } else if (path.startsWith('/warehouse/report')) {
-      return { parent: '', current: 'Báo cáo' }
+    if (path === '/accountance') {
+      return { parent: '', current: 'Thống kê' }
     }
-    return { parent: '', current: 'Trang chủ' }
+    if (path.startsWith('/accountance/finance')) {
+      return { parent: '', current: 'Thu - Chi' }
+    }
+    if (path.startsWith('/accountance/hr/list')) {
+      return { parent: 'Nhân sự', current: 'Danh sách nhân viên' }
+    }
+    if (path.startsWith('/accountance/hr/attendance')) {
+      return { parent: 'Nhân sự', current: 'Ngày công' }
+    }
+    if (path.startsWith('/accountance/hr/payroll')) {
+      return { parent: 'Nhân sự', current: 'Lương' }
+    }
+    if (path.startsWith('/accountance/payments')) {
+      return { parent: '', current: 'Thanh toán' }
+    }
+    if (path.startsWith('/accountance/debts')) {
+      return { parent: '', current: 'Công nợ' }
+    }
+    if (path.startsWith('/accountance/inventory')) {
+      return { parent: '', current: 'Kho & Vật tư' }
+    }
+    if (path.startsWith('/accountance/forms')) {
+      return { parent: '', current: 'Tạo phiếu' }
+    }
+    return { parent: '', current: 'Kế toán' }
   }
 
   const breadcrumb = getBreadcrumb()
@@ -70,7 +77,7 @@ export default function WarehouseLayout({ children }) {
       <header className="warehouse-header">
         <div className="warehouse-header-content">
           <div className="warehouse-topbar-left">
-            <button 
+            <button
               className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             >
@@ -97,83 +104,91 @@ export default function WarehouseLayout({ children }) {
 
       {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/warehouse')} style={{ marginTop: '57px' }}>
+        <div className="warehouse-brand" onClick={() => navigate('/accountance')} style={{ marginTop: '57px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">
           <button
-            className={`warehouse-nav-item ${isActive('/warehouse/report') ? 'active' : ''}`}
-            onClick={() => navigate('/warehouse/report')}
+            className={`warehouse-nav-item ${isActive('/accountance') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance')}
           >
             <i className="bi bi-bar-chart" />
-            <span>Báo cáo</span>
+            <span>Thống kê</span>
           </button>
 
           <button
-            className={`warehouse-nav-item ${isActive('/warehouse/parts') ? 'active' : ''}`}
-            onClick={() => navigate('/warehouse/parts')}
+            className={`warehouse-nav-item ${isActive('/accountance/finance') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/finance')}
           >
-            <i className="bi bi-calendar-check" />
-            <span>Danh sách linh kiện</span>
+            <i className="bi bi-cash-stack" />
+            <span>Thu - Chi</span>
+          </button>
+
+          <div className={`warehouse-nav-group ${openHR ? 'open' : ''}`}>
+            <button
+              className={`warehouse-nav-item ${isActiveParent('/accountance/hr') ? 'active' : ''}`}
+              onClick={() => setOpenHR((v) => !v)}
+            >
+              <i className="bi bi-people" />
+              <span>Nhân sự</span>
+              <i className={`bi bi-caret-down-fill caret ${openHR ? 'rot' : ''}`} />
+            </button>
+            {openHR && (
+              <div className="submenu">
+                <div className="submenu-line" />
+                <button
+                  className={`submenu-item ${isActive('/accountance/hr/list') ? 'active' : ''}`}
+                  onClick={() => navigate('/accountance/hr/list')}
+                >
+                  Danh sách
+                </button>
+                <button
+                  className={`submenu-item ${isActive('/accountance/hr/attendance') ? 'active' : ''}`}
+                  onClick={() => navigate('/accountance/hr/attendance')}
+                >
+                  Ngày công
+                </button>
+                <button
+                  className={`submenu-item ${isActive('/accountance/hr/payroll') ? 'active' : ''}`}
+                  onClick={() => navigate('/accountance/hr/payroll')}
+                >
+                  Lương
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            className={`warehouse-nav-item ${isActive('/accountance/payments') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/payments')}
+          >
+            <i className="bi bi-credit-card" />
+            <span>Thanh toán</span>
           </button>
 
           <button
-            className={`warehouse-nav-item ${isActive('/warehouse/ticket/create') ? 'active' : ''}`}
-            onClick={() => navigate('/warehouse/ticket/create')}
+            className={`warehouse-nav-item ${isActive('/accountance/debts') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/debts')}
           >
-            <i className="bi bi-file-earmark-plus" />
+            <i className="bi bi-receipt" />
+            <span>Công nợ</span>
+          </button>
+
+          <button
+            className={`warehouse-nav-item ${isActive('/accountance/inventory') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/inventory')}
+          >
+            <i className="bi bi-box-seam" />
+            <span>Kho & Vật tư</span>
+          </button>
+
+          <button
+            className={`warehouse-nav-item ${isActive('/accountance/forms') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/forms')}
+          >
+            <i className="bi bi-file-earmark-text" />
             <span>Tạo phiếu</span>
           </button>
-
-          <div className={`warehouse-nav-group ${openImport ? 'open' : ''}`}>
-            <button
-              className={`warehouse-nav-item ${isActiveParent('/warehouse/import') ? 'active' : ''}`}
-              onClick={() => setOpenImport((v) => !v)}
-            >
-              <i className="bi bi-box-arrow-in-down" />
-              <span>Nhập kho</span>
-              <i className={`bi bi-caret-down-fill caret ${openImport ? 'rot' : ''}`} />
-            </button>
-            {openImport && (
-              <div className="submenu">
-                <div className="submenu-line" />
-                <button 
-                  className={`submenu-item ${isActive('/warehouse/import/list') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/import/list')}
-                >
-                  Danh sách nhập
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className={`warehouse-nav-group ${openExport ? 'open' : ''}`}>
-            <button
-              className={`warehouse-nav-item ${isActiveParent('/warehouse/export') ? 'active' : ''}`}
-              onClick={() => setOpenExport((v) => !v)}
-            >
-              <i className="bi bi-box-arrow-up" />
-              <span>Xuất kho</span>
-              <i className={`bi bi-caret-down-fill caret ${openExport ? 'rot' : ''}`} />
-            </button>
-            {openExport && (
-              <div className="submenu">
-                <div className="submenu-line" />
-                <button 
-                  className={`submenu-item ${isActive('/warehouse/export/list') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/export/list')}
-                >
-                  Danh sách xuất
-                </button>
-                <button 
-                  className={`submenu-item ${isActive('/warehouse/export/request') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/export/request')}
-                >
-                  Xác nhận báo giá
-                </button>
-              </div>
-            )}
-          </div>
         </nav>
         <div className="warehouse-spacer" />
         

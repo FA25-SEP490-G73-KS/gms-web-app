@@ -1,8 +1,5 @@
 import React, { useState } from 'react'
-import Table from 'antd/es/table'
-import Input from 'antd/es/input'
-import Card from 'antd/es/card'
-import Badge from 'antd/es/badge'
+import { Table, Input, Card, Badge } from 'antd'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 
