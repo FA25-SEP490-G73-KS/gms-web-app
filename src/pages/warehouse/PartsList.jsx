@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
-import { Table, Input, Space, Button, DatePicker, Modal, Form, InputNumber, Select } from 'antd'
-import { SearchOutlined, CalendarOutlined, EditOutlined } from '@ant-design/icons'
+import { Table, Input, Space, Button, DatePicker, Modal, Form, InputNumber, Select, message, Checkbox } from 'antd'
+import { SearchOutlined, CalendarOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/warehouse/export-list.css'
@@ -16,6 +16,8 @@ export default function PartsList() {
   const [statusFilter, setStatusFilter] = useState('Chờ nhập')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPart, setSelectedPart] = useState(null)
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createForm] = Form.useForm()
 
   const parts = [
     {
@@ -200,9 +202,23 @@ export default function PartsList() {
     setModalOpen(true)
   }
 
+  const handleCreatePart = async (values) => {
+    // TODO: Call API to create part
+    console.log('Creating part:', values)
+    message.success('Thêm linh kiện thành công')
+    createForm.resetFields()
+    setCreateModalOpen(false)
+    // Refresh list if needed
+  }
+
+  const handleCreateModalClose = () => {
+    setCreateModalOpen(false)
+    createForm.resetFields()
+  }
+
   return (
     <WarehouseLayout>
-      <div style={{ padding: 24, background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: 24, background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 20 }}>Danh sách linh kiện</h1>
 
@@ -243,6 +259,15 @@ export default function PartsList() {
                 </Button>
               ))}
             </Space>
+
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setCreateModalOpen(true)}
+              style={{ background: '#22c55e', borderColor: '#22c55e', marginLeft: 'auto' }}
+            >
+              Thêm linh kiện
+            </Button>
           </div>
         </div>
 
@@ -280,81 +305,331 @@ export default function PartsList() {
           onCancel={() => setModalOpen(false)}
           closable={false}
           footer={null}
-          width={520}
-          bodyStyle={{ background: '#fefaf1', padding: 24 }}
+          width={571}
+          bodyStyle={{ background: '#ffffff', padding: 0 }}
           styles={{
-            content: { borderRadius: 16, overflow: 'hidden' }
+            content: { borderRadius: 0, overflow: 'hidden' }
           }}
         >
           {selectedPart && (
             <>
-              <div className="parts-modal-header">
-                <span>CHI TIẾT LINH KIỆN</span>
-                <button className="parts-modal-close" onClick={() => setModalOpen(false)}>
-                  ×
-                </button>
+              {/* Header với background gold */}
+              <div style={{
+                background: '#CBB081',
+                padding: '16px 20px',
+                margin: '-24px -24px 24px -24px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                height: '63px',
+                position: 'relative'
+              }}>
+                <span style={{ 
+                  fontWeight: 700, 
+                  fontSize: '20px', 
+                  color: '#111',
+                  position: 'absolute',
+                  left: '50%',
+                  transform: 'translateX(-50%)'
+                }}>
+                  CHI TIẾT LINH KIỆN
+                </span>
+                <CloseOutlined 
+                  onClick={() => setModalOpen(false)}
+                  style={{ fontSize: '18px', cursor: 'pointer', color: '#111', fontWeight: 700, marginLeft: 'auto' }}
+                />
               </div>
-              <Form layout="vertical" initialValues={selectedPart}>
-              <Form.Item label="Tên linh kiện" name="name">
-                <Input />
-              </Form.Item>
-              <Space size="middle" style={{ width: '100%' }}>
-                <Form.Item label="Xuất xứ" name="origin" style={{ flex: 1 }}>
-                  <Select
-                    options={[
-                      { value: 'VN', label: 'VN' },
-                      { value: 'USA', label: 'USA' },
-                      { value: 'China', label: 'China' },
-                      { value: 'UK', label: 'UK' }
-                    ]}
-                  />
-                </Form.Item>
-                <Form.Item label="Hãng" name="brand" style={{ flex: 1 }}>
-                  <Input />
-                </Form.Item>
-              </Space>
-              <Form.Item label="Dòng xe" name="vehicleModel">
-                <Input />
-              </Form.Item>
-              <Space size="middle" style={{ width: '100%' }}>
-                <Form.Item label="Số lượng tồn" name="quantityOnHand" style={{ flex: 1 }}>
-                  <InputNumber min={0} style={{ width: '100%' }} />
-                </Form.Item>
-                <Form.Item label="Số lượng giữ" name="reservedQuantity" style={{ flex: 1 }}>
-                  <InputNumber min={0} style={{ width: '100%' }} />
-                </Form.Item>
-              </Space>
-              <Form.Item label="Mức cảnh báo" name="alertThreshold">
-                <InputNumber min={0} style={{ width: '100%' }} />
-              </Form.Item>
-              <Space size="middle" style={{ width: '100%' }}>
-                <Form.Item label="Giá nhập" name="importPrice" style={{ flex: 1 }}>
-                  <InputNumber min={0} style={{ width: '100%' }} />
-                </Form.Item>
-                <Form.Item label="Giá bán" name="sellingPrice" style={{ flex: 1 }}>
-                  <InputNumber min={0} style={{ width: '100%' }} />
-                </Form.Item>
-              </Space>
-              <Form.Item label="Trạng thái" name="status">
-                <Select options={[{ value: 'Chờ nhập' }, { value: 'Đã nhập' }]} />
-              </Form.Item>
-              <Space style={{ width: '100%', justifyContent: 'space-between', marginTop: 16 }}>
-                <Button
-                  type="primary"
-                  style={{ background: '#d97706', borderColor: '#d97706', minWidth: 140 }}
-                >
-                  Nhập hàng
-                </Button>
-                <Button
-                  type="primary"
-                  style={{ background: '#22c55e', borderColor: '#22c55e', minWidth: 140 }}
-                >
-                  Lưu
-                </Button>
-              </Space>
-              </Form>
+
+              <div style={{ padding: '24px' }}>
+                <Form layout="vertical" initialValues={selectedPart}>
+                  {/* Trạng thái và Số lượng ở trên cùng */}
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                    <Form.Item label="Trạng thái" name="status" style={{ flex: 1 }}>
+                      <Select 
+                        placeholder="Không rõ"
+                        options={[
+                          { value: 'Chờ nhập', label: 'Chờ nhập' }, 
+                          { value: 'Đã nhập', label: 'Đã nhập' }
+                        ]} 
+                      />
+                    </Form.Item>
+                    <Form.Item label="Số lượng" name="quantityOnHand" style={{ flex: 1 }}>
+                      <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
+                    </Form.Item>
+                  </div>
+
+                  <Form.Item label="Tên linh kiện" name="name">
+                    <Input placeholder="Dầu máy 5W-30" />
+                  </Form.Item>
+
+                  <Form.Item label="Xuất xứ" name="origin">
+                    <Select
+                      placeholder="Chọn xuất xứ"
+                      options={[
+                        { value: 'VN', label: 'VN' },
+                        { value: 'USA', label: 'USA' },
+                        { value: 'China', label: 'China' },
+                        { value: 'UK', label: 'UK' },
+                        { value: 'Motul', label: 'Motul' }
+                      ]}
+                    />
+                  </Form.Item>
+
+                  <Form.Item name="useForAllModels" valuePropName="checked">
+                    <Checkbox>Dùng chung tất cả dòng xe</Checkbox>
+                  </Form.Item>
+
+                  <Form.Item label="Hãng" name="brand">
+                    <Select
+                      placeholder="Chọn hãng"
+                      options={[
+                        { value: 'Vinfast', label: 'Vinfast' },
+                        { value: 'Honda', label: 'Honda' },
+                        { value: 'Castrol', label: 'Castrol' }
+                      ]}
+                    />
+                  </Form.Item>
+
+                  <Form.Item label="Dòng xe" name="vehicleModel">
+                    <Select
+                      placeholder="Chọn dòng xe"
+                      options={[
+                        { value: 'VF3', label: 'VF3' },
+                        { value: 'VF5', label: 'VF5' },
+                        { value: 'VF8', label: 'VF8' },
+                        { value: 'Universal', label: 'Universal' }
+                      ]}
+                    />
+                  </Form.Item>
+
+                  <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                    <Form.Item label="Giá bán" name="sellingPrice" style={{ flex: 1 }}>
+                      <InputNumber 
+                        min={0} 
+                        style={{ width: '100%' }} 
+                        placeholder="130.000"
+                        addonAfter="/ vnd"
+                      />
+                    </Form.Item>
+                    <Form.Item label="Giá nhập" name="importPrice" style={{ flex: 1 }}>
+                      <InputNumber 
+                        min={0} 
+                        style={{ width: '100%' }} 
+                        placeholder="120.000"
+                        addonAfter="/ vnd"
+                      />
+                    </Form.Item>
+                  </div>
+
+                  <Form.Item label="Đơn vị" name="unit">
+                    <Input placeholder="lít, bộ, cái....." />
+                  </Form.Item>
+
+                  <Form.Item label="Ghi chú" name="note">
+                    <Input.TextArea rows={4} placeholder="Khả năng nhập" />
+                  </Form.Item>
+
+                  <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      style={{ 
+                        background: '#22c55e', 
+                        borderColor: '#22c55e', 
+                        minWidth: 140,
+                        height: '40px',
+                        fontSize: '16px',
+                        fontWeight: 600
+                      }}
+                    >
+                      Xác nhận
+                    </Button>
+                  </div>
+                </Form>
+              </div>
             </>
           )}
+        </Modal>
+
+        {/* Modal thêm linh kiện */}
+        <Modal
+          title={null}
+          open={createModalOpen}
+          onCancel={handleCreateModalClose}
+          closable={false}
+          footer={null}
+          width={571}
+          bodyStyle={{ background: '#ffffff', padding: 0 }}
+          styles={{
+            content: { borderRadius: 0, overflow: 'hidden' }
+          }}
+        >
+          {/* Header với background gold */}
+          <div style={{
+            background: '#CBB081',
+            padding: '16px 20px',
+            margin: '-24px -24px 24px -24px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            height: '63px',
+            position: 'relative'
+          }}>
+            <span style={{ 
+              fontWeight: 700, 
+              fontSize: '20px', 
+              color: '#111',
+              position: 'absolute',
+              left: '50%',
+              transform: 'translateX(-50%)'
+            }}>
+              THÊM LINH KIỆN
+            </span>
+            <CloseOutlined 
+              onClick={handleCreateModalClose}
+              style={{ fontSize: '18px', cursor: 'pointer', color: '#111', fontWeight: 700, marginLeft: 'auto' }}
+            />
+          </div>
+
+          <div style={{ padding: '24px' }}>
+            <Form 
+              layout="vertical" 
+              form={createForm}
+              onFinish={handleCreatePart}
+            >
+              {/* Trạng thái và Số lượng ở trên cùng */}
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                <Form.Item 
+                  label="Trạng thái" 
+                  name="status" 
+                  style={{ flex: 1 }}
+                  rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
+                >
+                  <Select 
+                    placeholder="Không rõ"
+                    options={[
+                      { value: 'Chờ nhập', label: 'Chờ nhập' }, 
+                      { value: 'Đã nhập', label: 'Đã nhập' }
+                    ]} 
+                  />
+                </Form.Item>
+                <Form.Item 
+                  label="Số lượng" 
+                  name="quantityOnHand" 
+                  style={{ flex: 1 }}
+                  rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} placeholder="0" />
+                </Form.Item>
+              </div>
+
+              <Form.Item 
+                label="Tên linh kiện" 
+                name="name"
+                rules={[{ required: true, message: 'Vui lòng nhập tên linh kiện' }]}
+              >
+                <Input placeholder="Dầu máy 5W-30" />
+              </Form.Item>
+
+              <Form.Item 
+                label="Xuất xứ" 
+                name="origin"
+                rules={[{ required: true, message: 'Vui lòng chọn xuất xứ' }]}
+              >
+                <Select
+                  placeholder="Chọn xuất xứ"
+                  options={[
+                    { value: 'VN', label: 'VN' },
+                    { value: 'USA', label: 'USA' },
+                    { value: 'China', label: 'China' },
+                    { value: 'UK', label: 'UK' },
+                    { value: 'Motul', label: 'Motul' }
+                  ]}
+                />
+              </Form.Item>
+
+              <Form.Item name="useForAllModels" valuePropName="checked">
+                <Checkbox>Dùng chung tất cả dòng xe</Checkbox>
+              </Form.Item>
+
+              <Form.Item label="Hãng" name="brand">
+                <Select
+                  placeholder="Chọn hãng"
+                  options={[
+                    { value: 'Vinfast', label: 'Vinfast' },
+                    { value: 'Honda', label: 'Honda' },
+                    { value: 'Castrol', label: 'Castrol' }
+                  ]}
+                />
+              </Form.Item>
+
+              <Form.Item label="Dòng xe" name="vehicleModel">
+                <Select
+                  placeholder="Chọn dòng xe"
+                  options={[
+                    { value: 'VF3', label: 'VF3' },
+                    { value: 'VF5', label: 'VF5' },
+                    { value: 'VF8', label: 'VF8' },
+                    { value: 'Universal', label: 'Universal' }
+                  ]}
+                />
+              </Form.Item>
+
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+                <Form.Item 
+                  label="Giá bán" 
+                  name="sellingPrice" 
+                  style={{ flex: 1 }}
+                  rules={[{ required: true, message: 'Vui lòng nhập giá bán' }]}
+                >
+                  <InputNumber 
+                    min={0} 
+                    style={{ width: '100%' }} 
+                    placeholder="130.000"
+                    addonAfter="/ vnd"
+                  />
+                </Form.Item>
+                <Form.Item 
+                  label="Giá nhập" 
+                  name="importPrice" 
+                  style={{ flex: 1 }}
+                  rules={[{ required: true, message: 'Vui lòng nhập giá nhập' }]}
+                >
+                  <InputNumber 
+                    min={0} 
+                    style={{ width: '100%' }} 
+                    placeholder="120.000"
+                    addonAfter="/ vnd"
+                  />
+                </Form.Item>
+              </div>
+
+              <Form.Item label="Đơn vị" name="unit">
+                <Input placeholder="lít, bộ, cái....." />
+              </Form.Item>
+
+              <Form.Item label="Ghi chú" name="note">
+                <Input.TextArea rows={4} placeholder="Khả năng nhập" />
+              </Form.Item>
+
+              <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  style={{ 
+                    background: '#22c55e', 
+                    borderColor: '#22c55e', 
+                    minWidth: 140,
+                    height: '40px',
+                    fontSize: '16px',
+                    fontWeight: 600
+                  }}
+                >
+                  Xác nhận
+                </Button>
+              </div>
+            </Form>
+          </div>
         </Modal>
       </div>
     </WarehouseLayout>

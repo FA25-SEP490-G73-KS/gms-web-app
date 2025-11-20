@@ -39,45 +39,148 @@
 .kv .v { color: #111; }
 .box-note { border: 1px solid #f0f0f2; border-radius: 10px; padding: 12px; background: #fff; }
 
-/* Timeline */
-.appointment-timeline {
-  position: relative;
-  padding-left: 20px;
+/* Appointments Layout */
+.appointments-layout .table-col {
+  width: 100%;
+  max-width: 100%;
 }
 
-.timeline-item {
+.appointments-layout .timeline-col {
+  display: none;
+}
+
+/* When sidebar is collapsed, show timeline and adjust table width */
+.admin-layout.sidebar-collapsed .appointments-layout .table-col {
+  width: 66.66666667%;
+  max-width: 66.66666667%;
+  flex: 0 0 66.66666667%;
+}
+
+.admin-layout.sidebar-collapsed .appointments-layout .timeline-col {
+  display: block !important;
+  width: 33.33333333%;
+  max-width: 33.33333333%;
+  flex: 0 0 33.33333333%;
+}
+
+.appointment-timeline-card {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e0e7ff;
+  padding: 20px;
   position: relative;
-  padding-bottom: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.timeline-header {
   display: flex;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-.timeline-item:not(:last-child)::before {
-  content: '';
-  position: absolute;
-  left: 7px;
-  top: 20px;
-  bottom: -20px;
-  width: 2px;
-  background: #e6e6e6;
+.timeline-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  background: #3b82f6;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
 }
 
-.timeline-marker {
-  position: absolute;
-  left: 0;
-  top: 4px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #ffd65a;
-  border: 2px solid #fff;
-  box-shadow: 0 0 0 2px #ffd65a;
-  z-index: 1;
+.timeline-date-picker {
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+.timeline-date-picker .ant-picker-input > input {
+  border: none !important;
+  padding: 0 !important;
+  font-size: 14px !important;
+  color: #111 !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+.timeline-date-picker .ant-picker-suffix {
+  margin-left: 8px !important;
+  color: #666 !important;
+  font-size: 16px !important;
+}
+
+.timeline-date-picker:hover .ant-picker-input > input,
+.timeline-date-picker.ant-picker-focused .ant-picker-input > input {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.timeline-date-picker .ant-picker {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.appointment-timeline {
+  padding: 8px 0;
+}
+
+.appointment-timeline .ant-timeline-item {
+  padding-bottom: 24px;
+}
+
+.appointment-timeline .ant-timeline-item:last-child {
+  padding-bottom: 0;
+}
+
+.appointment-timeline .ant-timeline-item-tail {
+  border-left: 2px solid #CBB081 !important;
+  left: 9px !important;
+}
+
+.appointment-timeline .ant-timeline-item-head {
+  width: 18px !important;
+  height: 18px !important;
+  border: 3px solid #fff !important;
+  box-shadow: 0 0 0 2px #CBB081, 0 2px 4px rgba(203, 176, 129, 0.3) !important;
+  background-color: #CBB081 !important;
+  left: 0 !important;
+  top: 0 !important;
+  margin-left: 0 !important;
+}
+
+.appointment-timeline .ant-timeline-item-content {
+  margin-left: 20px !important;
+  top: -2px !important;
+  margin-top: 0 !important;
 }
 
 .timeline-content {
-  margin-left: 24px;
   flex: 1;
+}
+
+.timeline-time {
+  font-weight: 700;
+  font-size: 15px;
+  color: #111;
+  margin-bottom: 6px;
+  letter-spacing: 0.2px;
+  line-height: 1.4;
+}
+
+.timeline-count {
+  font-size: 13px;
+  color: #666;
+  font-weight: 400;
+  line-height: 1.4;
 }
 
 

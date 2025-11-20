@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import useAuthStore from '../store/authStore'
 import '../styles/layout/warehouse-layout.css'
 
 export default function AccountanceLayout({ children }) {
@@ -7,12 +8,31 @@ export default function AccountanceLayout({ children }) {
   const location = useLocation()
   const [openHR, setOpenHR] = useState(location.pathname.startsWith('/accountance/hr'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const userMenuRef = useRef(null)
+  const { user, logout } = useAuthStore()
 
   useEffect(() => {
     if (location.pathname.startsWith('/accountance/hr')) {
       setOpenHR(true)
     }
   }, [location.pathname])
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setShowUserMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/login')
+  }
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
@@ -53,8 +73,38 @@ export default function AccountanceLayout({ children }) {
 
   return (
     <div className={`warehouse-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      {/* Header - Full width, no margin/padding */}
+      <header className="warehouse-header">
+        <div className="warehouse-header-content">
+          <div className="warehouse-topbar-left">
+            <button
+              className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
+            </button>
+            <div className="breadcrumb-divider"></div>
+            {breadcrumb.parent ? (
+              <div className="breadcrumb">
+                <span className="breadcrumb-item">{breadcrumb.parent}</span>
+                <span className="breadcrumb-separator">&gt;</span>
+                <span className="breadcrumb-current">{breadcrumb.current}</span>
+              </div>
+            ) : (
+              <span className="breadcrumb-current">{breadcrumb.current}</span>
+            )}
+          </div>
+          <div className="warehouse-topbar-right">
+            <button className="notification-btn">
+              <i className="bi bi-bell"></i>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/accountance')}>
+        <div className="warehouse-brand" onClick={() => navigate('/accountance')} style={{ marginTop: '57px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">
@@ -141,38 +191,78 @@ export default function AccountanceLayout({ children }) {
           </button>
         </nav>
         <div className="warehouse-spacer" />
-        <button className="warehouse-logout" onClick={() => navigate('/')}>
-          <i className="bi bi-box-arrow-right" />
-          <span>Đăng xuất</span>
-        </button>
+        
+        {/* User Info with Dropdown */}
+        <div className="warehouse-user-menu" ref={userMenuRef} style={{ position: 'relative' }}>
+          <button 
+            className="warehouse-user-info" 
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            style={{
+              width: '100%',
+              padding: '12px',
+              border: '1px solid #eee',
+              borderRadius: '10px',
+              background: '#fafafa',
+              cursor: 'pointer',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '4px',
+              alignItems: 'center'
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
+              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            </div>
+            <div style={{ fontSize: '12px', color: '#666' }}>
+              {user?.phone || '0123456789'}
+            </div>
+          </button>
+          
+          {showUserMenu && (
+            <div className="warehouse-user-dropdown" style={{
+              position: 'absolute',
+              bottom: '100%',
+              left: 0,
+              right: 0,
+              marginBottom: '8px',
+              background: '#fff',
+              border: '1px solid #e6e8eb',
+              borderRadius: '8px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              overflow: 'hidden'
+            }}>
+              <button
+                className="warehouse-logout"
+                onClick={handleLogout}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontWeight: 600,
+                  color: '#d1293d',
+                  fontSize: '14px'
+                }}
+              >
+                <i className="bi bi-box-arrow-right" />
+                <span>Đăng xuất</span>
+              </button>
+            </div>
+          )}
+        </div>
       </aside>
 
+      {/* Main Content */}
       <main className="warehouse-main">
-        <div className="warehouse-topbar">
-          <div className="warehouse-topbar-left">
-            <button
-              className={`sidebar-toggle-btn ${sidebarCollapsed ? 'collapsed' : ''}`}
-              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            >
-              <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
-            </button>
-            {breadcrumb.parent ? (
-              <div className="breadcrumb">
-                <span className="breadcrumb-item">{breadcrumb.parent}</span>
-                <i className="bi bi-chevron-right breadcrumb-separator"></i>
-                <span className="breadcrumb-item breadcrumb-current">{breadcrumb.current}</span>
-              </div>
-            ) : (
-              <span className="breadcrumb-current">{breadcrumb.current}</span>
-            )}
-          </div>
-          <div className="warehouse-topbar-right">
-            <button className="notification-btn">
-              <i className="bi bi-bell"></i>
-            </button>
-          </div>
+        <div className="warehouse-content">
+          {children}
         </div>
-        {children}
       </main>
     </div>
   )

@@ -1,18 +1,41 @@
 import { create } from 'zustand';
+import { authAPI } from '../services/api';
 
 const useAuthStore = create((set) => ({
   user: null,
   loading: false,
   
-  login: async (username, password) => {
+  login: async (phone, password) => {
     set({ loading: true });
     try {
-     
-      await new Promise((r) => setTimeout(r, 300));
+      const { data: response, error } = await authAPI.login(phone, password);
+      
+      if (error) {
+        set({ loading: false });
+        throw new Error(error);
+      }
+
+      // Save token if provided
+      if (response?.accessToken) {
+        localStorage.setItem('token', response.accessToken);
+        if (response.refreshToken) {
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
+      }
+
+      // Set user data
+      const userData = response?.user || {
+        id: response?.userId || '1',
+        phone: phone,
+        role: response?.role || 'USER'
+      };
+
       set({ 
-        user: { id: '1', name: 'Demo User', role: 'Manager' },
+        user: userData,
         loading: false 
       });
+
+      return response;
     } catch (error) {
       set({ loading: false });
       throw error;
@@ -20,8 +43,15 @@ const useAuthStore = create((set) => ({
   },
   
   logout: async () => {
-   
-    set({ user: null });
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      set({ user: null });
+    }
   },
   
   setUser: (user) => set({ user }),

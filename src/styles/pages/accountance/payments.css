@@ -1,0 +1,22 @@
+.payments-table .ant-table-thead > tr > th {
+  background: #cbb081 !important;
+  color: #111 !important;
+  border: none !important;
+}
+
+.payments-table .ant-table-tbody > tr:nth-child(odd) > td {
+  background: #fffdf6;
+}
+
+.payments-table .ant-table-tbody > tr:hover > td {
+  background: #f5efe0 !important;
+}
+
+.table-row-even {
+  background: #fffdf6;
+}
+
+.table-row-odd {
+  background: #ffffff;
+}
+

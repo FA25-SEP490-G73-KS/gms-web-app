@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
-import { Form, Input, InputNumber, Select, Button, Card, Row, Col, Table, Space, message } from 'antd'
+import { Form, Input, InputNumber, Select, Button, Card, Row, Col, Table, message } from 'antd'
 import { PlusOutlined, CloseOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import '../../styles/pages/warehouse/create-export-form.css'
+import '../../styles/pages/warehouse/create-import-form.css'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -24,7 +24,14 @@ const TICKET_TYPES = [
   { value: 'kiem_ke', label: 'Kiểm kê' }
 ]
 
-const REASONS = [
+const IMPORT_REASONS = [
+  { value: 'nhap_hang_moi', label: 'Nhập hàng mới' },
+  { value: 'tra_hang', label: 'Trả hàng' },
+  { value: 'dieu_chuyen', label: 'Điều chuyển' },
+  { value: 'khac', label: 'Khác' }
+]
+
+const EXPORT_REASONS = [
   { value: 'xuat_ban', label: 'Xuất bán' },
   { value: 'tra_hang', label: 'Trả hàng' },
   { value: 'dieu_chuyen', label: 'Điều chuyển' },
@@ -37,7 +44,7 @@ const USERS = [
   { value: 'htk_ly', label: 'HTK Ly' }
 ]
 
-export default function CreateExportForm() {
+export default function CreateTicketForm() {
   const [form] = Form.useForm()
   const [components, setComponents] = useState([])
 
@@ -194,7 +201,7 @@ export default function CreateExportForm() {
           form={form}
           layout="vertical"
           onFinish={handleSubmit}
-          className="create-export-form"
+          className="create-import-form"
         >
           {/* Thông tin chung */}
           <Card 
@@ -225,11 +232,11 @@ export default function CreateExportForm() {
                   rules={[{ required: true, message: 'Vui lòng chọn lý do' }]}
                 >
                   <Select placeholder="Chọn lý do">
-                    {REASONS.map(reason => (
-                      <Option key={reason.value} value={reason.value}>
-                        {reason.label}
-                      </Option>
-                    ))}
+                    <Option value="nhap_hang_moi">Nhập hàng mới</Option>
+                    <Option value="xuat_ban">Xuất bán</Option>
+                    <Option value="tra_hang">Trả hàng</Option>
+                    <Option value="dieu_chuyen">Điều chuyển</Option>
+                    <Option value="khac">Khác</Option>
                   </Select>
                 </Form.Item>
               </Col>
@@ -334,3 +341,4 @@ export default function CreateExportForm() {
     </WarehouseLayout>
   )
 }
+

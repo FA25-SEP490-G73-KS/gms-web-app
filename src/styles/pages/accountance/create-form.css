@@ -1,0 +1,72 @@
+.create-form .ant-form-item-label > label {
+  font-weight: 600;
+  color: #111;
+  font-size: 14px;
+}
+
+.create-form .ant-input,
+.create-form .ant-select-selector,
+.create-form .ant-picker {
+  border-radius: 8px;
+  border-color: #d9d9d9;
+  transition: all 0.2s;
+}
+
+.create-form .ant-input:hover,
+.create-form .ant-select-selector:hover,
+.create-form .ant-picker:hover {
+  border-color: #40a9ff;
+}
+
+.create-form .ant-input:focus,
+.create-form .ant-input-focused,
+.create-form .ant-select-focused .ant-select-selector,
+.create-form .ant-picker-focused {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+.create-form .ant-input,
+.create-form textarea.ant-input {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+
+.create-form textarea.ant-input {
+  min-height: 100px;
+}
+
+.file-upload-dragger {
+  border: 2px dashed #d9d9d9;
+  border-radius: 12px;
+  background: #fafafa;
+  padding: 48px 24px;
+  transition: all 0.3s;
+}
+
+.file-upload-dragger:hover {
+  border-color: #1890ff;
+  background: #f0f7ff;
+}
+
+.file-upload-dragger .ant-upload-drag-icon {
+  margin-bottom: 20px;
+}
+
+.file-upload-dragger .ant-upload-drag-icon .anticon {
+  font-size: 56px;
+  color: #1890ff;
+}
+
+.file-upload-dragger .ant-upload-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 8px;
+}
+
+.file-upload-dragger .ant-upload-hint {
+  font-size: 14px;
+  color: #666;
+}
+
