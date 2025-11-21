@@ -4,7 +4,7 @@ import { EyeOutlined, SearchOutlined, CalendarOutlined, PlusOutlined, CloseOutli
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
-import { serviceTicketAPI } from '../../services/api'
+import { serviceTicketAPI, employeeAPI } from '../../services/api'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/ticketservice.css'
@@ -12,13 +12,6 @@ import '../../styles/pages/admin/createticket.css'
 
 const { Search } = Input
 const { TextArea } = Input
-
-const TECHS = [
-  { id: 1, name: 'HTK Ly' },
-  { id: 2, name: 'DT Huyền' },
-  { id: 3, name: 'Nguyễn Văn B' },
-  { id: 4, name: 'Phạm Đức Đạt' }
-]
 
 const SERVICES = [
   { label: 'Thay thế phụ tùng', value: 1 },
@@ -73,6 +66,9 @@ export default function TicketService() {
   const [createLoading, setCreateLoading] = useState(false)
   const [selectedServices, setSelectedServices] = useState([])
   const [selectKey, setSelectKey] = useState(0)
+  const [currentAppointmentId, setCurrentAppointmentId] = useState(null)
+  const [technicians, setTechnicians] = useState([])
+  const [techniciansLoading, setTechniciansLoading] = useState(false)
 
   useEffect(() => {
     fetchServiceTickets()
@@ -88,6 +84,8 @@ export default function TicketService() {
 
   useEffect(() => {
     if (location.state?.appointmentId) {
+      const appointmentId = location.state.appointmentId
+      setCurrentAppointmentId(appointmentId)
       setCreateModalOpen(true)
       
       if (location.state.customer || location.state.phone || location.state.licensePlate) {
@@ -101,6 +99,49 @@ export default function TicketService() {
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location.state])
+
+  useEffect(() => {
+    if (createModalOpen) {
+      fetchTechnicians()
+    }
+  }, [createModalOpen])
+
+  const fetchTechnicians = async () => {
+    setTechniciansLoading(true)
+    try {
+      const { data: response, error } = await employeeAPI.getTechnicians()
+      
+      if (error) {
+        console.error('Error fetching technicians:', error)
+        message.error('Không thể tải danh sách kỹ thuật viên. Vui lòng thử lại.')
+        setTechnicians([])
+        setTechniciansLoading(false)
+        return
+      }
+
+      if (response && Array.isArray(response.result)) {
+        const techList = response.result.map(tech => ({
+          value: tech.employeeId,
+          label: tech.fullName
+        }))
+        setTechnicians(techList)
+      } else if (Array.isArray(response)) {
+        const techList = response.map(tech => ({
+          value: tech.employeeId,
+          label: tech.fullName
+        }))
+        setTechnicians(techList)
+      } else {
+        setTechnicians([])
+      }
+    } catch (err) {
+      console.error('Error fetching technicians:', err)
+      message.error('Đã xảy ra lỗi khi tải danh sách kỹ thuật viên.')
+      setTechnicians([])
+    } finally {
+      setTechniciansLoading(false)
+    }
+  }
 
   const fetchServiceTickets = async () => {
     setLoading(true)
@@ -256,36 +297,42 @@ export default function TicketService() {
     setCreateLoading(true)
     
     try {
-      const appointmentId = location.state?.appointmentId || 0
+      const appointmentId = currentAppointmentId ? parseInt(currentAppointmentId) : null
       
       const payload = {
-        appointmentId: appointmentId || 0,
+        appointmentId: appointmentId && appointmentId > 0 ? appointmentId : 0,
         serviceTypeIds: selectedServices.map(s => s.value),
         customer: {
           customerId: 0,
-          fullName: values.name,
-          phone: values.phone,
+          fullName: values.name || '',
+          phone: values.phone || '',
           address: values.address || '',
           customerType: 'CA_NHAN',
           loyaltyLevel: 'BRONZE'
         },
         vehicle: {
           vehicleId: 0,
-          licensePlate: values.plate,
-          brandId: 0,
-          modelId: 0,
+          licensePlate: values.plate || '',
+          brandId: values.brandId || 0,
+          modelId: values.modelId || 0,
           modelName: values.model || '',
-          year: 0,
-          vin: values.vin || ''
+          vin: values.vin || '',
+          year: values.year ? parseInt(values.year) : 0
         },
-        assignedTechnicianIds: values.techs || [],
-        receiveCondition: values.note || '',
-        expectedDeliveryAt: values.receiveDate ? values.receiveDate.format('YYYY-MM-DD') : ''
+        assignedTechnicianIds: values.techs && Array.isArray(values.techs) && values.techs.length > 0 ? values.techs : [0],
+        receiveCondition: values.note || ''
       }
+
+      if (values.receiveDate) {
+        payload.expectedDeliveryAt = values.receiveDate.format('YYYY-MM-DD')
+      }
+
+      console.log('Creating service ticket with payload:', payload)
 
       const { data, error } = await serviceTicketAPI.create(payload)
       
       if (error) {
+        console.error('Error creating service ticket:', error)
         message.error(error || 'Tạo phiếu không thành công. Vui lòng thử lại.')
         setCreateLoading(false)
         return
@@ -295,6 +342,7 @@ export default function TicketService() {
         message.success('Tạo phiếu dịch vụ thành công')
         createForm.resetFields()
         setSelectedServices([])
+        setCurrentAppointmentId(null)
         setCreateModalOpen(false)
         await fetchServiceTickets()
       } else {
@@ -312,6 +360,7 @@ export default function TicketService() {
     setCreateModalOpen(false)
     createForm.resetFields()
     setSelectedServices([])
+    setCurrentAppointmentId(null)
   }
 
   const historyColumns = [
@@ -728,8 +777,10 @@ export default function TicketService() {
               >
                 <Select
                   mode="multiple"
-                  options={TECHS.map(t => ({ value: t.id, label: t.name }))}
-                  placeholder="Chọn kỹ thuật viên"
+                  options={technicians}
+                  placeholder={techniciansLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                  loading={techniciansLoading}
+                  disabled={techniciansLoading}
                 />
               </Form.Item>
 

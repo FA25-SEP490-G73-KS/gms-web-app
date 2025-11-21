@@ -185,9 +185,9 @@ export default function AdminAppointments() {
       
       let transformed = resultArray.map(item => ({
         id: item.appointmentId,
-        customer: item.customerName || '',
+        customer: item.customerName || item.customer?.fullName || item.customer?.name || item.customer?.customerName || '',
         license: item.licensePlate || '',
-        phone: item.customerPhone || '',
+        phone: item.customerPhone || item.customer?.phone || '',
         status: statusMap[item.status] || item.status || 'Chờ',
         statusKey: item.status || 'CONFIRMED',
         time: item.timeSlotLabel || '',
@@ -195,6 +195,8 @@ export default function AdminAppointments() {
         dateRaw: item.appointmentDate,
         serviceType: Array.isArray(item.serviceType) ? item.serviceType.join(', ') : (item.serviceType || ''),
         note: item.note || '',
+        // Keep original item for detail view
+        originalItem: item
       }))
       
       if (statusFilter) {
@@ -254,7 +256,14 @@ export default function AdminAppointments() {
     }
     
     if (response && response.result) {
-      setSelectedFull(response.result)
+      // Ensure customerName is populated from customer object if available
+      const result = response.result
+      setSelectedFull({
+        ...result,
+        customerName: result.customerName || result.customer?.fullName || result.customer?.name || result.customer?.customerName || '',
+        customerPhone: result.customerPhone || result.customer?.phone || '',
+        licensePlate: result.licensePlate || result.vehicle?.licensePlate || ''
+      })
     } else {
       setSelectedFull(fallbackDetail)
     }
@@ -295,7 +304,7 @@ export default function AdminAppointments() {
     return timeSlots
   }, [data, selectedDate])
 
-  const handleCreateTicket = async () => {
+  const handleCreateTicket = () => {
     if (!selectedFull && !selected) {
       message.error('Không tìm thấy thông tin lịch hẹn')
       return
@@ -307,45 +316,30 @@ export default function AdminAppointments() {
       return
     }
 
-    try {
-      setLoading(true)
-      const { data: response, error } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
-      
-      if (error) {
-        message.error(error || 'Không thể cập nhật trạng thái lịch hẹn. Vui lòng thử lại.')
-        setLoading(false)
-        return
-      }
-
-      if (response && (response.statusCode === 200 || response.result)) {
-        message.success('Đã cập nhật trạng thái lịch hẹn và tạo phiếu dịch vụ thành công!')
-        
-        navigate('/service-advisor/orders', { 
-          state: { 
-            appointmentId: appointmentId,
-            customer: selectedFull?.customerName || selected?.customer,
-            phone: selectedFull?.customerPhone || selected?.phone,
-            licensePlate: selectedFull?.licensePlate || selected?.license
-          } 
-        })
-        
-        await fetchAppointments()
-        
-        setSelected(null)
-        setSelectedFull(null)
-      } else {
-        message.error('Không thể cập nhật trạng thái lịch hẹn. Vui lòng thử lại.')
-        setLoading(false)
-      }
-    } catch (err) {
-      console.error('Error updating appointment status:', err)
-      message.error('Đã xảy ra lỗi khi cập nhật trạng thái lịch hẹn.')
-      setLoading(false)
-    }
+    navigate('/service-advisor/orders', { 
+      state: { 
+        appointmentId: appointmentId,
+        customer: selectedFull?.customerName || selected?.customer,
+        phone: selectedFull?.customerPhone || selected?.phone,
+        licensePlate: selectedFull?.licensePlate || selected?.license
+      } 
+    })
+    
+    setSelected(null)
+    setSelectedFull(null)
   }
 
   const handleViewDetail = async (record) => {
     setSelected(record)
+    // If we have customer name in the record, use it immediately
+    if (record.originalItem && (record.originalItem.customer?.fullName || record.originalItem.customer?.name)) {
+      setSelectedFull({
+        ...record.originalItem,
+        customerName: record.originalItem.customerName || record.originalItem.customer?.fullName || record.originalItem.customer?.name || record.customer || '',
+        customerPhone: record.originalItem.customerPhone || record.originalItem.customer?.phone || record.phone || '',
+        licensePlate: record.originalItem.licensePlate || record.license || ''
+      })
+    }
     await fetchAppointmentDetail(record.id)
   }
 

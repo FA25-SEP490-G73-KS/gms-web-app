@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { message } from 'antd'
 import useAuthStore from '../../store/authStore'
 import '../../styles/pages/auth/login.css'
 
@@ -39,6 +40,8 @@ export default function Login() {
     setLoading(true)
     try {
       await login(form.phone, form.password)
+      
+      message.success('Đăng nhập thành công!')
       
       const currentUser = useAuthStore.getState().user
       const userRole = currentUser?.role

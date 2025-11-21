@@ -12,6 +12,7 @@ import AdminHome from './pages/admin/AdminHome';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
 import TicketDetailPage from './pages/admin/TicketDetailPage';
+import Reports from './pages/admin/Reports';
 import AccountanceEmployeeList from './pages/accountance/EmployeeList';
 import AccountancePayroll from './pages/accountance/Payroll';
 import AccountanceAttendance from './pages/accountance/Attendance';
@@ -70,7 +71,8 @@ function App() {
         <Route path="/admin/orders/:id" element={<AdminOrdersRedirect />} />
         <Route path="/admin/inventory" element={<Navigate to="/service-advisor/inventory" replace />} />
         
-        <Route path="/service-advisor" element={<AdminHome />} />
+        <Route path="/service-advisor" element={<Navigate to="/service-advisor/reports" replace />} />
+        <Route path="/service-advisor/reports" element={<Reports />} />
         <Route path="/service-advisor/appointments" element={<AdminAppointments />} />
         <Route path="/service-advisor/orders" element={<TicketService />} />
         <Route path="/service-advisor/orders/history" element={<TicketService />} />

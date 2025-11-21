@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import { Table, Input, Space, Button, DatePicker, Modal, Form, InputNumber, Select, message, Checkbox } from 'antd'
 import { SearchOutlined, CalendarOutlined, EditOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { partsAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 import '../../styles/pages/warehouse/import-list.css'
 import '../../styles/pages/warehouse/parts-list.css'
@@ -13,84 +14,94 @@ const statusOptions = ['Chờ nhập', 'Đã nhập', 'Tất cả']
 export default function PartsList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('Chờ nhập')
+  const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPart, setSelectedPart] = useState(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createForm] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+  const [parts, setParts] = useState([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [editForm] = Form.useForm()
 
-  const parts = [
-    {
-      id: 1,
-      name: 'Dầu nhớt',
-      origin: 'VN',
-      brand: 'Castrol',
-      vehicleModel: 'All',
-      quantityOnHand: 25,
-      reservedQuantity: 5,
-      alertThreshold: 5,
-      importPrice: 120000,
-      sellingPrice: 150000,
-      createdAt: '2025-11-10',
-      status: 'Chờ nhập'
-    },
-    {
-      id: 2,
-      name: 'Lọc gió',
-      origin: 'VN',
-      brand: 'Honda',
-      vehicleModel: 'Fortuner',
-      quantityOnHand: 15,
-      reservedQuantity: 5,
-      alertThreshold: 5,
-      importPrice: 120000,
-      sellingPrice: 150000,
-      createdAt: '2025-11-10',
-      status: 'Đã nhập'
-    },
-    {
-      id: 3,
-      name: 'Bugì',
-      origin: 'China',
-      brand: 'Honda',
-      vehicleModel: 'Fortuner',
-      quantityOnHand: 12,
-      reservedQuantity: 5,
-      alertThreshold: 5,
-      importPrice: 120000,
-      sellingPrice: 150000,
-      createdAt: '2025-11-10',
-      status: 'Chờ nhập'
-    },
-    {
-      id: 4,
-      name: 'Lốp xe',
-      origin: 'VN',
-      brand: 'Honda',
-      vehicleModel: 'Fortuner',
-      quantityOnHand: 8,
-      reservedQuantity: 5,
-      alertThreshold: 5,
-      importPrice: 120000,
-      sellingPrice: 150000,
-      createdAt: '2025-11-10',
-      status: 'Đã nhập'
-    },
-    {
-      id: 5,
-      name: 'Ống thủy lực động dầu',
-      origin: 'USA',
-      brand: 'Honda',
-      vehicleModel: 'Fortuner',
-      quantityOnHand: 3,
-      reservedQuantity: 5,
-      alertThreshold: 5,
-      importPrice: 120000,
-      sellingPrice: 150000,
-      createdAt: '2025-11-10',
-      status: 'Chờ nhập'
+  useEffect(() => {
+    fetchParts()
+  }, [page, pageSize])
+
+  const fetchParts = async () => {
+    setLoading(true)
+    try {
+      const { data: response, error } = await partsAPI.getAll(page - 1, pageSize)
+      
+      if (error) {
+        message.error('Không thể tải danh sách linh kiện. Vui lòng thử lại.')
+        setParts([])
+        setTotal(0)
+        setLoading(false)
+        return
+      }
+
+      let resultArray = []
+      let totalCount = 0
+
+      if (response) {
+        if (response.result && response.result.content && Array.isArray(response.result.content)) {
+          resultArray = response.result.content
+          totalCount = response.result.totalElements || response.result.numberOfElements || 0
+        } else if (Array.isArray(response.result)) {
+          resultArray = response.result
+          totalCount = response.result.length
+        } else if (Array.isArray(response.data)) {
+          resultArray = response.data
+          totalCount = response.data.length
+        } else if (Array.isArray(response)) {
+          resultArray = response
+          totalCount = response.length
+        } else if (Array.isArray(response.content)) {
+          resultArray = response.content
+          totalCount = response.totalElements || response.content.length
+        }
+      }
+
+      // Map API response to component format
+      const mappedParts = resultArray.map(item => ({
+        id: item.partId,
+        name: item.name || '',
+        origin: item.market || 'VN',
+        brand: item.categoryName || '',
+        vehicleModel: item.universal ? 'All' : (item.compatibleVehicleIds?.length > 0 ? 'Specific' : 'All'),
+        quantityOnHand: item.quantityInStock || 0,
+        reservedQuantity: item.reservedQuantity || 0,
+        alertThreshold: item.reorderLevel || 0,
+        importPrice: item.purchasePrice || 0,
+        sellingPrice: item.sellingPrice || 0,
+        unit: item.unit || '',
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        compatibleVehicleModelIds: item.compatibleVehicleIds || item.compatibleVehicleModelIds || [],
+        discountRate: item.discountRate || 0,
+        specialPart: item.specialPart || false,
+        universal: item.universal || false,
+        market: item.market || 'VN',
+        createdAt: item.createdAt || new Date().toISOString().split('T')[0],
+        status: item.quantityInStock > 0 ? 'Đã nhập' : 'Chờ nhập',
+        // Keep original item for updates
+        originalItem: item
+      }))
+
+      setParts(mappedParts)
+      setTotal(totalCount)
+    } catch (err) {
+      console.error('Error fetching parts:', err)
+      message.error('Đã xảy ra lỗi khi tải danh sách linh kiện.')
+      setParts([])
+      setTotal(0)
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
 
   const filteredData = useMemo(() => {
     return parts
@@ -98,7 +109,7 @@ export default function PartsList() {
         const matchesSearch =
           !searchTerm ||
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.brand.toLowerCase().includes(searchTerm.toLowerCase())
+          (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()))
 
         let matchesDate = true
         if (dateFilter) {
@@ -109,7 +120,7 @@ export default function PartsList() {
         return matchesSearch && matchesDate && matchesStatus
       })
       .map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
-  }, [searchTerm, dateFilter, statusFilter])
+  }, [parts, searchTerm, dateFilter, statusFilter])
 
   const columns = [
     {
@@ -197,18 +208,136 @@ export default function PartsList() {
     }
   ]
 
-  const handleOpenDetail = (part) => {
+  const handleOpenDetail = async (part) => {
     setSelectedPart(part)
     setModalOpen(true)
+    
+    // Fetch full details if needed
+    if (part.id && !part.originalItem) {
+      try {
+        const { data: response, error } = await partsAPI.getById(part.id)
+        if (!error && response && response.result) {
+          const fullPart = {
+            ...part,
+            ...response.result,
+            originalItem: response.result
+          }
+          setSelectedPart(fullPart)
+          editForm.setFieldsValue({
+            name: response.result.name,
+            origin: response.result.market,
+            brand: response.result.categoryName,
+            vehicleModel: response.result.universal ? 'All' : 'Specific',
+            quantityOnHand: response.result.quantityInStock,
+            reservedQuantity: response.result.reservedQuantity,
+            alertThreshold: response.result.reorderLevel,
+            sellingPrice: response.result.sellingPrice,
+            importPrice: response.result.purchasePrice,
+            unit: response.result.unit,
+            useForAllModels: response.result.universal,
+            status: response.result.quantityInStock > 0 ? 'Đã nhập' : 'Chờ nhập'
+          })
+        } else {
+          editForm.setFieldsValue(part)
+        }
+      } catch (err) {
+        console.error('Error fetching part details:', err)
+        editForm.setFieldsValue(part)
+      }
+    } else {
+      editForm.setFieldsValue({
+        name: part.name,
+        origin: part.origin,
+        brand: part.brand,
+        vehicleModel: part.vehicleModel,
+        quantityOnHand: part.quantityOnHand,
+        reservedQuantity: part.reservedQuantity,
+        alertThreshold: part.alertThreshold,
+        sellingPrice: part.sellingPrice,
+        importPrice: part.importPrice,
+        unit: part.unit,
+        useForAllModels: part.universal,
+        status: part.status
+      })
+    }
   }
 
   const handleCreatePart = async (values) => {
-    // TODO: Call API to create part
-    console.log('Creating part:', values)
-    message.success('Thêm linh kiện thành công')
-    createForm.resetFields()
-    setCreateModalOpen(false)
-    // Refresh list if needed
+    try {
+      const payload = {
+        name: values.name,
+        market: values.origin || 'VN',
+        categoryId: 0, // TODO: Get from category selection if available
+        purchasePrice: values.importPrice || 0,
+        sellingPrice: values.sellingPrice || 0,
+        reorderLevel: values.alertThreshold || 0,
+        unit: values.unit || '',
+        universal: values.useForAllModels || false,
+        specialPart: false,
+        compatibleVehicleModelIds: values.useForAllModels ? [] : (values.vehicleModelIds || []),
+        discountRate: 0
+      }
+
+      const { data: response, error } = await partsAPI.create(payload)
+
+      if (error) {
+        message.error(error || 'Tạo linh kiện không thành công. Vui lòng thử lại.')
+        return
+      }
+
+      if (response && (response.statusCode === 200 || response.statusCode === 201 || response.result)) {
+        message.success('Thêm linh kiện thành công')
+        createForm.resetFields()
+        setCreateModalOpen(false)
+        fetchParts() // Refresh list
+      } else {
+        message.error('Tạo linh kiện không thành công. Vui lòng thử lại.')
+      }
+    } catch (err) {
+      console.error('Error creating part:', err)
+      message.error('Đã xảy ra lỗi khi tạo linh kiện. Vui lòng thử lại.')
+    }
+  }
+
+  const handleUpdatePart = async (values) => {
+    if (!selectedPart || !selectedPart.id) {
+      message.error('Không tìm thấy thông tin linh kiện')
+      return
+    }
+
+    try {
+      const payload = {
+        name: values.name,
+        market: values.origin || 'VN',
+        categoryId: selectedPart.categoryId || 0,
+        purchasePrice: values.importPrice || 0,
+        sellingPrice: values.sellingPrice || 0,
+        reorderLevel: values.alertThreshold || 0,
+        unit: values.unit || '',
+        universal: values.useForAllModels || false,
+        specialPart: selectedPart.specialPart || false,
+        compatibleVehicleModelIds: values.useForAllModels ? [] : (selectedPart.compatibleVehicleModelIds || []),
+        discountRate: selectedPart.discountRate || 0
+      }
+
+      const { data: response, error } = await partsAPI.update(selectedPart.id, payload)
+
+      if (error) {
+        message.error(error || 'Cập nhật linh kiện không thành công. Vui lòng thử lại.')
+        return
+      }
+
+      if (response && (response.statusCode === 200 || response.statusCode === 201 || response.result)) {
+        message.success('Cập nhật linh kiện thành công')
+        setModalOpen(false)
+        fetchParts() // Refresh list
+      } else {
+        message.error('Cập nhật linh kiện không thành công. Vui lòng thử lại.')
+      }
+    } catch (err) {
+      console.error('Error updating part:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật linh kiện. Vui lòng thử lại.')
+    }
   }
 
   const handleCreateModalClose = () => {
@@ -283,12 +412,22 @@ export default function PartsList() {
             className="parts-table"
             columns={columns}
             dataSource={filteredData}
+            loading={loading}
             pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
+              current: page,
+              pageSize: pageSize,
               total: filteredData.length,
+              showSizeChanger: true,
               showTotal: (total) => `0 of ${total} row(s) selected.`,
-              pageSizeOptions: ['10', '20', '50', '100']
+              pageSizeOptions: ['10', '20', '50', '100'],
+              onChange: (page, pageSize) => {
+                setPage(page)
+                setPageSize(pageSize)
+              },
+              onShowSizeChange: (current, size) => {
+                setPage(1)
+                setPageSize(size)
+              }
             }}
             rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-even' : 'table-row-odd')}
             size="middle"
@@ -341,7 +480,7 @@ export default function PartsList() {
               </div>
 
               <div style={{ padding: '24px' }}>
-                <Form layout="vertical" initialValues={selectedPart}>
+              <Form layout="vertical" form={editForm} onFinish={handleUpdatePart}>
                   {/* Trạng thái và Số lượng ở trên cùng */}
                   <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
                     <Form.Item label="Trạng thái" name="status" style={{ flex: 1 }}>
@@ -358,17 +497,17 @@ export default function PartsList() {
                     </Form.Item>
                   </div>
 
-                  <Form.Item label="Tên linh kiện" name="name">
+              <Form.Item label="Tên linh kiện" name="name">
                     <Input placeholder="Dầu máy 5W-30" />
-                  </Form.Item>
+              </Form.Item>
 
                   <Form.Item label="Xuất xứ" name="origin">
-                    <Select
+                  <Select
                       placeholder="Chọn xuất xứ"
-                      options={[
-                        { value: 'VN', label: 'VN' },
-                        { value: 'USA', label: 'USA' },
-                        { value: 'China', label: 'China' },
+                    options={[
+                      { value: 'VN', label: 'VN' },
+                      { value: 'USA', label: 'USA' },
+                      { value: 'China', label: 'China' },
                         { value: 'UK', label: 'UK' },
                         { value: 'Motul', label: 'Motul' }
                       ]}
@@ -442,7 +581,7 @@ export default function PartsList() {
                         fontWeight: 600
                       }}
                     >
-                      Xác nhận
+                      Cập nhật
                     </Button>
                   </div>
                 </Form>
@@ -510,7 +649,7 @@ export default function PartsList() {
                     options={[
                       { value: 'Chờ nhập', label: 'Chờ nhập' }, 
                       { value: 'Đã nhập', label: 'Đã nhập' }
-                    ]} 
+                    ]}
                   />
                 </Form.Item>
                 <Form.Item 
@@ -628,7 +767,7 @@ export default function PartsList() {
                   Xác nhận
                 </Button>
               </div>
-            </Form>
+              </Form>
           </div>
         </Modal>
       </div>
