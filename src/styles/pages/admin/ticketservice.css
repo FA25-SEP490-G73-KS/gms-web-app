@@ -1,0 +1,19 @@
+.ts-badge { background: #f5f7fb; color: #3b4754; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
+.ts-badge.info { background: #eef3ff; color: #486FE0; }
+.ts-badge.warn { background: #fff3e0; color: #E89400; }
+.ts-badge.gray { background: #eef1f5; color: #5f6b7a; }
+.ts-badge.danger { background: #ffe9ec; color: #ef4444; }
+
+/* pagination (match appointments) */
+.pagination { display: flex; align-items: center; gap: 8px; }
+.pagination .page { border: none; background: transparent; min-width: 28px; height: 28px; padding: 0; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #5f6b7a; cursor: pointer; }
+.pagination .page.icon { border: 1px solid #e6e6e6; background: #fff; border-radius: 8px; min-width: 28px; }
+.pagination .page.active { background: #111; color: #ffd65a; }
+.pagination .page:disabled { opacity: .5; cursor: not-allowed; }
+.pagination .dots { color: #a0a7b3; padding: 0 4px; }
+
+/* icon cell centering */
+.admin-table td { vertical-align: middle; }
+.icon-cell { text-align: center; display: flex; align-items: center; justify-content: center; }
+.icon-cell .action-eye { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; line-height: 0; }
+

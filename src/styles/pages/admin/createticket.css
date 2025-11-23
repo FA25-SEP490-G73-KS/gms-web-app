@@ -1,0 +1,10 @@
+.ct-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 12px; }
+.ct-box { border: 1px solid #eee; border-radius: 8px; padding: 12px; background: #fff; }
+.ct-field { display: grid; gap: 6px; margin-bottom: 10px; }
+.ct-field label { font-weight: 700; color: #111; }
+.req { color: #ef4444; }
+.ct-actions { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+.caret { color: #9aa0a6; }
+
+@media (max-width: 900px) { .ct-grid { grid-template-columns: 1fr; } }
+

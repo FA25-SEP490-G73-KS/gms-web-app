@@ -1,0 +1,253 @@
+.customer-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.customer-header {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.customer-header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 5%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 80px;
+}
+
+.customer-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: #111;
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.customer-logo img {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.customer-nav {
+  display: flex;
+  gap: 2rem;
+}
+
+.customer-nav .nav-link {
+  text-decoration: none;
+  color: #333;
+  font-weight: 500;
+  transition: color 0.2s;
+  position: relative;
+}
+
+.customer-nav .nav-link:hover {
+  color: #e3b52a;
+}
+
+.customer-nav .nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #e3b52a;
+  transition: width 0.3s;
+}
+
+.customer-nav .nav-link:hover::after {
+  width: 100%;
+}
+
+.customer-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-outline {
+  padding: 0.6rem 1.2rem;
+  border: 2px solid #e3b52a;
+  background: transparent;
+  color: #e3b52a;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.3s;
+}
+
+.btn-outline:hover {
+  background: #e3b52a;
+  color: #fff;
+}
+
+.btn-primary {
+  padding: 0.6rem 1.5rem;
+  background: #e3b52a;
+  color: #111;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.btn-primary:hover {
+  background: #ffd65a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(227, 181, 42, 0.3);
+}
+
+.customer-main {
+  flex: 1;
+  width: 100%;
+}
+
+.customer-footer {
+  background: linear-gradient(135deg, #1a1a1a 0%, #2c2c2c 100%);
+  color: #ddd;
+  padding: 3rem 0 0;
+  margin-top: 4rem;
+}
+
+.customer-footer-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 5%;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 2rem;
+  padding-bottom: 2rem;
+}
+
+.footer-section h3 {
+  color: #e3b52a;
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.footer-section h4 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 0.8rem;
+}
+
+.footer-section p {
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.footer-section i {
+  color: #e3b52a;
+}
+
+.social-links {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.social-links a {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(227, 181, 42, 0.1);
+  color: #e3b52a;
+  border-radius: 50%;
+  text-decoration: none;
+  font-size: 1.2rem;
+  transition: all 0.3s;
+}
+
+.social-links a:hover {
+  background: #e3b52a;
+  color: #111;
+  transform: translateY(-3px);
+}
+
+.footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.5rem 5%;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+@media (max-width: 992px) {
+  .customer-header-content {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 1rem 5%;
+  }
+
+  .customer-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+  }
+
+  .customer-actions {
+    gap: 0.5rem;
+  }
+
+  .btn-outline,
+  .btn-primary {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .customer-nav {
+    flex-direction: column;
+    gap: 0.5rem;
+    text-align: center;
+  }
+
+  .customer-actions {
+    flex-direction: column;
+    width: 100%;
+    margin-top: 1rem;
+  }
+
+  .btn-outline,
+  .btn-primary {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .customer-footer-content {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+
+  .footer-section p {
+    justify-content: center;
+  }
+
+  .social-links {
+    justify-content: center;
+  }
+}
+
