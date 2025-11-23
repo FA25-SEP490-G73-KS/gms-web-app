@@ -6,18 +6,12 @@ import {
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI } from '../../services/api'
+import { serviceTicketAPI, priceQuotationAPI, partsAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/modals/ticketdetail.css'
+import dayjs from 'dayjs'
 
 const { TextArea } = Input
-const { TabPane } = Tabs
-
-const TECHS = [
-  { value: 'Hoàng Văn B', label: 'Hoàng Văn B' },
-  { value: 'Nguyễn Văn B', label: 'Nguyễn Văn B' },
-  { value: 'Phạm Đức Đạt', label: 'Phạm Đức Đạt' },
-]
 
 const UNITS = [
   { value: 'Cái', label: 'Cái' },
@@ -39,97 +33,145 @@ export default function TicketDetailPage() {
   const [showDateModal, setShowDateModal] = useState(false)
   const [expectedDate, setExpectedDate] = useState(null)
   const [errors, setErrors] = useState({})
+  const [technicians, setTechnicians] = useState([])
+  const [selectedTechnician, setSelectedTechnician] = useState(null)
+  const [parts, setParts] = useState([])
+  const [partsLoading, setPartsLoading] = useState(false)
 
   useEffect(() => {
     if (id) {
       fetchTicketDetail()
     }
+    fetchParts()
   }, [id])
+
+  const fetchParts = async () => {
+    setPartsLoading(true)
+    try {
+      const { data: response, error } = await partsAPI.getAll(0, 100)
+      
+      if (error) {
+        console.warn('Error fetching parts:', error)
+        setParts([])
+        setPartsLoading(false)
+        return
+      }
+
+      console.log('Parts API response:', response)
+
+      let partsList = []
+      if (response && response.result) {
+        if (Array.isArray(response.result)) {
+          partsList = response.result
+        } else if (response.result.content && Array.isArray(response.result.content)) {
+          partsList = response.result.content
+        } else if (Array.isArray(response.result)) {
+          partsList = response.result
+        }
+      } else if (Array.isArray(response)) {
+        partsList = response
+      }
+      
+      console.log('Parts list:', partsList)
+      
+      const partsOptions = partsList
+        .filter(part => part && (part.partId || part.id) && (part.name || part.partName))
+        .map(part => ({
+          value: part.partId || part.id,
+          label: part.name || part.partName || '',
+          part: part
+        }))
+      
+      console.log('Parts options:', partsOptions)
+      setParts(partsOptions)
+    } catch (err) {
+      console.error('Error fetching parts:', err)
+      setParts([])
+    } finally {
+      setPartsLoading(false)
+    }
+  }
 
   const fetchTicketDetail = async () => {
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getById(id)
     setLoading(false)
     
-    // Fallback data for testing
-    const fallbackTicketData = {
-      serviceTicketId: id,
-      code: `STK-2025-${String(id || 0).padStart(6, '0')}`,
-      customer: {
-        fullName: 'Nguyễn Văn A',
-        phone: '0123456789',
-      },
-      vehicle: {
-        model: 'Mazda-v3',
-        licensePlate: '25A-123456',
-        vin: '1HGCM82633A123456',
-      },
-      createdAt: '2025-10-12',
-      assignedTechnicians: [{ name: 'Nguyễn Văn B' }],
-      quoteItems: [],
-    }
-    
     if (error || !response || !response.result) {
-      console.warn('API error, using fallback data:', error)
-      setTicketData(fallbackTicketData)
-      form.setFieldsValue({
-        customerName: 'Nguyễn Văn A',
-        phone: '0123456789',
-        vehicleType: 'Mazda-v3',
-        licensePlate: '25A-123456',
-        chassisNumber: '1HGCM82633A123456',
-        quoteStaff: 'Hoàng Văn B',
-        receiveDate: '12/10/2025',
-        technician: 'Nguyễn Văn B',
-        serviceType: 'Thay thế phụ tùng',
-      })
-      
-      // Initialize with empty items to show "Tạo báo giá" button
-      setReplaceItems([])
-      setServiceItems([])
+      console.error('Error fetching ticket detail:', error)
+      message.error('Không thể tải thông tin phiếu dịch vụ. Vui lòng thử lại.')
       return
     }
     
     if (response && response.result) {
-      setTicketData(response.result)
+      const data = response.result
+      setTicketData(data)
+      
+      const deliveryDate = data.deliveryAt ? dayjs(data.deliveryAt) : null
+      setExpectedDate(deliveryDate)
+      
+      const vehicle = data.vehicle || {}
+      const vehicleModel = vehicle.vehicleModel || {}
+      const brandName = vehicleModel.brandName || vehicle.brand || ''
+      const modelName = vehicleModel.modelName || vehicle.model || ''
+      
+      const techniciansList = Array.isArray(data.technicians) ? data.technicians : []
+      const techniciansOptions = techniciansList.map(tech => ({
+        value: tech,
+        label: tech
+      }))
+      setTechnicians(techniciansOptions)
+      setSelectedTechnician(techniciansList[0] || null)
+      
+      const serviceTypes = Array.isArray(data.serviceType) ? data.serviceType.join(', ') : (data.serviceType || '')
+      
+      const quoteStaffName = data.createdBy || ''
+      const brandNameFromVehicle = vehicle.brandName || ''
+      const modelNameFromVehicle = vehicle.vehicleModelName || modelName
+      
       form.setFieldsValue({
-        customerName: response.result.customer?.fullName || 'Nguyễn Văn A',
-        phone: response.result.customer?.phone || '0123456789',
-        vehicleType: response.result.vehicle?.model || 'Mazda-v3',
-        licensePlate: response.result.vehicle?.licensePlate || '25A-123456',
-        chassisNumber: response.result.vehicle?.vin || '1HGCM82633A123456',
-        quoteStaff: 'Hoàng Văn B',
-        receiveDate: response.result.createdAt ? new Date(response.result.createdAt).toLocaleDateString('vi-VN') : '12/10/2025',
-        technician: response.result.assignedTechnicians?.[0]?.name || 'Nguyễn Văn B',
-        serviceType: 'Thay thế phụ tùng',
+        customerName: data.customer?.fullName || '',
+        phone: data.customer?.phone || '',
+        vehicleType: modelNameFromVehicle,
+        licensePlate: vehicle.licensePlate || '',
+        chassisNumber: vehicle.vin || '',
+        quoteStaff: quoteStaffName,
+        receiveDate: data.createdAt ? dayjs(data.createdAt) : null,
+        technician: techniciansList[0] || '',
+        serviceType: serviceTypes,
       })
       
-      // Load quote items if available
-      if (response.result.quoteItems && response.result.quoteItems.length > 0) {
-        setReplaceItems(response.result.quoteItems.filter(item => item.type === 'REPLACEMENT') || [])
-        setServiceItems(response.result.quoteItems.filter(item => item.type === 'SERVICE') || [])
+      // Load quote items from priceQuotation if available
+      if (data.priceQuotation && data.priceQuotation.items && Array.isArray(data.priceQuotation.items)) {
+        const items = data.priceQuotation.items
+        const replacementItems = items
+          .filter(item => item.itemType === 'PART')
+          .map((item, index) => ({
+            id: item.priceQuotationItemId || Date.now() + index,
+            category: item.partName || '',
+            quantity: item.quantity || 1,
+            unit: item.unit || '',
+            unitPrice: item.unitPrice || 0,
+            total: item.totalPrice || 0
+          }))
+        
+        const serviceItems = items
+          .filter(item => item.itemType === 'SERVICE')
+          .map((item, index) => ({
+            id: item.priceQuotationItemId || Date.now() + index + 1000,
+            task: item.serviceName || '',
+            quantity: item.quantity || 1,
+            unit: item.unit || '',
+            unitPrice: item.unitPrice || 0,
+            total: item.totalPrice || 0
+          }))
+        
+        setReplaceItems(replacementItems.length > 0 ? replacementItems : [])
+        setServiceItems(serviceItems.length > 0 ? serviceItems : [])
       } else {
-        // Initialize with empty items
-        setReplaceItems([{ 
-          id: Date.now(), 
-          category: '',
-          quantity: 1, 
-          unit: '',
-          unitPrice: 0,
-          total: 0
-        }])
-        setServiceItems([{ 
-          id: Date.now() + 1, 
-          task: '',
-          quantity: 1, 
-          unit: '',
-          unitPrice: 0,
-          total: 0
-        }])
+        setReplaceItems([])
+        setServiceItems([])
       }
-    } else {
-      // Use fallback if response structure is unexpected
-      setTicketData(fallbackTicketData)
     }
   }
 
@@ -161,6 +203,36 @@ export default function TicketDetailPage() {
 
   const deleteServiceItem = (id) => {
     setServiceItems(serviceItems.filter(item => item.id !== id))
+  }
+
+  const handleUpdateDeliveryDate = async (date) => {
+    if (!date) {
+      message.warning('Vui lòng chọn ngày dự đoán giao xe')
+      return
+    }
+
+    try {
+      const dateStr = date.format('YYYY-MM-DD')
+      const { data: response, error } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
+      
+      if (error) {
+        message.error(error || 'Cập nhật ngày giao xe không thành công')
+        return
+      }
+
+      if (response && (response.statusCode === 200 || response.result)) {
+        message.success('Cập nhật ngày giao xe thành công')
+        setExpectedDate(date)
+        if (ticketData) {
+          setTicketData({ ...ticketData, deliveryAt: dateStr })
+        }
+      } else {
+        message.error('Cập nhật ngày giao xe không thành công')
+      }
+    } catch (err) {
+      console.error('Error updating delivery date:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật ngày giao xe')
+    }
   }
 
   const updateReplaceItem = (id, field, value) => {
@@ -239,20 +311,43 @@ export default function TicketDetailPage() {
       message.error('Vui lòng điền đầy đủ thông tin')
       return
     }
-    setShowDateModal(true)
+    
+    if (!expectedDate) {
+      setShowDateModal(true)
+    } else {
+      confirmSendQuote()
+    }
   }
 
   const confirmSendQuote = async () => {
     if (!expectedDate) {
-      message.error('Vui lòng chọn ngày dự đoán nhận xe')
+      message.error('Vui lòng chọn ngày dự đoán giao xe')
       return
     }
     
     setLoading(true)
-    // Send quote logic here
-    setLoading(false)
-    setShowDateModal(false)
-    message.success('Đã gửi báo giá cho khách hàng')
+    try {
+      const { data: response, error } = await priceQuotationAPI.create(id)
+      
+      if (error) {
+        message.error(error || 'Tạo báo giá không thành công. Vui lòng thử lại.')
+        setLoading(false)
+        return
+      }
+
+      if (response && (response.statusCode === 200 || response.result)) {
+        message.success('Đã gửi báo giá cho khách hàng')
+        setShowDateModal(false)
+        await fetchTicketDetail()
+      } else {
+        message.error('Tạo báo giá không thành công. Vui lòng thử lại.')
+      }
+    } catch (err) {
+      console.error('Error creating price quotation:', err)
+      message.error('Đã xảy ra lỗi khi tạo báo giá.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const replaceColumns = [
@@ -269,22 +364,27 @@ export default function TicketDetailPage() {
         <div>
           <Select
             placeholder="Chọn danh mục"
-            value={record.category}
-            onChange={(value) => updateReplaceItem(record.id, 'category', value)}
+            value={record.category || undefined}
+            onChange={(value, option) => {
+              const selectedPart = parts.find(p => p.value === value || String(p.value) === String(value))
+              updateReplaceItem(record.id, 'category', value)
+              if (selectedPart?.part) {
+                updateReplaceItem(record.id, 'unit', selectedPart.part.unit || '')
+                updateReplaceItem(record.id, 'unitPrice', selectedPart.part.sellingPrice || 0)
+              }
+            }}
+            options={parts}
             style={{ width: '100%' }}
             showSearch
+            allowClear
             filterOption={(input, option) =>
               (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
             }
             status={errors[`replace_${record.id}_category`] ? 'error' : ''}
             disabled={isHistoryPage}
-          >
-            <Select.Option value="Linh kiện A">Linh kiện A</Select.Option>
-            <Select.Option value="Linh kiện B">Linh kiện B</Select.Option>
-            <Select.Option value="Má phanh - Nhật">Má phanh - Nhật</Select.Option>
-            <Select.Option value="Mâm xe - Hàn">Mâm xe - Hàn</Select.Option>
-            <Select.Option value="Moay-ơ - USA">Moay-ơ - USA</Select.Option>
-          </Select>
+            loading={partsLoading}
+            notFoundContent={parts.length === 0 ? 'Đang tải...' : 'Không tìm thấy'}
+          />
           {errors[`replace_${record.id}_category`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
               {errors[`replace_${record.id}_category`]}
@@ -496,7 +596,6 @@ export default function TicketDetailPage() {
             icon={<ArrowLeftOutlined />}
             onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}
           />
-          <span style={{ color: '#666' }}>Phiếu dịch vụ {'>'} Danh sách phiếu {'>'} Chi tiết phiếu dịch vụ</span>
         </div>
 
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
@@ -544,19 +643,29 @@ export default function TicketDetailPage() {
               <div style={{ marginBottom: '12px' }}>
                 <strong>Kỹ thuật viên sửa chữa:</strong>{' '}
                 <Select
-                  defaultValue="Nguyễn Văn B"
-                  options={TECHS}
+                  value={selectedTechnician}
+                  onChange={setSelectedTechnician}
+                  options={technicians}
                   style={{ width: '100%', marginTop: '4px' }}
                   disabled={isHistoryPage}
+                  placeholder="Chọn kỹ thuật viên"
                 />
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Loại dịch vụ:</strong>{' '}
                 <span>Thay thế phụ tùng</span>
               </div>
-              <div>
-                <strong>Ngày dự đoán giao xe:</strong>{' '}
-                <span>{expectedDate ? expectedDate.format('DD/MM/YYYY') : ''}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Ngày dự đoán giao xe:</strong>
+                <DatePicker
+                  value={expectedDate}
+                  onChange={handleUpdateDeliveryDate}
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày"
+                  style={{ width: '150px' }}
+                  suffixIcon={<CalendarOutlined />}
+                  disabled={isHistoryPage}
+                />
               </div>
             </Card>
           </Col>
@@ -566,38 +675,6 @@ export default function TicketDetailPage() {
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>BÁO GIÁ</h2>
-              {!isHistoryPage && replaceItems.length === 0 && serviceItems.length === 0 && (
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    setReplaceItems([{ 
-                      id: Date.now(), 
-                      category: '',
-                      quantity: 1, 
-                      unit: '',
-                      unitPrice: 0,
-                      total: 0
-                    }])
-                    setServiceItems([{ 
-                      id: Date.now() + 1, 
-                      task: '',
-                      quantity: 1, 
-                      unit: '',
-                      unitPrice: 0,
-                      total: 0
-                    }])
-                  }}
-                  style={{
-                    background: '#3b82f6',
-                    borderColor: '#3b82f6',
-                    height: '36px',
-                    fontWeight: 600
-                  }}
-                >
-                  <PlusOutlined style={{ marginRight: '8px' }} />
-                  Tạo báo giá
-                </Button>
-              )}
             </div>
           </div>
           
@@ -605,95 +682,114 @@ export default function TicketDetailPage() {
             activeKey={activeTab} 
             onChange={setActiveTab}
             style={{ marginBottom: '20px' }}
-          >
-            <TabPane tab={<span style={{ fontWeight: 700 }}>BÁO GIÁ</span>} key="quote">
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <strong>Thay thế</strong>
-                  {!isHistoryPage && (
-                    <Button 
-                      type="text" 
-                      icon={<PlusOutlined />}
-                      onClick={addReplaceItem}
-                      style={{ 
-                        width: '32px', 
-                        height: '32px', 
-                        borderRadius: '50%', 
-                        border: '1px solid #222',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    />
-                  )}
-                </div>
-                 <Table
-                   columns={replaceColumns}
-                   dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                   pagination={false}
-                   size="small"
-                   components={goldTableHeader}
-                 />
-              </div>
+            items={[
+              {
+                key: 'quote',
+                label: <span style={{ fontWeight: 700 }}>BÁO GIÁ</span>,
+                children: (
+                  <>
+                    <div style={{ marginBottom: '24px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <strong>Thay thế</strong>
+                        {!isHistoryPage && (
+                          <Button 
+                            type="text" 
+                            icon={<PlusOutlined />}
+                            onClick={addReplaceItem}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '50%', 
+                              border: '1px solid #222',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          />
+                        )}
+                      </div>
+                       <Table
+                         columns={replaceColumns}
+                         dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                         pagination={false}
+                         size="small"
+                         components={goldTableHeader}
+                       />
+                    </div>
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <strong>Dịch vụ</strong>
-                  {!isHistoryPage && (
-                    <Button 
-                      type="text" 
-                      icon={<PlusOutlined />}
-                      onClick={addServiceItem}
-                      style={{ 
-                        width: '32px', 
-                        height: '32px', 
-                        borderRadius: '50%', 
-                        border: '1px solid #222',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    />
-                  )}
-                </div>
-                 <Table
-                   columns={serviceColumns}
-                   dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                   pagination={false}
-                   size="small"
-                   components={goldTableHeader}
-                 />
-              </div>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <strong>Dịch vụ</strong>
+                        {!isHistoryPage && (
+                          <Button 
+                            type="text" 
+                            icon={<PlusOutlined />}
+                            onClick={addServiceItem}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '50%', 
+                              border: '1px solid #222',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                          />
+                        )}
+                      </div>
+                       <Table
+                         columns={serviceColumns}
+                         dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                         pagination={false}
+                         size="small"
+                         components={goldTableHeader}
+                       />
+                    </div>
 
-              {!isHistoryPage && (replaceItems.length > 0 || serviceItems.length > 0) && (
-                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ color: '#666', fontSize: '12px' }}>
-                    Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá
+                    {!isHistoryPage && (
+                      <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ color: '#666', fontSize: '12px' }}>
+                          {ticketData?.priceQuotation 
+                            ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
+                            : 'Vui lòng thêm các mục vào báo giá trước khi gửi'
+                          }
+                        </div>
+                        <Space>
+                          <Button onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}>Hủy</Button>
+                          <Button 
+                            type="primary" 
+                            onClick={handleSendQuote}
+                            disabled={replaceItems.length === 0 && serviceItems.length === 0}
+                            style={{ background: '#3b82f6', borderColor: '#3b82f6' }}
+                          >
+                            Gửi báo giá cho khách hàng →
+                          </Button>
+                        </Space>
+                      </div>
+                    )}
+                  </>
+                )
+              },
+              {
+                key: 'draft',
+                label: 'Nháp',
+                children: (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                    Chưa có bản nháp
                   </div>
-                  <Space>
-                    <Button onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}>Hủy</Button>
-                    <Button 
-                      type="primary" 
-                      onClick={handleSendQuote}
-                      style={{ background: '#3b82f6', borderColor: '#3b82f6' }}
-                    >
-                      Gửi báo giá cho khách hàng →
-                    </Button>
-                  </Space>
-                </div>
-              )}
-            </TabPane>
-            <TabPane tab="Nháp" key="draft">
-              <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                Chưa có bản nháp
-              </div>
-            </TabPane>
-            <TabPane tab="Kho đã duyệt" key="approved">
-              <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                Chưa có dữ liệu
-              </div>
-            </TabPane>
-          </Tabs>
+                )
+              },
+              {
+                key: 'approved',
+                label: 'Kho đã duyệt',
+                children: (
+                  <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                    Chưa có dữ liệu
+                  </div>
+                )
+              }
+            ]}
+          />
         </Card>
       </div>
 

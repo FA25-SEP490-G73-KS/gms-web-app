@@ -38,7 +38,7 @@ export default function AdminLayout({ children }) {
   }
 
   const items = [
-    { key: 'dashboard', label: 'Doanh thu', to: '/service-advisor', icon: 'bi-grid' },
+    { key: 'dashboard', label: 'Báo cáo', to: '/service-advisor/reports', icon: 'bi-grid' },
     { key: 'appointments', label: 'Lịch hẹn', to: '/service-advisor/appointments', icon: 'bi-calendar3' },
   ]
 

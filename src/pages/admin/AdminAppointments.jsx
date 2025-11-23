@@ -123,6 +123,31 @@ export default function AdminAppointments() {
       else if (Array.isArray(response.result)) {
         resultArray = response.result
       }
+      
+      let transformed = resultArray.map(item => ({
+        id: item.appointmentId,
+        customer: item.customerName || item.customer?.fullName || item.customer?.name || item.customer?.customerName || '',
+        license: item.licensePlate || '',
+        phone: item.customerPhone || item.customer?.phone || '',
+        status: statusMap[item.status] || item.status || 'Chờ',
+        statusKey: item.status || 'CONFIRMED',
+        time: item.timeSlotLabel || '',
+        date: item.appointmentDate ? new Date(item.appointmentDate).toLocaleDateString('vi-VN') : '',
+        dateRaw: item.appointmentDate,
+        serviceType: Array.isArray(item.serviceType) ? item.serviceType.join(', ') : (item.serviceType || ''),
+        note: item.note || '',
+        // Keep original item for detail view
+        originalItem: item
+      }))
+      
+      if (statusFilter) {
+        const statusKeyMap = {
+          'Hủy': 'CANCELLED',
+          'Đã đến': 'ARRIVED',
+          'Chờ': 'CONFIRMED'
+        }
+        transformed = transformed.filter(item => item.statusKey === statusKeyMap[statusFilter])
+
       else if (Array.isArray(response.data)) {
         resultArray = response.data
       }
@@ -186,7 +211,14 @@ export default function AdminAppointments() {
     }
     
     if (response && response.result) {
-      setSelectedFull(response.result)
+      // Ensure customerName is populated from customer object if available
+      const result = response.result
+      setSelectedFull({
+        ...result,
+        customerName: result.customerName || result.customer?.fullName || result.customer?.name || result.customer?.customerName || '',
+        customerPhone: result.customerPhone || result.customer?.phone || '',
+        licensePlate: result.licensePlate || result.vehicle?.licensePlate || ''
+      })
     } else {
       setSelectedFull(fallbackDetail)
     }
@@ -244,6 +276,27 @@ export default function AdminAppointments() {
   }, [data, selectedDate])
 
   const handleCreateTicket = () => {
+
+    if (!selectedFull && !selected) {
+      message.error('Không tìm thấy thông tin lịch hẹn')
+      return
+    }
+
+    const appointmentId = selectedFull?.appointmentId || selected?.id
+    if (!appointmentId) {
+      message.error('Không tìm thấy ID lịch hẹn')
+      return
+    }
+
+    navigate('/service-advisor/orders', { 
+      state: { 
+        appointmentId: appointmentId,
+        customer: selectedFull?.customerName || selected?.customer,
+        phone: selectedFull?.customerPhone || selected?.phone,
+        licensePlate: selectedFull?.licensePlate || selected?.license
+      } 
+    })
+    
     if (selectedFull) {
       navigate('/service-advisor/orders/create', { 
         state: { 
@@ -260,6 +313,15 @@ export default function AdminAppointments() {
 
   const handleViewDetail = async (record) => {
     setSelected(record)
+    // If we have customer name in the record, use it immediately
+    if (record.originalItem && (record.originalItem.customer?.fullName || record.originalItem.customer?.name)) {
+      setSelectedFull({
+        ...record.originalItem,
+        customerName: record.originalItem.customerName || record.originalItem.customer?.fullName || record.originalItem.customer?.name || record.customer || '',
+        customerPhone: record.originalItem.customerPhone || record.originalItem.customer?.phone || record.phone || '',
+        licensePlate: record.originalItem.licensePlate || record.license || ''
+      })
+    }
     await fetchAppointmentDetail(record.id)
   }
 

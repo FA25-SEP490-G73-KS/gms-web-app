@@ -1,3 +1,11 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { message } from 'antd'
+import useAuthStore from '../../store/authStore'
+import '../../styles/pages/auth/login.css'
+const imgImage15 = "http://localhost:3845/assets/e3f06dc74cc8cb44cf93eb05563cb8c82f9ac956.png"
+const imgEyeOff = "http://localhost:3845/assets/42da4380efeca78b000e3917abb285b4d143b77b.svg"
+const imgCheck = "http://localhost:3845/assets/3eb0b3b98f576e4a7c0b701a5a928b2ae47a95a2.svg"
 import { useState, useMemo, useCallback } from 'react';
 import Form from 'antd/es/form';
 import Input from 'antd/es/input';
@@ -9,11 +17,20 @@ import Divider from 'antd/es/divider';
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
 import '../../styles/pages/auth/login.css';
 
+
 export default function Login() {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [logoLoaded, setLogoLoaded] = useState(false);
 
+    setLoading(true)
+    try {
+      await login(form.phone, form.password)
+      
+      message.success('Đăng nhập thành công!')
+      
+      const currentUser = useAuthStore.getState().user
+      const userRole = currentUser?.role
     const onFinish = useCallback(async (values) => {
         setLoading(true);
         try {
@@ -25,6 +42,7 @@ export default function Login() {
             setLoading(false);
         }
     }, []);
+
 
     const onFinishFailed = useCallback((errorInfo) => {
         console.error('Form validation failed:', errorInfo);

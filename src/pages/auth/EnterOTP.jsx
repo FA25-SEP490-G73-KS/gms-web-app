@@ -36,7 +36,7 @@ export default function EnterOTP() {
 
     setLoading(true)
     try {
-      const { data, error: apiError } = await otpAPI.verify(phone, otp, purpose)
+      const { data, error: apiError } = await otpAPI.verify(phone, otp, purpose, { skipAuth: true })
       
       if (apiError) {
         setError(apiError || 'Mã OTP không đúng hoặc đã hết hạn.')

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { message } from 'antd'
 import CustomerLayout from '../../../layouts/CustomerLayout'
 import { appointmentAPI, otpAPI } from '../../../services/api'
 
@@ -15,7 +16,11 @@ export default function AppointmentService() {
   const [verifyOtpLoading, setVerifyOtpLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
   const [timeSlots, setTimeSlots] = useState([])
+  const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
+  const [appointmentResult, setAppointmentResult] = useState(null)
   const [form, setForm] = useState({
+    phonePrefix: '+84',
+    phoneNumber: '',
     phone: '',
     otp: '',
     fullName: '',
@@ -46,24 +51,27 @@ export default function AppointmentService() {
       return
     }
 
+    setTimeSlotsLoading(true)
+    setTimeSlots([])
+    setForm({ ...form, time: '' })
+
     try {
-      // Format date as YYYY-MM-DD for API
       const dateStr = form.date
       const { data: response, error } = await appointmentAPI.getTimeSlots(dateStr)
       
       if (error) {
         console.error('Error fetching time slots:', error)
+        message.error('Không thể tải danh sách khung giờ. Vui lòng thử lại.')
         setTimeSlots([])
+        setTimeSlotsLoading(false)
         return
       }
 
       if (response && response.result && Array.isArray(response.result)) {
-        // Filter available slots and map to select options
-        // Keep original index from API response for timeSlotIndex
         const availableSlots = response.result
           .map((slot, originalIndex) => ({
             ...slot,
-            originalIndex, // Keep original index from API response
+            originalIndex,
             displayLabel: slot.label || `${slot.startTime} - ${slot.endTime}`
           }))
           .filter(slot => slot.available && slot.booked < slot.maxCapacity)
@@ -75,59 +83,63 @@ export default function AppointmentService() {
           }))
         
         setTimeSlots(availableSlots)
+        if (availableSlots.length === 0) {
+          message.info('Không có khung giờ trống cho ngày đã chọn.')
+        }
       } else {
         setTimeSlots([])
+        message.warning('Không có khung giờ nào cho ngày đã chọn.')
       }
     } catch (err) {
       console.error('Error fetching time slots:', err)
+      message.error('Đã xảy ra lỗi khi tải khung giờ. Vui lòng thử lại.')
       setTimeSlots([])
+    } finally {
+      setTimeSlotsLoading(false)
     }
   }
 
   const validatePhone = (phoneNumber) => {
     const cleaned = phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
-    if (cleaned.length < 10 || cleaned.length > 11) {
-      return false
-    }
-    if (!cleaned.startsWith('0')) {
+    if (cleaned.length < 9 || cleaned.length > 10) {
       return false
     }
     return true
   }
 
   const handleSendOTP = async () => {
-    if (!form.phone) {
-      alert('Vui lòng nhập số điện thoại')
+    if (!form.phoneNumber) {
+      message.warning('Vui lòng nhập số điện thoại')
       return
     }
 
-    // Validate phone number format
-    if (!validatePhone(form.phone)) {
-      alert('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 chữ số, bắt đầu bằng 0)')
+    const cleanedNumber = form.phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
+    if (!validatePhone(cleanedNumber)) {
+      message.error('Số điện thoại không hợp lệ. Vui lòng nhập 9-10 chữ số')
       return
     }
 
     setOtpLoading(true)
     setOtpError('')
     
-    // Clean phone number before sending
-    const cleanedPhone = form.phone.replace(/\s+/g, '').replace(/[^\d]/g, '')
+    // Combine prefix and number: +84 -> 84, then add phone number
+    const fullPhone = '84' + cleanedNumber
     
-    const { data: response, error } = await otpAPI.send(cleanedPhone, 'APPOINTMENT')
+    const { data: response, error } = await otpAPI.send(fullPhone, 'APPOINTMENT')
     setOtpLoading(false)
 
     if (error) {
-      alert('Gửi mã OTP không thành công. Vui lòng thử lại.')
+      message.error('Gửi mã OTP không thành công. Vui lòng thử lại.')
       return
     }
 
     if (response && (response.statusCode === 200 || response.result)) {
-      // Update form with cleaned phone
-      setForm({ ...form, phone: cleanedPhone })
-      alert('Mã OTP đã được gửi đến số điện thoại của bạn!')
+      // Update form with full phone number
+      setForm({ ...form, phone: fullPhone })
+      message.success('Mã OTP đã được gửi đến số điện thoại của bạn!')
       next()
     } else {
-      alert('Gửi mã OTP không thành công. Vui lòng thử lại.')
+      message.error('Gửi mã OTP không thành công. Vui lòng thử lại.')
     }
   }
 
@@ -157,6 +169,7 @@ export default function AppointmentService() {
       // Check if OTP is valid (result should be true)
       if (data && (data.result === true || data.result === 'true' || data.statusCode === 200)) {
         // OTP verified successfully, proceed to next step
+        message.success('Xác thực OTP thành công!')
         next()
       } else {
         setOtpError('Mã OTP không đúng hoặc đã hết hạn.')
@@ -170,14 +183,14 @@ export default function AppointmentService() {
 
   const handleSubmit = async () => {
     if (!form.fullName || !form.license || !form.phone || !form.date || !form.time || !form.service) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc')
+      message.warning('Vui lòng điền đầy đủ thông tin bắt buộc')
       return
     }
 
     // Validate that a time slot is selected
     const selectedSlot = timeSlots.find(slot => slot.value === parseInt(form.time))
     if (!selectedSlot) {
-      alert('Vui lòng chọn khung giờ hợp lệ')
+      message.warning('Vui lòng chọn khung giờ hợp lệ')
       return
     }
 
@@ -190,38 +203,64 @@ export default function AppointmentService() {
       // Get service type ID
       const serviceTypeId = SERVICE_TYPE_MAP[form.service]
       if (!serviceTypeId) {
-        alert('Loại dịch vụ không hợp lệ')
+        message.error('Loại dịch vụ không hợp lệ')
         setLoading(false)
         return
       }
 
+      // Get timeSlotIndex from selected slot (originalIndex from API response)
+      const timeSlotIndex = selectedSlot?.originalIndex !== undefined 
+        ? selectedSlot.originalIndex 
+        : parseInt(form.time)
+
       const payload = {
-        customerName: form.fullName,
-        phoneNumber: form.phone,
-        licensePlate: form.license,
         appointmentDate: appointmentDate,
-        timeSlotIndex: parseInt(form.time), // Index in the filtered available slots array
-        serviceType: [serviceTypeId], // API expects array
-        note: form.note || ''
+        customerName: form.fullName,
+        licensePlate: form.license,
+        note: form.note || '',
+        phoneNumber: form.phone,
+        serviceType: [serviceTypeId],
+        timeSlotIndex: timeSlotIndex
       }
 
-      const { data: response, error } = await appointmentAPI.create(payload)
+      console.log('Creating appointment with payload:', payload)
+      console.log('Selected slot:', selectedSlot)
+      console.log('Time slot index:', timeSlotIndex)
+
+      const { data: response, error, statusCode } = await appointmentAPI.create(payload)
+      
+      console.log('API Response:', { response, error, statusCode })
       
       if (error) {
-        alert(error || 'Đặt lịch không thành công. Vui lòng thử lại.')
+        let errorMessage = error
+        if (error.includes('Query did not return a unique result') || error.includes('unique result')) {
+          errorMessage = 'Có nhiều dữ liệu trùng lặp trong hệ thống. Vui lòng liên hệ quản trị viên để được hỗ trợ.'
+        }
+        message.error(errorMessage || 'Đặt lịch không thành công. Vui lòng thử lại.')
         setLoading(false)
         return
       }
 
       // Check if appointment was created successfully
       if (response && (response.statusCode === 200 || response.statusCode === 201 || response.result)) {
+        // Save appointment result with customer name from form (backend may return null)
+        const appointmentData = response.result || response
+        setAppointmentResult({
+          ...appointmentData,
+          customerName: form.fullName, // Use form.fullName because backend returns null
+          customerPhone: appointmentData.customerPhone || form.phone,
+          licensePlate: appointmentData.licensePlate || form.license,
+          appointmentDate: appointmentData.appointmentDate || form.date,
+          serviceType: appointmentData.serviceType || [form.service]
+        })
+        setLoading(false)
         next()
       } else {
-        alert('Đặt lịch không thành công. Vui lòng thử lại.')
+        message.error('Đặt lịch không thành công. Vui lòng thử lại.')
         setLoading(false)
       }
     } catch (err) {
-      alert('Đã xảy ra lỗi. Vui lòng thử lại.')
+      message.error('Đã xảy ra lỗi. Vui lòng thử lại.')
       setLoading(false)
     }
   }
@@ -240,7 +279,22 @@ export default function AppointmentService() {
             <div>
               <div style={{ color: '#CBB081', fontWeight: 600, marginBottom: 10 }}>Bước 1/4: Xác thực số điện thoại</div>
               <div style={{ marginBottom: 10, fontSize: 14 }}>Vui lòng nhập số điện thoại bạn muốn gửi mã OTP !</div>
-              <input value={form.phone} onChange={update('phone')} placeholder="VD: 0123456789" style={inputStyle} />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <input 
+                  value={form.phonePrefix} 
+                  disabled
+                  style={{ ...inputStyle, width: '80px', background: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280', flexShrink: 0 }} 
+                />
+                <input 
+                  value={form.phoneNumber} 
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 10)
+                    setForm({ ...form, phoneNumber: value })
+                  }}
+                  placeholder="VD: 909123456" 
+                  style={{ ...inputStyle, flex: 1 }} 
+                />
+              </div>
               <div style={rowBtns}>
                 <button style={btnGhost} onClick={() => (window.location.href = '/')}>Trang chủ</button>
                 <button style={btnPrimary} onClick={handleSendOTP} disabled={otpLoading}>
@@ -298,9 +352,9 @@ export default function AppointmentService() {
                 <div>
                   <label style={labelStyle}>Số điện thoại *</label>
                   <input 
-                    value={form.phone} 
+                    value={form.phone ? `+${form.phone.substring(0, 2)} ${form.phone.substring(2)}` : ''} 
                     disabled
-                    placeholder="0123456789" 
+                    placeholder="+84 909123456" 
                     style={{ ...inputStyle, background: '#f3f4f6', cursor: 'not-allowed', color: '#6b7280' }} 
                   />
                 </div>
@@ -319,8 +373,15 @@ export default function AppointmentService() {
                 </div>
                 <div>
                   <label style={labelStyle}>Khung giờ *</label>
-                  <select value={form.time} onChange={update('time')} style={inputStyle}>
-                    <option value="">--Chọn khung giờ--</option>
+                  <select 
+                    value={form.time} 
+                    onChange={update('time')} 
+                    disabled={timeSlotsLoading || !form.date}
+                    style={{ ...inputStyle, ...(timeSlotsLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+                  >
+                    <option value="">
+                      {timeSlotsLoading ? 'Đang tải khung giờ...' : '--Chọn khung giờ--'}
+                    </option>
                     {timeSlots.map(slot => (
                       <option key={slot.value} value={slot.value}>{slot.label}</option>
                     ))}
@@ -343,7 +404,67 @@ export default function AppointmentService() {
           {step === 4 && (
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#28c76f', margin: '8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 40 }}>✓</div>
-              <div style={{ margin: '12px 0' }}>Chúc mừng bạn đã đặt lịch thành công !</div>
+              <div style={{ margin: '12px 0', fontSize: 18, fontWeight: 600 }}>Chúc mừng bạn đã đặt lịch thành công!</div>
+              
+              {appointmentResult && (
+                <div style={{ background: '#f8fafc', borderRadius: 12, padding: 20, margin: '20px 0', textAlign: 'left' }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 16, color: '#CBB081', textAlign: 'center' }}>Thông tin đặt lịch</div>
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Họ và tên:</div>
+                    <div style={infoValue}>{appointmentResult.customerName || form.fullName || 'N/A'}</div>
+                  </div>
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Số điện thoại:</div>
+                    <div style={infoValue}>
+                      {appointmentResult.customerPhone 
+                        ? `+${appointmentResult.customerPhone.substring(0, 2)} ${appointmentResult.customerPhone.substring(2)}`
+                        : form.phone 
+                        ? `+${form.phone.substring(0, 2)} ${form.phone.substring(2)}`
+                        : 'N/A'}
+                    </div>
+                  </div>
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Biển số xe:</div>
+                    <div style={infoValue}>{appointmentResult.licensePlate || form.license || 'N/A'}</div>
+                  </div>
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Ngày đặt:</div>
+                    <div style={infoValue}>
+                      {appointmentResult.appointmentDate 
+                        ? new Date(appointmentResult.appointmentDate + 'T00:00:00').toLocaleDateString('vi-VN')
+                        : form.date 
+                        ? new Date(form.date + 'T00:00:00').toLocaleDateString('vi-VN')
+                        : 'N/A'}
+                    </div>
+                  </div>
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Khung giờ:</div>
+                    <div style={infoValue}>{appointmentResult.timeSlotLabel || 'N/A'}</div>
+                  </div>
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Loại dịch vụ:</div>
+                    <div style={infoValue}>
+                      {appointmentResult.serviceType && appointmentResult.serviceType.length > 0
+                        ? appointmentResult.serviceType.map(id => {
+                            const serviceName = Object.keys(SERVICE_TYPE_MAP).find(key => SERVICE_TYPE_MAP[key] === id)
+                            return serviceName || id
+                          }).join(', ')
+                        : form.service || 'N/A'}
+                    </div>
+                  </div>
+                  {appointmentResult.note && (
+                    <div style={infoRow}>
+                      <div style={infoLabel}>Ghi chú:</div>
+                      <div style={infoValue}>{appointmentResult.note}</div>
+                    </div>
+                  )}
+                  <div style={infoRow}>
+                    <div style={infoLabel}>Mã đặt lịch:</div>
+                    <div style={infoValue}>#{appointmentResult.appointmentId || 'N/A'}</div>
+                  </div>
+                </div>
+              )}
+              
               <button style={{ ...btnPrimary, width: '60%' }} onClick={() => (window.location.href = '/')}>Trang chủ</button>
             </div>
           )}
@@ -387,5 +508,8 @@ const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
 const rowBtns = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 14, width: '100%' }
 const btnGhost = { background: '#fff', border: '1px solid #ddd', color: '#111', padding: '10px 18px', borderRadius: 12, cursor: 'pointer' }
 const btnPrimary = { background: '#CBB081', border: 'none', color: '#111', padding: '10px 18px', borderRadius: 12, cursor: 'pointer', fontWeight: 600 }
+const infoRow = { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }
+const infoLabel = { fontWeight: 600, color: '#6b7280', fontSize: 14 }
+const infoValue = { fontWeight: 500, color: '#111', fontSize: 14, textAlign: 'right', flex: 1, marginLeft: 16 }
 
 

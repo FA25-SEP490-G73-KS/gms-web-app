@@ -8,9 +8,17 @@ import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
 import CreateTicket from './pages/admin/CreateTicket';
 import TicketDetailPage from './pages/admin/TicketDetailPage';
-
+import Reports from './pages/admin/Reports';
+import AccountanceEmployeeList from './pages/accountance/EmployeeList';
+import AccountancePayroll from './pages/accountance/Payroll';
+import AccountanceAttendance from './pages/accountance/Attendance';
+import AccountancePlaceholder from './pages/accountance/Placeholder';
+import AccountanceDebts from './pages/accountance/Debts';
+import AccountanceFinance from './pages/accountance/Finance';
+import AccountanceCreateForm from './pages/accountance/CreateForm';
+import AccountanceMaterials from './pages/accountance/Materials';
+import AccountancePayments from './pages/accountance/Payments';
 import Inventory from './pages/admin/Inventory';
-
 import WarehouseHome from './pages/warehouse/WarehouseHome';
 import WarehouseReport from './pages/warehouse/WarehouseReport';
 import PartsList from './pages/warehouse/PartsList';
@@ -43,7 +51,8 @@ function App() {
         <Route path="/admin/orders/:id" element={<AdminOrdersRedirect />} />
         <Route path="/admin/inventory" element={<Navigate to="/service-advisor/inventory" replace />} />
         
-        <Route path="/service-advisor" element={<AdminHome />} />
+        <Route path="/service-advisor" element={<Navigate to="/service-advisor/reports" replace />} />
+        <Route path="/service-advisor/reports" element={<Reports />} />
         <Route path="/service-advisor/appointments" element={<AdminAppointments />} />
         <Route path="/service-advisor/orders" element={<TicketService />} />
         <Route path="/service-advisor/orders/create" element={<CreateTicket />} />
