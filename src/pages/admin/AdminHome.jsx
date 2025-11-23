@@ -1,5 +1,9 @@
 import React from 'react'
-import { Card, Row, Col, Statistic, Typography } from 'antd'
+import Card from 'antd/es/card'
+import Row from 'antd/es/row'
+import Col from 'antd/es/col'
+import Statistic from 'antd/es/statistic'
+import Typography from 'antd/es/typography'
 import { CalendarOutlined, FileTextOutlined, DollarOutlined, UserOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 
