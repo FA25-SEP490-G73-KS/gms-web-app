@@ -2,96 +2,37 @@
   --gold: #CBB081; 
   --beige: #F5E6D3;
   --dark-beige: #E8D5B7;
-  --sidebar-width: 240px;
-  --sidebar-collapsed-width: 72px;
 }
 
 .warehouse-layout {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 240px 1fr;
   background: #f7f7f8;
-  position: relative;
-}
-
-.warehouse-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  background: #ffffff;
-  border-bottom: 1px solid #e6e8eb;
-  z-index: 100;
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
-}
-
-.warehouse-header-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  height: 57px;
-  min-height: 57px;
+  transition: grid-template-columns 0.3s ease;
 }
 
 .warehouse-layout.sidebar-collapsed {
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: 0 1fr;
 }
 
 .warehouse-layout.sidebar-collapsed .warehouse-sidebar {
-  width: var(--sidebar-collapsed-width);
-  padding: 16px 8px;
-  align-items: center;
+  overflow: hidden;
+  width: 0;
+  padding: 0;
   border: none;
 }
 
-.warehouse-layout.sidebar-collapsed .warehouse-brand {
-  padding: 0;
-}
-
-.warehouse-layout.sidebar-collapsed .warehouse-brand img {
-  height: 48px;
-}
-
-.warehouse-layout.sidebar-collapsed .warehouse-nav-item {
-  justify-content: center;
-  gap: 0;
-  padding: 8px;
-}
-
-.warehouse-layout.sidebar-collapsed .warehouse-nav-item span,
-.warehouse-layout.sidebar-collapsed .warehouse-nav-group .caret,
-.warehouse-layout.sidebar-collapsed .submenu,
-.warehouse-layout.sidebar-collapsed .warehouse-logout span {
-  display: none;
-}
-
-.warehouse-layout.sidebar-collapsed .warehouse-logout {
-  padding: 8px;
-}
-
 .warehouse-sidebar {
-  position: fixed;
+  position: sticky;
   top: 0;
-  left: 0;
   height: 100vh;
-  width: var(--sidebar-width);
-  background: #fafafa;
-  border-right: 1px solid #eee;
-  z-index: 200;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 16px 12px;
-  transition: width 0.3s ease, transform 0.3s ease;
-  overflow-y: auto;
-  overflow-x: hidden;
+  border-right: 1px solid #eee;
+  background: #fafafa;
 }
 
 .warehouse-brand {
@@ -233,31 +174,14 @@
 }
 
 .warehouse-main {
-  margin-left: var(--sidebar-width);
-  margin-top: 57px; /* Header height */
-  padding: 0;
-  min-height: calc(100vh - 57px);
-  transition: margin-left 0.3s ease;
+  padding: 20px 24px;
   overflow-x: auto;
 }
 
-.warehouse-layout.sidebar-collapsed .warehouse-main {
-  margin-left: var(--sidebar-collapsed-width);
-}
-
-.warehouse-content {
-  padding: 20px 24px;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 0;
-  padding-top: 24px;
-}
-
 .warehouse-topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
   background: #ffffff;
   border: 1px solid #e6e8eb;
   border-radius: 12px;
@@ -268,15 +192,7 @@
 .warehouse-topbar-left { 
   display: flex; 
   align-items: center; 
-  gap: 0; 
-  flex: 0 0 auto;
-  height: 100%;
-  margin-left: 240px;
-  transition: margin-left 0.3s ease;
-}
-
-.warehouse-layout.sidebar-collapsed .warehouse-topbar-left {
-  margin-left: 72px;
+  gap: 16px; 
 }
 
 .sidebar-toggle-btn {
@@ -285,74 +201,47 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border: 1px solid #e6e8eb;
-  background: #ffffff;
+  border: none;
+  background: transparent;
   cursor: pointer;
   border-radius: 6px;
   color: #666;
-  font-size: 16px;
+  font-size: 18px;
   transition: all 0.2s ease;
-  flex-shrink: 0;
 }
 
 .sidebar-toggle-btn:hover {
   background: #f5f5f5;
   color: #333;
-  border-color: #d1d5db;
-}
-
-.breadcrumb-divider {
-  width: 1px;
-  height: 20px;
-  background: #e6e8eb;
-  margin: 0 12px;
-  flex-shrink: 0;
-  align-self: center;
 }
 
 .breadcrumb {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 100%;
-  line-height: 1;
 }
 
 .breadcrumb-item {
-  color: #9ca3af;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  height: 100%;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .breadcrumb-separator {
-  color: #030303;
-  font-size: 16px;
-  font-weight: 400;
-  margin: 0 4px;
-  display: flex;
-  align-items: center;
+  color: #999;
+  font-size: 12px;
 }
 
 .breadcrumb-current {
-  color: #030303;
+  color: #111;
   font-weight: 600;
-  font-size: 16px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  height: 100%;
+  font-size: 14px;
 }
 
 .warehouse-topbar-right { 
   display: flex; 
   align-items: center; 
   gap: 12px; 
-  flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .notification-btn {

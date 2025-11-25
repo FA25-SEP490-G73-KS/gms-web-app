@@ -3,14 +3,10 @@ import HomePage from './pages/home/HomePage';
 import AboutPage from './pages/home/about';
 import ContactPage from './pages/home/contact';
 import AppointmentService from './pages/customer/appointment/appointmentservice';
-import Login from './pages/auth/Login';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import EnterOTP from './pages/auth/EnterOTP';
-import ResetPassword from './pages/auth/ResetPassword';
-import ResetPasswordSuccess from './pages/auth/ResetPasswordSuccess';
 import AdminHome from './pages/admin/AdminHome';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
+import CreateTicket from './pages/admin/CreateTicket';
 import TicketDetailPage from './pages/admin/TicketDetailPage';
 import Reports from './pages/admin/Reports';
 import AccountanceEmployeeList from './pages/accountance/EmployeeList';
@@ -22,6 +18,7 @@ import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
 import AccountanceMaterials from './pages/accountance/Materials';
 import AccountancePayments from './pages/accountance/Payments';
+
 import AccountanceServices from './pages/accountance/Services';
 import ManagerSuppliers from './pages/manager/Suppliers';
 import ManagerCustomers from './pages/manager/Customers';
@@ -38,11 +35,9 @@ import PayrollForManager from './pages/manager/accountance/Payroll';
 import ManagerServiceAdvisorHome from './pages/manager/ManagerServiceAdvisorHome';
 import ManagerServiceOrders from './pages/manager/service/ServiceOrders';
 import ManagerServiceTypes from './pages/manager/service/ServiceTypes';
-
 import Inventory from './pages/admin/Inventory';
-
-// Manager pages
 import ManagerHome from './pages/manager/ManagerHome';
+import Inventory from './pages/admin/Inventory';
 
 import WarehouseHome from './pages/warehouse/WarehouseHome';
 import WarehouseReport from './pages/warehouse/WarehouseReport';
@@ -53,9 +48,8 @@ import CreateImportForm from './pages/warehouse/CreateImportForm';
 import ExportList from './pages/warehouse/ExportList';
 import ExportRequest from './pages/warehouse/ExportRequest';
 import CreateExportForm from './pages/warehouse/CreateExportForm';
-import CreateTicketForm from './pages/warehouse/CreateTicketForm';
 
-// Component to redirect old /admin/orders/:id to new route
+
 function AdminOrdersRedirect() {
   const { id } = useParams()
   return <Navigate to={`/service-advisor/orders/${id}`} replace />
@@ -63,19 +57,9 @@ function AdminOrdersRedirect() {
 
 function App() {
   return (
-    <Router
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
+    <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-        <Route path="/auth/enter-otp" element={<EnterOTP />} />
-        <Route path="/auth/reset-password" element={<ResetPassword />} />
-        <Route path="/auth/reset-password-success" element={<ResetPasswordSuccess />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/appointment" element={<AppointmentService />} />
@@ -83,6 +67,7 @@ function App() {
         <Route path="/admin" element={<Navigate to="/service-advisor" replace />} />
         <Route path="/admin/appointments" element={<Navigate to="/service-advisor/appointments" replace />} />
         <Route path="/admin/orders" element={<Navigate to="/service-advisor/orders" replace />} />
+        <Route path="/admin/orders/create" element={<Navigate to="/service-advisor/orders/create" replace />} />
         <Route path="/admin/orders/:id" element={<AdminOrdersRedirect />} />
         <Route path="/admin/inventory" element={<Navigate to="/service-advisor/inventory" replace />} />
         
@@ -90,6 +75,7 @@ function App() {
         <Route path="/service-advisor/reports" element={<Reports />} />
         <Route path="/service-advisor/appointments" element={<AdminAppointments />} />
         <Route path="/service-advisor/orders" element={<TicketService />} />
+        <Route path="/service-advisor/orders/create" element={<CreateTicket />} />
         <Route path="/service-advisor/orders/history" element={<TicketService />} />
      
         <Route path="/service-advisor/orders/:id" element={<TicketDetailPage />} />
@@ -97,12 +83,12 @@ function App() {
         <Route path="/warehouse" element={<WarehouseHome />} />
         <Route path="/warehouse/report" element={<WarehouseReport />} />
         <Route path="/warehouse/parts" element={<PartsList />} />
-        <Route path="/warehouse/ticket/create" element={<CreateTicketForm />} />
         <Route path="/warehouse/import/list" element={<ImportList />} />
         <Route path="/warehouse/import/request" element={<ImportRequest />} />
-        <Route path="/warehouse/import/create" element={<Navigate to="/warehouse/ticket/create" replace />} />
+        <Route path="/warehouse/import/create" element={<CreateImportForm />} />
         <Route path="/warehouse/export/list" element={<ExportList />} />
         <Route path="/warehouse/export/request" element={<ExportRequest />} />
+
         <Route path="/warehouse/export/create" element={<Navigate to="/warehouse/ticket/create" replace />} />
 
         <Route path="/accountance" element={<AccountancePlaceholder title="Thống kê" />} />
@@ -154,6 +140,8 @@ function App() {
         <Route path="/manager/system/employees" element={<AccountancePlaceholder title="Quản lý nhân viên" />} />
         <Route path="/manager/system/settings" element={<AccountancePlaceholder title="Cài đặt" />} />
         <Route path="/manager/system/reports" element={<AccountancePlaceholder title="Báo cáo tổng hợp" />} />
+
+
 
       </Routes>
     </Router>

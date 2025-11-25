@@ -1,5 +1,9 @@
 import React from 'react'
-import { Card, Statistic, Row, Col, Typography } from 'antd'
+import Card from 'antd/es/card'
+import Statistic from 'antd/es/statistic'
+import Row from 'antd/es/row'
+import Col from 'antd/es/col'
+import Typography from 'antd/es/typography'
 import { ArrowUpOutlined, ArrowDownOutlined, ShoppingOutlined, ShopOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 

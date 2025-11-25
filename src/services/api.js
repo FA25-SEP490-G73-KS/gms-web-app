@@ -194,6 +194,7 @@ export const authAPI = {
   updatePassword: (phone, otpCode, newPassword) => post('/auth/update-password', { phone, otpCode, newPassword }, { skipAuth: true }),
 };
 
+
 function buildQueryString(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -252,4 +253,3 @@ export const manualVoucherAPI = {
     });
   },
 };
-
