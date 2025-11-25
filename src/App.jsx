@@ -37,7 +37,6 @@ import ManagerServiceOrders from './pages/manager/service/ServiceOrders';
 import ManagerServiceTypes from './pages/manager/service/ServiceTypes';
 import Inventory from './pages/admin/Inventory';
 import ManagerHome from './pages/manager/ManagerHome';
-import Inventory from './pages/admin/Inventory';
 
 import WarehouseHome from './pages/warehouse/WarehouseHome';
 import WarehouseReport from './pages/warehouse/WarehouseReport';
