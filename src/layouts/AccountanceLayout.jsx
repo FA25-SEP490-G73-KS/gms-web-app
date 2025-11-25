@@ -66,6 +66,9 @@ export default function AccountanceLayout({ children }) {
     if (path.startsWith('/accountance/forms')) {
       return { parent: '', current: 'Tạo phiếu' }
     }
+    if (path.startsWith('/accountance/services')) {
+      return { parent: '', current: 'Dịch vụ' }
+    }
     return { parent: '', current: 'Kế toán' }
   }
 
@@ -188,6 +191,14 @@ export default function AccountanceLayout({ children }) {
           >
             <i className="bi bi-file-earmark-text" />
             <span>Tạo phiếu</span>
+          </button>
+
+          <button
+            className={`warehouse-nav-item ${isActive('/accountance/services') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/services')}
+          >
+            <i className="bi bi-briefcase" />
+            <span>Dịch vụ</span>
           </button>
         </nav>
         <div className="warehouse-spacer" />

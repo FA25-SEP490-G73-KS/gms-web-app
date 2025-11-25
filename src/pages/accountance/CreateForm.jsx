@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Form, Input, Select, DatePicker, Button, Upload, Row, Col, Tag, Space, message } from 'antd'
 import { InboxOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
+import { manualVoucherAPI } from '../../services/api'
 import dayjs from 'dayjs'
 import '../../styles/pages/accountance/create-form.css'
 
@@ -16,29 +17,92 @@ const TICKET_TYPES = [
 ]
 
 const APPROVERS = [
-  { value: 'htk_ly', label: 'HTK Ly' },
-  { value: 'dt_huyen', label: 'DT Huyền' },
-  { value: 'nguyen_van_a', label: 'Nguyễn Văn A' },
-  { value: 'tran_thi_b', label: 'Trần Thị B' }
+  { value: 101, label: 'HTK Ly' },
+  { value: 102, label: 'DT Huyền' },
+  { value: 103, label: 'Nguyễn Văn A' },
+  { value: 104, label: 'Trần Thị B' }
 ]
 
 const CREATORS = [
-  { value: 'dt_huyen', label: 'DT Huyền' },
-  { value: 'htk_ly', label: 'HTK Ly' },
-  { value: 'nguyen_van_a', label: 'Nguyễn Văn A' }
+  { value: 201, label: 'DT Huyền' },
+  { value: 202, label: 'HTK Ly' },
+  { value: 203, label: 'Nguyễn Văn A' }
 ]
 
 export default function CreateForm() {
   const [form] = Form.useForm()
-  const [selectedApprovers, setSelectedApprovers] = useState(['htk_ly', 'dt_huyen'])
+  const [selectedApprovers, setSelectedApprovers] = useState([101, 102])
   const [fileList, setFileList] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (values) => {
-    console.log('Form values:', values)
-    message.success('Tạo phiếu thành công!')
-    form.resetFields()
-    setSelectedApprovers([])
-    setFileList([])
+  const handleSubmit = async (values) => {
+    try {
+      
+      if (values.ticketType === 'ung_luong') {
+        message.error('Loại phiếu "Ứng lương" chưa được hỗ trợ. Vui lòng chọn "Thu" hoặc "Chi".')
+        return
+      }
+
+      // Validate approvers
+      if (!selectedApprovers || selectedApprovers.length === 0) {
+        message.error('Vui lòng chọn ít nhất một người duyệt')
+        return
+      }
+
+      // Lấy người duyệt đầu tiên (API chỉ nhận 1 người duyệt)
+      const approverId = selectedApprovers[0]
+      const approvedByEmployeeId = Number(approverId)
+
+      if (!Number.isFinite(approvedByEmployeeId)) {
+        message.error('Người duyệt phải có ID hợp lệ')
+        return
+      }
+
+      // Map ticketType: 'thu' -> 'THU', 'chi' -> 'CHI'
+      const type = values.ticketType.toUpperCase()
+
+      // Parse amount - loại bỏ dấu chấm và phẩy (format VN: 2.000.000 hoặc 2,000,000)
+      let amount = 0
+      if (values.amount) {
+        const cleanedAmount = String(values.amount).replace(/[.,]/g, '')
+        amount = Number(cleanedAmount) || 0
+      }
+
+      if (amount <= 0) {
+        message.error('Số tiền phải lớn hơn 0')
+        return
+      }
+
+      // Chuẩn bị payload
+      const payload = {
+        type,
+        amount,
+        target: values.subject || '',
+        description: values.content || '',
+            approvedByEmployeeId
+      }
+
+      // Lấy file đầu tiên nếu có
+      const file = fileList.length > 0 ? fileList[0].originFileObj || fileList[0] : null
+
+      setLoading(true)
+
+      // Gọi API
+      const { data, error } = await manualVoucherAPI.create(payload, file)
+
+      if (error) {
+        throw new Error(error)
+      }
+
+      message.success('Tạo phiếu thành công!')
+      form.resetFields()
+      setSelectedApprovers([])
+      setFileList([])
+    } catch (err) {
+      message.error(err.message || 'Không thể tạo phiếu. Vui lòng thử lại.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleApproverChange = (value) => {
@@ -92,7 +156,7 @@ export default function CreateForm() {
             onFinish={handleSubmit}
             initialValues={{
               createdAt: dayjs('2025-10-11'),
-              creator: 'dt_huyen'
+          creator: 201
             }}
             className="create-form"
           >
@@ -385,6 +449,7 @@ export default function CreateForm() {
                 type="primary"
                 htmlType="submit"
                 size="large"
+                loading={loading}
                 style={{
                   background: '#22c55e',
                   borderColor: '#22c55e',

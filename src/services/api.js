@@ -151,6 +151,10 @@ export const serviceTicketAPI = {
   getCountByType: (year, month) => get(`/service-tickets/count-by-type?year=${year}&month=${month}`),
 };
 
+export const serviceTypeAPI = {
+  getAll: () => get('/services'),
+};
+
 export const inventoryAPI = {
   getAll: () => get('/inventory'),
   getById: (id) => get(`/inventory/${id}`),
@@ -188,5 +192,64 @@ export const authAPI = {
   // Expected: POST /api/auth/update-password
   // Body: { phone: string, otpCode: string, newPassword: string }
   updatePassword: (phone, otpCode, newPassword) => post('/auth/update-password', { phone, otpCode, newPassword }, { skipAuth: true }),
+};
+
+function buildQueryString(params = {}) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      search.append(key, value);
+    }
+  });
+  return search.toString();
+}
+
+export const debtsAPI = {
+  list: ({
+    customerId,
+    status,
+    keyword,
+    page = 0,
+    size = 10,
+    sort = 'createdAt,desc',
+  }) => {
+    const qs = buildQueryString({ customerId, status, keyword, page, size, sort });
+    return get(`/debts?${qs}`);
+  },
+};
+
+export const employeesAPI = {
+  getAll: (page = 0, size = 6) => get(`/employees?page=${page}&size=${size}`),
+};
+
+export const suppliersAPI = {
+  getAll: (page = 0, size = 6) => get(`/suppliers?page=${page}&size=${size}`),
+  getById: (id) => get(`/suppliers/${id}`),
+  create: (payload) => post('/suppliers', payload),
+  update: (id, payload) => put(`/suppliers/${id}`, payload),
+  remove: (id) => del(`/suppliers/${id}`),
+};
+
+export const customersAPI = {
+  getAll: (page = 0, size = 10) => get(`/customers?page=${page}&size=${size}`),
+  getById: (id) => get(`/customers/${id}`),
+  getServiceHistory: (phone) => get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
+  update: (id, payload) => put(`/customers/${id}`, payload),
+};
+
+export const manualVoucherAPI = {
+  create: (payload, file) => {
+    const formData = new FormData();
+    formData.append('data', JSON.stringify(payload));
+    if (file) {
+      formData.append('file', file);
+    }
+
+    return post('/manual-vouchers', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
 };
 

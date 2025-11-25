@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react'
 import { Table, Input, Button, Tag, DatePicker } from 'antd'
 import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
-import AccountanceLayout from '../../layouts/AccountanceLayout'
-import { goldTableHeader } from '../../utils/tableComponents'
-import '../../styles/pages/accountance/payroll.css'
+import ManagerLayout from '../../../layouts/ManagerLayout'
+import { goldTableHeader } from '../../../utils/tableComponents'
+import '../../../styles/pages/accountance/payroll.css'
 
 const statusFilters = [
   { key: 'all', label: 'Tất cả' },
@@ -12,8 +12,8 @@ const statusFilters = [
 ]
 
 const STATUS_CONFIG = {
-  paid: { color: '#5b8def', bg: '#eef4ff', text: 'Đã chi trả' },
-  pending: { color: '#b45309', bg: '#fff4e6', text: 'Đang xử lý' }
+  paid: { color: '#3b82f6', bg: '#eef4ff', text: 'Đã chi trả' },
+  pending: { color: '#c2410c', bg: '#fff4e6', text: 'Đang xử lý' }
 }
 
 const payrollData = [
@@ -29,7 +29,7 @@ const payrollData = [
   },
   {
     id: 2,
-    name: 'Nguyễn Văn A',
+    name: 'Nguyễn Văn Minh',
     phone: '0913336432',
     baseSalary: 20000000,
     allowance: 2000000,
@@ -59,7 +59,7 @@ const payrollData = [
   }
 ]
 
-export function AccountancePayrollContent() {
+export default function PayrollForManager() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [month, setMonth] = useState(null)
@@ -121,9 +121,7 @@ export function AccountancePayrollContent() {
       dataIndex: 'netSalary',
       key: 'netSalary',
       width: 150,
-      render: (value) => (
-        <span style={{ fontWeight: 600 }}>{value.toLocaleString('vi-VN')}</span>
-      )
+      render: (value) => <span style={{ fontWeight: 600 }}>{value.toLocaleString('vi-VN')}</span>
     },
     {
       title: 'Trạng thái',
@@ -157,76 +155,79 @@ export function AccountancePayrollContent() {
   ]
 
   return (
-      <div className="payroll-page">
-        <div className="payroll-header">
-          <h1>Lương nhân viên</h1>
-        </div>
-
-        <div className="payroll-filters">
-          <DatePicker
-            picker="month"
-            placeholder="Tháng"
-            value={month}
-            onChange={setMonth}
-            className="payroll-month-picker"
-          />
-          <div className="status-filters">
-            {statusFilters.map((item) => (
-              <Button
-                key={item.key}
-                type={status === item.key ? 'primary' : 'default'}
-                onClick={() => setStatus(item.key)}
-                className={status === item.key ? 'status-btn active' : 'status-btn'}
-              >
-                {item.label}
-              </Button>
-            ))}
+    <ManagerLayout>
+      <div style={{ padding: 24, background: '#f5f7fb', minHeight: '100vh' }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 20,
+            padding: 24,
+            boxShadow: '0 20px 45px rgba(15,23,42,0.08)',
+          }}
+        >
+          <div className="payroll-header" style={{ marginBottom: 24 }}>
+            <h2>Lương nhân viên</h2>
+            <p style={{ color: '#98a2b3', margin: 0 }}>Theo dõi các khoản lương và trạng thái chi trả</p>
           </div>
-          <div className="payroll-actions">
-            <Input
-              prefix={<SearchOutlined />}
-              placeholder="Tìm kiếm"
-              allowClear
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="payroll-search"
+
+          <div className="payroll-filters" style={{ gap: 16 }}>
+            <DatePicker
+              picker="month"
+              placeholder="Tháng"
+              value={month}
+              onChange={setMonth}
+              className="payroll-month-picker"
             />
-            <Button icon={<FilterOutlined />} className="sort-btn">
-              Sort
-            </Button>
+            <div className="status-filters">
+              {statusFilters.map((item) => (
+                <Button
+                  key={item.key}
+                  type={status === item.key ? 'primary' : 'default'}
+                  onClick={() => setStatus(item.key)}
+                  className={status === item.key ? 'status-btn active' : 'status-btn'}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+            <div className="payroll-actions">
+              <Input
+                prefix={<SearchOutlined />}
+                placeholder="Tìm kiếm"
+                allowClear
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="payroll-search"
+              />
+              <Button icon={<FilterOutlined />} className="sort-btn">
+                Sort
+              </Button>
+            </div>
           </div>
-        </div>
 
-        <div className="payroll-table-card">
-          <Table
-            className="payroll-table"
-            columns={columns}
-            dataSource={filtered}
-            pagination={{
-              current: page,
-              pageSize,
-              total: filtered.length,
-              showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              onChange: (current, size) => {
-                setPage(current)
-                setPageSize(size)
-              }
-            }}
-            components={goldTableHeader}
-          />
+          <div className="payroll-table-card" style={{ borderRadius: 16 }}>
+            <Table
+              className="payroll-table"
+              columns={columns}
+              dataSource={filtered}
+              pagination={{
+                current: page,
+                pageSize,
+                total: filtered.length,
+                showSizeChanger: true,
+                showTotal: (total) => `0 of ${total} row(s) selected.`,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                onChange: (current, size) => {
+                  setPage(current)
+                  setPageSize(size)
+                }
+              }}
+              components={goldTableHeader}
+            />
+          </div>
         </div>
       </div>
-  )
-}
-
-export default function AccountancePayroll({ Layout = AccountanceLayout }) {
-  const Wrapper = Layout || (({ children }) => <>{children}</>)
-  return (
-    <Wrapper>
-      <AccountancePayrollContent />
-    </Wrapper>
+    </ManagerLayout>
   )
 }
 

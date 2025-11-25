@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Space, Tag } from 'antd'
+import { Table, Input, Button } from 'antd'
 import { SearchOutlined, CloseOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -53,7 +53,7 @@ const paymentsData = [
   }
 ]
 
-export default function Payments() {
+export function AccountancePaymentsContent() {
   const [query, setQuery] = useState('')
 
   const filtered = useMemo(() => {
@@ -130,8 +130,7 @@ export default function Payments() {
   ]
 
   return (
-    <AccountanceLayout>
-      <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
+    <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Thanh toán</h1>
 
@@ -170,7 +169,15 @@ export default function Payments() {
           />
         </div>
       </div>
-    </AccountanceLayout>
+  )
+}
+
+export default function AccountancePayments({ Layout = AccountanceLayout }) {
+  const Wrapper = Layout || (({ children }) => <>{children}</>)
+  return (
+    <Wrapper>
+      <AccountancePaymentsContent />
+    </Wrapper>
   )
 }
 

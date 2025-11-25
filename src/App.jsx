@@ -22,12 +22,27 @@ import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
 import AccountanceMaterials from './pages/accountance/Materials';
 import AccountancePayments from './pages/accountance/Payments';
+import AccountanceServices from './pages/accountance/Services';
+import ManagerSuppliers from './pages/manager/Suppliers';
+import ManagerCustomers from './pages/manager/Customers';
+import ManagerCustomerStats from './pages/manager/CustomerStats';
+import ManagerPromotions from './pages/manager/Promotions';
+import CustomerDetailForManager from './pages/manager/CustomerDetail';
+import SupplierForm from './pages/manager/SupplierForm';
+import FinanceForManager from './pages/manager/accountance/Finance';
+import PaymentsForManager from './pages/manager/accountance/Payments';
+import DebtsForManager from './pages/manager/accountance/Debts';
+import EmployeeListForManager from './pages/manager/accountance/EmployeeList';
+import AttendanceForManager from './pages/manager/accountance/Attendance';
+import PayrollForManager from './pages/manager/accountance/Payroll';
+import ManagerServiceAdvisorHome from './pages/manager/ManagerServiceAdvisorHome';
+import ManagerServiceOrders from './pages/manager/service/ServiceOrders';
+import ManagerServiceTypes from './pages/manager/service/ServiceTypes';
 
 import Inventory from './pages/admin/Inventory';
 
 // Manager pages
 import ManagerHome from './pages/manager/ManagerHome';
-import ManagerServiceAdvisorHome from './pages/manager/ManagerServiceAdvisorHome';
 
 import WarehouseHome from './pages/warehouse/WarehouseHome';
 import WarehouseReport from './pages/warehouse/WarehouseReport';
@@ -99,35 +114,41 @@ function App() {
         <Route path="/accountance/debts" element={<AccountanceDebts />} />
         <Route path="/accountance/inventory" element={<AccountanceMaterials />} />
         <Route path="/accountance/forms" element={<AccountanceCreateForm />} />
+        <Route path="/accountance/services" element={<AccountanceServices />} />
 
         {/* Manager Routes */}
         <Route path="/manager" element={<ManagerHome />} />
-        <Route path="/manager/service-advisor" element={<ManagerServiceAdvisorHome />} />
-        <Route path="/manager/service-advisor/appointments" element={<AdminAppointments />} />
-        <Route path="/manager/service-advisor/orders" element={<TicketService />} />
-        <Route path="/manager/service-advisor/orders/history" element={<TicketService />} />
-        <Route path="/manager/service-advisor/orders/:id" element={<TicketDetailPage />} />
-        <Route path="/manager/service-advisor/inventory" element={<Inventory />} />
         
-        <Route path="/manager/warehouse" element={<WarehouseHome />} />
-        <Route path="/manager/warehouse/report" element={<WarehouseReport />} />
-        <Route path="/manager/warehouse/parts" element={<PartsList />} />
-        <Route path="/manager/warehouse/import/list" element={<ImportList />} />
-        <Route path="/manager/warehouse/import/request" element={<ImportRequest />} />
-        <Route path="/manager/warehouse/import/create" element={<CreateImportForm />} />
-        <Route path="/manager/warehouse/export/list" element={<ExportList />} />
-        <Route path="/manager/warehouse/export/request" element={<ExportRequest />} />
-        <Route path="/manager/warehouse/export/create" element={<CreateExportForm />} />
-
-        <Route path="/manager/accountance" element={<AccountancePlaceholder title="Thống kê" />} />
-        <Route path="/manager/accountance/finance" element={<AccountanceFinance />} />
-        <Route path="/manager/accountance/hr/list" element={<AccountanceEmployeeList />} />
-        <Route path="/manager/accountance/hr/attendance" element={<AccountanceAttendance />} />
-        <Route path="/manager/accountance/hr/payroll" element={<AccountancePayroll />} />
-        <Route path="/manager/accountance/payments" element={<AccountancePayments />} />
-        <Route path="/manager/accountance/debts" element={<AccountanceDebts />} />
-        <Route path="/manager/accountance/inventory" element={<AccountanceMaterials />} />
-        <Route path="/manager/accountance/forms" element={<AccountanceCreateForm />} />
+        {/* Manager - Thu - chi */}
+        <Route path="/manager/accountance/finance" element={<FinanceForManager />} />
+        <Route path="/manager/accountance/payments" element={<PaymentsForManager />} />
+        
+        {/* Manager - Công nợ */}
+        <Route path="/manager/accountance/debts" element={<DebtsForManager />} />
+        
+        {/* Manager - Nhân sự */}
+        <Route path="/manager/accountance/hr/list" element={<EmployeeListForManager />} />
+        <Route path="/manager/accountance/hr/attendance" element={<AttendanceForManager />} />
+        <Route path="/manager/accountance/hr/payroll" element={<PayrollForManager />} />
+        
+        {/* Manager - Khách hàng */}
+        <Route path="/manager/customers" element={<ManagerCustomers />} />
+        <Route path="/manager/customers/:id" element={<CustomerDetailForManager />} />
+        <Route path="/manager/customers/stats" element={<ManagerCustomerStats />} />
+        
+        {/* Manager - Dịch vụ */}
+        <Route path="/manager/service" element={<ManagerServiceAdvisorHome />} />
+        <Route path="/manager/service/orders" element={<ManagerServiceOrders />} />
+        <Route path="/manager/service/orders/:id" element={<TicketDetailPage />} />
+        <Route path="/manager/service/types" element={<ManagerServiceTypes />} />
+        
+        {/* Manager - Khuyến mãi */}
+        <Route path="/manager/promotions" element={<ManagerPromotions />} />
+        
+        {/* Manager - Nhà cung cấp */}
+        <Route path="/manager/suppliers" element={<ManagerSuppliers />} />
+        <Route path="/manager/suppliers/create" element={<SupplierForm />} />
+        <Route path="/manager/suppliers/:id/edit" element={<SupplierForm />} />
 
         <Route path="/manager/system" element={<AccountancePlaceholder title="Hệ thống" />} />
         <Route path="/manager/system/employees" element={<AccountancePlaceholder title="Quản lý nhân viên" />} />

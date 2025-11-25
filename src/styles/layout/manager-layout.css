@@ -58,67 +58,44 @@
   min-height: 73px;
 }
 
-.manager-header-left {
+.manager-topbar-left {
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-left: 224px;
 }
 
-.manager-header-logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.manager-breadcrumb-divider {
+  width: 1px;
+  height: 24px;
+  background: #e6e8eb;
 }
 
-.manager-header-logo img {
-  height: 60px;
-  width: auto;
-}
-
-.manager-header-title {
+.manager-breadcrumb {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.manager-header-title .garage-text {
-  color: #CBB081;
-  font-weight: 600;
-  font-size: 20px;
-}
-
-.manager-header-title .name-text {
-  color: #030303;
-  font-weight: 700;
-  font-size: 20px;
-}
-
-.manager-header-greeting {
-  color: #030303;
-  font-size: 16px;
+.manager-breadcrumb-item {
+  color: #6b7280;
   font-weight: 500;
-  margin-left: 16px;
 }
 
-.manager-header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.manager-breadcrumb-separator {
+  color: #9ca3af;
+  font-size: 12px;
 }
 
-.manager-header-zalo {
+.manager-breadcrumb-current {
+  color: #111827;
+  font-weight: 700;
+}
+
+.manager-topbar-right {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: #0068FF;
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
+  gap: 12px;
 }
 
 .manager-header-notification {

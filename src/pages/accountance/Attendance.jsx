@@ -55,7 +55,7 @@ const dayColumns = Array.from({ length: 13 }, (_, index) => ({
   }
 }))
 
-export default function Attendance() {
+export function AccountanceAttendanceContent() {
   const [query, setQuery] = useState('')
   const [month, setMonth] = useState(null)
 
@@ -93,7 +93,6 @@ export default function Attendance() {
   ]
 
   return (
-    <AccountanceLayout>
       <div className="attendance-page">
         <div className="attendance-header">
           <h1>Ngày công nhân viên</h1>
@@ -146,7 +145,15 @@ export default function Attendance() {
           </div>
         </div>
       </div>
-    </AccountanceLayout>
+  )
+}
+
+export default function AccountanceAttendance({ Layout = AccountanceLayout }) {
+  const Wrapper = Layout || (({ children }) => <>{children}</>)
+  return (
+    <Wrapper>
+      <AccountanceAttendanceContent />
+    </Wrapper>
   )
 }
 

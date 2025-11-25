@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Table, Input, Button, Space, Tag, Avatar, message } from 'antd'
 import { SearchOutlined, PlusOutlined, FilterOutlined } from '@ant-design/icons'
-import AccountanceLayout from '../../layouts/AccountanceLayout'
-import { goldTableHeader } from '../../utils/tableComponents'
-import { employeesAPI } from '../../services/api'
-import '../../styles/pages/accountance/employee-list.css'
+import ManagerLayout from '../../../layouts/ManagerLayout'
+import { goldTableHeader } from '../../../utils/tableComponents'
+import { employeesAPI } from '../../../services/api'
+import '../../../styles/pages/accountance/employee-list.css'
 
 const STATUS_CONFIG = {
   active: { color: '#1f8f4d', bg: '#eafff5', text: 'Đang làm việc' },
@@ -33,7 +33,7 @@ const fallbackEmployees = [
   },
   {
     id: 2,
-    name: 'Nguyễn Văn A',
+    name: 'Nguyễn Văn Minh',
     phone: '0913336432',
     salary: 20000000,
     department: 'Sơn',
@@ -61,46 +61,6 @@ const fallbackEmployees = [
     position: 'Kế toán',
     joinDate: '23/02/2025',
     status: 'leave'
-  },
-  {
-    id: 5,
-    name: 'Hoàng Văn D',
-    phone: '0456787345',
-    salary: 20000000,
-    department: 'Sơn',
-    position: 'Kỹ thuật viên',
-    joinDate: '23/02/2025',
-    status: 'active'
-  },
-  {
-    id: 6,
-    name: 'Đặng Thị Huyền',
-    phone: '0456787345',
-    salary: 20000000,
-    department: 'Máy',
-    position: 'Kỹ thuật viên',
-    joinDate: '23/02/2025',
-    status: 'active'
-  },
-  {
-    id: 7,
-    name: 'Nguyễn Văn A',
-    phone: '0456787347',
-    salary: 20000000,
-    department: 'Máy',
-    position: 'Kỹ thuật viên',
-    joinDate: '23/02/2025',
-    status: 'leave'
-  },
-  {
-    id: 8,
-    name: 'Nguyễn Văn A',
-    phone: '0456787347',
-    salary: 20000000,
-    department: 'Máy',
-    position: 'Kỹ thuật viên',
-    joinDate: '23/02/2025',
-    status: 'inactive'
   }
 ]
 
@@ -111,7 +71,6 @@ const formatEmployee = (employee, index) => {
     }
     return Number(value)
   }
-
   const rawDate = employee.joinDate || employee.startDate || employee.createdAt
   const joinDate = (() => {
     if (!rawDate) return '—'
@@ -133,7 +92,7 @@ const formatEmployee = (employee, index) => {
   }
 }
 
-export function AccountanceEmployeeListContent() {
+export default function EmployeeListForManager() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
@@ -148,9 +107,7 @@ export function AccountanceEmployeeListContent() {
       setLoading(true)
       try {
         const { data, error } = await employeesAPI.getAll(pageIndex, size)
-        if (error) {
-          throw new Error(error)
-        }
+        if (error) throw new Error(error)
         const payload = data?.result || data?.data || data
         const list = Array.isArray(payload)
           ? payload
@@ -198,9 +155,7 @@ export function AccountanceEmployeeListContent() {
       dataIndex: 'index',
       key: 'index',
       width: 70,
-      render: (_, __, index) => (
-        <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
-      )
+      render: (_, __, index) => <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
     },
     {
       title: 'Họ Tên',
@@ -210,11 +165,7 @@ export function AccountanceEmployeeListContent() {
       render: (_, record) => (
         <div className="employee-name-cell">
           <Avatar size={40} src={record.avatar}>
-            {record.name
-              .split(' ')
-              .slice(-1)
-              .join('')
-              .charAt(0)}
+            {record.name.split(' ').slice(-1).join('').charAt(0)}
           </Avatar>
           <div>
             <div className="emp-name">{record.name}</div>
@@ -228,18 +179,14 @@ export function AccountanceEmployeeListContent() {
       dataIndex: 'salary',
       key: 'salary',
       width: 160,
-      render: (value) => (
-        <span style={{ fontWeight: 600 }}>{value.toLocaleString('vi-VN')} đ</span>
-      )
+      render: (value) => <span style={{ fontWeight: 600 }}>{value.toLocaleString('vi-VN')} đ</span>
     },
     {
       title: 'Phòng ban',
       dataIndex: 'department',
       key: 'department',
       width: 140,
-      render: (text) => (
-        <Tag className="department-tag">{text}</Tag>
-      )
+      render: (text) => <Tag className="department-tag">{text}</Tag>
     },
     {
       title: 'Chức vụ',
@@ -290,73 +237,76 @@ export function AccountanceEmployeeListContent() {
   ]
 
   return (
-    <div className="employee-page">
-        <div className="employee-header">
-          <h1>Danh sách nhân viên</h1>
-        </div>
+    <ManagerLayout>
+      <div style={{ padding: 24, background: '#f5f7fb', minHeight: '100vh' }}>
+        <div
+          style={{
+            background: '#fff',
+            borderRadius: 20,
+            padding: 24,
+            boxShadow: '0 20px 45px rgba(15,23,42,0.08)',
+          }}
+        >
+          <div className="employee-header" style={{ marginBottom: 24 }}>
+            <h2>Danh sách nhân sự</h2>
+            <p style={{ color: '#98a2b3', margin: 0 }}>Theo dõi trạng thái và thông tin nhân viên</p>
+          </div>
 
-        <div className="employee-filters">
-          <div className="status-filters">
-            {statusFilters.map((item) => (
-              <Button
-                key={item.key}
-                type={status === item.key ? 'primary' : 'default'}
-                onClick={() => setStatus(item.key)}
-                className={status === item.key ? 'status-btn active' : 'status-btn'}
-              >
-                {item.label}
+          <div className="employee-filters" style={{ gap: 16 }}>
+            <div className="status-filters">
+              {statusFilters.map((item) => (
+                <Button
+                  key={item.key}
+                  type={status === item.key ? 'primary' : 'default'}
+                  onClick={() => setStatus(item.key)}
+                  className={status === item.key ? 'status-btn active' : 'status-btn'}
+                >
+                  {item.label}
+                </Button>
+              ))}
+            </div>
+            <div className="employee-actions">
+              <Input
+                prefix={<SearchOutlined />}
+                placeholder="Tìm kiếm"
+                allowClear
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="employee-search"
+              />
+              <Button type="primary" icon={<PlusOutlined />} className="add-btn">
+                Thêm nhân viên
               </Button>
-            ))}
+              <Button icon={<FilterOutlined />} className="sort-btn">
+                Sort
+              </Button>
+            </div>
           </div>
-          <div className="employee-actions">
-            <Input
-              prefix={<SearchOutlined />}
-              placeholder="Tìm kiếm"
-              allowClear
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="employee-search"
+
+          <div className="employee-table-card" style={{ borderRadius: 16 }}>
+            <div className="table-title">Danh sách</div>
+            <Table
+              className="employee-table"
+              columns={columns}
+              dataSource={filtered}
+              loading={loading}
+              pagination={{
+                current: page,
+                pageSize,
+                total,
+                showSizeChanger: true,
+                showTotal: (t) => `0 of ${t} row(s) selected.`,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                onChange: (current, size) => {
+                  fetchEmployees(current - 1, size)
+                }
+              }}
+              components={goldTableHeader}
             />
-            <Button type="primary" icon={<PlusOutlined />} className="add-btn">
-              Thêm nhân viên
-            </Button>
-            <Button icon={<FilterOutlined />} className="sort-btn">
-              Sort
-            </Button>
           </div>
         </div>
-
-        <div className="employee-table-card">
-          <div className="table-title">Table List</div>
-          <Table
-            className="employee-table"
-            columns={columns}
-            dataSource={filtered}
-            loading={loading}
-            pagination={{
-              current: page,
-              pageSize,
-              total,
-              showSizeChanger: true,
-              showTotal: (t) => `0 of ${t} row(s) selected.`,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              onChange: (current, size) => {
-                fetchEmployees(current - 1, size)
-              }
-            }}
-            components={goldTableHeader}
-          />
-        </div>
-    </div>
-  )
-}
-
-export default function AccountanceEmployeeList({ Layout = AccountanceLayout }) {
-  const Wrapper = Layout || (({ children }) => <>{children}</>)
-  return (
-    <Wrapper>
-      <AccountanceEmployeeListContent />
-    </Wrapper>
+      </div>
+    </ManagerLayout>
   )
 }
 

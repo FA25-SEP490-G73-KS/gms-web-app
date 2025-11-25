@@ -1,8 +1,21 @@
 import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Tag, Space, Select } from 'antd'
-import { SearchOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons'
+import {
+  Table,
+  Input,
+  Button,
+  Tag,
+  Space,
+  Select,
+  Modal,
+  Form,
+  InputNumber,
+  Upload,
+  message
+} from 'antd'
+import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { manualVoucherAPI } from '../../services/api'
 import '../../styles/pages/accountance/finance.css'
 
 const { Option } = Select
@@ -21,7 +34,7 @@ const TICKET_TYPES = [
   { value: 'ung_luong', label: 'Ứng lương' }
 ]
 
-const financeData = [
+const initialFinanceData = [
   {
     id: 1,
     code: 'PT-2025-000001',
@@ -97,13 +110,19 @@ const getStatusConfig = (status) => {
   return configs[status] || { label: status, color: '#666', bg: '#f3f4f6' }
 }
 
-export default function Finance() {
+export function AccountanceFinanceContent() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [ticketType, setTicketType] = useState('all')
+  const [data, setData] = useState(initialFinanceData)
+  const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [fileList, setFileList] = useState([])
+  const [creating, setCreating] = useState(false)
+  const [form] = Form.useForm()
 
   const filtered = useMemo(() => {
-    return financeData
+    return data
       .filter((item) => {
         const matchesQuery =
           !query ||
@@ -211,8 +230,8 @@ export default function Finance() {
   ]
 
   return (
-    <AccountanceLayout>
-      <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
+    <>
+    <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
 
@@ -246,6 +265,7 @@ export default function Finance() {
               type="primary"
               icon={<PlusOutlined />}
               style={{ background: '#22c55e', borderColor: '#22c55e', fontWeight: 600 }}
+              onClick={() => setCreateModalVisible(true)}
             >
               Tạo phiếu
             </Button>
@@ -286,7 +306,144 @@ export default function Finance() {
           />
         </div>
       </div>
-    </AccountanceLayout>
+
+      <Modal
+        title="Tạo phiếu Thu/Chi"
+        open={createModalVisible}
+        onCancel={() => setCreateModalVisible(false)}
+        okText="Tạo phiếu"
+        confirmLoading={creating}
+        onOk={async () => {
+          try {
+            const values = await form.validateFields()
+            setCreating(true)
+            const payload = {
+              type: values.type,
+              amount: Number(values.amount),
+              target: values.target,
+              description: values.description,
+              attachmentUrl: values.attachmentUrl || undefined,
+              approvedByEmployeeId: values.approvedByEmployeeId
+            }
+            const { data: response, error } = await manualVoucherAPI.create(payload, uploadFile)
+            if (error) {
+              throw new Error(error)
+            }
+            const result = response?.result || response?.data || response
+            const newRecord = {
+              id: result?.id || Date.now(),
+              code: result?.code || result?.voucherCode || `TMP-${Date.now()}`,
+              type: (result?.type || values.type || 'thu').toLowerCase(),
+              subject: result?.target || values.target,
+              amount: Number(result?.amount || values.amount),
+              createdAt: result?.createdAt
+                ? new Date(result.createdAt).toLocaleDateString('vi-VN')
+                : new Date().toLocaleDateString('vi-VN'),
+              status: (result?.status || 'pending').toLowerCase()
+            }
+            setData((prev) => [newRecord, ...prev])
+            message.success('Tạo phiếu thành công')
+            form.resetFields()
+            setUploadFile(null)
+            setFileList([])
+            setCreateModalVisible(false)
+          } catch (err) {
+            if (err?.errorFields) {
+              return
+            }
+            message.error(err.message || 'Tạo phiếu thất bại')
+          } finally {
+            setCreating(false)
+          }
+        }}
+        destroyOnClose
+      >
+        <Form layout="vertical" form={form} initialValues={{ type: 'THU' }}>
+          <Form.Item
+            name="type"
+            label="Loại phiếu"
+            rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
+          >
+            <Select options={[
+              { value: 'THU', label: 'Thu' },
+              { value: 'CHI', label: 'Chi' }
+            ]} />
+          </Form.Item>
+          <Form.Item
+            name="amount"
+            label="Số tiền"
+            rules={[
+              { required: true, message: 'Vui lòng nhập số tiền' },
+              { type: 'number', min: 1, message: 'Số tiền phải lớn hơn 0' }
+            ]}
+          >
+            <InputNumber
+              style={{ width: '100%' }}
+              formatter={(value) =>
+                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+              }
+              parser={(value) => value?.replace(/\./g, '')}
+            />
+          </Form.Item>
+          <Form.Item
+            name="target"
+            label="Đối tượng"
+            rules={[{ required: true, message: 'Vui lòng nhập đối tượng' }]}
+          >
+            <Input placeholder="Nhà cung cấp A" />
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="Nội dung"
+            rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
+          >
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Form.Item
+            name="approvedByEmployeeId"
+            label="Người duyệt (ID nhân viên)"
+            rules={[{ required: true, message: 'Vui lòng nhập người duyệt' }]}
+          >
+            <Input placeholder="ID nhân viên" />
+          </Form.Item>
+          <Form.Item
+            name="attachmentUrl"
+            label="Link chứng từ (nếu có)"
+          >
+            <Input placeholder="https://example.com/file.pdf" />
+          </Form.Item>
+          <Form.Item label="Tệp chứng từ">
+            <Upload
+              beforeUpload={(file) => {
+                setUploadFile(file)
+                setFileList([{
+                  uid: file.uid || file.name,
+                  name: file.name,
+                  status: 'done'
+                }])
+                return false
+              }}
+              onRemove={() => {
+                setUploadFile(null)
+                setFileList([])
+              }}
+              fileList={fileList}
+            >
+              <Button icon={<UploadOutlined />}>Chọn tệp</Button>
+            </Upload>
+          </Form.Item>
+        </Form>
+      </Modal>
+    </>
+  )
+}
+
+export default function AccountanceFinance({ Layout = AccountanceLayout }) {
+  const Wrapper = Layout || (({ children }) => <>{children}</>)
+  return (
+    <Wrapper>
+      <AccountanceFinanceContent />
+    </Wrapper>
   )
 }
 
