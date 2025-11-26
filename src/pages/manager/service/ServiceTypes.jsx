@@ -39,7 +39,7 @@ export default function ManagerServiceTypes() {
 
   return (
     <ManagerLayout>
-      <div style={{ padding: 24, minHeight: '100vh', background: '#f5f7fb' }}>
+      <div style={{ padding: 24, minHeight: '100vh' }}>
         <div
           style={{
             background: '#fff',

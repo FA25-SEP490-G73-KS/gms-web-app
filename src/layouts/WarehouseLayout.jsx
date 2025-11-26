@@ -97,7 +97,7 @@ export default function WarehouseLayout({ children }) {
 
       {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/warehouse')} style={{ marginTop: '57px' }}>
+        <div className="warehouse-brand" onClick={() => navigate('/warehouse')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">

@@ -85,7 +85,7 @@ export default function SupplierForm() {
   return (
     <ManagerLayout>
       <Spin spinning={loading}>
-        <div style={{ padding: 24, minHeight: '100vh', background: '#f5f7fb' }}>
+        <div style={{ padding: 24, minHeight: '100vh' }}>
           <Card
             style={{
               borderRadius: 16,

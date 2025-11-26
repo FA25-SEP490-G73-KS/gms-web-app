@@ -141,7 +141,7 @@ export default function CreateForm() {
 
   return (
     <AccountanceLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ 
           background: '#ffffff', 
           borderRadius: '12px', 

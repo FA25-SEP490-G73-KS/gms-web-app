@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Input, Card, Badge, Space, message, Button, DatePicker, Row, Col } from 'antd'
-import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
+import { Table, Input, Card, Badge, Space, message, Button, DatePicker, Row, Col, Form, Select, Modal } from 'antd'
+import { EyeOutlined, SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
@@ -527,7 +527,7 @@ export default function TicketService() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
             {isHistoryPage ? 'Lịch sử sửa chữa' : 'Danh sách phiếu'}
@@ -565,12 +565,7 @@ export default function TicketService() {
                     <Button
                       key={item.key}
                       type={statusFilter === item.key ? 'primary' : 'default'}
-                      style={{
-                        background: statusFilter === item.key ? '#ffd65a' : '#fff',
-                        borderColor: statusFilter === item.key ? '#ffd65a' : '#e6e6e6',
-                        color: statusFilter === item.key ? '#111' : '#666',
-                        fontWeight: 600
-                      }}
+                      className={statusFilter === item.key ? 'status-btn active' : 'status-btn'}
                       onClick={() => setStatusFilter(item.key)}
                     >
                       {item.label}
@@ -582,7 +577,15 @@ export default function TicketService() {
           </Row>
         </div>
 
-        <Card style={{ borderRadius: '12px' }} bodyStyle={{ padding: 0 }}>
+        <Card 
+          style={{ 
+            borderRadius: '16px', 
+            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+            background: '#fff',
+            padding: '24px'
+          }} 
+          bodyStyle={{ padding: 0 }}
+        >
           <Table
             columns={columns}
             dataSource={filtered.map((item, index) => ({ ...item, key: item.id, index }))}

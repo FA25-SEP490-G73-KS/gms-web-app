@@ -1,14 +1,13 @@
 :root { 
   --gold: #CBB081; 
   --sidebar-width: 240px;
-  --sidebar-collapsed-width: 72px;
+  --sidebar-collapsed-width: 90px;
 }
 
 .manager-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7f7f8;
   position: relative;
 }
 
@@ -156,7 +155,7 @@
 }
 
 .manager-layout.sidebar-collapsed .manager-sidebar .manager-brand img {
-  height: 60px;
+  height: 52px;
 }
 
 .manager-layout.sidebar-collapsed .manager-sidebar .manager-nav-item span,
@@ -179,11 +178,11 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  margin-top: 80px; /* Space for header */
+  margin-top: 10px; /* Space for header */
 }
 
 .manager-brand img {
-  height: 80px;
+  height: 76px;
   width: auto;
 }
 

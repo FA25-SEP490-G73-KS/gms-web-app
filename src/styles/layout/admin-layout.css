@@ -1,14 +1,13 @@
 :root { 
   --gold: #CBB081; 
   --sidebar-width: 240px;
-  --sidebar-collapsed-width: 72px;
+  --sidebar-collapsed-width: 90px;
 }
 
 .admin-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7f7f8;
   position: relative;
 }
 
@@ -49,7 +48,7 @@
 }
 
 .admin-layout.sidebar-collapsed .admin-brand img {
-  height: 60px;
+  height: 52px;
 }
 
 .admin-layout.sidebar-collapsed .admin-nav-item span,
@@ -91,9 +90,10 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  margin-top: 10px;
 }
 
-.admin-brand img { height: 120px; width: auto; }
+.admin-brand img { height: 88px; width: auto; }
 
 .admin-nav { display: flex; flex-direction: column; gap: 6px; }
 
@@ -121,7 +121,7 @@
 
 .admin-nav-group .caret { margin-left: auto; transition: transform .2s ease; }
 .admin-nav-group .caret.rot { transform: rotate(180deg); }
-.submenu { position: relative; padding-left: 24px; display: grid; gap: 8px; }
+.submenu { position: relative; padding-left: 24px; display: grid; gap: 10px; margin-top: 6px; }
 .submenu-line { position: absolute; top: 0; bottom: 0; left: 12px; width: 2px; background: #CBB081; border-radius: 2px; }
 .submenu-item { background: transparent; border: none; color: #444; padding: 8px 12px 8px 30px; text-align: left; border-radius: 8px; cursor: pointer; font-weight: 500; }
 .submenu-item:hover { background: rgba(203, 176, 129, 0.25); }

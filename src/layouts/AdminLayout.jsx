@@ -96,7 +96,7 @@ export default function AdminLayout({ children }) {
 
       {/* Sidebar - Overlay on header */}
       <aside className="admin-sidebar">
-        <div className="admin-brand" onClick={() => navigate('/service-advisor')} style={{ marginTop: '57px' }}>
+        <div className="admin-brand" onClick={() => navigate('/service-advisor')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="admin-nav">

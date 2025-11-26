@@ -1,14 +1,13 @@
 :root {
   --gold: #CBB081;
   --sidebar-width: 240px;
-  --sidebar-collapsed-width: 72px;
+  --sidebar-collapsed-width: 90px;
 }
 
 .warehouse-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7f7f8;
   position: relative;
 }
 
@@ -19,7 +18,7 @@
 }
 
 .warehouse-layout.sidebar-collapsed .warehouse-brand img {
-  height: 60px;
+  height: 52px;
 }
 
 .warehouse-layout.sidebar-collapsed .warehouse-nav-item span,
@@ -165,11 +164,11 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  margin-top: 80px;
+  margin-top: 10px;
 }
 
 .warehouse-brand img {
-  height: 80px;
+  height: 76px;
   width: auto;
 }
 

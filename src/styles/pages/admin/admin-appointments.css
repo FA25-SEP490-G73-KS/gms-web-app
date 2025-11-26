@@ -13,6 +13,21 @@
 .status-warning { background: #ffffff; color: #e49a00; border-color: #ffe6b3; }
 .status-secondary { background: #ffffff; color: #b0b5bd; border-color: #e7eaf0; }
 
+/* status filter buttons */
+.status-btn {
+  border-radius: 24px !important;
+  border-color: #d9d9d9 !important;
+  color: #666 !important;
+}
+
+.status-btn.active,
+.status-btn.ant-btn-primary {
+  background: #cbb081 !important;
+  border-color: #cbb081 !important;
+  color: #111 !important;
+  font-weight: 600;
+}
+
 .search-box { display: flex; align-items: center; gap: 8px; border: 1px solid #e6e6e6; background: #fff; padding: 8px 10px; border-radius: 10px; }
 .search-box input { border: none; outline: none; min-width: 240px; }
 
@@ -66,7 +81,7 @@
 .appointment-timeline-card {
   background: #fff;
   border-radius: 12px;
-  border: 1px solid #e0e7ff;
+  border: 1px solid #eee;
   padding: 20px;
   position: relative;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -85,13 +100,13 @@
   display: inline-flex;
   align-items: center;
   padding: 6px 14px;
-  background: #3b82f6;
-  color: #fff;
+  background: #CBB081;
+  color: #111;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.3px;
-  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 2px 4px rgba(203, 176, 129, 0.2);
 }
 
 .timeline-date-picker {

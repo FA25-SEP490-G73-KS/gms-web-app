@@ -3,7 +3,7 @@ import AccountanceLayout from '../../layouts/AccountanceLayout'
 export default function AccountanceServices() {
   return (
     <AccountanceLayout>
-      <div style={{ padding: 24, background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: 24, minHeight: '100vh' }}>
         <div
           style={{
             background: '#fff',

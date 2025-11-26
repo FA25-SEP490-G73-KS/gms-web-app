@@ -311,7 +311,13 @@ export default function AppointmentService() {
                 <input 
                   value={form.phoneNumber} 
                   onChange={(e) => {
-                    const value = e.target.value.replace(/\D/g, '').slice(0, 10)
+                    let value = e.target.value.replace(/\D/g, '')
+                    // Bỏ số 0 đầu tiên nếu có
+                    if (value.startsWith('0')) {
+                      value = value.slice(1)
+                    }
+                    // Giới hạn tối đa 10 ký tự
+                    value = value.slice(0, 10)
                     setForm({ ...form, phoneNumber: value })
                   }}
                   placeholder="VD: 909123456" 

@@ -189,7 +189,7 @@ export default function CreateImportForm() {
 
   return (
     <WarehouseLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <Form
           form={form}
           layout="vertical"
