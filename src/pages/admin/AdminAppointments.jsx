@@ -49,6 +49,7 @@ export default function AdminAppointments() {
   const [selectedFull, setSelectedFull] = useState(null)
   const [statusFilter, setStatusFilter] = useState(null)
   const [selectedDate, setSelectedDate] = useState(null)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     fetchAppointments()
@@ -228,7 +229,7 @@ export default function AdminAppointments() {
     return timeSlots.filter((s) => s.appointments.length > 0)
   }, [data, selectedDate])
 
-  const handleCreateTicket = () => {
+  const handleCreateTicket = async () => {
     if (!selectedFull && !selected) {
       message.error('Không tìm thấy thông tin lịch hẹn')
       return
@@ -240,13 +241,38 @@ export default function AdminAppointments() {
       return
     }
 
+    setUpdatingStatus(true)
+
+    try {
+      const { error } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
+      if (error) {
+        message.error('Cập nhật trạng thái lịch hẹn thất bại. Vui lòng thử lại.')
+        setUpdatingStatus(false)
+        return
+      }
+      message.success('Đã cập nhật trạng thái lịch hẹn thành "Đã đến"')
+      await fetchAppointments()
+    } catch (err) {
+      console.error('Failed to update appointment status:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật trạng thái lịch hẹn.')
+      setUpdatingStatus(false)
+      return
+    } finally {
+      setUpdatingStatus(false)
+    }
+
     // Điều hướng tạo phiếu, truyền state
     navigate('/service-advisor/orders/create', { 
       state: { 
         appointmentId: appointmentId,
         customer: selectedFull?.customerName || selected?.customer,
         phone: selectedFull?.customerPhone || selected?.phone,
-        licensePlate: selectedFull?.licensePlate || selected?.license
+        licensePlate: selectedFull?.licensePlate || selected?.license,
+        note: selectedFull?.note || selected?.note,
+        serviceType: selectedFull?.serviceType || selected?.serviceType,
+        appointmentDate: selectedFull?.appointmentDate || selected?.dateRaw,
+        timeSlotLabel: selectedFull?.timeSlotLabel || selected?.time,
+        appointmentStatus: selectedFull?.statusKey || selected?.statusKey
       } 
     })
     
@@ -525,6 +551,8 @@ export default function AdminAppointments() {
                 type="primary"
                 size="large"
                 onClick={handleCreateTicket}
+                loading={updatingStatus}
+                disabled={updatingStatus}
                 style={{
                   background: '#22c55e',
                   borderColor: '#22c55e',

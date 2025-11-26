@@ -3,6 +3,9 @@ import HomePage from './pages/home/HomePage';
 import AboutPage from './pages/home/about';
 import ContactPage from './pages/home/contact';
 import AppointmentService from './pages/customer/appointment/appointmentservice';
+import Login from './pages/auth/Login';
+import ForgotPassword from './pages/auth/ForgotPassword';
+import ChangePassword from './pages/auth/ChangePassword';
 import AdminHome from './pages/admin/AdminHome';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
@@ -62,6 +65,9 @@ function App() {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/appointment" element={<AppointmentService />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+        <Route path="/auth/change-password" element={<ChangePassword />} />
         {/* Redirect old /admin routes to /service-advisor */}
         <Route path="/admin" element={<Navigate to="/service-advisor" replace />} />
         <Route path="/admin/appointments" element={<Navigate to="/service-advisor/appointments" replace />} />

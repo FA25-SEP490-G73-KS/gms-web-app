@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react'
 import { message } from 'antd'
 import CustomerLayout from '../../../layouts/CustomerLayout'
-import { appointmentAPI, otpAPI } from '../../../services/api'
-
-const SERVICE_TYPE_MAP = {
-  'Sơn': 1,
-  'Thay thế phụ tùng': 2,
-  'Bảo dưỡng': 3
-}
+import { appointmentAPI, otpAPI, serviceTypeAPI } from '../../../services/api'
 
 export default function AppointmentService() {
   const [step, setStep] = useState(1)
@@ -15,6 +9,8 @@ export default function AppointmentService() {
   const [otpLoading, setOtpLoading] = useState(false)
   const [verifyOtpLoading, setVerifyOtpLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
+  const [serviceTypes, setServiceTypes] = useState([])
+  const [serviceTypesLoading, setServiceTypesLoading] = useState(false)
   const [timeSlots, setTimeSlots] = useState([])
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
   const [appointmentResult, setAppointmentResult] = useState(null)
@@ -34,6 +30,34 @@ export default function AppointmentService() {
   const update = (k) => (e) => setForm({ ...form, [k]: e.target.value })
   const next = () => setStep((s) => Math.min(4, s + 1))
   const back = () => setStep((s) => Math.max(1, s - 1))
+
+  useEffect(() => {
+    fetchServiceTypes()
+  }, [])
+
+  const fetchServiceTypes = async () => {
+    setServiceTypesLoading(true)
+    try {
+      const { data, error } = await serviceTypeAPI.getAll()
+      if (error) {
+        message.error('Không thể tải danh sách loại dịch vụ. Vui lòng thử lại.')
+        setServiceTypes([])
+        return
+      }
+      if (data?.result && Array.isArray(data.result)) {
+        setServiceTypes(data.result)
+      } else {
+        setServiceTypes([])
+        message.warning('Không tìm thấy loại dịch vụ khả dụng.')
+      }
+    } catch (err) {
+      console.error('Error fetching service types:', err)
+      message.error('Đã xảy ra lỗi khi tải loại dịch vụ.')
+      setServiceTypes([])
+    } finally {
+      setServiceTypesLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (step === 3 && form.date) {
@@ -200,9 +224,8 @@ export default function AppointmentService() {
       // Format date as YYYY-MM-DD
       const appointmentDate = form.date
       
-      // Get service type ID
-      const serviceTypeId = SERVICE_TYPE_MAP[form.service]
-      if (!serviceTypeId) {
+      const serviceTypeId = parseInt(form.service, 10)
+      if (Number.isNaN(serviceTypeId)) {
         message.error('Loại dịch vụ không hợp lệ')
         setLoading(false)
         return
@@ -251,7 +274,7 @@ export default function AppointmentService() {
           customerPhone: appointmentData.customerPhone || form.phone,
           licensePlate: appointmentData.licensePlate || form.license,
           appointmentDate: appointmentData.appointmentDate || form.date,
-          serviceType: appointmentData.serviceType || [form.service]
+          serviceType: appointmentData.serviceType || [serviceTypeId]
         })
         setLoading(false)
         next()
@@ -360,11 +383,23 @@ export default function AppointmentService() {
                 </div>
                 <div>
                   <label style={labelStyle}>Loại dịch vụ *</label>
-                  <select value={form.service} onChange={update('service')} style={inputStyle}>
-                    <option value="">--Chọn loại dịch vụ--</option>
-                    <option>Sơn</option>
-                    <option>Thay thế phụ tùng</option>
-                    <option>Bảo dưỡng</option>
+                  <select
+                    value={form.service}
+                    onChange={update('service')}
+                    disabled={serviceTypesLoading || serviceTypes.length === 0}
+                    style={{
+                      ...inputStyle,
+                      ...(serviceTypesLoading ? { opacity: 0.6, cursor: 'not-allowed' } : {})
+                    }}
+                  >
+                    <option value="">
+                      {serviceTypesLoading ? 'Đang tải loại dịch vụ...' : '--Chọn loại dịch vụ--'}
+                    </option>
+                    {serviceTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -444,12 +479,19 @@ export default function AppointmentService() {
                   <div style={infoRow}>
                     <div style={infoLabel}>Loại dịch vụ:</div>
                     <div style={infoValue}>
-                      {appointmentResult.serviceType && appointmentResult.serviceType.length > 0
-                        ? appointmentResult.serviceType.map(id => {
-                            const serviceName = Object.keys(SERVICE_TYPE_MAP).find(key => SERVICE_TYPE_MAP[key] === id)
-                            return serviceName || id
-                          }).join(', ')
-                        : form.service || 'N/A'}
+                      {(() => {
+                        const ids =
+                          appointmentResult.serviceType && appointmentResult.serviceType.length > 0
+                            ? appointmentResult.serviceType
+                            : form.service
+                              ? [parseInt(form.service, 10)]
+                              : []
+                        if (ids.length === 0) return 'N/A'
+                        const names = ids
+                          .map((id) => serviceTypes.find((type) => type.id === id)?.name || id)
+                          .join(', ')
+                        return names || 'N/A'
+                      })()}
                     </div>
                   </div>
                   {appointmentResult.note && (

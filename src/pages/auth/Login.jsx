@@ -1,154 +1,186 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { message } from 'antd'
+import { useMemo, useCallback, useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Form, Input, Button, Card, Checkbox, Divider, message } from 'antd'
+import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
 import useAuthStore from '../../store/authStore'
 import '../../styles/pages/auth/login.css'
-const imgImage15 = "http://localhost:3845/assets/e3f06dc74cc8cb44cf93eb05563cb8c82f9ac956.png"
-const imgEyeOff = "http://localhost:3845/assets/42da4380efeca78b000e3917abb285b4d143b77b.svg"
-const imgCheck = "http://localhost:3845/assets/3eb0b3b98f576e4a7c0b701a5a928b2ae47a95a2.svg"
-import { useState, useMemo, useCallback } from 'react';
-import Form from 'antd/es/form';
-import Input from 'antd/es/input';
-import Button from 'antd/es/button';
-import Card from 'antd/es/card';
-import Checkbox from 'antd/es/checkbox';
-import message from 'antd/es/message';
-import Divider from 'antd/es/divider';
-import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons';
-import '../../styles/pages/auth/login.css';
-
 
 export default function Login() {
-    const [form] = Form.useForm();
-    const [loading, setLoading] = useState(false);
-    const [logoLoaded, setLogoLoaded] = useState(false);
+  const [form] = Form.useForm()
+  const [loading, setLoading] = useState(false)
+  const [logoLoaded, setLogoLoaded] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const login = useAuthStore((state) => state.login)
 
-    setLoading(true)
-    try {
-      await login(form.phone, form.password)
-      
-      message.success('Đăng nhập thành công!')
-      
-      const currentUser = useAuthStore.getState().user
-      const userRole = currentUser?.role
-    const onFinish = useCallback(async (values) => {
-        setLoading(true);
-        try {
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            message.success('Đăng nhập thành công!');
-        } catch (error) {
-            message.error('Đăng nhập thất bại. Vui lòng thử lại!');
-        } finally {
-            setLoading(false);
+  const handleLogoLoad = useCallback(() => {
+    setLogoLoaded(true)
+  }, [])
+
+  const iconRender = useMemo(
+    () => (visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />),
+    []
+  )
+
+  const redirectAfterLogin = useCallback(() => {
+    const userRole = useAuthStore.getState().user?.role
+    const from = location.state?.from?.pathname
+
+    if (from) {
+      navigate(from, { replace: true })
+      return
+    }
+
+    switch (userRole) {
+      case 'ADMIN':
+        navigate('/admin/dashboard', { replace: true })
+        break
+      case 'MANAGER':
+        navigate('/manager/dashboard', { replace: true })
+        break
+      case 'SERVICE_ADVISOR':
+        navigate('/service-advisor/appointments', { replace: true })
+        break
+      default:
+        navigate('/', { replace: true })
+        break
+    }
+  }, [location.state, navigate])
+
+  const onFinish = useCallback(
+    async (values) => {
+      const { phone, password, remember } = values
+      setLoading(true)
+      try {
+        await login(phone, password)
+        message.success('Đăng nhập thành công!')
+
+        if (remember) {
+          localStorage.setItem('rememberedPhone', phone)
+        } else {
+          localStorage.removeItem('rememberedPhone')
         }
-    }, []);
 
+        redirectAfterLogin()
+      } catch (error) {
+        const errorMessage = error?.message || 'Đăng nhập thất bại. Vui lòng thử lại!'
+        message.error(errorMessage)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [login, redirectAfterLogin]
+  )
 
-    const onFinishFailed = useCallback((errorInfo) => {
-        console.error('Form validation failed:', errorInfo);
-    }, []);
+  const onFinishFailed = useCallback((errorInfo) => {
+    console.error('Form validation failed:', errorInfo)
+  }, [])
 
-    const handleLogoLoad = useCallback(() => {
-        setLogoLoaded(true);
-    }, []);
-
-    const iconRender = useMemo(() => (visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />), []);
-
-    return (
-        <div className="login-container">
-            <div className="login-wrapper">
-                <Card className="login-card">
-                    <div className="login-header">
-                        <div className="login-logo">
-                            {!logoLoaded && <div className="login-logo-placeholder" />}
-                            <img
-                                src="/image/mainlogo.png"
-                                alt="Logo Garage Hoàng Tuấn"
-                                loading="eager"
-                                onLoad={handleLogoLoad}
-                                style={{ opacity: logoLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
-                                width="120"
-                                height="auto"
-                            />
-                        </div>
-                        <h1 className="login-title">Đăng Nhập</h1>
-                        <p className="login-subtitle">Chào mừng bạn trở lại Garage Hoàng Tuấn</p>
-                    </div>
-
-                    <Form
-                        form={form}
-                        name="login"
-                        onFinish={onFinish}
-                        onFinishFailed={onFinishFailed}
-                        autoComplete="off"
-                        layout="vertical"
-                        size="large"
-                        className="login-form"
-                    >
-                        <Form.Item
-                            label="Tên đăng nhập"
-                            name="username"
-                            rules={[
-                                { required: true, message: 'Vui lòng nhập tên đăng nhập!' },
-                                { min: 3, message: 'Tên đăng nhập phải có ít nhất 3 ký tự!' }
-                            ]}
-                        >
-                            <Input
-                                prefix={<UserOutlined className="input-icon" />}
-                                placeholder="Nhập tên đăng nhập"
-                                autoComplete="username"
-                            />
-                        </Form.Item>
-
-                        <Form.Item
-                            label="Mật khẩu"
-                            name="password"
-                            rules={[
-                                { required: true, message: 'Vui lòng nhập mật khẩu!' },
-                                { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự!' }
-                            ]}
-                        >
-                            <Input.Password
-                                prefix={<LockOutlined className="input-icon" />}
-                                placeholder="Nhập mật khẩu"
-                                iconRender={iconRender}
-                                autoComplete="current-password"
-                            />
-                        </Form.Item>
-
-                        <Form.Item>
-                            <div className="login-options">
-                                <Form.Item name="remember" valuePropName="checked" noStyle>
-                                    <Checkbox>Ghi nhớ đăng nhập</Checkbox>
-                                </Form.Item>
-                                <a className="login-forgot" href="#forgot">
-                                    Quên mật khẩu?
-                                </a>
-                            </div>
-                        </Form.Item>
-
-                        <Form.Item>
-                            <Button
-                                type="primary"
-                                htmlType="submit"
-                                loading={loading}
-                                block
-                                className="login-button"
-                            >
-                                Đăng Nhập
-                            </Button>
-                        </Form.Item>
-
-                        <Divider plain>Hoặc</Divider>
-
-                        <div className="login-footer">
-                            <p>
-                                Chưa có tài khoản? <a href="#register">Đăng ký ngay</a>
-                            </p>
-                        </div>
-                    </Form>
-                </Card>
+  return (
+    <div className="login-container">
+      <div className="login-wrapper">
+        <Card className="login-card">
+          <div className="login-header">
+            <div className="login-logo">
+              {!logoLoaded && <div className="login-logo-placeholder" />}
+              <img
+                src="/image/mainlogo.png"
+                alt="Logo Garage Hoàng Tuấn"
+                loading="eager"
+                onLoad={handleLogoLoad}
+                style={{ opacity: logoLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+                width="120"
+                height="auto"
+              />
             </div>
-        </div>
-    );
+            <h1 className="login-title">Đăng Nhập</h1>
+            <p className="login-subtitle">Chào mừng bạn trở lại Garage Hoàng Tuấn</p>
+          </div>
+
+          <Form
+            form={form}
+            name="login"
+            onFinish={onFinish}
+            onFinishFailed={onFinishFailed}
+            autoComplete="off"
+            layout="vertical"
+            size="large"
+            className="login-form"
+            initialValues={{
+              phone: localStorage.getItem('rememberedPhone') || '',
+              remember: !!localStorage.getItem('rememberedPhone'),
+            }}
+          >
+            <Form.Item
+              label="Số điện thoại"
+              name="phone"
+              rules={[
+                { required: true, message: 'Vui lòng nhập số điện thoại!' },
+                { len: 10, message: 'Số điện thoại phải gồm 10 chữ số!' },
+              ]}
+            >
+              <Input
+                prefix={<UserOutlined className="input-icon" />}
+                placeholder="Nhập số điện thoại"
+                autoComplete="username"
+                maxLength={10}
+              />
+            </Form.Item>
+
+            <Form.Item
+              label="Mật khẩu"
+              name="password"
+              rules={[
+                { required: true, message: 'Vui lòng nhập mật khẩu!' },
+                { min: 6, message: 'Mật khẩu phải có ít nhất 6 ký tự!' },
+              ]}
+            >
+              <Input.Password
+                prefix={<LockOutlined className="input-icon" />}
+                placeholder="Nhập mật khẩu"
+                iconRender={iconRender}
+                autoComplete="current-password"
+              />
+            </Form.Item>
+
+            <Form.Item>
+              <div className="login-options">
+                <Form.Item name="remember" valuePropName="checked" noStyle>
+                  <Checkbox>Ghi nhớ đăng nhập</Checkbox>
+                </Form.Item>
+                <button
+                  type="button"
+                  className="login-forgot"
+                  onClick={() => navigate('/auth/forgot-password')}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer' }}
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
+            </Form.Item>
+
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                block
+                className="login-button"
+              >
+                Đăng Nhập
+              </Button>
+            </Form.Item>
+
+            <Divider plain>Hoặc</Divider>
+
+            <div className="login-footer">
+              <p>
+                Chưa có tài khoản? <a href="#register">Đăng ký ngay</a>
+              </p>
+            </div>
+          </Form>
+        </Card>
+      </div>
+    </div>
+  )
 }

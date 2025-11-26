@@ -179,6 +179,12 @@ export const partsAPI = {
   update: (id, data) => put(`/parts/${id}`, data),
 };
 
+export const vehiclesAPI = {
+  getBrands: () => get('/vehicles/brands'),
+  getModelsByBrand: (brandId) => get(`/vehicles/brands/${brandId}/models`),
+  getByLicensePlate: (licensePlate) => get(`/vehicles?licensePlate=${encodeURIComponent(licensePlate)}`),
+};
+
 export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
 };
@@ -192,6 +198,7 @@ export const authAPI = {
   // Expected: POST /api/auth/update-password
   // Body: { phone: string, otpCode: string, newPassword: string }
   updatePassword: (phone, otpCode, newPassword) => post('/auth/update-password', { phone, otpCode, newPassword }, { skipAuth: true }),
+  changePassword: (currentPassword, newPassword) => put('/auth/change-password', { currentPassword, newPassword }),
 };
 
 
@@ -221,6 +228,7 @@ export const debtsAPI = {
 
 export const employeesAPI = {
   getAll: (page = 0, size = 6) => get(`/employees?page=${page}&size=${size}`),
+  getTechnicians: () => get('/employees/technicians'),
 };
 
 export const suppliersAPI = {
@@ -235,6 +243,8 @@ export const customersAPI = {
   getAll: (page = 0, size = 10) => get(`/customers?page=${page}&size=${size}`),
   getById: (id) => get(`/customers/${id}`),
   getServiceHistory: (phone) => get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
+  getByPhone: (phone) => get(`/customers/phone?phone=${encodeURIComponent(phone)}`),
+  create: (payload) => post('/customers', payload),
   update: (id, payload) => put(`/customers/${id}`, payload),
 };
 
