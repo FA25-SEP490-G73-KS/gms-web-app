@@ -3,6 +3,7 @@ import { Form, Input, Button, Card, Row, Col, Space, message, Modal, Select } fr
 import { useLocation, useNavigate } from 'react-router-dom'
 import AdminLayout from '../../layouts/AdminLayout'
 import { serviceTicketAPI, employeesAPI, vehiclesAPI, customersAPI } from '../../services/api'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 
 const { TextArea } = Input
 
@@ -38,10 +39,7 @@ export default function CreateTicket() {
   // Prefill từ lịch hẹn
   useEffect(() => {
     if (appointmentPrefill?.customer || appointmentPrefill?.phone) {
-      let phoneValue = appointmentPrefill.phone || ''
-      if (phoneValue && phoneValue.startsWith('84')) {
-        phoneValue = '0' + phoneValue.slice(2)
-      }
+      const phoneValue = displayPhoneFrom84(appointmentPrefill.phone || '')
 
       form.setFieldsValue({
         phone: phoneValue,
@@ -73,12 +71,8 @@ export default function CreateTicket() {
       setCustomerExists(true)
       setCustomerId(customer.customerId || customer.id || null)
 
-      // Normalize phone từ API (84xxx -> 0xxx) để hiển thị
-      let phoneValue = customer.phone || phone
-      if (phoneValue && phoneValue.startsWith('84')) {
-        phoneValue = '0' + phoneValue.slice(2)
-      }
-
+      const phoneValue = displayPhoneFrom84(customer.phone || phone)
+      
       setCurrentPhone(phoneValue || phone)
 
       form.setFieldsValue({
@@ -93,15 +87,6 @@ export default function CreateTicket() {
     } finally {
       setCustomerLookupLoading(false)
     }
-  }
-
-  const normalizePhoneTo84 = (phone) => {
-    const cleaned = String(phone || '').replace(/\D/g, '')
-    if (cleaned.startsWith('0')) {
-      return '84' + cleaned.slice(1)
-    }
-    if (cleaned.startsWith('84')) return cleaned
-    return cleaned
   }
 
   // Lấy danh sách kỹ thuật viên
@@ -516,7 +501,7 @@ export default function CreateTicket() {
                 const newCustomerId = created.customerId || created.id || null
                 setCustomerId(newCustomerId)
                 form.setFieldsValue({
-                  phone: newCustomer.phone,
+                  phone: displayPhoneFrom84(created.phone || newCustomer.phone),
                   name: created.fullName || newCustomer.fullName,
                   address: created.address || newCustomer.address,
                 })

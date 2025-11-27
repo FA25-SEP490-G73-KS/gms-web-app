@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Modal, Form, Input, DatePicker, Button, Row, Col, message } from 'antd'
 import { serviceTicketAPI } from '../../../services/api'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../../utils/helpers'
 import dayjs from 'dayjs'
 
 const { TextArea } = Input
@@ -49,7 +50,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       
       form.setFieldsValue({
         customerName: data.customer?.fullName || '',
-        phone: data.customer?.phone || '',
+        phone: displayPhoneFrom84(data.customer?.phone || ''),
         brand: brandName,
         vehicleType: modelName,
         licensePlate: vehicle.licensePlate || '',
@@ -70,7 +71,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       const payload = {
         customer: {
           fullName: values.customerName,
-          phone: values.phone,
+          phone: normalizePhoneTo84(values.phone),
         },
         vehicle: {
           licensePlate: values.licensePlate,

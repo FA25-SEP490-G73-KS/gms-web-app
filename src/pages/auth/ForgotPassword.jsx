@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { otpAPI } from '../../services/api'
 import '../../styles/pages/auth/forgot-password.css'
+import { normalizePhoneTo84 } from '../../utils/helpers'
 
 const imgImage15 = "http://localhost:3845/assets/e3f06dc74cc8cb44cf93eb05563cb8c82f9ac956.png"
 
@@ -12,14 +13,8 @@ export default function ForgotPassword() {
   const navigate = useNavigate()
 
   const validatePhone = (phoneNumber) => {
-    const cleaned = phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
-    if (cleaned.length < 11 || cleaned.length > 12) {
-      return false
-    }
-    if (!cleaned.startsWith('84')) {
-      return false
-    }
-    return true
+    const normalized = normalizePhoneTo84(phoneNumber)
+    return Boolean(normalized && normalized.startsWith('84') && normalized.length >= 11 && normalized.length <= 12)
   }
 
   const handleSubmit = async (e) => {
@@ -32,14 +27,13 @@ export default function ForgotPassword() {
     }
 
     if (!validatePhone(phone)) {
-      setError('Số điện thoại không hợp lệ. Vui lòng nhập theo định dạng 84xxxxxxxxx')
+      setError('Số điện thoại không hợp lệ. Vui lòng nhập 0xxxxxxxxx hoặc 84xxxxxxxxx')
       return
     }
 
     setLoading(true)
     try {
-      // Clean phone number before sending
-      const cleanedPhone = phone.replace(/\s+/g, '').replace(/[^\d]/g, '')
+      const cleanedPhone = normalizePhoneTo84(phone)
       
       const { data, error: apiError } = await otpAPI.send(cleanedPhone, 'RESET_PASSWORD', { skipAuth: true })
       
@@ -91,7 +85,7 @@ export default function ForgotPassword() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Ví dụ: 84909123456"
+              placeholder="Ví dụ: 0989123456 hoặc 84989123456"
               className="forgot-password__input"
             />
           </div>

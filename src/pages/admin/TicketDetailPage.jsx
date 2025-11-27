@@ -1,30 +1,29 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
-  Row, Col, Card, Select, InputNumber, Button, Input, Table, Space, 
-  DatePicker, Modal, Form, message, Tabs 
+  Row, Col, Card, Button, Table, Space, 
+  DatePicker, Modal, message, Tabs, Calendar 
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI, priceQuotationAPI, partsAPI } from '../../services/api'
+import { serviceTicketAPI, priceQuotationAPI, partsAPI, unitsAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/modals/ticketdetail.css'
 import dayjs from 'dayjs'
+import Select, { components as selectComponents } from 'react-select'
 
-const { TextArea } = Input
-
-const UNITS = [
+const DEFAULT_UNITS = [
   { value: 'Cái', label: 'Cái' },
   { value: 'Giờ', label: 'Giờ' },
   { value: 'Bộ', label: 'Bộ' },
 ]
+const PARTS_PAGE_SIZE = 100
 
 export default function TicketDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const isHistoryPage = location.state?.fromHistory || false
-  const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [ticketData, setTicketData] = useState(null)
   const [activeTab, setActiveTab] = useState('quote')
@@ -37,56 +36,382 @@ export default function TicketDetailPage() {
   const [selectedTechnician, setSelectedTechnician] = useState(null)
   const [parts, setParts] = useState([])
   const [partsLoading, setPartsLoading] = useState(false)
+  const [unitOptions, setUnitOptions] = useState(DEFAULT_UNITS)
+  const [partsCache, setPartsCache] = useState({})
+  const [isQuoteExpanded, setIsQuoteExpanded] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [createQuoteLoading, setCreateQuoteLoading] = useState(false)
+  const inputsDisabled = isHistoryPage || actionLoading
+const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
+const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
+
+  const disabledDeliveryDate = (current) => {
+    if (!current) return false
+    return current < dayjs().startOf('day')
+  }
+
+  const menuPortalTarget = typeof document !== 'undefined' ? document.body : null
+  const openDeliveryPicker = () => {
+    if (inputsDisabled) return
+    setDeliveryPickerValue(expectedDate || dayjs())
+    setDeliveryPickerVisible(true)
+  }
+
+  const closeDeliveryPicker = () => {
+    setDeliveryPickerVisible(false)
+  }
+
+  const confirmDeliveryPicker = async () => {
+    if (!deliveryPickerValue) {
+      message.warning('Vui lòng chọn ngày dự đoán giao xe')
+      return
+    }
+    const success = await handleUpdateDeliveryDate(deliveryPickerValue)
+    if (success) {
+      setDeliveryPickerVisible(false)
+    }
+  }
+
+  const baseInputStyle = useMemo(() => ({
+    width: '100%',
+    border: '1px solid #d0d7de',
+    borderRadius: '12px',
+    padding: '8px 12px',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    height: '40px',
+    background: '#fff'
+  }), [])
+
+  const selectStyles = useMemo(() => ({
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: '42px',
+      borderRadius: '12px',
+      borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      ':hover': {
+        borderColor: '#3b82f6'
+      }
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      padding: '0 12px'
+    }),
+    menu: (provided) => ({
+      ...provided,
+      borderRadius: '12px',
+      overflow: 'hidden',
+      zIndex: 5
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isFocused ? '#f5f5f5' : '#fff',
+      color: state.isSelected ? '#111' : '#111',
+      fontWeight: state.isSelected ? 600 : 400
+    })
+  }), [])
+
+  const selectComponentsOverrides = useMemo(() => ({
+    IndicatorSeparator: () => null,
+    DropdownIndicator: (props) => (
+      <selectComponents.DropdownIndicator {...props}>
+        <span style={{ fontSize: '12px', color: '#64748b' }}>▾</span>
+      </selectComponents.DropdownIndicator>
+    )
+  }), [])
+
+  const cachePartOption = (value, label) => {
+    if (value === undefined || value === null || value === '') return
+    setPartsCache(prev => {
+      if (prev[value]) return prev
+      console.log('[cachePartOption] add cache', value, label)
+      return {
+        ...prev,
+        [value]: {
+          value,
+          label: label || (typeof value === 'string' ? value : String(value)),
+          isFallback: true
+        }
+      }
+    })
+  }
+
+  const getPartOption = (value) => {
+    if (value === undefined || value === null || value === '') return null
+    return (
+      parts.find(option => String(option.value) === String(value)) ||
+      partsCache[value] ||
+      null
+    )
+  }
+
+  const transformQuotationItems = (items = []) => {
+    const replacementItems = []
+    const serviceItemsResult = []
+
+    items.forEach((item, index) => {
+      if (item.itemType === 'PART') {
+        replacementItems.push({
+          id: item.priceQuotationItemId || `part-${index}-${Date.now()}`,
+          priceQuotationItemId: item.priceQuotationItemId || null,
+          // Ưu tiên itemName, sau đó tới partName/partCode
+          category: item.partId || item.partCode || item.itemName || item.partName || '',
+          categoryLabel: item.itemName || item.partName || item.partCode || '',
+          quantity: item.quantity ?? 1,
+          unit: item.unit || '',
+          unitPrice: item.unitPrice || 0,
+          total: item.totalPrice || 0
+        })
+      } else if (item.itemType === 'SERVICE') {
+        serviceItemsResult.push({
+          id: item.priceQuotationItemId || `service-${index}-${Date.now()}`,
+          priceQuotationItemId: item.priceQuotationItemId || null,
+          // Backend hiện trả partName cho SERVICE, map sang task qua itemName/partName
+          task: item.itemName || item.serviceName || item.partName || item.description || '',
+          quantity: item.quantity ?? 1,
+          unit: item.unit || '',
+          unitPrice: item.unitPrice || 0,
+          total: item.totalPrice || 0
+        })
+      }
+    })
+
+    replacementItems.forEach(item => {
+      if (item.category) {
+        cachePartOption(item.category, item.categoryLabel || item.category)
+      }
+    })
+
+    return { replacementItems, serviceItemsResult }
+  }
+
+  const CustomSelect = (props) => (
+    <Select
+      classNamePrefix="custom-select"
+      menuPortalTarget={menuPortalTarget}
+      styles={selectStyles}
+      components={selectComponentsOverrides}
+      {...props}
+    />
+  )
+
+  const parseNumericId = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+    return null
+  }
+
+  const normalizePriceQuotation = (quote) => {
+    if (!quote) return null
+    const numericId = parseNumericId(
+      quote.priceQuotationId ??
+      quote.id ??
+      quote.quotationId
+    )
+
+    return {
+      ...quote,
+      priceQuotationId: numericId
+    }
+  }
+
+  const getQuotationId = () => {
+    return parseNumericId(
+      ticketData?.priceQuotation?.priceQuotationId ??
+      ticketData?.priceQuotation?.id ??
+      ticketData?.priceQuotation?.quotationId
+    )
+  }
+
+  const buildQuotationItemsPayload = () => {
+    const partItems = replaceItems.map(item => ({
+      itemName: item.categoryLabel || item.category || '',
+      partId: item.category || null,
+      priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
+      quantity: Number(item.quantity) || 0,
+      totalPrice: Number(item.total) || 0,
+      type: 'PART',
+      unit: item.unit || '',
+      unitPrice: Number(item.unitPrice) || 0
+    }))
+
+    const servicePayload = serviceItems.map(item => {
+      const unitPrice = Number(item.unitPrice) || 0
+      const quantity = 1 
+      const totalPrice = unitPrice * quantity
+
+      return {
+        itemName: item.task || '',
+        partId: null,
+        priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
+        quantity,
+        totalPrice,
+        type: 'SERVICE',
+        unit: null,
+        unitPrice
+      }
+    })
+
+    return [...partItems, ...servicePayload]
+  }
+
+  const handleInputFocus = (e) => {
+    e.target.style.borderColor = '#3b82f6'
+    e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+  }
+
+  const handleInputBlur = (e) => {
+    e.target.style.borderColor = '#d0d7de'
+    e.target.style.boxShadow = 'none'
+  }
+
+  const getDisplayValue = (value) => {
+    if (Array.isArray(value)) {
+      const normalized = value
+        .filter(item => item !== null && item !== undefined)
+        .map(item => (typeof item === 'string' ? item.trim() : item))
+        .filter(item => item !== '' && item !== undefined && item !== null)
+      const joined = normalized.join(', ')
+      return joined || 'đang cập nhật'
+    }
+
+    if (value === null || value === undefined) {
+      return 'đang cập nhật'
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() === '' ? 'đang cập nhật' : value
+    }
+
+    return value
+  }
+
+  const formatCurrency = (value) => {
+    const amount = Number(value) || 0
+    return amount.toLocaleString('vi-VN')
+  }
+
+  const normalizeUnitsResponse = (response = {}) => {
+    if (Array.isArray(response?.result?.content)) return response.result.content
+    if (Array.isArray(response?.result)) return response.result
+    if (Array.isArray(response?.content)) return response.content
+    if (Array.isArray(response?.data)) return response.data
+    if (Array.isArray(response)) return response
+    return []
+  }
+
+  const fetchUnits = async () => {
+    try {
+      const { data: response, error } = await unitsAPI.getAll({ page: 0, size: 50 })
+      if (error) throw new Error(error)
+
+      const unitList = normalizeUnitsResponse(response)
+      const mappedUnits = unitList
+        .filter(unit => unit)
+        .map(unit => {
+          const value = unit.id ?? unit.code ?? unit.name ?? ''
+          const label = unit.name ?? unit.label ?? unit.code ?? ''
+          return value && label
+            ? {
+                value: String(value),
+                label,
+                code: unit.code ? String(unit.code).toLowerCase() : undefined,
+                raw: unit
+              }
+            : null
+        })
+        .filter(Boolean)
+
+      if (mappedUnits.length > 0) {
+        setUnitOptions(mappedUnits)
+        return mappedUnits
+      }
+    } catch (err) {
+      console.warn('Unable to fetch units:', err)
+    }
+
+    setUnitOptions(DEFAULT_UNITS)
+    return DEFAULT_UNITS
+  }
 
   useEffect(() => {
     if (id) {
       fetchTicketDetail()
     }
-    fetchParts()
+    fetchAllParts()
+    fetchUnits()
   }, [id])
 
-  const fetchParts = async () => {
+
+  const normalizePartsResponse = (response = {}) => {
+    if (Array.isArray(response?.result?.content)) return response.result.content
+    if (Array.isArray(response?.result)) return response.result
+    if (Array.isArray(response?.content)) return response.content
+    if (Array.isArray(response?.data)) return response.data
+    if (Array.isArray(response)) return response
+    return []
+  }
+
+  const fetchAllParts = async ({ keyword = '' } = {}) => {
     setPartsLoading(true)
     try {
-      const { data: response, error } = await partsAPI.getAll(0, 100)
-      
-      if (error) {
-        console.warn('Error fetching parts:', error)
-        setParts([])
-        setPartsLoading(false)
-        return
-      }
+      const aggregatedOptions = []
+      let currentPage = 0
+      let hasMore = true
 
-      console.log('Parts API response:', response)
+      while (hasMore) {
+        const { data: response, error } = await partsAPI.getAll({
+          page: currentPage,
+          size: PARTS_PAGE_SIZE,
+          keyword: keyword || undefined
+        })
 
-      let partsList = []
-      if (response && response.result) {
-        if (Array.isArray(response.result)) {
-          partsList = response.result
-        } else if (response.result.content && Array.isArray(response.result.content)) {
-          partsList = response.result.content
-        } else if (Array.isArray(response.result)) {
-          partsList = response.result
+        if (error) {
+          console.error('[fetchParts] API error:', error)
+          throw new Error(error)
         }
-      } else if (Array.isArray(response)) {
-        partsList = response
+
+        const fetchedParts = normalizePartsResponse(response)
+        console.log('[fetchParts] keyword:', keyword, 'page:', currentPage, 'items:', fetchedParts?.length || 0)
+
+        const options = fetchedParts
+          .filter(part => part && (part.partId || part.id) && (part.name || part.partName))
+          .map(part => ({
+            value: part.partId || part.id,
+            label: part.name || part.partName || '',
+            part
+          }))
+
+        aggregatedOptions.push(...options)
+
+        const isLast =
+          response?.result?.last ??
+          response?.last ??
+          fetchedParts.length < PARTS_PAGE_SIZE
+
+        if (isLast) {
+          hasMore = false
+        } else {
+          currentPage += 1
+        }
       }
-      
-      console.log('Parts list:', partsList)
-      
-      const partsOptions = partsList
-        .filter(part => part && (part.partId || part.id) && (part.name || part.partName))
-        .map(part => ({
-          value: part.partId || part.id,
-          label: part.name || part.partName || '',
-          part: part
-        }))
-      
-      console.log('Parts options:', partsOptions)
-      setParts(partsOptions)
+
+      setParts(aggregatedOptions)
+      const nextCache = {}
+      aggregatedOptions.forEach(option => {
+        nextCache[option.value] = option
+      })
+      setPartsCache(nextCache)
+      console.log('[fetchParts] total options count:', aggregatedOptions.length)
     } catch (err) {
       console.error('Error fetching parts:', err)
       setParts([])
+      setPartsCache({})
     } finally {
       setPartsLoading(false)
     }
@@ -105,12 +430,16 @@ export default function TicketDetailPage() {
     
     if (response && response.result) {
       const data = response.result
-      setTicketData(data)
+      const normalizedData = {
+        ...data,
+        priceQuotation: normalizePriceQuotation(data.priceQuotation)
+      }
+      setTicketData(normalizedData)
       
-      const deliveryDate = data.deliveryAt ? dayjs(data.deliveryAt) : null
+      const deliveryDate = normalizedData.deliveryAt ? dayjs(normalizedData.deliveryAt) : null
       setExpectedDate(deliveryDate)
       
-      const vehicle = data.vehicle || {}
+      const vehicle = normalizedData.vehicle || {}
       const vehicleModel = vehicle.vehicleModel || {}
       const brandName = vehicleModel.brandName || vehicle.brand || ''
       const modelName = vehicleModel.modelName || vehicle.model || ''
@@ -123,54 +452,27 @@ export default function TicketDetailPage() {
       setTechnicians(techniciansOptions)
       setSelectedTechnician(techniciansList[0] || null)
       
-      const serviceTypes = Array.isArray(data.serviceType) ? data.serviceType.join(', ') : (data.serviceType || '')
+      const serviceTypes = Array.isArray(normalizedData.serviceType) ? normalizedData.serviceType.join(', ') : (normalizedData.serviceType || '')
       
       const quoteStaffName = data.createdBy || ''
       const brandNameFromVehicle = vehicle.brandName || ''
       const modelNameFromVehicle = vehicle.vehicleModelName || modelName
       
-      form.setFieldsValue({
-        customerName: data.customer?.fullName || '',
-        phone: data.customer?.phone || '',
-        vehicleType: modelNameFromVehicle,
-        licensePlate: vehicle.licensePlate || '',
-        chassisNumber: vehicle.vin || '',
-        quoteStaff: quoteStaffName,
-        receiveDate: data.createdAt ? dayjs(data.createdAt) : null,
-        technician: techniciansList[0] || '',
-        serviceType: serviceTypes,
-      })
-      
       // Load quote items from priceQuotation if available
-      if (data.priceQuotation && data.priceQuotation.items && Array.isArray(data.priceQuotation.items)) {
-        const items = data.priceQuotation.items
-        const replacementItems = items
-          .filter(item => item.itemType === 'PART')
-          .map((item, index) => ({
-            id: item.priceQuotationItemId || Date.now() + index,
-            category: item.partName || '',
-            quantity: item.quantity || 1,
-            unit: item.unit || '',
-            unitPrice: item.unitPrice || 0,
-            total: item.totalPrice || 0
-          }))
-        
-        const serviceItems = items
-          .filter(item => item.itemType === 'SERVICE')
-          .map((item, index) => ({
-            id: item.priceQuotationItemId || Date.now() + index + 1000,
-            task: item.serviceName || '',
-            quantity: item.quantity || 1,
-            unit: item.unit || '',
-            unitPrice: item.unitPrice || 0,
-            total: item.totalPrice || 0
-          }))
-        
-        setReplaceItems(replacementItems.length > 0 ? replacementItems : [])
-        setServiceItems(serviceItems.length > 0 ? serviceItems : [])
+      if (normalizedData.priceQuotation) {
+        if (Array.isArray(normalizedData.priceQuotation.items)) {
+          const { replacementItems, serviceItemsResult } = transformQuotationItems(normalizedData.priceQuotation.items)
+          setReplaceItems(replacementItems)
+          setServiceItems(serviceItemsResult)
+        } else {
+          setReplaceItems([])
+          setServiceItems([])
+        }
+        setIsQuoteExpanded(true)
       } else {
         setReplaceItems([])
         setServiceItems([])
+        setIsQuoteExpanded(false)
       }
     }
   }
@@ -178,7 +480,9 @@ export default function TicketDetailPage() {
   const addReplaceItem = () => {
     setReplaceItems([...replaceItems, { 
       id: Date.now(), 
+      priceQuotationItemId: null,
       category: '',
+      categoryLabel: '',
       quantity: 1, 
       unit: '',
       unitPrice: 0,
@@ -189,6 +493,7 @@ export default function TicketDetailPage() {
   const addServiceItem = () => {
     setServiceItems([...serviceItems, { 
       id: Date.now(), 
+      priceQuotationItemId: null,
       task: '',
       quantity: 1, 
       unit: '',
@@ -205,10 +510,52 @@ export default function TicketDetailPage() {
     setServiceItems(serviceItems.filter(item => item.id !== id))
   }
 
+  const handleCreateQuote = async () => {
+    if (createQuoteLoading || inputsDisabled) return
+
+    const hide = message.loading('Đang tạo báo giá...', 0)
+    setCreateQuoteLoading(true)
+
+    try {
+      const { data: response, error } = await priceQuotationAPI.create(id)
+
+      if (error) {
+        throw new Error(error || 'Tạo báo giá không thành công. Vui lòng thử lại.')
+      }
+
+      if (!response || (response.statusCode !== 200 && !response.result)) {
+        throw new Error('Tạo báo giá không thành công. Vui lòng thử lại.')
+      }
+
+      const quotationResult = response.result || {}
+      const { replacementItems, serviceItemsResult } = transformQuotationItems(quotationResult.items || [])
+
+      setReplaceItems(replacementItems)
+      setServiceItems(serviceItemsResult)
+      setIsQuoteExpanded(true)
+      setActiveTab('quote')
+
+      const normalizedQuote = normalizePriceQuotation(quotationResult)
+      if (normalizedQuote?.priceQuotationId) {
+        setTicketData(prev => (prev ? { ...prev, priceQuotation: normalizedQuote } : prev))
+      } else {
+        await fetchTicketDetail()
+      }
+
+      message.success('Đã tạo báo giá mới')
+    } catch (err) {
+      console.error('Error creating price quotation:', err)
+      message.error(err?.message || 'Đã xảy ra lỗi khi tạo báo giá.')
+    } finally {
+      hide?.()
+      setCreateQuoteLoading(false)
+    }
+  }
+
   const handleUpdateDeliveryDate = async (date) => {
     if (!date) {
       message.warning('Vui lòng chọn ngày dự đoán giao xe')
-      return
+    return false
     }
 
     try {
@@ -217,7 +564,7 @@ export default function TicketDetailPage() {
       
       if (error) {
         message.error(error || 'Cập nhật ngày giao xe không thành công')
-        return
+      return false
       }
 
       if (response && (response.statusCode === 200 || response.result)) {
@@ -226,30 +573,34 @@ export default function TicketDetailPage() {
         if (ticketData) {
           setTicketData({ ...ticketData, deliveryAt: dateStr })
         }
+      return true
       } else {
         message.error('Cập nhật ngày giao xe không thành công')
+      return false
       }
     } catch (err) {
       console.error('Error updating delivery date:', err)
       message.error('Đã xảy ra lỗi khi cập nhật ngày giao xe')
+    return false
     }
   }
 
-  const updateReplaceItem = (id, field, value) => {
-    setReplaceItems(replaceItems.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, [field]: value }
-        if (field === 'quantity' || field === 'unitPrice') {
+  const updateReplaceItem = (id, updates = {}) => {
+    setReplaceItems(prev =>
+      prev.map(item => {
+        if (item.id !== id) return item
+        const updated = { ...item, ...updates }
+        if ('quantity' in updates || 'unitPrice' in updates) {
           updated.total = (updated.quantity || 0) * (updated.unitPrice || 0)
         }
         return updated
+      })
+    )
+    Object.keys(updates).forEach(field => {
+      if (errors[`replace_${id}_${field}`]) {
+        setErrors(prev => ({ ...prev, [`replace_${id}_${field}`]: null }))
       }
-      return item
-    }))
-    // Clear error for this field
-    if (errors[`replace_${id}_${field}`]) {
-      setErrors({ ...errors, [`replace_${id}_${field}`]: null })
-    }
+    })
   }
 
   const updateServiceItem = (id, field, value) => {
@@ -281,7 +632,7 @@ export default function TicketDetailPage() {
       }
     })
     
-    serviceItems.forEach((item, index) => {
+    serviceItems.forEach((item) => {
       if (!item.task) {
         newErrors[`service_${item.id}_task`] = 'Trường không được bỏ trống'
       }
@@ -294,19 +645,8 @@ export default function TicketDetailPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSave = async () => {
-    if (!validateForm()) {
-      message.error('Vui lòng điền đầy đủ thông tin')
-      return
-    }
-    
-    setLoading(true)
-    // Save logic here
-    setLoading(false)
-    message.success('Lưu thành công')
-  }
-
   const handleSendQuote = () => {
+    if (actionLoading) return
     if (!validateForm()) {
       message.error('Vui lòng điền đầy đủ thông tin')
       return
@@ -324,29 +664,45 @@ export default function TicketDetailPage() {
       message.error('Vui lòng chọn ngày dự đoán giao xe')
       return
     }
+
+    if (actionLoading) {
+      return
+    }
     
-    setLoading(true)
+    const quotationId = getQuotationId()
+    if (!quotationId) {
+      message.error('Vui lòng tạo báo giá trước khi lưu')
+      return
+    }
+
+    const payload = {
+      discount: ticketData?.priceQuotation?.discountPercent ?? ticketData?.priceQuotation?.discount ?? 0,
+      estimateAmount: grandTotal,
+      items: buildQuotationItemsPayload()
+    }
+
+    const hide = message.loading('Đang gửi báo giá...', 0)
+    setActionLoading(true)
     try {
-      const { data: response, error } = await priceQuotationAPI.create(id)
+      const { data: response, error } = await priceQuotationAPI.update(quotationId, payload)
       
       if (error) {
-        message.error(error || 'Tạo báo giá không thành công. Vui lòng thử lại.')
-        setLoading(false)
-        return
+        throw new Error(error || 'Lưu báo giá không thành công. Vui lòng thử lại.')
       }
 
-      if (response && (response.statusCode === 200 || response.result)) {
-        message.success('Đã gửi báo giá cho khách hàng')
-        setShowDateModal(false)
-        await fetchTicketDetail()
-      } else {
-        message.error('Tạo báo giá không thành công. Vui lòng thử lại.')
+      if (!response || (response.statusCode !== 200 && !response.result)) {
+        throw new Error('Lưu báo giá không thành công. Vui lòng thử lại.')
       }
+
+      message.success('Đã lưu báo giá thành công')
+      setShowDateModal(false)
+      await fetchTicketDetail()
     } catch (err) {
-      console.error('Error creating price quotation:', err)
-      message.error('Đã xảy ra lỗi khi tạo báo giá.')
+      console.error('Error sending price quotation:', err)
+      message.error(err?.message || 'Đã xảy ra lỗi khi gửi báo giá.')
     } finally {
-      setLoading(false)
+      hide?.()
+      setActionLoading(false)
     }
   }
 
@@ -360,30 +716,81 @@ export default function TicketDetailPage() {
     {
       title: 'Danh mục',
       key: 'category',
+      width: 350,
       render: (_, record) => (
         <div>
-          <Select
-            placeholder="Chọn danh mục"
-            value={record.category || undefined}
-            onChange={(value, option) => {
-              const selectedPart = parts.find(p => p.value === value || String(p.value) === String(value))
-              updateReplaceItem(record.id, 'category', value)
-              if (selectedPart?.part) {
-                updateReplaceItem(record.id, 'unit', selectedPart.part.unit || '')
-                updateReplaceItem(record.id, 'unitPrice', selectedPart.part.sellingPrice || 0)
-              }
-            }}
-            options={parts}
-            style={{ width: '100%' }}
-            showSearch
-            allowClear
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+          <CustomSelect
+            placeholder="Chọn linh kiện"
+            value={
+              getPartOption(record.category) ||
+              (record.category
+                ? {
+                    value: record.category,
+                    label:
+                      record.categoryLabel ||
+                      getPartOption(record.category)?.label ||
+                      String(record.category)
+                  }
+                : null)
             }
-            status={errors[`replace_${record.id}_category`] ? 'error' : ''}
-            disabled={isHistoryPage}
-            loading={partsLoading}
-            notFoundContent={parts.length === 0 ? 'Đang tải...' : 'Không tìm thấy'}
+            options={parts}
+            isSearchable
+            isClearable
+            isDisabled={inputsDisabled}
+            isLoading={partsLoading}
+            noOptionsMessage={() => partsLoading ? 'Đang tải...' : 'Không có linh kiện'}
+            onChange={(option) => {
+              const value = option?.value || ''
+              const selectedPart =
+                parts.find(p => String(p.value) === String(value)) ||
+                partsCache[value] ||
+                null
+
+              if (value) {
+                cachePartOption(
+                  value,
+                  option?.label ||
+                    selectedPart?.label ||
+                    selectedPart?.part?.name ||
+                    ''
+                )
+              }
+
+              console.log('[SelectPart] option:', option, 'resolved:', selectedPart)
+
+              const updates = {
+                category: value,
+                categoryLabel:
+                  option?.label ||
+                  selectedPart?.label ||
+                  selectedPart?.part?.name ||
+                  '',
+              }
+
+              if (selectedPart?.part) {
+                const partUnitCode =
+                  selectedPart.part.unitCode ||
+                  selectedPart.part.unit ||
+                  selectedPart.part.unitId
+                let matchedUnit = null
+                if (partUnitCode) {
+                  matchedUnit = unitOptions.find(unit =>
+                    String(unit.value).toLowerCase() ===
+                      String(partUnitCode).toLowerCase() ||
+                    unit.label?.toLowerCase() ===
+                      String(partUnitCode).toLowerCase() ||
+                    unit.code === String(partUnitCode).toLowerCase()
+                  )
+                }
+                updates.unit = matchedUnit?.value || selectedPart.part.unit || ''
+                updates.unitPrice = selectedPart.part.sellingPrice || 0
+              } else {
+                updates.unit = ''
+                updates.unitPrice = 0
+              }
+
+              updateReplaceItem(record.id, updates)
+            }}
           />
           {errors[`replace_${record.id}_category`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -398,12 +805,19 @@ export default function TicketDetailPage() {
       key: 'quantity',
       width: 120,
       render: (_, record) => (
-        <InputNumber
+        <input
+          type="number"
           min={1}
-          value={record.quantity}
-          onChange={(value) => updateReplaceItem(record.id, 'quantity', value)}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
+          value={record.quantity ?? 1}
+          onChange={(e) =>
+            updateReplaceItem(record.id, {
+              quantity: Number(e.target.value) || 1
+            })
+          }
+          style={baseInputStyle}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          disabled={inputsDisabled}
         />
       )
     },
@@ -412,13 +826,15 @@ export default function TicketDetailPage() {
       key: 'unit',
       width: 120,
       render: (_, record) => (
-        <Select
+        <CustomSelect
           placeholder="Đơn vị"
-          value={record.unit}
-          onChange={(value) => updateReplaceItem(record.id, 'unit', value)}
-          options={UNITS}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
+          value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
+          options={unitOptions}
+          isClearable
+          isDisabled={inputsDisabled}
+          onChange={(option) =>
+            updateReplaceItem(record.id, { unit: option?.value || '' })
+          }
         />
       )
     },
@@ -428,15 +844,24 @@ export default function TicketDetailPage() {
       width: 150,
       render: (_, record) => (
         <div>
-          <Input
+          <input
+            type="text"
+            inputMode="numeric"
             placeholder="Số tiền..."
             value={record.unitPrice ? record.unitPrice.toLocaleString('vi-VN') : ''}
             onChange={(e) => {
-              const value = parseInt(e.target.value.replace(/,/g, '')) || 0
-              updateReplaceItem(record.id, 'unitPrice', value)
+              const sanitized = e.target.value.replace(/[^\d]/g, '')
+              updateReplaceItem(record.id, {
+                unitPrice: sanitized ? parseInt(sanitized, 10) : 0
+              })
             }}
-            status={errors[`replace_${record.id}_unitPrice`] ? 'error' : ''}
-            disabled={isHistoryPage}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`replace_${record.id}_unitPrice`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
           />
           {errors[`replace_${record.id}_unitPrice`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -460,7 +885,7 @@ export default function TicketDetailPage() {
       width: 80,
       render: (_, record) => (
         <Space>
-          {!isHistoryPage && (
+          {!inputsDisabled && (
             <DeleteOutlined
               style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
               onClick={() => deleteReplaceItem(record.id)}
@@ -483,12 +908,18 @@ export default function TicketDetailPage() {
       key: 'task',
       render: (_, record) => (
         <div>
-          <Input
+          <input
+            type="text"
             placeholder="Tên công việc..."
             value={record.task}
             onChange={(e) => updateServiceItem(record.id, 'task', e.target.value)}
-            status={errors[`service_${record.id}_task`] ? 'error' : ''}
-            disabled={isHistoryPage}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`service_${record.id}_task`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
           />
           {errors[`service_${record.id}_task`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -499,49 +930,27 @@ export default function TicketDetailPage() {
       )
     },
     {
-      title: 'Số lượng',
-      key: 'quantity',
-      width: 120,
-      render: (_, record) => (
-        <InputNumber
-          min={1}
-          value={record.quantity}
-          onChange={(value) => updateServiceItem(record.id, 'quantity', value)}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
-        />
-      )
-    },
-    {
-      title: 'Đơn vị',
-      key: 'unit',
-      width: 120,
-      render: (_, record) => (
-        <Select
-          placeholder="Đơn vị"
-          value={record.unit}
-          onChange={(value) => updateServiceItem(record.id, 'unit', value)}
-          options={UNITS}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
-        />
-      )
-    },
-    {
       title: 'Đơn giá (vnd)',
       key: 'unitPrice',
-      width: 150,
+      width: 180,
       render: (_, record) => (
         <div>
-          <Input
+          <input
+            type="text"
+            inputMode="numeric"
             placeholder="Số tiền..."
             value={record.unitPrice ? record.unitPrice.toLocaleString('vi-VN') : ''}
             onChange={(e) => {
-              const value = parseInt(e.target.value.replace(/,/g, '')) || 0
-              updateServiceItem(record.id, 'unitPrice', value)
+              const sanitized = e.target.value.replace(/[^\d]/g, '')
+              updateServiceItem(record.id, 'unitPrice', sanitized ? parseInt(sanitized, 10) : 0)
             }}
-            status={errors[`service_${record.id}_unitPrice`] ? 'error' : ''}
-            disabled={isHistoryPage}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`service_${record.id}_unitPrice`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
           />
           {errors[`service_${record.id}_unitPrice`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -565,7 +974,7 @@ export default function TicketDetailPage() {
       width: 80,
       render: (_, record) => (
         <Space>
-          {!isHistoryPage && (
+          {!inputsDisabled && (
             <DeleteOutlined
               style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
               onClick={() => deleteServiceItem(record.id)}
@@ -587,6 +996,31 @@ export default function TicketDetailPage() {
     )
   }
 
+  const technicianDisplay = getDisplayValue(
+    selectedTechnician ||
+    ticketData?.technicians?.[0] ||
+    null
+  )
+
+  const serviceTypeValue = Array.isArray(ticketData?.serviceType)
+    ? ticketData.serviceType
+    : ticketData?.serviceType || null
+
+  const quoteCreator = getDisplayValue(ticketData?.createdBy)
+  const createdDate = ticketData?.createdAt
+    ? new Date(ticketData.createdAt).toLocaleDateString('vi-VN')
+    : null
+
+  const totalReplacement = replaceItems.reduce((sum, item) => sum + (item.total || 0), 0)
+  const totalService = serviceItems.reduce((sum, item) => sum + (item.total || 0), 0)
+  const grandTotal = totalReplacement + totalService
+  const discountPercent =
+    ticketData?.priceQuotation?.discountPercent ??
+    ticketData?.priceQuotation?.discountRate ??
+    0
+  const discountAmount = Math.round((grandTotal * discountPercent) / 100)
+  const finalAmount = grandTotal - discountAmount
+
   return (
     <AdminLayout>
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
@@ -605,67 +1039,79 @@ export default function TicketDetailPage() {
         </div>
 
         <Row gutter={16} style={{ marginBottom: '24px' }}>
-          <Col span={12}>
-            <Card style={{ borderRadius: '12px', background: '#fafafa' }}>
+          <Col span={12} style={{ display: 'flex' }}>
+            <Card style={{ borderRadius: '12px', background: '#fafafa', width: '100%', height: '100%' }}>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Tên khách hàng:</strong>{' '}
-                <span>{ticketData?.customer?.fullName || 'Nguyễn Văn A'}</span>
-                <span style={{ marginLeft: '8px', color: '#ffd65a' }}>★★★</span>
+                <span>{getDisplayValue(ticketData?.customer?.fullName)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Số điện thoại:</strong>{' '}
-                <span>{ticketData?.customer?.phone || '0123456789'}</span>
+                <span>{getDisplayValue(ticketData?.customer?.phone)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Loại xe:</strong>{' '}
-                <span>{ticketData?.vehicle?.model || 'Mazda-v3'}</span>
+                <span>
+                  {getDisplayValue(
+                    ticketData?.vehicle?.vehicleModelName ||
+                    ticketData?.vehicle?.vehicleModel?.modelName ||
+                    ticketData?.vehicle?.model ||
+                    ticketData?.vehicle?.brandName ||
+                    ticketData?.vehicle?.vehicleModel?.brandName
+                  )}
+                </span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Biển số xe:</strong>{' '}
-                <span>{ticketData?.vehicle?.licensePlate || '25A-123456'}</span>
+                <span>{getDisplayValue(ticketData?.vehicle?.licensePlate)}</span>
               </div>
               <div>
                 <strong>Số khung:</strong>{' '}
-                <span>{ticketData?.vehicle?.vin || '1HGCM82633A123456'}</span>
+                <span>{getDisplayValue(ticketData?.vehicle?.vin)}</span>
               </div>
             </Card>
           </Col>
-          <Col span={12}>
-            <Card style={{ borderRadius: '12px', background: '#fafafa' }}>
+          <Col span={12} style={{ display: 'flex' }}>
+            <Card style={{ borderRadius: '12px', background: '#fafafa', width: '100%', height: '100%' }}>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Nhân viên lập báo giá:</strong>{' '}
-                <span>Hoàng Văn B</span>
+                <span>{quoteCreator}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Ngày tạo báo giá:</strong>{' '}
-                <span>{ticketData?.createdAt ? new Date(ticketData.createdAt).toLocaleDateString('vi-VN') : '12/10/2025'}</span>
+                <span>{getDisplayValue(createdDate)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Kỹ thuật viên sửa chữa:</strong>{' '}
-                <Select
-                  value={selectedTechnician}
-                  onChange={setSelectedTechnician}
-                  options={technicians}
-                  style={{ width: '100%', marginTop: '4px' }}
-                  disabled={isHistoryPage}
-                  placeholder="Chọn kỹ thuật viên"
-                />
+                <span>{technicianDisplay}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Loại dịch vụ:</strong>{' '}
-                <span>Thay thế phụ tùng</span>
+                <span>{getDisplayValue(serviceTypeValue)}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <strong>Ngày dự đoán giao xe:</strong>
-                <DatePicker
-                  value={expectedDate}
-                  onChange={handleUpdateDeliveryDate}
-                  format="DD/MM/YYYY"
-                  placeholder="Chọn ngày"
-                  style={{ width: '150px' }}
-                  suffixIcon={<CalendarOutlined />}
-                  disabled={isHistoryPage}
-                />
+                <div
+                  onClick={openDeliveryPicker}
+                  style={{
+                    border: '1px solid #d0d7de',
+                    borderRadius: '10px',
+                    padding: '6px 12px',
+                    minWidth: '160px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    cursor: inputsDisabled ? 'not-allowed' : 'pointer',
+                    background: '#fff',
+                    opacity: inputsDisabled ? 0.6 : 1
+                  }}
+                >
+                  <span style={{ color: expectedDate ? '#111' : '#9ca3af', fontWeight: 500 }}>
+                    {expectedDate ? expectedDate.format('DD/MM/YYYY') : 'Chọn ngày'}
+                  </span>
+                  <CalendarOutlined style={{ color: '#6b7280' }} />
+                </div>
               </div>
             </Card>
           </Col>
@@ -677,121 +1123,201 @@ export default function TicketDetailPage() {
               <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>BÁO GIÁ</h2>
             </div>
           </div>
-          
-          <Tabs 
-            activeKey={activeTab} 
-            onChange={setActiveTab}
-            style={{ marginBottom: '20px' }}
-            items={[
-              {
-                key: 'quote',
-                label: <span style={{ fontWeight: 700 }}>BÁO GIÁ</span>,
-                children: (
-                  <>
-                    <div style={{ marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <strong>Thay thế</strong>
-                        {!isHistoryPage && (
-                          <Button 
-                            type="text" 
-                            icon={<PlusOutlined />}
-                            onClick={addReplaceItem}
-                            style={{ 
-                              width: '32px', 
-                              height: '32px', 
-                              borderRadius: '50%', 
-                              border: '1px solid #222',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                          />
-                        )}
+          {!isQuoteExpanded ? (
+            <div style={{ padding: '24px 0', textAlign: 'left' }}>
+              <Button
+                type="primary"
+                ghost
+                icon={<PlusOutlined />}
+                onClick={handleCreateQuote}
+                loading={createQuoteLoading}
+                disabled={inputsDisabled}
+                style={{ borderColor: '#111', color: '#111', fontWeight: 600 }}
+              >
+                Tạo báo giá
+              </Button>
+            </div>
+          ) : (
+            <Tabs 
+              activeKey={activeTab} 
+              onChange={setActiveTab}
+              style={{ marginBottom: '20px' }}
+              items={[
+                {
+                  key: 'quote',
+                  label: <span style={{ fontWeight: 700 }}>BÁO GIÁ</span>,
+                  children: (
+                    <>
+                      <div style={{ marginBottom: '24px' }}>
+                        <strong style={{ display: 'block', marginBottom: '12px' }}>Thay thế</strong>
+                         <Table
+                           columns={replaceColumns}
+                           dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                           pagination={false}
+                           size="small"
+                           components={goldTableHeader}
+                           footer={() => (
+                             !isHistoryPage && (
+                               <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                                 <Button 
+                                   type="text" 
+                                   icon={<PlusOutlined />}
+                                   onClick={addReplaceItem}
+                                   style={{ 
+                                     width: '32px', 
+                                     height: '32px', 
+                                     borderRadius: '50%', 
+                                     border: '1px solid #222',
+                                     display: 'flex',
+                                     alignItems: 'center',
+                                     justifyContent: 'center'
+                                   }}
+                                 />
+                               </div>
+                             )
+                           )}
+                         />
                       </div>
-                       <Table
-                         columns={replaceColumns}
-                         dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                         pagination={false}
-                         size="small"
-                         components={goldTableHeader}
-                       />
-                    </div>
 
-                    <div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                        <strong>Dịch vụ</strong>
-                        {!isHistoryPage && (
-                          <Button 
-                            type="text" 
-                            icon={<PlusOutlined />}
-                            onClick={addServiceItem}
-                            style={{ 
-                              width: '32px', 
-                              height: '32px', 
-                              borderRadius: '50%', 
-                              border: '1px solid #222',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}
-                          />
-                        )}
+                      <div>
+                        <strong style={{ display: 'block', marginBottom: '12px' }}>Dịch vụ</strong>
+                         <Table
+                           columns={serviceColumns}
+                           dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                           pagination={false}
+                           size="small"
+                           components={goldTableHeader}
+                           footer={() => (
+                             !isHistoryPage && (
+                               <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                                 <Button 
+                                   type="text" 
+                                   icon={<PlusOutlined />}
+                                   onClick={addServiceItem}
+                                   style={{ 
+                                     width: '32px', 
+                                     height: '32px', 
+                                     borderRadius: '50%', 
+                                     border: '1px solid #222',
+                                     display: 'flex',
+                                     alignItems: 'center',
+                                     justifyContent: 'center'
+                                   }}
+                                 />
+                               </div>
+                             )
+                           )}
+                         />
                       </div>
-                       <Table
-                         columns={serviceColumns}
-                         dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                         pagination={false}
-                         size="small"
-                         components={goldTableHeader}
-                       />
-                    </div>
 
-                    {!isHistoryPage && (
-                      <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ color: '#666', fontSize: '12px' }}>
-                          {ticketData?.priceQuotation 
-                            ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
-                            : 'Vui lòng thêm các mục vào báo giá trước khi gửi'
-                          }
+                      <div
+                        style={{
+                          marginTop: '32px',
+                          borderTop: '1px solid #edecec',
+                          paddingTop: '24px',
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          justifyContent: 'space-between',
+                          gap: '16px',
+                          alignItems: 'center'
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px' }}>
+                          <div>
+                            <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Tổng cộng</div>
+                            <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Giảm giá</div>
+                            <div style={{ fontSize: '16px', fontWeight: 600 }}>
+                              {discountPercent ? `${discountPercent}%` : '0%'}{' '}
+                              {discountAmount > 0 && (
+                                <span style={{ color: '#6b7280', fontWeight: 400 }}>
+                                  ({formatCurrency(discountAmount)} đ)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Thanh toán cuối cùng</div>
+                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>
+                              {formatCurrency(finalAmount)} đ
+                            </div>
+                          </div>
                         </div>
-                        <Space>
-                          <Button onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}>Hủy</Button>
+                        {!isHistoryPage ? (
                           <Button 
-                            type="primary" 
                             onClick={handleSendQuote}
-                            disabled={replaceItems.length === 0 && serviceItems.length === 0}
-                            style={{ background: '#3b82f6', borderColor: '#3b82f6' }}
+                            disabled={
+                              actionLoading ||
+                              (replaceItems.length === 0 && serviceItems.length === 0)
+                            }
+                            loading={actionLoading}
+                            style={{ 
+                              background: '#22c55e',
+                              borderColor: '#22c55e',
+                              color: '#fff',
+                              fontWeight: 600,
+                              padding: '0 24px',
+                              height: '40px'
+                            }}
                           >
-                            Gửi báo giá cho khách hàng →
+                            Lưu
                           </Button>
-                        </Space>
+                        ) : (
+                          <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                            {ticketData?.priceQuotation 
+                              ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
+                              : 'Báo giá đang ở chế độ chỉ xem'}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </>
-                )
-              },
-              {
-                key: 'draft',
-                label: 'Nháp',
-                children: (
-                  <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                    Chưa có bản nháp
-                  </div>
-                )
-              },
-              {
-                key: 'approved',
-                label: 'Kho đã duyệt',
-                children: (
-                  <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                    Chưa có dữ liệu
-                  </div>
-                )
-              }
-            ]}
-          />
+                    </>
+                  )
+                },
+                {
+                  key: 'draft',
+                  label: 'Nháp',
+                  children: (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                      Chưa có bản nháp
+                    </div>
+                  )
+                },
+                {
+                  key: 'approved',
+                  label: 'Kho đã duyệt',
+                  children: (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                      Chưa có dữ liệu
+                    </div>
+                  )
+                }
+              ]}
+            />
+          )}
         </Card>
       </div>
+
+      <Modal
+        title="Chọn ngày dự đoán giao xe"
+        open={deliveryPickerVisible}
+        onCancel={closeDeliveryPicker}
+        footer={[
+          <Button key="cancel" onClick={closeDeliveryPicker}>Hủy</Button>,
+          <Button key="ok" type="primary" onClick={confirmDeliveryPicker}>
+            Cập nhật
+          </Button>
+        ]}
+        destroyOnClose
+      >
+        <Calendar
+          fullscreen={false}
+          value={deliveryPickerValue || expectedDate || dayjs()}
+          onSelect={(date) => setDeliveryPickerValue(date)}
+          disabledDate={disabledDeliveryDate}
+        />
+      </Modal>
 
       <Modal
         title="Ngày dự đoán nhận xe"
@@ -808,6 +1334,8 @@ export default function TicketDetailPage() {
             value={expectedDate}
             onChange={setExpectedDate}
             style={{ width: '100%' }}
+            disabledDate={disabledDeliveryDate}
+            allowClear={false}
           />
         </div>
         <Button

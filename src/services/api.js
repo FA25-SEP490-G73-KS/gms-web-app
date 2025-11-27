@@ -82,12 +82,13 @@ axiosClient.interceptors.response.use(
 async function request(method, path, body, init = {}) {
   try {
     
-    const { skipAuth, ...axiosConfig } = init;
+    const { skipAuth, signal, ...axiosConfig } = init;
     
     const config = {
       method,
       url: path,
       skipAuth: skipAuth === true, // Explicitly set skipAuth flag
+      signal,
       ...axiosConfig,
     };
     
@@ -173,10 +174,22 @@ export const employeeAPI = {
 };
 
 export const partsAPI = {
-  getAll: (page = 0, size = 100) => get(`/parts?page=${page}&size=${size}`),
+  getAll: ({ page = 0, size = 6, keyword, signal } = {}) => {
+    const query = buildQueryString({ page, size, keyword })
+    const suffix = query ? `?${query}` : ''
+    return get(`/parts${suffix}`, { signal })
+  },
   getById: (id) => get(`/parts/${id}`),
   create: (data) => post('/parts', data),
   update: (id, data) => put(`/parts/${id}`, data),
+};
+
+export const unitsAPI = {
+  getAll: ({ page = 0, size = 20, sort } = {}) => {
+    const query = buildQueryString({ page, size, sort })
+    const suffix = query ? `?${query}` : ''
+    return get(`/units${suffix}`)
+  }
 };
 
 export const vehiclesAPI = {
@@ -187,6 +200,13 @@ export const vehiclesAPI = {
 
 export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
+  update: (id, payload) => put(`/price-quotations/${id}`, payload),
+  sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
+};
+
+export const znsNotificationsAPI = {
+  sendQuotation: (quotationId) =>
+    post(`/zns-notifications/quotation/${quotationId}/send`),
 };
 
 export const authAPI = {

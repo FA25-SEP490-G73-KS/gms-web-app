@@ -70,7 +70,7 @@ export default function PartsList() {
   const fetchParts = async (pageIndex = 0, size = 10) => {
     setLoading(true)
     try {
-      const { data: response, error } = await partsAPI.getAll(pageIndex, size)
+      const { data: response, error } = await partsAPI.getAll({ page: pageIndex, size })
       if (error) {
         throw new Error(error)
       }

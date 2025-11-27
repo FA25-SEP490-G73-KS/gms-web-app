@@ -4,6 +4,7 @@ import { Card, Col, Row, Tabs, Table, Tag, Spin, message, Button, Modal, Form, I
 import ManagerLayout from '../../layouts/ManagerLayout'
 import { customersAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 
 const loyaltyConfig = {
   BRONZE: { color: '#a97155', label: 'Bronze' },
@@ -164,7 +165,7 @@ export default function CustomerDetailForManager() {
   const openEditModal = () => {
     form.setFieldsValue({
       fullName: customer.fullName,
-      phone: customer.phone,
+      phone: displayPhoneFrom84(customer.phone),
       address: customer.address,
       customerType: customer.customerType || 'CA_NHAN',
     })
@@ -182,7 +183,7 @@ export default function CustomerDetailForManager() {
       const payload = {
         customerId: customer.id,
         fullName: values.fullName?.trim(),
-        phone: values.phone?.trim(),
+        phone: normalizePhoneTo84(values.phone?.trim()),
         address: values.address?.trim(),
         customerType: values.customerType,
       }
@@ -250,7 +251,7 @@ export default function CustomerDetailForManager() {
                     {loyaltyTag}{' '}
                     {customer.customerType === 'DOANH_NGHIEP' && <Tag color="#cbb081">Doanh nghiệp</Tag>}
                   </div>
-                  <div>Số điện thoại: {customer.phone}</div>
+                  <div>Số điện thoại: {displayPhoneFrom84(customer.phone)}</div>
                   <div>Địa chỉ: {customer.address}</div>
                 </Card>
               </Col>

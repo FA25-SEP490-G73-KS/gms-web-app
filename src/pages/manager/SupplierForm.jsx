@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button, Card, Col, Form, Input, Row, Space, Spin, message } from 'antd'
 import ManagerLayout from '../../layouts/ManagerLayout'
 import { suppliersAPI } from '../../services/api'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 
 export default function SupplierForm() {
   const { id } = useParams()
@@ -31,7 +32,7 @@ export default function SupplierForm() {
         const payload = data?.result || data?.data || data
         form.setFieldsValue({
           name: payload?.name,
-          phone: payload?.phone,
+          phone: displayPhoneFrom84(payload?.phone),
           email: payload?.email,
           province: '',
           district: '',
@@ -62,7 +63,7 @@ export default function SupplierForm() {
         .join(', ')
       const payload = {
         name: values.name.trim(),
-        phone: values.phone.trim(),
+        phone: normalizePhoneTo84(values.phone.trim()),
         email: values.email.trim(),
         address,
       }

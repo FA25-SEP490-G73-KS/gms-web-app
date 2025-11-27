@@ -7,6 +7,7 @@ import UpdateTicketModal from './modals/UpdateTicketModal'
 import { serviceTicketAPI, employeeAPI } from '../../services/api'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 import '../../styles/pages/admin/ticketservice.css'
 
 const { Search } = Input
@@ -90,7 +91,7 @@ export default function TicketService() {
       if (location.state.customer || location.state.phone || location.state.licensePlate) {
         createForm.setFieldsValue({
           name: location.state.customer || '',
-          phone: location.state.phone || '',
+          phone: displayPhoneFrom84(location.state.phone || ''),
           plate: location.state.licensePlate || ''
         })
       }
@@ -344,7 +345,7 @@ export default function TicketService() {
         customer: {
           customerId: 0,
           fullName: values.name || '',
-          phone: values.phone || '',
+          phone: normalizePhoneTo84(values.phone || ''),
           address: values.address || '',
           customerType: 'CA_NHAN',
           loyaltyLevel: 'BRONZE'

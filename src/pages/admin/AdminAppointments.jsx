@@ -6,6 +6,7 @@ import { appointmentAPI } from '../../services/api'
 import { useNavigate } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/admin-appointments.css'
+import { displayPhoneFrom84 } from '../../utils/helpers'
 
 const { Search } = Input
 
@@ -130,7 +131,7 @@ export default function AdminAppointments() {
       id: item.appointmentId || item.id,
       customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
       license: item.licensePlate || item.license || '',
-      phone: item.customerPhone || item.customer?.phone || '',
+      phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
       status: statusMap[item.status] || item.status || 'Chờ',
       statusKey: item.status || 'CONFIRMED',
       time: item.timeSlotLabel || item.time || '',
@@ -164,7 +165,7 @@ export default function AdminAppointments() {
       setSelectedFull({
         ...result,
         customerName: result.customerName || result.customer?.fullName || '',
-        customerPhone: result.customerPhone || result.customer?.phone || '',
+        customerPhone: displayPhoneFrom84(result.customerPhone || result.customer?.phone || ''),
         licensePlate: result.licensePlate || result.vehicle?.licensePlate || ''
       })
     }

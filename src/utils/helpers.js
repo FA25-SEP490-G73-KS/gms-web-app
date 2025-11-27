@@ -24,3 +24,21 @@ export function generateCode(prefix = 'STK') {
   return `${prefix}-${year}-${random}`;
 }
 
+export function normalizePhoneTo84(phone) {
+  if (phone === undefined || phone === null) return '';
+  const cleaned = String(phone).replace(/\D/g, '');
+  if (!cleaned) return '';
+  if (cleaned.startsWith('84')) return cleaned;
+  if (cleaned.startsWith('0')) return `84${cleaned.slice(1)}`;
+  return `84${cleaned}`;
+}
+
+export function displayPhoneFrom84(phone) {
+  if (!phone) return '';
+  const cleaned = String(phone).replace(/\D/g, '');
+  if (cleaned.startsWith('84')) {
+    return `0${cleaned.slice(2)}`;
+  }
+  return cleaned;
+}
+
