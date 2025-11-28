@@ -411,21 +411,21 @@ export default function ExportRequest() {
           // Chỉ hiện nút khi status là PENDING
           if (part.warehouseReviewStatus === 'PENDING') {
             return (
-              <Button
-                type="primary"
-                size="small"
+            <Button
+              type="primary"
+              size="small"
                 onClick={() => handleOpenConfirmModal(part)}
-                style={{
-                  background: '#22c55e',
-                  borderColor: '#22c55e',
-                  fontWeight: 500,
-                  borderRadius: '6px',
-                  height: '32px'
-                }}
-              >
-                Xác nhận
-              </Button>
-            )
+              style={{
+                background: '#22c55e',
+                borderColor: '#22c55e',
+                fontWeight: 500,
+                borderRadius: '6px',
+                height: '32px'
+              }}
+            >
+              Xác nhận
+            </Button>
+        )
           }
           return <span style={{ color: '#999' }}>—</span>
         }

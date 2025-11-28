@@ -274,7 +274,7 @@ export default function CreateTicket() {
     // Lấy brandId và modelId từ state hoặc form values
     const finalBrandId = selectedBrandId || values.brand || null
     const finalModelId = selectedModelId || values.model || null
-    
+
     // Tìm brandName và modelName từ danh sách đã fetch
     const selectedBrand = brands.find(b => b.id === Number(finalBrandId))
     const selectedModel = models.find(m => m.id === Number(finalModelId))
@@ -366,49 +366,49 @@ export default function CreateTicket() {
                   name="phone"
                   rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
                 >
-                  <Input
-                    placeholder={customerLookupLoading ? 'Đang kiểm tra...' : 'VD: 0123456789'}
-                    onBlur={(e) => {
-                      const raw = e.target.value.trim()
-                      if (!raw) {
+                    <Input
+                      placeholder={customerLookupLoading ? 'Đang kiểm tra...' : 'VD: 0123456789'}
+                      onBlur={(e) => {
+                        const raw = e.target.value.trim()
+                        if (!raw) {
                         resetCustomerSelection()
                         setPhoneLocked(false)
-                        return
-                      }
-                      setCurrentPhone(raw)
-                      fetchCustomerByPhone(raw)
-                    }}
-                    onChange={(e) => {
-                      const newPhone = e.target.value.trim()
-                      if (newPhone !== currentPhone) {
+                          return
+                        }
+                        setCurrentPhone(raw)
+                        fetchCustomerByPhone(raw)
+                      }}
+                      onChange={(e) => {
+                        const newPhone = e.target.value.trim()
+                        if (newPhone !== currentPhone) {
                         resetCustomerSelection()
                       }
                       if (!newPhone) {
                         setPhoneLocked(false)
                         resetCustomerSelection()
-                      }
-                    }}
+                        }
+                      }}
                     addonAfter={
                       (!customerExists && !phoneLocked) ? (
-                        <Button
+                      <Button
                           type="link"
                           style={{ padding: 0 }}
-                          onClick={() => {
-                            const phoneValue = form.getFieldValue('phone') || currentPhone
-                            if (!phoneValue) {
-                              message.warning('Vui lòng nhập số điện thoại trước')
-                              return
-                            }
-                            setNewCustomer({
-                              phone: phoneValue,
-                              fullName: form.getFieldValue('name') || '',
-                              address: form.getFieldValue('address') || '',
-                            })
-                            setShowCreateCustomerModal(true)
-                          }}
-                        >
-                          Tạo mới
-                        </Button>
+                        onClick={() => {
+                          const phoneValue = form.getFieldValue('phone') || currentPhone
+                          if (!phoneValue) {
+                            message.warning('Vui lòng nhập số điện thoại trước')
+                            return
+                          }
+                          setNewCustomer({
+                            phone: phoneValue,
+                            fullName: form.getFieldValue('name') || '',
+                            address: form.getFieldValue('address') || '',
+                          })
+                          setShowCreateCustomerModal(true)
+                        }}
+                      >
+                        Tạo mới
+                      </Button>
                       ) : null
                     }
                   />
@@ -574,16 +574,16 @@ export default function CreateTicket() {
                           <Col span={12} key={option.value}>
                             <Checkbox 
                               value={option.value}
-                              style={{ 
+                    style={{
                                 padding: '8px 12px',
                                 border: '1px solid #d9d9d9',
                                 borderRadius: '6px',
-                                width: '100%',
+                      width: '100%',
                                 display: 'flex',
                                 alignItems: 'center',
                                 transition: 'all 0.2s'
-                              }}
-                            >
+                    }}
+                  >
                               {option.label}
                             </Checkbox>
                           </Col>
@@ -612,11 +612,11 @@ export default function CreateTicket() {
                           <Col span={12} key={option.value}>
                             <Checkbox 
                               value={option.value}
-                              style={{ 
+                    style={{
                                 padding: '8px 12px',
                                 border: '1px solid #d9d9d9',
                                 borderRadius: '6px',
-                                width: '100%',
+                      width: '100%',
                                 display: 'flex',
                                 alignItems: 'center',
                                 transition: 'all 0.2s'

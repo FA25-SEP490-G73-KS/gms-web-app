@@ -331,19 +331,19 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getById(ticketId)
     setLoading(false)
-
+    
     if (error || !response || !response.result) {
       console.error('Error fetching ticket data:', error)
       message.error('Không thể tải thông tin phiếu dịch vụ. Vui lòng thử lại.')
       onClose()
       return
     }
-
-    const data = response.result
+    
+      const data = response.result
     setTicketData(data)
-
-    const vehicle = data.vehicle || {}
-    const vehicleModel = vehicle.vehicleModel || {}
+      
+      const vehicle = data.vehicle || {}
+      const vehicleModel = vehicle.vehicleModel || {}
     const brandId = vehicle.brandId ?? vehicleModel.brandId ?? null
     const modelId = vehicle.modelId ?? vehicleModel.modelId ?? null
     const brandName = vehicle.brandName || vehicleModel.brandName || ''
@@ -403,20 +403,20 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     }
 
     const quoteStaffName = data.createdBy || currentUserName || ''
-
-    form.setFieldsValue({
-      customerName: data.customer?.fullName || '',
+      
+      form.setFieldsValue({
+        customerName: data.customer?.fullName || '',
       phone: displayPhoneFrom84(data.customer?.phone || ''),
       brandId: brandId || null,
       modelId: modelId || null,
       licensePlate: (vehicle.licensePlate || '').toUpperCase(),
       chassisNumber: vin,
       year: year || 2020,
-      quoteStaff: quoteStaffName,
-      receiveDate: data.createdAt ? dayjs(data.createdAt) : (data.deliveryAt ? dayjs(data.deliveryAt) : null),
+        quoteStaff: quoteStaffName,
+        receiveDate: data.createdAt ? dayjs(data.createdAt) : (data.deliveryAt ? dayjs(data.deliveryAt) : null),
       serviceTypes: serviceTypeIds,
       assignedTechnicianIds: assignedTechnicianIds
-    })
+      })
   }
 
   const handleSubmit = async () => {
@@ -426,7 +426,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
 
       const brandOption = brands.find((brand) => String(brand.id) === String(values.brandId))
       const modelOption = models.find((model) => String(model.id) === String(values.modelId))
-
+      
       const payload = {
         assignedTechnicianId: (values.assignedTechnicianIds || []).length
           ? values.assignedTechnicianIds.map((id) => Number(id))
@@ -457,10 +457,10 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       console.log('Service Type IDs:', payload.serviceTypeIds)
       console.log('Assigned Technician IDs:', payload.assignedTechnicianId)
       console.log('====================================')
-
+      
       const { error } = await serviceTicketAPI.update(ticketId, payload)
       setLoading(false)
-
+      
       if (error) {
         console.error('=== [UpdateTicketModal] ERROR ===')
         console.error('Error:', error)

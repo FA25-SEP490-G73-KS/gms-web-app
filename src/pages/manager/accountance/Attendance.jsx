@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { Button, Checkbox, Input, Tabs, Table, message, Select } from 'antd'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
-import { attendanceAPI } from '../../../services/api'
+import { attendanceAPI, employeeAPI } from '../../../services/api'
 import dayjs from 'dayjs'
 
 const fallbackEmployees = [
@@ -18,7 +18,7 @@ const fallbackEmployees = [
 const morningLabel = 'Sáng (7:30-11:30)'
 const afternoonLabel = 'Chiều (13:30-17:30)'
 
-const DAYS_IN_MONTH = 31
+const MAX_DAYS_IN_MONTH = 31 // For column generation
 const STATUS_COLORS = {
   present: '#32D74B',
   absent: '#F87171',
@@ -29,7 +29,7 @@ const STATUS_COLORS = {
 
 const fallbackOverview = fallbackEmployees.map((emp, idx) => {
   const statuses = {}
-  for (let day = 1; day <= DAYS_IN_MONTH; day += 1) {
+  for (let day = 1; day <= MAX_DAYS_IN_MONTH; day += 1) {
     const mod = (idx + day) % 7
     let status = 'present'
     if (mod === 0) status = 'absent'
@@ -46,28 +46,39 @@ const fallbackOverview = fallbackEmployees.map((emp, idx) => {
   }
 })
 
+// Generate month options dynamically (last 6 months + next 6 months)
+const generateMonthOptions = () => {
+  const options = []
+  const now = dayjs()
+  
+  for (let i = -6; i <= 6; i++) {
+    const month = now.add(i, 'month')
+    const value = month.format('MM/YYYY')
+    const label = `Tháng ${month.format('M/YYYY')}`
+    options.push({ label, value })
+  }
+  
+  return options
+}
+
 export default function AttendanceForManager() {
   const [activeTab, setActiveTab] = useState('checkin')
   const [search, setSearch] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState('03/2025')
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('MM/YYYY')) // Current month
   const [overviewData, setOverviewData] = useState([])
   const [overviewLoading, setOverviewLoading] = useState(false)
-  const [attendance, setAttendance] = useState(() =>
-    fallbackEmployees.map((emp) => ({
-      ...emp,
-      note: '',
-      present: false,
-    }))
-  )
+  const [employees, setEmployees] = useState([])
+  const [employeesLoading, setEmployeesLoading] = useState(false)
+  const [attendance, setAttendance] = useState([])
 
   const filtered = useMemo(() => {
-    if (!search) return attendance
+    if (!search || search.trim() === '') return attendance
     const lower = search.toLowerCase()
     return attendance.filter(
       (item) =>
-        item.fullName.toLowerCase().includes(lower) ||
-        item.phone.includes(lower) ||
-        item.position.toLowerCase().includes(lower)
+        (item.fullName || '').toLowerCase().includes(lower) ||
+        (item.phone || '').includes(lower) ||
+        (item.position || '').toLowerCase().includes(lower)
     )
   }, [attendance, search])
 
@@ -87,6 +98,11 @@ export default function AttendanceForManager() {
     return filtered.length > 0 && filtered.every((item) => item.present)
   }, [filtered])
 
+  // Fetch employees list on mount
+  useEffect(() => {
+    fetchEmployees()
+  }, [])
+
   // Fetch overview data from API
   useEffect(() => {
     if (activeTab === 'overview') {
@@ -94,57 +110,131 @@ export default function AttendanceForManager() {
     }
   }, [activeTab, selectedMonth])
 
+  const fetchEmployees = async () => {
+    try {
+      setEmployeesLoading(true)
+      
+      console.log('=== Fetching Employees ===')
+      
+      const { data, error } = await employeeAPI.getAll({ size: 100 })
+      
+      if (error) {
+        console.error('Error fetching employees:', error)
+        message.error('Không thể tải danh sách nhân viên')
+        setEmployees(fallbackEmployees)
+        setAttendance(fallbackEmployees.map(emp => ({ ...emp, note: '', present: false })))
+        return
+      }
+
+      console.log('API Response:', data)
+
+      if (data && data.result && data.result.content) {
+        // Transform API data to match component format
+        const transformedEmployees = data.result.content
+          .filter(emp => emp.employeeId != null && emp.employeeId !== undefined) // Use employeeId from API
+          .map((emp) => ({
+            id: Number(emp.employeeId), // Map employeeId → id
+            fullName: emp.fullName || 'Không rõ',
+            phone: emp.phone || '',
+            position: emp.role || 'Nhân viên',
+            note: '',
+            present: false,
+          }))
+        
+        setEmployees(transformedEmployees)
+        setAttendance(transformedEmployees)
+        
+        console.log('=== Employees Loaded ===')
+        console.log('Total:', transformedEmployees.length)
+        console.log('First 3 employees:', transformedEmployees.slice(0, 3))
+        console.log('========================')
+      } else {
+        console.warn('No content in API response, using fallback')
+        setEmployees(fallbackEmployees)
+        setAttendance(fallbackEmployees.map(emp => ({ ...emp, note: '', present: false })))
+      }
+    } catch (err) {
+      console.error('Exception fetching employees:', err)
+      message.error('Đã xảy ra lỗi khi tải danh sách nhân viên')
+      setEmployees(fallbackEmployees)
+      setAttendance(fallbackEmployees.map(emp => ({ ...emp, note: '', present: false })))
+    } finally {
+      setEmployeesLoading(false)
+    }
+  }
+
   const fetchOverviewData = async () => {
     try {
       setOverviewLoading(true)
       
-      // Convert "03/2025" to "2025-03-01" for API
+      // Convert "11/2025" to start and end dates for API
       const [month, year] = selectedMonth.split('/')
-      const dateStr = `${year}-${month.padStart(2, '0')}-01`
+      const startDate = dayjs(`${year}-${month.padStart(2, '0')}-01`)
+      const endDate = startDate.endOf('month')
+      const daysInMonth = endDate.date()
       
-      console.log('=== Fetching Overview ===')
-      console.log('Date:', dateStr)
-      console.log('========================')
+      const startDateStr = startDate.format('YYYY-MM-DD')
+      const endDateStr = endDate.format('YYYY-MM-DD')
       
-      const { data, error } = await attendanceAPI.getDaily(dateStr)
+      console.log('=== Fetching Overview Summary ===')
+      console.log('Start Date:', startDateStr)
+      console.log('End Date:', endDateStr)
+      console.log('Days in month:', daysInMonth)
+      console.log('==================================')
+      
+      const { data, error } = await attendanceAPI.getSummary(startDateStr, endDateStr)
       
       if (error) {
+        console.error('Error:', error)
         message.error('Không thể tải dữ liệu điểm danh')
-        setOverviewData(fallbackOverview) // Fallback to sample data
+        setOverviewData(fallbackOverview)
         return
       }
+
+      console.log('API Response:', data)
 
       if (data && data.result) {
         // Transform API data to match table format
         const transformedData = data.result.map((emp) => {
           const statuses = {}
           
-          // Build statuses object for each day of month
-          for (let day = 1; day <= DAYS_IN_MONTH; day++) {
-            // Default to empty
+          // Initialize all days as empty
+          for (let day = 1; day <= daysInMonth; day++) {
             statuses[day] = 'empty'
           }
           
-          // Override with actual data if present
-          if (emp.isPresent) {
-            const dayNum = parseInt(emp.recordedAt?.split('-')[2]) || 1
-            statuses[dayNum] = 'present'
+          // Fill in attendance data from API
+          if (emp.attendanceData && Array.isArray(emp.attendanceData)) {
+            emp.attendanceData.forEach((record) => {
+              if (record.date) {
+                // Extract day from date "2025-11-28"
+                const dayNum = parseInt(record.date.split('-')[2])
+                if (dayNum >= 1 && dayNum <= daysInMonth) {
+                  statuses[dayNum] = record.isPresent ? 'present' : 'absent'
+                }
+              }
+            })
           }
+          
+          // Count total working days (present)
+          const totalWorking = Object.values(statuses).filter(s => s === 'present').length
           
           return {
             id: emp.employeeId,
             fullName: emp.employeeName,
-            totalWorking: emp.recordedBy || 0,
+            totalWorking,
             statuses
           }
         })
         
+        console.log('Transformed data:', transformedData.length, 'employees')
         setOverviewData(transformedData)
       } else {
+        console.warn('No result in API response')
         setOverviewData(fallbackOverview)
       }
     } catch (err) {
-      console.error('Error fetching overview:', err)
+      console.error('Exception fetching overview:', err)
       message.error('Đã xảy ra lỗi khi tải dữ liệu')
       setOverviewData(fallbackOverview)
     } finally {
@@ -229,15 +319,13 @@ export default function AttendanceForManager() {
 
   const handleSave = async () => {
     try {
-      // Get current date or selected date
-      const attendanceDate = dayjs().format('YYYY-MM-DD')
-      
       // Build array of attendance records for employees who are checked
       const attendanceRecords = filtered
         .filter(emp => emp.present)
+        .filter(emp => emp.id != null && emp.id !== undefined) // Filter out invalid IDs
         .map(emp => ({
-          employeeId: emp.id,
-          isPresent: true,
+          employeeId: Number(emp.id), // Ensure it's a number
+          isPresent: true, // Backend requires this field
           note: emp.note || ''
         }))
 
@@ -246,20 +334,21 @@ export default function AttendanceForManager() {
         return
       }
 
-      const payload = attendanceRecords.map(record => ({
-        ...record,
-        date: attendanceDate
-      }))
+      console.log('=== Attendance Payload (Array) ===')
+      console.log('Total employees:', attendanceRecords.length)
+      console.log('Payload:', JSON.stringify(attendanceRecords, null, 2))
+      console.log('===================================')
 
-      console.log('=== Attendance Payload ===')
-      console.log('Date:', attendanceDate)
-      console.log('Records:', JSON.stringify(payload, null, 2))
-      console.log('==========================')
+      // Call API once with array of employee records
+      const { data, error } = await attendanceAPI.mark(attendanceRecords)
 
-      // Call API for each record
-      const promises = payload.map(record => attendanceAPI.mark(record))
-      await Promise.all(promises)
+      if (error) {
+        console.error('Error:', error)
+        message.error(error || 'Không thể lưu điểm danh')
+        return
+      }
 
+      console.log('Success:', data)
       message.success(`Đã điểm danh thành công cho ${attendanceRecords.length} nhân viên`)
       
       // Reset attendance state after successful save
@@ -308,7 +397,7 @@ export default function AttendanceForManager() {
         render: (value) => <span style={{ fontWeight: 600 }}>{value}</span>,
       },
     ]
-    const dayColumns = Array.from({ length: DAYS_IN_MONTH }, (_, idx) => {
+    const dayColumns = Array.from({ length: MAX_DAYS_IN_MONTH }, (_, idx) => {
       const day = idx + 1
       return {
         title: day < 10 ? `0${day}` : `${day}`,
@@ -404,6 +493,7 @@ export default function AttendanceForManager() {
                 components={goldTableHeader}
                 style={{ marginBottom: 24 }}
                 rowClassName={() => 'attendance-row'}
+                loading={employeesLoading}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
@@ -431,10 +521,7 @@ export default function AttendanceForManager() {
                 <Select
                   value={selectedMonth}
                   onChange={setSelectedMonth}
-                  options={[
-                    { label: 'Tháng 3/2025', value: '03/2025' },
-                    { label: 'Tháng 2/2025', value: '02/2025' },
-                  ]}
+                  options={generateMonthOptions()}
                   style={{ width: 180 }}
                 />
                 <div style={{ display: 'flex', gap: 16 }}>

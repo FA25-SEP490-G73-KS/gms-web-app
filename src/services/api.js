@@ -184,6 +184,11 @@ export const otpAPI = {
 
 export const employeeAPI = {
   getTechnicians: () => get('/employees/technicians'),
+  getAll: ({ page = 0, size = 20, keyword, role } = {}) => {
+    const query = buildQueryString({ page, size, keyword, role })
+    const suffix = query ? `?${query}` : ''
+    return get(`/employees${suffix}`)
+  },
 };
 
 export const partsAPI = {
@@ -311,4 +316,5 @@ export const manualVoucherAPI = {
 export const attendanceAPI = {
   mark: (data) => post('/attendances/mark', data),
   getDaily: (date) => get(`/attendances/daily?date=${date}`),
+  getSummary: (startDate, endDate) => get(`/attendances/summary?startDate=${startDate}&endDate=${endDate}`),
 };
