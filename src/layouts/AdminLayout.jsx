@@ -141,6 +141,12 @@ export default function AdminLayout({ children }) {
                   Danh sách phiếu
                 </button>
                 <button 
+                  className={`submenu-item ${location.pathname === '/service-advisor/orders/new-customer' ? 'active' : ''}`}
+                  onClick={() => navigate('/service-advisor/orders/new-customer')}
+                >
+                  Tạo phiếu khách mới
+                </button>
+                <button 
                   className={`submenu-item ${location.pathname === '/service-advisor/orders/history' ? 'active' : ''}`}
                   onClick={() => navigate('/service-advisor/orders/history')}
                 >

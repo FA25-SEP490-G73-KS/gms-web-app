@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authAPI } from '../services/api';
+import { normalizePhoneTo0 } from '../utils/helpers';
 
 
 const initializeUser = () => {
@@ -19,9 +20,10 @@ const useAuthStore = create((set) => ({
   loading: false,
   
   login: async (phone, password) => {
+    const normalizedPhone = normalizePhoneTo0(phone);
     set({ loading: true });
     try {
-      const { data: response, error } = await authAPI.login(phone, password);
+      const { data: response, error } = await authAPI.login(normalizedPhone, password);
       
       if (error) {
         set({ loading: false });
@@ -48,7 +50,7 @@ const useAuthStore = create((set) => ({
    
       const userData = result?.user || {
         id: result?.userId || result?.id || '1',
-        phone: phone,
+        phone: normalizedPhone,
         role: result?.role || result?.userRole || 'USER',
         fullName: result?.fullName || result?.name || '',
         email: result?.email || ''

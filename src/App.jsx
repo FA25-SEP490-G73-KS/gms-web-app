@@ -10,6 +10,7 @@ import AdminHome from './pages/admin/AdminHome';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
 import CreateTicket from './pages/admin/CreateTicket';
+import CreateTicketNewCustomer from './pages/admin/CreateTicketNewCustomer';
 import TicketDetailPage from './pages/admin/TicketDetailPage';
 import Reports from './pages/admin/Reports';
 import AccountanceEmployeeList from './pages/accountance/EmployeeList';
@@ -74,6 +75,7 @@ function App() {
         <Route path="/admin/orders" element={<Navigate to="/service-advisor/orders" replace />} />
         <Route path="/admin/orders/create" element={<Navigate to="/service-advisor/orders/create" replace />} />
         <Route path="/admin/orders/:id" element={<AdminOrdersRedirect />} />
+        <Route path="/admin/orders/new-customer" element={<Navigate to="/service-advisor/orders/new-customer" replace />} />
         <Route path="/admin/inventory" element={<Navigate to="/service-advisor/inventory" replace />} />
         
         <Route path="/service-advisor" element={<Navigate to="/service-advisor/reports" replace />} />
@@ -81,6 +83,7 @@ function App() {
         <Route path="/service-advisor/appointments" element={<AdminAppointments />} />
         <Route path="/service-advisor/orders" element={<TicketService />} />
         <Route path="/service-advisor/orders/create" element={<CreateTicket />} />
+        <Route path="/service-advisor/orders/new-customer" element={<CreateTicketNewCustomer />} />
         <Route path="/service-advisor/orders/history" element={<TicketService />} />
      
         <Route path="/service-advisor/orders/:id" element={<TicketDetailPage />} />

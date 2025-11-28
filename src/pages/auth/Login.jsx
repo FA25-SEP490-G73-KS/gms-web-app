@@ -4,7 +4,7 @@ import { Form, Input, Button, Card, Checkbox, Divider, message } from 'antd'
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
 import useAuthStore from '../../store/authStore'
 import '../../styles/pages/auth/login.css'
-import { normalizePhoneTo84 } from '../../utils/helpers'
+import { normalizePhoneTo0 } from '../../utils/helpers'
 
 export default function Login() {
   const [form] = Form.useForm()
@@ -53,7 +53,7 @@ export default function Login() {
       const { phone, password, remember } = values
       setLoading(true)
       try {
-        await login(normalizePhoneTo84(phone), password)
+        await login(normalizePhoneTo0(phone), password)
         message.success('Đăng nhập thành công!')
 
         if (remember) {

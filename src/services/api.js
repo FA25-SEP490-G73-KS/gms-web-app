@@ -145,7 +145,13 @@ export const serviceTicketAPI = {
   getAll: (page = 0, size = 10) => get(`/service-tickets?page=${page}&size=${size}`),
   getById: (id) => get(`/service-tickets/${id}`),
   create: (data) => post('/service-tickets', data),
-  update: (id, data) => patch(`/service-tickets/${id}`, data),
+  update: (id, data) => {
+    console.log('=== [API] serviceTicketAPI.update ===')
+    console.log('Ticket ID:', id)
+    console.log('Sending to backend:', JSON.stringify(data, null, 2))
+    console.log('====================================')
+    return patch(`/service-tickets/${id}`, data)
+  },
   updateDeliveryAt: (id, date) => patch(`/service-tickets/${id}/delivery-at`, date),
   getCompletedPerMonth: () => get('/service-tickets/completed-per-month'),
   getCount: (date) => get(`/service-tickets/count?date=${date}`),
@@ -162,6 +168,13 @@ export const inventoryAPI = {
   create: (data) => post('/inventory', data),
   update: (id, data) => put(`/inventory/${id}`, data),
   delete: (id) => del(`/inventory/${id}`),
+};
+
+export const stockExportAPI = {
+  getAll: (page = 0, size = 6) => get(`/stock-exports?page=${page}&size=${size}`),
+  getById: (id) => get(`/stock-exports/${id}`),
+  create: (data) => post('/stock-exports', data),
+  update: (id, data) => put(`/stock-exports/${id}`, data),
 };
 
 export const otpAPI = {

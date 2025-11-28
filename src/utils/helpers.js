@@ -42,3 +42,12 @@ export function displayPhoneFrom84(phone) {
   return cleaned;
 }
 
+export function normalizePhoneTo0(phone) {
+  if (phone === undefined || phone === null) return '';
+  const cleaned = String(phone).replace(/\D/g, '');
+  if (!cleaned) return '';
+  if (cleaned.startsWith('84')) return `0${cleaned.slice(2)}`;
+  if (cleaned.startsWith('0')) return cleaned;
+  return `0${cleaned}`;
+}
+

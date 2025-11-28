@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
-import { Table, Input, Space, Button, DatePicker, Tag, Card, Divider } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Table, Input, Space, Button, DatePicker, Tag, Card, Divider, message } from 'antd'
 import { SearchOutlined, CalendarOutlined, DownOutlined, UpOutlined, InboxOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { stockExportAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 
 const { Search } = Input
@@ -11,97 +12,61 @@ export default function ExportList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState(null)
   const [statusFilter, setStatusFilter] = useState('Đang xuất hàng')
-  const [expandedRowKeys, setExpandedRowKeys] = useState(['1'])
+  const [expandedRowKeys, setExpandedRowKeys] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [exportList, setExportList] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
 
-  // Sample data with nested parts
-  const exportList = [
-    {
-      id: 1,
-      code: 'STK-2025-000001',
-      customer: 'Nguyễn Văn A',
-      licensePlate: '30A-12345',
-      createDate: '30/10/2025',
-      status: 'Đang xuất hàng',
-      parts: [
-        {
-          id: 1,
-          name: 'Dầu máy 5W-30',
-          needed: 30,
-          inStock: 100,
-          exported: 0
-        },
-        {
-          id: 2,
-          name: 'Lọc nhiên liệu',
-          needed: 10,
-          inStock: 50,
-          exported: 5
-        },
-        {
-          id: 3,
-          name: 'Chụp bụi gioăng cao su',
-          needed: 9,
-          inStock: 0,
-          exported: 0
-        }
-      ]
-    },
-    {
-      id: 2,
-      code: 'STK-2025-000002',
-      customer: 'Trần Văn B',
-      licensePlate: '29A-67890',
-      createDate: '30/10/2025',
-      status: 'Đang xuất hàng',
-      parts: [
-        {
-          id: 1,
-          name: 'Dầu máy 5W-30',
-          needed: 20,
-          inStock: 100,
-          exported: 0
-        }
-      ]
-    },
-    {
-      id: 3,
-      code: 'STK-2025-000003',
-      customer: 'Lê Văn C',
-      licensePlate: '51A-11111',
-      createDate: '29/10/2025',
-      status: 'Đang xuất hàng',
-      parts: []
-    },
-    {
-      id: 4,
-      code: 'STK-2025-000004',
-      customer: 'Phạm Văn D',
-      licensePlate: '43A-22222',
-      createDate: '29/10/2025',
-      status: 'Đang xuất hàng',
-      parts: []
-    },
-    {
-      id: 5,
-      code: 'STK-2025-000005',
-      customer: 'Hoàng Văn E',
-      licensePlate: '92A-33333',
-      createDate: '28/10/2025',
-      status: 'Hoàn thành',
-      parts: []
-    },
-    {
-      id: 6,
-      code: 'STK-2025-000006',
-      customer: 'Vũ Văn F',
-      licensePlate: '14A-44444',
-      createDate: '28/10/2025',
-      status: 'Hoàn thành',
-      parts: []
+  // Fetch data from API
+  useEffect(() => {
+    fetchExportList()
+  }, [page, pageSize])
+
+  const fetchExportList = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await stockExportAPI.getAll(page - 1, pageSize)
+      
+      if (error) {
+        message.error('Không thể tải danh sách xuất kho')
+        setLoading(false)
+        return
+      }
+
+      const result = data?.result || {}
+      const content = result.content || []
+      
+      // Transform API data to match UI structure
+      const transformedData = content.map((item) => ({
+        id: item.priceQuotationId || item.id,
+        code: item.code || 'N/A',
+        customer: item.customerName || 'N/A',
+        licensePlate: item.licensePlate || 'N/A',
+        createDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'N/A',
+        status: mapExportStatus(item.exportStatus),
+        parts: [] // Will be loaded on expand if needed
+      }))
+
+      setExportList(transformedData)
+      setTotal(result.totalElements || 0)
+    } catch (err) {
+      console.error('Failed to fetch export list:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  const mapExportStatus = (status) => {
+    const statusMap = {
+      'WAITING_PURCHASE': 'Chờ mua hàng',
+      'COMPLETED': 'Hoàn thành',
+      'EXPORTING': 'Đang xuất hàng'
+    }
+    return statusMap[status] || status
+  }
 
   const getStatusConfig = (status) => {
     if (status === 'Hoàn thành') {
@@ -463,7 +428,7 @@ export default function ExportList() {
             pagination={{
               current: page,
               pageSize: pageSize,
-              total: 100,
+              total: total,
               showSizeChanger: true,
               showTotal: (total) => `0 of ${total} row(s) selected.`,
               pageSizeOptions: ['10', '20', '50', '100'],
@@ -476,6 +441,7 @@ export default function ExportList() {
                 setPageSize(size)
               }
             }}
+            loading={loading}
             size="middle"
             components={goldTableHeader}
           />

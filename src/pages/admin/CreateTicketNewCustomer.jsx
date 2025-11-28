@@ -1,6 +1,6 @@
-import React, { useState, useEffect, forwardRef, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, forwardRef } from 'react'
 import { Form, Input, Button, Card, Row, Col, Space, message, Modal, Select, Checkbox } from 'antd'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../layouts/AdminLayout'
 import { serviceTicketAPI, employeesAPI, vehiclesAPI, customersAPI, serviceTypeAPI } from '../../services/api'
 import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
@@ -8,7 +8,7 @@ import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import dayjs from 'dayjs'
 import { CalendarOutlined } from '@ant-design/icons'
-
+import ReactSelect from 'react-select'
 
 const { TextArea } = Input
 
@@ -24,7 +24,7 @@ const DateInput = forwardRef(({ value, onClick }, ref) => (
   />
 ))
 
-export default function CreateTicket() {
+export default function CreateTicketNewCustomer() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
 
@@ -36,27 +36,17 @@ export default function CreateTicket() {
   const [brandsLoading, setBrandsLoading] = useState(false)
   const [serviceOptions, setServiceOptions] = useState([])
   const [serviceLoading, setServiceLoading] = useState(false)
-  const [customerDiscountPolicyId, setCustomerDiscountPolicyId] = useState(0)
 
   const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
   const [customerExists, setCustomerExists] = useState(false)
   const [currentPhone, setCurrentPhone] = useState('')
   const [customerId, setCustomerId] = useState(null)
-  const [phoneLocked, setPhoneLocked] = useState(false)
+  const [customerDiscountPolicyId, setCustomerDiscountPolicyId] = useState(0)
 
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false)
   const [newCustomer, setNewCustomer] = useState({ phone: '', fullName: '', address: '' })
 
-  // Track selected values
-  const [selectedBrandId, setSelectedBrandId] = useState(null)
-  const [selectedModelId, setSelectedModelId] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(null)
-
   const navigate = useNavigate()
-  const location = useLocation()
-  const appointmentPrefill = location.state || {}
-  const appointmentVehicle = appointmentPrefill.vehicle || {}
-  const existingTicketId = appointmentPrefill.ticketId || null
 
   const customerTypeSelected = Form.useWatch('customerType', form) || 'CA_NHAN'
 
@@ -74,6 +64,182 @@ export default function CreateTicket() {
   const techOptionsStable = useMemo(() => techOptions, [techOptions])
   const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
 
+  const OLD_singleSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: 40,
+      borderRadius: 6,
+      borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(24,144,255,0.2)' : 'none',
+      transition: 'all 0.2s',
+      '&:hover': {
+        borderColor: '#40a9ff'
+      }
+    }),
+    valueContainer: (base) => ({
+      ...base,
+      padding: '4px 11px'
+    }),
+    placeholder: (base) => ({
+      ...base,
+      color: '#bfbfbf'
+    }),
+    singleValue: (base) => ({
+      ...base,
+      color: '#000000d9'
+    }),
+    menu: (base) => ({
+      ...base,
+      zIndex: 9999,
+      borderRadius: 6
+    }),
+    menuPortal: (base) => ({
+      ...base,
+      zIndex: 9999
+    }),
+    option: (base, state) => ({
+      ...base,
+      backgroundColor: state.isSelected
+        ? '#e6f7ff'
+        : state.isFocused
+          ? '#f5f5f5'
+          : 'white',
+      color: state.isSelected ? '#1890ff' : '#000000d9',
+      ':active': {
+        backgroundColor: '#bae7ff'
+      }
+    })
+  }
+
+  const multiSelectStyles = {
+      control: (base, state) => ({
+        ...base,
+        minHeight: 48,
+        borderRadius: 10,
+        borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+        boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+        transition: 'all 0.15s ease',
+        '&:hover': {
+          borderColor: '#3b82f6'
+        }
+      }),
+      indicatorsContainer: (base) => ({
+        ...base,
+        paddingRight: 8,
+        gap: 0
+      }),
+      valueContainer: (base) => ({
+        ...base,
+        padding: '6px 8px',
+        gap: 6,
+        flexWrap: 'wrap',
+        alignItems: 'flex-start'
+      }),
+      placeholder: (base) => ({
+        ...base,
+        color: '#9ca3af',
+        fontWeight: 500
+      }),
+      multiValue: (base) => ({
+        ...base,
+        borderRadius: 12,
+        backgroundColor: '#e0f2ff',
+        border: '1px solid #bae6fd'
+      }),
+      multiValueLabel: (base) => ({
+        ...base,
+        color: '#0f172a',
+        fontWeight: 600,
+        padding: '2px 8px',
+        fontSize: 13
+      }),
+      multiValueRemove: (base) => ({
+        ...base,
+        color: '#0ea5e9',
+        borderLeft: '1px solid #bae6fd',
+        padding: '2px 6px',
+        ':hover': {
+          backgroundColor: '#bae6fd',
+          color: '#0284c7'
+        }
+      }),
+      menu: (base) => ({
+        ...base,
+        zIndex: 9999,
+        borderRadius: 12,
+        overflow: 'hidden'
+      }),
+      menuPortal: (base) => ({
+        ...base,
+        zIndex: 9999
+      }),
+      option: (base, state) => ({
+        ...base,
+        backgroundColor: state.isSelected
+          ? '#dbeafe'
+          : state.isFocused
+            ? '#f8fafc'
+            : 'white',
+        color: '#0f172a',
+        fontWeight: state.isSelected ? 600 : 500
+      })
+  }
+
+  const getServiceSelectValue = () => {
+    if (!Array.isArray(serviceValue)) return []
+    return serviceValue
+      .map((val) => serviceOptions.find((opt) => String(opt.value) === String(val)))
+      .filter(Boolean)
+  }
+
+  const getTechSelectValue = () => {
+    if (!Array.isArray(techValue)) return []
+    return techValue
+      .map((val) => techOptions.find((opt) => String(opt.value) === String(val)))
+      .filter(Boolean)
+  }
+
+  const getBrandOptions = () => {
+    return brands.map((brand) => ({
+      label: brand.name,
+      value: brand.id
+    }))
+  }
+
+  const getModelOptions = () => {
+    return models.map((model) => ({
+      label: model.name,
+      value: model.id
+    }))
+  }
+
+  const [selectedBrandId, setSelectedBrandId] = useState(null)
+  const [selectedModelId, setSelectedModelId] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(null)
+
+  const getBrandSelectValue = () => {
+    if (!selectedBrandId) return null
+    const options = getBrandOptions()
+    return options.find((opt) => opt.value === selectedBrandId) || null
+  }
+
+  const getModelSelectValue = () => {
+    if (!selectedModelId) return null
+    const options = getModelOptions()
+    return options.find((opt) => opt.value === selectedModelId) || null
+  }
+
+  const handleServiceChange = (selected) => {
+    setSelectedServices(selected || [])
+    const values = (selected || []).map((option) => option.value)
+    form.setFieldsValue({ service: values })
+  }
+
+  const handleTechChange = (selected) => {
+    setSelectedTechs(selected || [])
+    const values = (selected || []).map((option) => option.value)
+    form.setFieldsValue({ techs: values })
+  }
 
   const resetCustomerSelection = () => {
     setCustomerId(null)
@@ -81,29 +247,6 @@ export default function CreateTicket() {
     setCustomerDiscountPolicyId(0)
     form.setFieldsValue({ customerType: 'DOANH_NGHIEP' })
   }
-
-  useEffect(() => {
-    if (appointmentPrefill?.customer || appointmentPrefill?.phone) {
-      const phoneValue = displayPhoneFrom84(appointmentPrefill.phone || '')
-      const appointmentVehicle = appointmentPrefill.vehicle || {}
-
-      form.setFieldsValue({
-        phone: phoneValue,
-        name: appointmentPrefill.customer || '',
-        plate: appointmentPrefill.licensePlate || '',
-        note: appointmentPrefill.note || '',
-        customerType: appointmentPrefill.customerType || appointmentPrefill.customer?.customerType || 'DOANH_NGHIEP',
-        vin: appointmentVehicle.vin || '',
-        year: appointmentVehicle.year || 2020,
-      })
-
-      if (phoneValue) {
-        setCurrentPhone(phoneValue)
-        setPhoneLocked(true)
-        fetchCustomerByPhone(phoneValue)
-      }
-    }
-  }, [appointmentPrefill, form])
 
   useEffect(() => {
     form.setFieldsValue({ 
@@ -120,10 +263,7 @@ export default function CreateTicket() {
       const { data, error } = await customersAPI.getByPhone(requestPhone)
 
       if (error || !data || !data.result) {
-        setCustomerExists(false)
-        setCustomerId(null)
-        setCustomerDiscountPolicyId(0)
-        form.setFieldsValue({ customerType: 'DOANH_NGHIEP' })
+        resetCustomerSelection()
         setCustomerLookupLoading(false)
         return
       }
@@ -143,20 +283,16 @@ export default function CreateTicket() {
         customerType: customer.customerType || 'DOANH_NGHIEP',
         plate: (Array.isArray(customer.licensePlates) && customer.licensePlates.length > 0)
           ? customer.licensePlates[0]
-          : (customer.licensePlate || form.getFieldValue('plate')),
+          : (customer.licensePlate || form.getFieldValue('plate'))
       })
     } catch (err) {
       console.error('Lookup customer by phone failed:', err)
-      setCustomerExists(false)
-      setCustomerId(null)
-      setCustomerDiscountPolicyId(0)
-      form.setFieldsValue({ customerType: 'CA_NHAN' })
+      resetCustomerSelection()
     } finally {
       setCustomerLookupLoading(false)
     }
   }
 
-  // Lấy danh sách kỹ thuật viên
   useEffect(() => {
     const fetchTechnicians = async () => {
       setTechLoading(true)
@@ -169,11 +305,10 @@ export default function CreateTicket() {
       }
 
       const technicians = data?.result || data || []
-
       setTechOptions(
         technicians.map((tech) => ({
           value: tech.employeeId,
-          label: `${tech.fullName} - ${tech.phone || ''}`,
+          label: `${tech.fullName} - ${tech.phone || ''}`
         }))
       )
 
@@ -183,21 +318,27 @@ export default function CreateTicket() {
     fetchTechnicians()
   }, [])
 
-  // Lấy hãng xe
   useEffect(() => {
     const fetchBrands = async () => {
       setBrandsLoading(true)
       const { data, error } = await vehiclesAPI.getBrands()
+
       if (error) {
         message.error('Không thể tải danh sách hãng xe')
         setBrandsLoading(false)
         return
       }
+
       const brandList = data?.result || data || []
-      console.log('Vehicle brands from API:', brandList)
-      setBrands(brandList)
+      setBrands(
+        brandList.map((brand) => ({
+          id: brand.brandId || brand.id,
+          name: brand.brandName || brand.name
+        }))
+      )
       setBrandsLoading(false)
     }
+
     fetchBrands()
   }, [])
 
@@ -224,7 +365,6 @@ export default function CreateTicket() {
   }, [])
 
   const handleBrandChange = async (brandId) => {
-    setSelectedBrandId(brandId)
     setSelectedModelId(null)
     form.setFieldsValue({ model: undefined })
     
@@ -234,43 +374,47 @@ export default function CreateTicket() {
     }
 
     setModelsLoading(true)
-    const { data, error } = await vehiclesAPI.getModelsByBrand(brandId)
-    if (error) {
-      message.error('Không thể tải danh sách mẫu xe')
-      setModels([])
+    try {
+      const { data, error } = await vehiclesAPI.getModelsByBrand(brandId)
+      if (error) {
+        message.error('Không thể tải danh sách dòng xe')
+        setModelsLoading(false)
+        return
+      }
+
+      const modelList = data?.result || data || []
+      setModels(
+        modelList.map((model) => ({
+          id: model.vehicleModelId || model.id,
+          name: model.vehicleModelName || model.name
+        }))
+      )
       setModelsLoading(false)
-      return
+    } catch (err) {
+      console.error('Failed to fetch models:', err)
+      setModelsLoading(false)
     }
-    const modelList = data?.result || data || []
-    setModels(modelList)
-    setModelsLoading(false)
   }
 
   const handleCreate = async (values) => {
-    setLoading(true)
-
-    console.log('=== [CreateTicket] Form Submit ===')
-    console.log('existingTicketId:', existingTicketId)
-    console.log('Form values:', values)
-
-    let expectedDeliveryAt = ''
-    if (values.receiveDate) {
-      if (values.receiveDate instanceof Date) {
-        expectedDeliveryAt = dayjs(values.receiveDate).format('YYYY-MM-DD')
-      } else if (typeof values.receiveDate === 'string') {
-        expectedDeliveryAt = values.receiveDate
-      } else if (values.receiveDate.format) {
-        expectedDeliveryAt = values.receiveDate.format('YYYY-MM-DD')
-      }
-    }
-
-    // Kiểm tra nếu chưa có customerId thì cần tạo khách hàng trước
-    if (!customerId) {
-      message.warning('Vui lòng kiểm tra hoặc tạo khách hàng trước khi tạo phiếu')
-      setLoading(false)
+    if (!Array.isArray(values.service) || values.service.length === 0) {
+      message.warning('Vui lòng chọn ít nhất một loại dịch vụ')
       return
     }
 
+    if (!values.receiveDate) {
+      message.warning('Vui lòng chọn ngày nhận xe')
+      return
+    }
+
+    setLoading(true)
+
+    const expectedDeliveryAt = values.receiveDate
+      ? dayjs(values.receiveDate).format('YYYY-MM-DD')
+      : null
+
+    const normalizedPhone = normalizePhoneTo84(values.phone)
+    
     // Lấy brandId và modelId từ state hoặc form values
     const finalBrandId = selectedBrandId || values.brand || null
     const finalModelId = selectedModelId || values.model || null
@@ -279,84 +423,70 @@ export default function CreateTicket() {
     const selectedBrand = brands.find(b => b.id === Number(finalBrandId))
     const selectedModel = models.find(m => m.id === Number(finalModelId))
 
-    // Kiểm tra phải có ticketId từ modal lịch hẹn
-    if (!existingTicketId) {
-      message.error('Không tìm thấy ID phiếu dịch vụ. Vui lòng tạo từ lịch hẹn.')
-      setLoading(false)
-      return
-    }
-
-    console.log('=== [CreateTicket] Calling PATCH API ===')
-    console.log('Ticket ID:', existingTicketId)
-    console.log('Form values breakdown:')
-    console.log('  - name:', values.name)
-    console.log('  - phone:', values.phone, '→', normalizePhoneTo84(values.phone))
-    console.log('  - address:', values.address)
-    console.log('  - plate:', values.plate)
-    console.log('  - brand:', values.brand, '→ brandId:', finalBrandId, 'brandName:', selectedBrand?.name)
-    console.log('  - model:', values.model, '→ modelId:', finalModelId, 'modelName:', selectedModel?.name)
-    console.log('  - vin:', values.vin)
-    console.log('  - year:', values.year)
-    console.log('  - service:', values.service)
-    console.log('  - techs:', values.techs)
-    console.log('  - vehicleId from appointment:', appointmentVehicle.vehicleId)
-    
-    const updatePayload = {
-      assignedTechnicianId: (values.techs || []).map((id) => Number(id)),  // ← Sửa lại: bỏ "s"
-      brandId: finalBrandId ? Number(finalBrandId) : null,
-      brandName: selectedBrand?.name || '',
-      customerName: values.name,
-      customerPhone: normalizePhoneTo84(values.phone),
-      licensePlate: values.plate ? String(values.plate).toUpperCase() : '',
-      modelId: finalModelId ? Number(finalModelId) : null,
-      modelName: selectedModel?.name || '',
+    const payload = {
+      appointmentId: 0,
+      assignedTechnicianIds: (values.techs || []).map((id) => Number(id)),
+      customer: {
+        customerId: customerId || null,
+        fullName: values.name,
+        address: values.address,
+        phone: normalizedPhone || '',
+        customerType: customerTypeSelected || 'DOANH_NGHIEP',
+        discountPolicyId: customerDiscountPolicyId ?? 0
+      },
+      expectedDeliveryAt: expectedDeliveryAt || null,
+      receiveCondition: values.note || '',
       serviceTypeIds: (values.service || []).map((id) => Number(id)),
-      vehicleId: appointmentVehicle.vehicleId || null,
-      vin: values.vin ? String(values.vin).trim() : null
-      // ← Bỏ year và customerAddress vì backend không hỗ trợ
+      vehicle: {
+        brandId: finalBrandId ? Number(finalBrandId) : null,
+        brandName: selectedBrand?.name || '',
+        licensePlate: values.plate?.toUpperCase() || '',
+        modelId: finalModelId ? Number(finalModelId) : null,
+        modelName: selectedModel?.name || '',
+        vehicleId: null,
+        vin: values.vin ? String(values.vin).trim() : null,
+        year: values.year ? Number(values.year) : 2020
+      }
     }
 
-    console.log('=== PATCH Payload ===')
-    console.log(JSON.stringify(updatePayload, null, 2))
-    console.log('=====================')
-
-    const { data, error } = await serviceTicketAPI.update(existingTicketId, updatePayload)
+    const { data, error } = await serviceTicketAPI.create(payload)
     setLoading(false)
 
     if (error) {
-      console.error('=== PATCH Error ===')
-      console.error(error)
-      console.error('===================')
-      message.error(error || 'Cập nhật phiếu không thành công')
+      message.error(error || 'Tạo phiếu không thành công')
       return
     }
 
-    console.log('=== PATCH Success ===')
-    console.log('Response:', JSON.stringify(data, null, 2))
-    console.log('=====================')
+    const ticketId = data?.result?.serviceTicketId
+    message.success('Tạo phiếu dịch vụ thành công')
     
-    message.success('Cập nhật phiếu dịch vụ thành công')
-    navigate(`/service-advisor/orders/${existingTicketId}`)
+    // Navigate đến trang chi tiết để cập nhật thông tin
+    if (ticketId) {
+      navigate(`/service-advisor/orders/${ticketId}`)
+    } else {
+      form.resetFields()
+      setCustomerId(null)
+      setCustomerExists(false)
+      navigate('/service-advisor/orders')
+    }
   }
 
   const cardTitle = (
-    <span style={{ fontSize: '20px', fontWeight: 600, display: 'block' }}>
-      Tạo phiếu dịch vụ
-    </span>
+    <div>
+      <span style={{ fontSize: '20px', fontWeight: 600, display: 'block' }}>
+        Tạo phiếu dịch vụ cho khách mới
+      </span>
+      <span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
+        Dành cho khách chưa có tài khoản trong hệ thống. Vui lòng nhập đầy đủ thông tin trước khi tạo phiếu.
+      </span>
+    </div>
   )
 
   return (
     <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
-        <Card
-          title={cardTitle}
-          style={{ borderRadius: '12px' }}
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleCreate}
-          >
+        <Card title={cardTitle} style={{ borderRadius: '12px' }}>
+          <Form form={form} layout="vertical" onFinish={handleCreate}>
             <Row gutter={24}>
               <Col span={12}>
                 <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin khách hàng</h3>
@@ -372,7 +502,6 @@ export default function CreateTicket() {
                       const raw = e.target.value.trim()
                       if (!raw) {
                         resetCustomerSelection()
-                        setPhoneLocked(false)
                         return
                       }
                       setCurrentPhone(raw)
@@ -384,32 +513,29 @@ export default function CreateTicket() {
                         resetCustomerSelection()
                       }
                       if (!newPhone) {
-                        setPhoneLocked(false)
                         resetCustomerSelection()
                       }
                     }}
                     addonAfter={
-                      (!customerExists && !phoneLocked) ? (
-                        <Button
-                          type="link"
-                          style={{ padding: 0 }}
-                          onClick={() => {
-                            const phoneValue = form.getFieldValue('phone') || currentPhone
-                            if (!phoneValue) {
-                              message.warning('Vui lòng nhập số điện thoại trước')
-                              return
-                            }
-                            setNewCustomer({
-                              phone: phoneValue,
-                              fullName: form.getFieldValue('name') || '',
-                              address: form.getFieldValue('address') || '',
-                            })
-                            setShowCreateCustomerModal(true)
-                          }}
-                        >
-                          Tạo mới
-                        </Button>
-                      ) : null
+                      <Button
+                        type="link"
+                        style={{ padding: 0 }}
+                        onClick={() => {
+                          const phoneValue = form.getFieldValue('phone') || currentPhone
+                          if (!phoneValue) {
+                            message.warning('Vui lòng nhập số điện thoại trước')
+                            return
+                          }
+                          setNewCustomer({
+                            phone: phoneValue,
+                            fullName: form.getFieldValue('name') || '',
+                            address: form.getFieldValue('address') || ''
+                          })
+                          setShowCreateCustomerModal(true)
+                        }}
+                      >
+                        Tạo mới
+                      </Button>
                     }
                   />
                 </Form.Item>
@@ -543,10 +669,7 @@ export default function CreateTicket() {
                   </select>
                 </Form.Item>
 
-                <Form.Item
-                  label="Số khung"
-                  name="vin"
-                >
+                <Form.Item label="Số khung" name="vin">
                   <Input placeholder="VD: RL4XW430089206813" />
                 </Form.Item>
               </Col>
@@ -593,10 +716,7 @@ export default function CreateTicket() {
                   </Checkbox.Group>
                 </Form.Item>
 
-                <Form.Item
-                  label="Kỹ thuật viên sửa chữa"
-                  name="techs"
-                >
+                <Form.Item label="Kỹ thuật viên sửa chữa" name="techs">
                   <Checkbox.Group style={{ width: '100%' }}>
                     <Row gutter={[8, 8]}>
                       {techLoading ? (
@@ -651,20 +771,17 @@ export default function CreateTicket() {
                       {
                         name: 'offset',
                         options: {
-                          offset: [0, 8],
-                        },
-                      },
+                          offset: [0, 8]
+                        }
+                      }
                     ]}
                     shouldCloseOnSelect
                     withPortal
-                    portalId="create-ticket-date-portal"
+                    portalId="create-ticket-new-customer-date-portal"
                   />
                 </Form.Item>
 
-                <Form.Item
-                  label="Ghi chú"
-                  name="note"
-                >
+                <Form.Item label="Ghi chú" name="note">
                   <TextArea rows={6} placeholder="Nhập ghi chú..." />
                 </Form.Item>
 
@@ -700,7 +817,7 @@ export default function CreateTicket() {
                   customerType: form.getFieldValue('customerType') || 'CA_NHAN',
                   discountPolicyId: customerDiscountPolicyId ?? 0,
                   fullName: newCustomer.fullName,
-                  phone: normalizePhoneTo84(newCustomer.phone),
+                  phone: normalizePhoneTo84(newCustomer.phone)
                 }
                 const { data, error } = await customersAPI.create(payload)
                 if (error) {
@@ -754,3 +871,4 @@ export default function CreateTicket() {
     </AdminLayout>
   )
 }
+

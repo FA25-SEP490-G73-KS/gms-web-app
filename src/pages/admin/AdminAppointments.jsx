@@ -2,11 +2,12 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { Table, Input, Card, Badge, Modal, Space, Button, DatePicker, Row, Col, message } from 'antd'
 import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { appointmentAPI } from '../../services/api'
+import { appointmentAPI, serviceTicketAPI } from '../../services/api'
 import { useNavigate } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/admin-appointments.css'
-import { displayPhoneFrom84 } from '../../utils/helpers'
+import { displayPhoneFrom84, normalizePhoneTo84 } from '../../utils/helpers'
+import dayjs from 'dayjs'
 
 const { Search } = Input
 
@@ -37,6 +38,68 @@ const getStatusConfig = (status) => {
     default:
       return { color: '#111', text: status }
   }
+}
+
+const formatLicensePlate = (value) => {
+  if (!value) return ''
+  return String(value).toUpperCase()
+}
+
+const mapServiceEntryToName = (entry) => {
+  if (!entry) return ''
+  if (typeof entry === 'string') return entry.trim()
+  if (typeof entry === 'object') {
+    return entry.name || entry.serviceName || entry.label || entry.title || ''
+  }
+  return ''
+}
+
+const formatServiceDisplay = (value) => {
+  if (!value) return ''
+
+  if (Array.isArray(value)) {
+    return value.map(mapServiceEntryToName).filter(Boolean).join(', ')
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .replace(/[\n\r]+/g, ',')
+      .split(/[,;|]/)
+      .map(part => part.trim())
+      .filter(Boolean)
+      .join(', ')
+  }
+
+  if (typeof value === 'object') {
+    if (Array.isArray(value.items)) {
+      return value.items.map(mapServiceEntryToName).filter(Boolean).join(', ')
+    }
+    if (Array.isArray(value.list)) {
+      return value.list.map(mapServiceEntryToName).filter(Boolean).join(', ')
+    }
+    const single = mapServiceEntryToName(value)
+    return single
+  }
+
+  return ''
+}
+
+const extractServiceLabel = (item = {}) => {
+  const sources = [
+    item.serviceType,
+    item.serviceTypes,
+    item.serviceNames,
+    item.serviceNameList,
+    item.services,
+    item.serviceRequests
+  ]
+
+  for (const source of sources) {
+    const formatted = formatServiceDisplay(source)
+    if (formatted) return formatted
+  }
+
+  return ''
 }
 
 export default function AdminAppointments() {
@@ -127,20 +190,22 @@ export default function AdminAppointments() {
 
   // Hàm phụ trợ để map dữ liệu thống nhất
   const processData = (rawData) => {
-    const transformed = rawData.map(item => ({
+    const transformed = rawData.map(item => {
+      const serviceLabel = extractServiceLabel(item)
+      return {
       id: item.appointmentId || item.id,
       customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
-      license: item.licensePlate || item.license || '',
+      license: formatLicensePlate(item.licensePlate || item.license || ''),
       phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
       status: statusMap[item.status] || item.status || 'Chờ',
       statusKey: item.status || 'CONFIRMED',
       time: item.timeSlotLabel || item.time || '',
       date: item.appointmentDate ? new Date(item.appointmentDate).toLocaleDateString('vi-VN') : '',
       dateRaw: item.appointmentDate,
-      serviceType: Array.isArray(item.serviceType) ? item.serviceType.join(', ') : (item.serviceType || ''),
+      serviceType: serviceLabel || '',
       note: item.note || '',
       originalItem: item
-    }))
+    }})
     setData(transformed)
   }
 
@@ -154,7 +219,8 @@ export default function AdminAppointments() {
              ...selected.originalItem,
              customerName: selected.customer,
              customerPhone: selected.phone,
-             licensePlate: selected.license
+             licensePlate: formatLicensePlate(selected.license),
+             serviceType: selected.serviceType || extractServiceLabel(selected.originalItem)
          })
       }
       return
@@ -166,7 +232,8 @@ export default function AdminAppointments() {
         ...result,
         customerName: result.customerName || result.customer?.fullName || '',
         customerPhone: displayPhoneFrom84(result.customerPhone || result.customer?.phone || ''),
-        licensePlate: result.licensePlate || result.vehicle?.licensePlate || ''
+        licensePlate: formatLicensePlate(result.licensePlate || result.vehicle?.licensePlate || ''),
+        serviceType: extractServiceLabel(result)
       })
     }
   }
@@ -231,54 +298,159 @@ export default function AdminAppointments() {
   }, [data, selectedDate])
 
   const handleCreateTicket = async () => {
+    console.log('=== [AdminAppointments] Tạo Phiếu Dịch Vụ - START ===')
+    console.log('selectedFull:', selectedFull)
+    console.log('selected:', selected)
+    
     if (!selectedFull && !selected) {
       message.error('Không tìm thấy thông tin lịch hẹn')
       return
     }
 
-    const appointmentId = selectedFull?.appointmentId || selected?.id
+    const appointmentData = selectedFull || selected
+    const appointmentId = appointmentData?.appointmentId || appointmentData?.id
+    
     if (!appointmentId) {
       message.error('Không tìm thấy ID lịch hẹn')
       return
     }
 
+    console.log('Appointment ID:', appointmentId)
+    console.log('Appointment Data:', appointmentData)
+    
     setUpdatingStatus(true)
 
     try {
-      const { error } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
-      if (error) {
-        message.error('Cập nhật trạng thái lịch hẹn thất bại. Vui lòng thử lại.')
+      // Bước 1: Update trạng thái lịch hẹn thành ARRIVED
+      console.log('Step 1: Updating appointment status to ARRIVED...')
+      const { error: statusError } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
+      if (statusError) {
+        console.error('Update status error:', statusError)
+        message.error('Cập nhật trạng thái lịch hẹn thất bại')
         setUpdatingStatus(false)
         return
       }
-      message.success('Đã cập nhật trạng thái lịch hẹn thành "Đã đến"')
-      await fetchAppointments()
+      console.log('✓ Appointment status updated to ARRIVED')
+
+      // Bước 2: Chuẩn bị payload để tạo phiếu dịch vụ
+      // Parse expectedDeliveryAt
+      let expectedDeliveryAt = null
+      if (appointmentData.appointmentDate) {
+        const dateStr = appointmentData.appointmentDate
+        console.log('Parsing appointmentDate:', dateStr)
+        
+        // Try parsing with different formats
+        let parsedDate = dayjs(dateStr, 'DD/MM/YYYY', true)
+        if (!parsedDate.isValid()) {
+          parsedDate = dayjs(dateStr, 'YYYY-MM-DD', true)
+        }
+        if (!parsedDate.isValid()) {
+          parsedDate = dayjs(dateStr)
+        }
+        
+        if (parsedDate.isValid()) {
+          expectedDeliveryAt = parsedDate.format('YYYY-MM-DD')
+          console.log('Parsed expectedDeliveryAt:', expectedDeliveryAt)
+        } else {
+          console.warn('Could not parse date:', dateStr)
+          expectedDeliveryAt = null
+        }
+      }
+
+      const payload = {
+        appointmentId: appointmentId,
+        assignedTechnicianIds: appointmentData.assignedTechnicianIds || [],
+        customer: {
+          customerId: appointmentData.customerId || null,
+          fullName: appointmentData.customerName || '',
+          phone: normalizePhoneTo84(appointmentData.customerPhone || ''),
+          address: appointmentData.address || '',
+          customerType: appointmentData.customerType || 'DOANH_NGHIEP',
+          discountPolicyId: appointmentData.discountPolicyId || 0
+        },
+        expectedDeliveryAt: expectedDeliveryAt,
+        receiveCondition: appointmentData.note || '',
+        serviceTypeIds: appointmentData.serviceTypeIds || [],
+        vehicle: {
+          brandId: appointmentData.brandId || null,
+          brandName: appointmentData.brandName || '',
+          licensePlate: (appointmentData.licensePlate || '').toUpperCase(),
+          modelId: appointmentData.modelId || null,
+          modelName: appointmentData.modelName || '',
+          vehicleId: appointmentData.vehicleId || null,
+          vin: appointmentData.vin || null,
+          year: appointmentData.year || 2020
+        }
+      }
+
+      console.log('=== [AdminAppointments] CREATE SERVICE TICKET ===')
+      console.log('Payload:', JSON.stringify(payload, null, 2))
+      console.log('==================================================')
+
+      // Bước 3: Tạo phiếu dịch vụ
+      const { data: ticketData, error: createError } = await serviceTicketAPI.create(payload)
+      
+      if (createError) {
+        console.error('Create ticket error:', createError)
+        message.error('Tạo phiếu dịch vụ thất bại')
+        setUpdatingStatus(false)
+        return
+      }
+
+      console.log('=== [AdminAppointments] TICKET CREATED ===')
+      console.log('Response:', JSON.stringify(ticketData, null, 2))
+      console.log('===========================================')
+
+      const ticketId = ticketData?.result?.serviceTicketId
+      
+      if (ticketId) {
+        console.log('=== [AdminAppointments] Navigation State ===')
+        const navigationState = {
+          ticketId: ticketId,
+          appointmentId: appointmentId,
+          customer: appointmentData.customerName,
+          phone: appointmentData.customerPhone,
+          licensePlate: appointmentData.licensePlate,
+          note: appointmentData.note,
+          customerId: appointmentData.customerId,
+          customerType: appointmentData.customerType,
+          vehicle: {
+            vehicleId: ticketData?.result?.vehicle?.vehicleId,
+            brandId: appointmentData.brandId,
+            brandName: appointmentData.brandName,
+            modelId: appointmentData.modelId,
+            modelName: appointmentData.modelName,
+            vin: appointmentData.vin,
+            year: appointmentData.year
+          }
+        }
+        console.log('State to pass:', JSON.stringify(navigationState, null, 2))
+        console.log('============================================')
+        
+        message.success('Tạo phiếu dịch vụ thành công. Đang chuyển trang...')
+        
+        // Clean up first
+        setSelected(null)
+        setSelectedFull(null)
+        setUpdatingStatus(false)
+        
+        // Small delay to ensure modal closes and state updates
+        setTimeout(() => {
+          console.log('Navigating to /service-advisor/orders/create')
+          navigate('/service-advisor/orders/create', { state: navigationState })
+        }, 500)
+        
+        await fetchAppointments()
+      } else {
+        message.warning('Tạo phiếu thành công nhưng không có ID')
+        setUpdatingStatus(false)
+      }
+
     } catch (err) {
-      console.error('Failed to update appointment status:', err)
-      message.error('Đã xảy ra lỗi khi cập nhật trạng thái lịch hẹn.')
-      setUpdatingStatus(false)
-      return
-    } finally {
+      console.error('Error in handleCreateTicket:', err)
+      message.error('Đã xảy ra lỗi khi tạo phiếu dịch vụ')
       setUpdatingStatus(false)
     }
-
-    // Điều hướng tạo phiếu, truyền state
-    navigate('/service-advisor/orders/create', { 
-      state: { 
-        appointmentId: appointmentId,
-        customer: selectedFull?.customerName || selected?.customer,
-        phone: selectedFull?.customerPhone || selected?.phone,
-        licensePlate: selectedFull?.licensePlate || selected?.license,
-        note: selectedFull?.note || selected?.note,
-        serviceType: selectedFull?.serviceType || selected?.serviceType,
-        appointmentDate: selectedFull?.appointmentDate || selected?.dateRaw,
-        timeSlotLabel: selectedFull?.timeSlotLabel || selected?.time,
-        appointmentStatus: selectedFull?.statusKey || selected?.statusKey
-      } 
-    })
-    
-    setSelected(null)
-    setSelectedFull(null)
   }
 
   const handleViewDetail = async (record) => {
@@ -289,7 +461,8 @@ export default function AdminAppointments() {
         ...record.originalItem,
         customerName: record.customer,
         customerPhone: record.phone,
-        licensePlate: record.license
+        licensePlate: formatLicensePlate(record.license),
+        serviceType: record.serviceType || extractServiceLabel(record.originalItem)
       })
     }
     await fetchAppointmentDetail(record.id)
@@ -437,41 +610,78 @@ export default function AdminAppointments() {
           </Col>
           
           <Col span={8}>
-            <Card 
-              title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
-                  <CalendarOutlined style={{ color: '#CBB081' }} />
-                  <span>Lịch trình: {selectedDate ? selectedDate.format('DD/MM/YYYY') : 'Tất cả'}</span>
-                </div>
-              }
-              style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}
+            <Card
+              style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
+              bodyStyle={{ padding: '24px' }}
             >
-              <div className="appointment-timeline" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                {timelineData.length > 0 ? (
-                  timelineData.map((slot, index) => (
-                    <div key={index} className="timeline-item" style={{ display: 'flex', marginBottom: '20px', position: 'relative' }}>
-                      <div style={{ width: '100px', fontWeight: 700, color: '#555' }}>{slot.time}</div>
-                      <div style={{ flex: 1, borderLeft: '2px solid #CBB081', paddingLeft: '16px', marginLeft: '10px' }}>
-                         {slot.appointments.map(apt => (
-                             <div key={apt.id} style={{ background: '#f9f9f9', padding: '8px', borderRadius: '6px', marginBottom: '8px' }}>
-                                 <div style={{ fontWeight: 600 }}>{apt.customer}</div>
-                                 <div style={{ fontSize: '12px', color: '#666' }}>{apt.license} - {apt.serviceType}</div>
-                                 <Badge status={apt.statusKey === 'ARRIVED' ? 'success' : (apt.statusKey === 'CANCELLED' ? 'error' : 'warning')} text={apt.status} />
-                             </div>
-                         ))}
-                         <div style={{ color: '#999', fontSize: '12px', marginTop: '4px' }}>
-                           Tổng: {slot.appointments.length} khách
-                         </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '32px' }}>
+                <div>
+                  <div style={{ fontSize: '12px', textTransform: 'uppercase', color: '#9ca3af', letterSpacing: '0.08em', marginBottom: '6px' }}>
+                    Lịch trình
+                  </div>
+                  <div style={{ fontSize: '18px', fontWeight: 700, color: '#04091e' }}>
+                    {selectedDate ? selectedDate.format('DD/MM/YYYY') : 'Tất cả lịch hẹn'}
+                  </div>
+                </div>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    border: '1px solid #e5e7eb',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#04091e'
+                  }}
+                >
+                  <CalendarOutlined />
+                </div>
+              </div>
+
+              {timelineData.length > 0 ? (
+                <div style={{ position: 'relative', paddingLeft: '36px', minHeight: '320px' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '16px',
+                      top: '8px',
+                      bottom: '8px',
+                      width: '2px',
+                      background: '#e5d9c8'
+                    }}
+                  />
+                  {timelineData.map((slot, index) => (
+                    <div key={index} style={{ display: 'flex', gap: '16px', marginBottom: index === timelineData.length - 1 ? 0 : '32px' }}>
+                      <div style={{ position: 'relative' }}>
+                        <div
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            borderRadius: '50%',
+                            background: '#bea685',
+                            border: '2px solid #fff',
+                            boxShadow: '0 0 0 3px #f5efe7',
+                            position: 'relative',
+                            zIndex: 1
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '16px', fontWeight: 600, color: '#04091e' }}>{slot.time}</div>
+                        <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
+                          {slot.appointments.length} lịch hẹn
+                        </div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div style={{ textAlign: 'center', color: '#999', padding: '40px 0' }}>
-                    <CalendarOutlined style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }} />
-                    {selectedDate ? 'Không có lịch hẹn ngày này' : 'Vui lòng chọn ngày để xem lịch trình'}
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
+                  <CalendarOutlined style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }} />
+                  {selectedDate ? 'Không có lịch hẹn ngày này' : 'Vui lòng chọn ngày để xem lịch trình'}
+                </div>
+              )}
             </Card>
           </Col>
         </Row>
@@ -569,6 +779,7 @@ export default function AdminAppointments() {
                 Tạo Phiếu Dịch Vụ
               </Button>
             </div>
+            
           </div>
         )}
       </Modal>

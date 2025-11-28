@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
   Row, Col, Card, Button, Table, Space, 
@@ -6,11 +6,12 @@ import {
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI, priceQuotationAPI, partsAPI, unitsAPI } from '../../services/api'
+import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/modals/ticketdetail.css'
 import dayjs from 'dayjs'
 import Select, { components as selectComponents } from 'react-select'
+import CreatableSelect from 'react-select/creatable'
 
 const DEFAULT_UNITS = [
   { value: 'Cái', label: 'Cái' },
@@ -18,6 +19,39 @@ const DEFAULT_UNITS = [
   { value: 'Bộ', label: 'Bộ' },
 ]
 const PARTS_PAGE_SIZE = 100
+
+const QUOTATION_STATUS_CONFIG = {
+  CREATED: {
+    label: 'Đã tạo',
+    badgeBg: '#e0f2fe',
+    badgeColor: '#0369a1',
+    canEdit: false
+  },
+  WAREHOUSE_PENDING: {
+    label: 'Chờ kho duyệt',
+    badgeBg: '#fef3c7',
+    badgeColor: '#92400e',
+    canEdit: false
+  },
+  WAREHOUSE_CONFIRMING: {
+    label: 'Chờ kho duyệt',
+    badgeBg: '#fef3c7',
+    badgeColor: '#92400e',
+    canEdit: false
+  },
+  WAREHOUSE_CONFIRMED: {
+    label: 'Kho đã duyệt',
+    badgeBg: '#dcfce7',
+    badgeColor: '#15803d',
+    canEdit: true
+  },
+  WAITING_CUSTOMER_CONFIRM: {
+    label: 'Chờ khách xác nhận',
+    badgeBg: '#e0e7ff',
+    badgeColor: '#3730a3',
+    canEdit: false
+  }
+}
 
 export default function TicketDetailPage() {
   const { id } = useParams()
@@ -41,9 +75,37 @@ export default function TicketDetailPage() {
   const [isQuoteExpanded, setIsQuoteExpanded] = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [createQuoteLoading, setCreateQuoteLoading] = useState(false)
-  const inputsDisabled = isHistoryPage || actionLoading
-const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
-const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
+  const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
+  const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
+  const [sendToCustomerLoading, setSendToCustomerLoading] = useState(false)
+
+  const quotationStatusRaw = ticketData?.priceQuotation?.status
+  const normalizedQuotationStatus = quotationStatusRaw
+    ? String(quotationStatusRaw).toUpperCase()
+    : 'CREATED'
+  const quotationStatusConfig = (() => {
+    if (!quotationStatusRaw) {
+      return {
+        label: '',
+        badgeBg: '#e5e7eb',
+        badgeColor: '#4b5563',
+        canEdit: true
+      }
+    }
+    return (
+      QUOTATION_STATUS_CONFIG[normalizedQuotationStatus] || {
+        label: quotationStatusRaw,
+        badgeBg: '#e5e7eb',
+        badgeColor: '#4b5563',
+        canEdit: false
+      }
+    )
+  })()
+
+  const inputsDisabled = isHistoryPage || actionLoading || !quotationStatusConfig.canEdit
+  const actionButtonLabel =
+    quotationStatusConfig.label === 'Kho đã duyệt' ? 'Cập nhật' : 'Lưu'
+  const canSendToCustomer = quotationStatusConfig.label === 'Kho đã duyệt'
 
   const disabledDeliveryDate = (current) => {
     if (!current) return false
@@ -138,6 +200,16 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
     })
   }
 
+  const addCustomPartOption = useCallback((value, label) => {
+    if (!value) return
+    const normalizedLabel = label || (typeof value === 'string' ? value : String(value))
+    setParts(prev => {
+      if (prev.some(option => String(option.value) === String(value))) return prev
+      return [...prev, { value, label: normalizedLabel, isCustom: true }]
+    })
+    cachePartOption(value, normalizedLabel)
+  }, [cachePartOption])
+
   const getPartOption = (value) => {
     if (value === undefined || value === null || value === '') return null
     return (
@@ -189,6 +261,16 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
 
   const CustomSelect = (props) => (
     <Select
+      classNamePrefix="custom-select"
+      menuPortalTarget={menuPortalTarget}
+      styles={selectStyles}
+      components={selectComponentsOverrides}
+      {...props}
+    />
+  )
+
+  const CustomCreatableSelect = (props) => (
+    <CreatableSelect
       classNamePrefix="custom-select"
       menuPortalTarget={menuPortalTarget}
       styles={selectStyles}
@@ -370,23 +452,23 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
           size: PARTS_PAGE_SIZE,
           keyword: keyword || undefined
         })
-
-        if (error) {
+      
+      if (error) {
           console.error('[fetchParts] API error:', error)
           throw new Error(error)
         }
 
         const fetchedParts = normalizePartsResponse(response)
         console.log('[fetchParts] keyword:', keyword, 'page:', currentPage, 'items:', fetchedParts?.length || 0)
-
+      
         const options = fetchedParts
-          .filter(part => part && (part.partId || part.id) && (part.name || part.partName))
-          .map(part => ({
-            value: part.partId || part.id,
-            label: part.name || part.partName || '',
+        .filter(part => part && (part.partId || part.id) && (part.name || part.partName))
+        .map(part => ({
+          value: part.partId || part.id,
+          label: part.name || part.partName || '',
             part
-          }))
-
+        }))
+      
         aggregatedOptions.push(...options)
 
         const isLast =
@@ -464,9 +546,9 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
           const { replacementItems, serviceItemsResult } = transformQuotationItems(normalizedData.priceQuotation.items)
           setReplaceItems(replacementItems)
           setServiceItems(serviceItemsResult)
-        } else {
-          setReplaceItems([])
-          setServiceItems([])
+      } else {
+        setReplaceItems([])
+        setServiceItems([])
         }
         setIsQuoteExpanded(true)
       } else {
@@ -597,9 +679,9 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
       })
     )
     Object.keys(updates).forEach(field => {
-      if (errors[`replace_${id}_${field}`]) {
+    if (errors[`replace_${id}_${field}`]) {
         setErrors(prev => ({ ...prev, [`replace_${id}_${field}`]: null }))
-      }
+    }
     })
   }
 
@@ -646,6 +728,10 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
   }
 
   const handleSendQuote = () => {
+    if (inputsDisabled) {
+      message.warning('Báo giá chưa thể chỉnh sửa ở trạng thái hiện tại.')
+      return
+    }
     if (actionLoading) return
     if (!validateForm()) {
       message.error('Vui lòng điền đầy đủ thông tin')
@@ -659,12 +745,38 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
     }
   }
 
+  const handleSendToCustomer = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+    try {
+      setSendToCustomerLoading(true)
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const { error: sendError } = await priceQuotationAPI.sendToCustomer(quotationId)
+      if (sendError) {
+        throw new Error(sendError)
+      }
+      const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
+      if (znsError) {
+        throw new Error(znsError)
+      }
+      message.success('Đã gửi báo giá cho khách hàng')
+      await fetchTicketDetail()
+    } catch (error) {
+      console.error('Error sending quotation to customer:', error)
+      message.error(error?.message || 'Gửi báo giá thất bại. Vui lòng thử lại.')
+    } finally {
+      setSendToCustomerLoading(false)
+    }
+  }
+
   const confirmSendQuote = async () => {
     if (!expectedDate) {
       message.error('Vui lòng chọn ngày dự đoán giao xe')
       return
     }
-
+    
     if (actionLoading) {
       return
     }
@@ -695,8 +807,8 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
       }
 
       message.success('Đã lưu báo giá thành công')
-      setShowDateModal(false)
-      await fetchTicketDetail()
+        setShowDateModal(false)
+        await fetchTicketDetail()
     } catch (err) {
       console.error('Error sending price quotation:', err)
       message.error(err?.message || 'Đã xảy ra lỗi khi gửi báo giá.')
@@ -719,7 +831,7 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
       width: 350,
       render: (_, record) => (
         <div>
-          <CustomSelect
+          <CustomCreatableSelect
             placeholder="Chọn linh kiện"
             value={
               getPartOption(record.category) ||
@@ -730,7 +842,7 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
                       record.categoryLabel ||
                       getPartOption(record.category)?.label ||
                       String(record.category)
-                  }
+              }
                 : null)
             }
             options={parts}
@@ -739,6 +851,17 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
             isDisabled={inputsDisabled}
             isLoading={partsLoading}
             noOptionsMessage={() => partsLoading ? 'Đang tải...' : 'Không có linh kiện'}
+            onCreateOption={(inputValue) => {
+              const trimmed = inputValue?.trim()
+              if (!trimmed) return
+              addCustomPartOption(trimmed, trimmed)
+              updateReplaceItem(record.id, {
+                category: trimmed,
+                categoryLabel: trimmed,
+                unit: '',
+                unitPrice: 0
+              })
+            }}
             onChange={(option) => {
               const value = option?.value || ''
               const selectedPart =
@@ -1120,8 +1243,25 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
         <Card style={{ borderRadius: '12px' }}>
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>BÁO GIÁ</h2>
+                {ticketData?.priceQuotation?.status && (
+                  <span
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: '999px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      backgroundColor: quotationStatusConfig.badgeBg,
+                      color: quotationStatusConfig.badgeColor
+                    }}
+                  >
+                    {quotationStatusConfig.label}
+                  </span>
+                )}
             </div>
+          </div>
           </div>
           {!isQuoteExpanded ? (
             <div style={{ padding: '24px 0', textAlign: 'left' }}>
@@ -1138,166 +1278,157 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
               </Button>
             </div>
           ) : (
-            <Tabs 
-              activeKey={activeTab} 
-              onChange={setActiveTab}
-              style={{ marginBottom: '20px' }}
-              items={[
-                {
-                  key: 'quote',
-                  label: <span style={{ fontWeight: 700 }}>BÁO GIÁ</span>,
-                  children: (
-                    <>
-                      <div style={{ marginBottom: '24px' }}>
-                        <strong style={{ display: 'block', marginBottom: '12px' }}>Thay thế</strong>
-                         <Table
-                           columns={replaceColumns}
-                           dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                           pagination={false}
-                           size="small"
-                           components={goldTableHeader}
-                           footer={() => (
-                             !isHistoryPage && (
-                               <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
-                                 <Button 
-                                   type="text" 
-                                   icon={<PlusOutlined />}
-                                   onClick={addReplaceItem}
-                                   style={{ 
-                                     width: '32px', 
-                                     height: '32px', 
-                                     borderRadius: '50%', 
-                                     border: '1px solid #222',
-                                     display: 'flex',
-                                     alignItems: 'center',
-                                     justifyContent: 'center'
-                                   }}
-                                 />
-                               </div>
-                             )
-                           )}
-                         />
-                      </div>
-
-                      <div>
-                        <strong style={{ display: 'block', marginBottom: '12px' }}>Dịch vụ</strong>
-                         <Table
-                           columns={serviceColumns}
-                           dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                           pagination={false}
-                           size="small"
-                           components={goldTableHeader}
-                           footer={() => (
-                             !isHistoryPage && (
-                               <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
-                                 <Button 
-                                   type="text" 
-                                   icon={<PlusOutlined />}
-                                   onClick={addServiceItem}
-                                   style={{ 
-                                     width: '32px', 
-                                     height: '32px', 
-                                     borderRadius: '50%', 
-                                     border: '1px solid #222',
-                                     display: 'flex',
-                                     alignItems: 'center',
-                                     justifyContent: 'center'
-                                   }}
-                                 />
-                               </div>
-                             )
-                           )}
-                         />
-                      </div>
-
-                      <div
-                        style={{
-                          marginTop: '32px',
-                          borderTop: '1px solid #edecec',
-                          paddingTop: '24px',
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          justifyContent: 'space-between',
-                          gap: '16px',
-                          alignItems: 'center'
-                        }}
-                      >
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px' }}>
-                          <div>
-                            <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Tổng cộng</div>
-                            <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
-                          </div>
-                          <div>
-                            <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Giảm giá</div>
-                            <div style={{ fontSize: '16px', fontWeight: 600 }}>
-                              {discountPercent ? `${discountPercent}%` : '0%'}{' '}
-                              {discountAmount > 0 && (
-                                <span style={{ color: '#6b7280', fontWeight: 400 }}>
-                                  ({formatCurrency(discountAmount)} đ)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div>
-                            <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Thanh toán cuối cùng</div>
-                            <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>
-                              {formatCurrency(finalAmount)} đ
-                            </div>
-                          </div>
-                        </div>
-                        {!isHistoryPage ? (
+                  <>
+                    <div style={{ marginBottom: '24px' }}>
+              <strong style={{ display: 'block', marginBottom: '12px' }}>Thay thế</strong>
+              <Table
+                columns={replaceColumns}
+                dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                pagination={false}
+                size="small"
+                components={goldTableHeader}
+                footer={() =>
+                  !isHistoryPage && !inputsDisabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
                           <Button 
-                            onClick={handleSendQuote}
-                            disabled={
-                              actionLoading ||
-                              (replaceItems.length === 0 && serviceItems.length === 0)
-                            }
-                            loading={actionLoading}
+                            type="text" 
+                            icon={<PlusOutlined />}
+                            onClick={addReplaceItem}
                             style={{ 
-                              background: '#22c55e',
-                              borderColor: '#22c55e',
-                              color: '#fff',
-                              fontWeight: 600,
-                              padding: '0 24px',
-                              height: '40px'
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '50%', 
+                              border: '1px solid #222',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
                             }}
-                          >
-                            Lưu
-                          </Button>
-                        ) : (
-                          <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                            {ticketData?.priceQuotation 
-                              ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
-                              : 'Báo giá đang ở chế độ chỉ xem'}
-                          </div>
-                        )}
+                        disabled={inputsDisabled}
+                          />
                       </div>
-                    </>
-                  )
-                },
-                {
-                  key: 'draft',
-                  label: 'Nháp',
-                  children: (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                      Chưa có bản nháp
-                    </div>
-                  )
-                },
-                {
-                  key: 'approved',
-                  label: 'Kho đã duyệt',
-                  children: (
-                    <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                      Chưa có dữ liệu
-                    </div>
                   )
                 }
-              ]}
-            />
+                       />
+                    </div>
+
+                    <div>
+              <strong style={{ display: 'block', marginBottom: '12px' }}>Dịch vụ</strong>
+              <Table
+                columns={serviceColumns}
+                dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                pagination={false}
+                size="small"
+                components={goldTableHeader}
+                footer={() =>
+                  !isHistoryPage && !inputsDisabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <Button 
+                            type="text" 
+                            icon={<PlusOutlined />}
+                            onClick={addServiceItem}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '50%', 
+                              border: '1px solid #222',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                        disabled={inputsDisabled}
+                          />
+                      </div>
+                  )
+                }
+                       />
+                    </div>
+
+            <div
+              style={{
+                marginTop: '32px',
+                borderTop: '1px solid #edecec',
+                paddingTop: '24px',
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'space-between',
+                gap: '16px',
+                alignItems: 'center'
+              }}
+            >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px' }}>
+                <div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Tổng cộng</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
+                        </div>
+                <div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Giảm giá</div>
+                  <div style={{ fontSize: '16px', fontWeight: 600 }}>
+                    {discountPercent ? `${discountPercent}%` : '0%'}{' '}
+                    {discountAmount > 0 && (
+                      <span style={{ color: '#6b7280', fontWeight: 400 }}>
+                        ({formatCurrency(discountAmount)} đ)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Thanh toán cuối cùng</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>
+                    {formatCurrency(finalAmount)} đ
+                  </div>
+                </div>
+              </div>
+              {!isHistoryPage ? (
+                <Space size="middle">
+                          <Button 
+                            onClick={handleSendQuote}
+                    disabled={
+                      actionLoading ||
+                      inputsDisabled ||
+                      (replaceItems.length === 0 && serviceItems.length === 0)
+                    }
+                    loading={actionLoading}
+                    style={{
+                      background: '#22c55e',
+                      borderColor: '#22c55e',
+                      color: '#fff',
+                      fontWeight: 600,
+                      padding: '0 24px',
+                      height: '40px'
+                    }}
+                          >
+                    {actionButtonLabel}
+                          </Button>
+                  {canSendToCustomer && (
+                    <Button
+                      onClick={handleSendToCustomer}
+                      loading={sendToCustomerLoading}
+                      disabled={sendToCustomerLoading}
+                      style={{
+                        background: '#2563eb',
+                        borderColor: '#2563eb',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '0 24px',
+                        height: '40px'
+                      }}
+                    >
+                      Gửi báo giá
+                    </Button>
+                  )}
+                        </Space>
+              ) : (
+                <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                  {ticketData?.priceQuotation
+                    ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
+                    : 'Báo giá đang ở chế độ chỉ xem'}
+                      </div>
+                    )}
+            </div>
+                  </>
           )}
         </Card>
-      </div>
+                  </div>
 
       <Modal
         title="Chọn ngày dự đoán giao xe"
@@ -1316,7 +1447,7 @@ const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
           value={deliveryPickerValue || expectedDate || dayjs()}
           onSelect={(date) => setDeliveryPickerValue(date)}
           disabledDate={disabledDeliveryDate}
-        />
+          />
       </Modal>
 
       <Modal
