@@ -194,7 +194,7 @@ export const partsAPI = {
   },
   getById: (id) => get(`/parts/${id}`),
   create: (data) => post('/parts', data),
-  update: (id, data) => put(`/parts/${id}`, data),
+  update: (id, data) => patch(`/parts/${id}`, data),
 };
 
 export const unitsAPI = {
@@ -203,6 +203,14 @@ export const unitsAPI = {
     const suffix = query ? `?${query}` : ''
     return get(`/units${suffix}`)
   }
+};
+
+export const marketsAPI = {
+  getAll: () => get('/markets')
+};
+
+export const partCategoriesAPI = {
+  getAll: () => get('/part-category')
 };
 
 export const vehiclesAPI = {
@@ -215,6 +223,9 @@ export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
   update: (id, payload) => put(`/price-quotations/${id}`, payload),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
+  getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
+  confirmItem: (itemId, payload) => patch(`/quotation-items/${itemId}/confirm/update`, payload),
+  rejectItem: (itemId, reason) => patch(`/quotation-items/${itemId}/reject`, reason),
 };
 
 export const znsNotificationsAPI = {
@@ -295,4 +306,9 @@ export const manualVoucherAPI = {
       },
     });
   },
+};
+
+export const attendanceAPI = {
+  mark: (data) => post('/attendances/mark', data),
+  getDaily: (date) => get(`/attendances/daily?date=${date}`),
 };

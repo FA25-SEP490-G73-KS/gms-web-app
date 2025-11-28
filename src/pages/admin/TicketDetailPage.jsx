@@ -21,19 +21,13 @@ const DEFAULT_UNITS = [
 const PARTS_PAGE_SIZE = 100
 
 const QUOTATION_STATUS_CONFIG = {
-  CREATED: {
-    label: 'Đã tạo',
-    badgeBg: '#e0f2fe',
-    badgeColor: '#0369a1',
-    canEdit: false
+  DRAFT: {
+    label: 'Nháp',
+    badgeBg: '#f3f4f6',
+    badgeColor: '#6b7280',
+    canEdit: true
   },
-  WAREHOUSE_PENDING: {
-    label: 'Chờ kho duyệt',
-    badgeBg: '#fef3c7',
-    badgeColor: '#92400e',
-    canEdit: false
-  },
-  WAREHOUSE_CONFIRMING: {
+  WAITING_WAREHOUSE_CONFIRM: {
     label: 'Chờ kho duyệt',
     badgeBg: '#fef3c7',
     badgeColor: '#92400e',
@@ -49,6 +43,24 @@ const QUOTATION_STATUS_CONFIG = {
     label: 'Chờ khách xác nhận',
     badgeBg: '#e0e7ff',
     badgeColor: '#3730a3',
+    canEdit: false
+  },
+  CUSTOMER_CONFIRMED: {
+    label: 'Khách đã xác nhận',
+    badgeBg: '#d1fae5',
+    badgeColor: '#065f46',
+    canEdit: true
+  },
+  CUSTOMER_REJECTED: {
+    label: 'Khách từ chối',
+    badgeBg: '#fee2e2',
+    badgeColor: '#991b1b',
+    canEdit: true
+  },
+  COMPLETED: {
+    label: 'Hoàn thành',
+    badgeBg: '#dbeafe',
+    badgeColor: '#1e40af',
     canEdit: false
   }
 }

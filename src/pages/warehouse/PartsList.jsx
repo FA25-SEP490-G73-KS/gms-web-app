@@ -231,20 +231,24 @@ export default function PartsList() {
         const { data: response, error } = await partsAPI.getById(part.id)
         if (!error && response?.result) {
           const detail = response.result
+          console.log('=== Part Detail from API ===')
+          console.log('Detail:', detail)
+          console.log('===========================')
+          
           setSelectedPart((prev) => ({ ...prev, originalItem: detail }))
           editForm.setFieldsValue({
             name: detail.name,
-            origin: detail.market,
+            origin: detail.marketName || detail.market,
             brand: detail.categoryName,
-            vehicleModel: detail.universal ? 'Tất cả' : 'Chỉ định',
-            quantityOnHand: detail.quantityInStock,
+            vehicleModel: detail.universal ? 'Tất cả' : (detail.modelName || 'Chỉ định'),
+            quantityOnHand: detail.quantityInStock ?? detail.quantity,
             reservedQuantity: detail.reservedQuantity,
             alertThreshold: detail.reorderLevel,
             sellingPrice: detail.sellingPrice,
             importPrice: detail.purchasePrice,
-            unit: detail.unit,
+            unit: detail.unitName || detail.unit,
             useForAllModels: detail.universal,
-            status: detail.quantityInStock > 0 ? 'Đã nhập' : 'Chờ nhập',
+            status: (detail.quantityInStock ?? detail.quantity) > 0 ? 'Đã nhập' : 'Chờ nhập',
             note: detail.note
           })
           return
@@ -308,20 +312,31 @@ export default function PartsList() {
       return
     }
 
+    const detail = selectedPart.originalItem || selectedPart
+
     try {
+      console.log('=== Update Part Payload ===')
+      console.log('Selected Part:', selectedPart)
+      console.log('Detail:', detail)
+      console.log('Form Values:', values)
+      
       const payload = {
         name: values.name,
-        market: values.origin || 'VN',
-        categoryId: selectedPart.categoryId || 0,
+        marketId: detail.marketId || detail.market?.id || 1,
+        categoryId: detail.categoryId || detail.category?.id || 1,
         purchasePrice: values.importPrice || 0,
         sellingPrice: values.sellingPrice || 0,
         reorderLevel: values.alertThreshold || 0,
-        unit: values.unit || '',
+        unitId: detail.unitId || detail.unit?.id || 1,
         universal: values.useForAllModels || false,
-        specialPart: selectedPart.specialPart || false,
-        compatibleVehicleModelIds: values.useForAllModels ? [] : selectedPart.compatibleVehicleModelIds || [],
-        discountRate: selectedPart.discountRate || 0
+        specialPart: detail.specialPart || false,
+        vehicleModelId: detail.vehicleModelId || detail.vehicleModel?.id || detail.modelId || 1,
+        discountRate: detail.discountRate || 0,
+        note: values.note || ''
       }
+
+      console.log('Final Payload:', JSON.stringify(payload, null, 2))
+      console.log('===========================')
 
       const { data: response, error } = await partsAPI.update(selectedPart.id, payload)
       if (error || !response) {
@@ -368,9 +383,6 @@ export default function PartsList() {
                 onChange={setStatusFilter}
                 style={{ width: 160 }}
               />
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
-                Thêm linh kiện
-              </Button>
             </Space>
           }
         >
@@ -405,7 +417,7 @@ export default function PartsList() {
         closable={false}
         footer={null}
         width={580}
-        bodyStyle={{ background: '#fff', padding: 0 }}
+        styles={{ body: { background: '#fff', padding: 0 } }}
       >
         {selectedPart && (
           <>
@@ -493,7 +505,7 @@ export default function PartsList() {
         closable={false}
         footer={null}
         width={580}
-        bodyStyle={{ background: '#fff', padding: 0 }}
+        styles={{ body: { background: '#fff', padding: 0 } }}
       >
         <div
           style={{

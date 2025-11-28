@@ -5,30 +5,49 @@ import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/accountance/attendance.css'
 
+const DAYS_IN_MONTH = 31
+
+// Generate sample data for 31 days
+const generateDaysData = (pattern) => {
+  const days = []
+  for (let i = 0; i < DAYS_IN_MONTH; i++) {
+    const mod = (i + pattern) % 7
+    if (mod === 0) days.push('A')
+    else if (mod === 1) days.push('HR')
+    else if (mod === 2) days.push('P')
+    else days.push('')
+  }
+  return days
+}
+
 const attendanceData = [
   {
     id: 1,
     name: 'Hoàng Thị Khánh Ly',
     phone: '0919866874',
-    days: ['P', 'A', 'HR', '', '', '', '', '', '', '', '', '', '']
+    totalWorking: 10,
+    days: generateDaysData(0)
   },
   {
     id: 2,
     name: 'Nguyễn Văn A',
     phone: '0913336432',
-    days: ['P', '', 'P', '', '', '', '', '', '', '', '', '', '']
+    totalWorking: 10,
+    days: generateDaysData(1)
   },
   {
     id: 3,
     name: 'Phạm Văn B',
     phone: '0123456789',
-    days: ['', '', '', '', '', '', '', '', '', '', '', '', '']
+    totalWorking: 9,
+    days: generateDaysData(2)
   },
   {
     id: 4,
     name: 'Lê Thị C',
     phone: '0987623455',
-    days: ['', '', '', '', '', '', '', '', '', '', '', '', '']
+    totalWorking: 8,
+    days: generateDaysData(3)
   }
 ]
 
@@ -39,7 +58,7 @@ const DAY_COLORS = {
   '': { bg: '#f0f1f5', label: 'Không có dữ liệu' }
 }
 
-const dayColumns = Array.from({ length: 13 }, (_, index) => ({
+const dayColumns = Array.from({ length: DAYS_IN_MONTH }, (_, index) => ({
   title: String(index + 1).padStart(2, '0'),
   dataIndex: `day_${index}`,
   key: `day_${index}`,
@@ -48,7 +67,21 @@ const dayColumns = Array.from({ length: 13 }, (_, index) => ({
   render: (value) => {
     const color = DAY_COLORS[value || ''] || DAY_COLORS['']
     return (
-      <div className="attendance-cell" style={{ background: color.bg }}>
+      <div 
+        style={{ 
+          width: 36,
+          height: 36,
+          borderRadius: '50%',
+          background: color.bg,
+          margin: '0 auto',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '13px',
+          fontWeight: 600,
+          color: value ? '#000' : 'transparent'
+        }}
+      >
         {value}
       </div>
     )
@@ -80,7 +113,7 @@ export function AccountanceAttendanceContent() {
       title: 'Họ Tên',
       dataIndex: 'name',
       key: 'name',
-      width: 220,
+      width: 200,
       fixed: 'left',
       render: (_, record) => (
         <div className="attendance-name-cell">
@@ -88,6 +121,14 @@ export function AccountanceAttendanceContent() {
           <div className="attendance-phone">{record.phone}</div>
         </div>
       )
+    },
+    {
+      title: 'Ngày công',
+      dataIndex: 'totalWorking',
+      key: 'totalWorking',
+      width: 100,
+      align: 'center',
+      render: (value) => <span style={{ fontWeight: 600 }}>{value}</span>
     },
     ...dayColumns
   ]
@@ -125,7 +166,7 @@ export function AccountanceAttendanceContent() {
             columns={columns}
             dataSource={dataSource}
             pagination={false}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 2200 }}
             components={goldTableHeader}
           />
         </div>

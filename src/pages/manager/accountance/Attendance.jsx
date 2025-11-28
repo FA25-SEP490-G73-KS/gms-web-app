@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Button, Checkbox, Input, Tabs, Table, message, Select } from 'antd'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
+import { attendanceAPI } from '../../../services/api'
+import dayjs from 'dayjs'
 
 const fallbackEmployees = [
   { id: 'EMP-001', fullName: 'Nguyễn Văn A', phone: '0919866874', position: 'Kỹ thuật viên' },
@@ -48,20 +50,15 @@ export default function AttendanceForManager() {
   const [activeTab, setActiveTab] = useState('checkin')
   const [search, setSearch] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('03/2025')
+  const [overviewData, setOverviewData] = useState([])
+  const [overviewLoading, setOverviewLoading] = useState(false)
   const [attendance, setAttendance] = useState(() =>
     fallbackEmployees.map((emp) => ({
       ...emp,
       note: '',
-      morning: false,
-      afternoon: false,
+      present: false,
     }))
   )
-
-  const updateAttendance = (id, field, value) => {
-    setAttendance((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
-    )
-  }
 
   const filtered = useMemo(() => {
     if (!search) return attendance
@@ -74,27 +71,106 @@ export default function AttendanceForManager() {
     )
   }, [attendance, search])
 
+  const updateAttendance = (id, field, value) => {
+    setAttendance((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+    )
+  }
+
+  const handleCheckAll = (checked) => {
+    setAttendance((prev) =>
+      prev.map((item) => ({ ...item, present: checked }))
+    )
+  }
+
+  const allChecked = useMemo(() => {
+    return filtered.length > 0 && filtered.every((item) => item.present)
+  }, [filtered])
+
+  // Fetch overview data from API
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      fetchOverviewData()
+    }
+  }, [activeTab, selectedMonth])
+
+  const fetchOverviewData = async () => {
+    try {
+      setOverviewLoading(true)
+      
+      // Convert "03/2025" to "2025-03-01" for API
+      const [month, year] = selectedMonth.split('/')
+      const dateStr = `${year}-${month.padStart(2, '0')}-01`
+      
+      console.log('=== Fetching Overview ===')
+      console.log('Date:', dateStr)
+      console.log('========================')
+      
+      const { data, error } = await attendanceAPI.getDaily(dateStr)
+      
+      if (error) {
+        message.error('Không thể tải dữ liệu điểm danh')
+        setOverviewData(fallbackOverview) // Fallback to sample data
+        return
+      }
+
+      if (data && data.result) {
+        // Transform API data to match table format
+        const transformedData = data.result.map((emp) => {
+          const statuses = {}
+          
+          // Build statuses object for each day of month
+          for (let day = 1; day <= DAYS_IN_MONTH; day++) {
+            // Default to empty
+            statuses[day] = 'empty'
+          }
+          
+          // Override with actual data if present
+          if (emp.isPresent) {
+            const dayNum = parseInt(emp.recordedAt?.split('-')[2]) || 1
+            statuses[dayNum] = 'present'
+          }
+          
+          return {
+            id: emp.employeeId,
+            fullName: emp.employeeName,
+            totalWorking: emp.recordedBy || 0,
+            statuses
+          }
+        })
+        
+        setOverviewData(transformedData)
+      } else {
+        setOverviewData(fallbackOverview)
+      }
+    } catch (err) {
+      console.error('Error fetching overview:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+      setOverviewData(fallbackOverview)
+    } finally {
+      setOverviewLoading(false)
+    }
+  }
+
   const columns = [
     {
       title: 'Họ Tên',
       dataIndex: 'fullName',
       key: 'fullName',
       fixed: 'left',
-      width: 180,
+      width: 200,
       render: (_, record) => (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <span
             style={{
               fontWeight: 600,
-              maxWidth: 150,
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              fontSize: 14,
+              color: '#1a1a1a',
             }}
           >
             {record.fullName}
           </span>
-          <span style={{ color: '#667085', fontSize: 12 }}>{record.phone}</span>
+          <span style={{ color: '#667085', fontSize: 12, marginTop: 2 }}>{record.phone}</span>
         </div>
       ),
     },
@@ -102,31 +178,31 @@ export default function AttendanceForManager() {
       title: 'Chức vụ',
       dataIndex: 'position',
       key: 'position',
-      width: 180,
+      width: 250,
+      render: (text) => (
+        <span style={{ color: '#344054', fontSize: 14 }}>{text}</span>
+      )
     },
     {
-      title: morningLabel,
-      dataIndex: 'morning',
-      key: 'morning',
-      align: 'center',
-      width: 160,
-      render: (_, record) => (
-        <Checkbox
-          checked={record.morning}
-          onChange={(e) => updateAttendance(record.id, 'morning', e.target.checked)}
-        />
+      title: (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <Checkbox
+            checked={allChecked}
+            onChange={(e) => handleCheckAll(e.target.checked)}
+            style={{ transform: 'scale(1.2)' }}
+          />
+          <span>Có mặt</span>
+        </div>
       ),
-    },
-    {
-      title: afternoonLabel,
-      dataIndex: 'afternoon',
-      key: 'afternoon',
+      dataIndex: 'present',
+      key: 'present',
       align: 'center',
-      width: 160,
+      width: 150,
       render: (_, record) => (
         <Checkbox
-          checked={record.afternoon}
-          onChange={(e) => updateAttendance(record.id, 'afternoon', e.target.checked)}
+          checked={record.present}
+          onChange={(e) => updateAttendance(record.id, 'present', e.target.checked)}
+          style={{ transform: 'scale(1.3)' }}
         />
       ),
     },
@@ -134,19 +210,70 @@ export default function AttendanceForManager() {
       title: 'Ghi chú',
       dataIndex: 'note',
       key: 'note',
-      width: 220,
+      width: 500,
       render: (_, record) => (
         <Input
           value={record.note}
           onChange={(e) => updateAttendance(record.id, 'note', e.target.value)}
           placeholder="Ghi chú"
+          style={{ 
+            width: '100%',
+            height: 40,
+            fontSize: 14,
+            borderRadius: 8
+          }}
         />
       ),
     },
   ]
 
-  const handleSave = () => {
-    message.success('Đã lưu chấm công cho ' + attendance.length + ' nhân viên')
+  const handleSave = async () => {
+    try {
+      // Get current date or selected date
+      const attendanceDate = dayjs().format('YYYY-MM-DD')
+      
+      // Build array of attendance records for employees who are checked
+      const attendanceRecords = filtered
+        .filter(emp => emp.present)
+        .map(emp => ({
+          employeeId: emp.id,
+          isPresent: true,
+          note: emp.note || ''
+        }))
+
+      if (attendanceRecords.length === 0) {
+        message.warning('Vui lòng chọn ít nhất một nhân viên để điểm danh')
+        return
+      }
+
+      const payload = attendanceRecords.map(record => ({
+        ...record,
+        date: attendanceDate
+      }))
+
+      console.log('=== Attendance Payload ===')
+      console.log('Date:', attendanceDate)
+      console.log('Records:', JSON.stringify(payload, null, 2))
+      console.log('==========================')
+
+      // Call API for each record
+      const promises = payload.map(record => attendanceAPI.mark(record))
+      await Promise.all(promises)
+
+      message.success(`Đã điểm danh thành công cho ${attendanceRecords.length} nhân viên`)
+      
+      // Reset attendance state after successful save
+      setAttendance((prev) =>
+        prev.map((item) => ({
+          ...item,
+          present: false,
+          note: ''
+        }))
+      )
+    } catch (error) {
+      console.error('Error marking attendance:', error)
+      message.error('Không thể lưu điểm danh. Vui lòng thử lại')
+    }
   }
 
   const overviewColumns = useMemo(() => {
@@ -186,7 +313,7 @@ export default function AttendanceForManager() {
       return {
         title: day < 10 ? `0${day}` : `${day}`,
         key: `day-${day}`,
-        width: 36,
+        width: 60,
         align: 'center',
         render: (_, record) => {
           const value = record.statuses[day] || 'empty'
@@ -201,8 +328,8 @@ export default function AttendanceForManager() {
           return (
             <div
               style={{
-                width: 18,
-                height: 18,
+                width: 36,
+                height: 36,
                 borderRadius: '50%',
                 background: color,
                 margin: '0 auto',
@@ -223,29 +350,37 @@ export default function AttendanceForManager() {
             background: '#fff',
             borderRadius: 16,
             padding: 24,
-            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           }}
         >
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
+              alignItems: 'center',
               flexWrap: 'wrap',
               gap: 16,
-              marginBottom: 16,
+              marginBottom: 24,
             }}
           >
             <div>
-              <div style={{ fontSize: 14, color: '#98A2B3' }}>manager / Chấm công</div>
-              <h2 style={{ marginBottom: 0 }}>Chấm công</h2>
+              <div style={{ fontSize: 14, color: '#98A2B3', marginBottom: 4 }}>manager / Chấm công</div>
+              <h2 style={{ marginBottom: 0, fontSize: 28, fontWeight: 700, color: '#1a1a1a' }}>Chấm công</h2>
             </div>
             <Input
               allowClear
-              prefix={<i className="bi bi-search" />}
+              prefix={<i className="bi bi-search" style={{ fontSize: 16, color: '#667085' }} />}
               placeholder="Tìm kiếm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ maxWidth: 280, background: '#f5f6fb' }}
+              style={{ 
+                maxWidth: 320, 
+                height: 42,
+                background: '#F9FAFB',
+                borderRadius: 8,
+                border: '1px solid #E5E7EB',
+                fontSize: 14
+              }}
             />
           </div>
 
@@ -265,15 +400,25 @@ export default function AttendanceForManager() {
                 columns={columns}
                 dataSource={filtered}
                 pagination={false}
-                scroll={{ x: 900 }}
+                scroll={{ x: 1100 }}
                 components={goldTableHeader}
-                style={{ marginBottom: 16 }}
+                style={{ marginBottom: 24 }}
+                rowClassName={() => 'attendance-row'}
               />
               <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
                   type="primary"
                   size="large"
-                  style={{ background: '#32D74B', borderColor: '#32D74B', minWidth: 160 }}
+                  style={{ 
+                    background: '#16A34A', 
+                    borderColor: '#16A34A', 
+                    minWidth: 180,
+                    height: 48,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    borderRadius: 8,
+                    boxShadow: '0 2px 8px rgba(22, 163, 74, 0.3)'
+                  }}
                   onClick={handleSave}
                 >
                   Lưu
@@ -316,10 +461,11 @@ export default function AttendanceForManager() {
               </div>
               <Table
                 columns={overviewColumns}
-                dataSource={fallbackOverview.map((item) => ({ ...item, key: item.id }))}
+                dataSource={overviewData.map((item) => ({ ...item, key: item.id }))}
                 pagination={false}
-                scroll={{ x: 1400 }}
+                scroll={{ x: 2200 }}
                 components={goldTableHeader}
+                loading={overviewLoading}
               />
             </>
           )}
