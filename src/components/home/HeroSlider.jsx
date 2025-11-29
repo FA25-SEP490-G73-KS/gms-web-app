@@ -1,6 +1,33 @@
 import { useState, useEffect, useCallback } from 'react';
 import '../../styles/components/hero-slider.css';
 
+/**
+ * KÍCH THƯỚC ẢNH SLIDER TỐI ƯU:
+ * 
+ * Desktop (1920px+):
+ * - Tỉ lệ: 21:9 (ultrawide)
+ * - Kích thước: 2560 x 1080px (hoặc 1920 x 823px)
+ * - Format: WebP hoặc JPG (optimized, quality 80-85%)
+ * - File size: < 500KB mỗi ảnh
+ * 
+ * Tablet (768px - 960px):
+ * - Tỉ lệ: 16:9
+ * - Kích thước: 1920 x 1080px
+ * - Format: WebP hoặc JPG
+ * - File size: < 300KB mỗi ảnh
+ * 
+ * Mobile (< 640px):
+ * - Tỉ lệ: 4:3
+ * - Kích thước: 1200 x 900px
+ * - Format: WebP hoặc JPG
+ * - File size: < 200KB mỗi ảnh
+ * 
+ * Lưu ý:
+ * - Ảnh sẽ được crop theo object-fit: cover
+ * - Nên đặt nội dung quan trọng ở center để tránh bị crop
+ * - Sử dụng srcset cho responsive images nếu có thể
+ */
+
 const slides = [
   {
     id: 1,

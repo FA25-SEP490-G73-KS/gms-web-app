@@ -298,7 +298,7 @@ export default function AdminAppointments() {
   }, [data, selectedDate])
 
   const handleCreateTicket = async () => {
-    console.log('=== [AdminAppointments] Tạo Phiếu Dịch Vụ - START ===')
+    console.log('=== [AdminAppointments] Navigate to CreateTicket - START ===')
     console.log('selectedFull:', selectedFull)
     console.log('selected:', selected)
     
@@ -321,8 +321,74 @@ export default function AdminAppointments() {
     setUpdatingStatus(true)
 
     try {
-      // Bước 1: Update trạng thái lịch hẹn thành ARRIVED
-      console.log('Step 1: Updating appointment status to ARRIVED...')
+      // Check if service ticket already exists for this appointment
+      console.log('=== Checking for existing ticket ===')
+      console.log('Appointment ID:', appointmentId)
+      
+      let existingTicket = null
+      let page = 0
+      const pageSize = 100
+      let hasMore = true
+      
+      // Loop through pages to find existing ticket
+      while (hasMore && !existingTicket) {
+        const { data: ticketsData, error: ticketsError } = await serviceTicketAPI.getAll(page, pageSize)
+        
+        console.log(`Page ${page} response:`, ticketsData)
+        
+        if (ticketsError) {
+          console.warn('Error fetching tickets:', ticketsError)
+          break
+        }
+        
+        if (ticketsData?.result?.content && Array.isArray(ticketsData.result.content)) {
+          existingTicket = ticketsData.result.content.find(
+            (ticket) => {
+              const ticketAppointmentId = ticket.appointmentId || ticket.appointment?.appointmentId || ticket.appointment?.id
+              const matches = ticketAppointmentId && Number(ticketAppointmentId) === Number(appointmentId)
+              if (matches) {
+                console.log('Found existing ticket:', {
+                  ticketId: ticket.serviceTicketId || ticket.id,
+                  appointmentId: ticketAppointmentId,
+                  ticket: ticket
+                })
+              }
+              return matches
+            }
+          )
+          
+          // Check if there are more pages
+          hasMore = !ticketsData.result.last && ticketsData.result.content.length === pageSize
+          page++
+        } else {
+          hasMore = false
+        }
+      }
+      
+      if (existingTicket) {
+        const ticketId = existingTicket.serviceTicketId || existingTicket.id
+        console.log('=== Existing ticket found ===')
+        console.log('Ticket ID:', ticketId)
+        console.log('============================')
+        
+        message.warning('Lịch hẹn này đã có phiếu dịch vụ. Đang chuyển đến danh sách phiếu...')
+        
+        // Clean up
+        setSelected(null)
+        setSelectedFull(null)
+        setUpdatingStatus(false)
+        
+        // Navigate to service tickets list
+        setTimeout(() => {
+          navigate('/service-advisor/orders')
+        }, 500)
+        return
+      }
+      
+      console.log('✓ No existing ticket found, proceeding to create')
+
+      // Update trạng thái lịch hẹn thành ARRIVED
+      console.log('Updating appointment status to ARRIVED...')
       const { error: statusError } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
       if (statusError) {
         console.error('Update status error:', statusError)
@@ -332,14 +398,12 @@ export default function AdminAppointments() {
       }
       console.log('✓ Appointment status updated to ARRIVED')
 
-      // Bước 2: Chuẩn bị payload để tạo phiếu dịch vụ
       // Parse expectedDeliveryAt
       let expectedDeliveryAt = null
       if (appointmentData.appointmentDate) {
         const dateStr = appointmentData.appointmentDate
         console.log('Parsing appointmentDate:', dateStr)
         
-        // Try parsing with different formats
         let parsedDate = dayjs(dateStr, 'DD/MM/YYYY', true)
         if (!parsedDate.isValid()) {
           parsedDate = dayjs(dateStr, 'YYYY-MM-DD', true)
@@ -357,13 +421,15 @@ export default function AdminAppointments() {
         }
       }
 
-      const payload = {
+      // Chuẩn bị data để pass sang CreateTicket (sẽ dùng để build payload ở đó)
+      const navigationState = {
+        fromAppointment: true,
         appointmentId: appointmentId,
         assignedTechnicianIds: appointmentData.assignedTechnicianIds || [],
         customer: {
           customerId: appointmentData.customerId || null,
           fullName: appointmentData.customerName || '',
-          phone: normalizePhoneTo84(appointmentData.customerPhone || ''),
+          phone: appointmentData.customerPhone || '',
           address: appointmentData.address || '',
           customerType: appointmentData.customerType || 'DOANH_NGHIEP',
           discountPolicyId: appointmentData.discountPolicyId || 0
@@ -383,72 +449,28 @@ export default function AdminAppointments() {
         }
       }
 
-      console.log('=== [AdminAppointments] CREATE SERVICE TICKET ===')
-      console.log('Payload:', JSON.stringify(payload, null, 2))
-      console.log('==================================================')
-
-      // Bước 3: Tạo phiếu dịch vụ
-      const { data: ticketData, error: createError } = await serviceTicketAPI.create(payload)
+      console.log('=== [AdminAppointments] Navigation State ===')
+      console.log('State to pass:', JSON.stringify(navigationState, null, 2))
+      console.log('============================================')
       
-      if (createError) {
-        console.error('Create ticket error:', createError)
-        message.error('Tạo phiếu dịch vụ thất bại')
-        setUpdatingStatus(false)
-        return
-      }
-
-      console.log('=== [AdminAppointments] TICKET CREATED ===')
-      console.log('Response:', JSON.stringify(ticketData, null, 2))
-      console.log('===========================================')
-
-      const ticketId = ticketData?.result?.serviceTicketId
+      message.success('Đang chuyển sang trang tạo phiếu dịch vụ...')
       
-      if (ticketId) {
-        console.log('=== [AdminAppointments] Navigation State ===')
-        const navigationState = {
-          ticketId: ticketId,
-          appointmentId: appointmentId,
-          customer: appointmentData.customerName,
-          phone: appointmentData.customerPhone,
-          licensePlate: appointmentData.licensePlate,
-          note: appointmentData.note,
-          customerId: appointmentData.customerId,
-          customerType: appointmentData.customerType,
-          vehicle: {
-            vehicleId: ticketData?.result?.vehicle?.vehicleId,
-            brandId: appointmentData.brandId,
-            brandName: appointmentData.brandName,
-            modelId: appointmentData.modelId,
-            modelName: appointmentData.modelName,
-            vin: appointmentData.vin,
-            year: appointmentData.year
-          }
-        }
-        console.log('State to pass:', JSON.stringify(navigationState, null, 2))
-        console.log('============================================')
-        
-        message.success('Tạo phiếu dịch vụ thành công. Đang chuyển trang...')
-        
-        // Clean up first
-        setSelected(null)
-        setSelectedFull(null)
-        setUpdatingStatus(false)
-        
-        // Small delay to ensure modal closes and state updates
-        setTimeout(() => {
-          console.log('Navigating to /service-advisor/orders/create')
-          navigate('/service-advisor/orders/create', { state: navigationState })
-        }, 500)
-        
-        await fetchAppointments()
-      } else {
-        message.warning('Tạo phiếu thành công nhưng không có ID')
-        setUpdatingStatus(false)
-      }
+      // Clean up first
+      setSelected(null)
+      setSelectedFull(null)
+      setUpdatingStatus(false)
+      
+      // Navigate to CreateTicket page - API POST sẽ gọi ở đó
+      setTimeout(() => {
+        console.log('Navigating to /service-advisor/orders/create')
+        navigate('/service-advisor/orders/create', { state: navigationState })
+      }, 300)
+      
+      await fetchAppointments()
 
     } catch (err) {
       console.error('Error in handleCreateTicket:', err)
-      message.error('Đã xảy ra lỗi khi tạo phiếu dịch vụ')
+      message.error('Đã xảy ra lỗi')
       setUpdatingStatus(false)
     }
   }

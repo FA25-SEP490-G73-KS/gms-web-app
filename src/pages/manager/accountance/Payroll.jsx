@@ -1,8 +1,10 @@
-import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Tag, DatePicker } from 'antd'
+import React, { useState, useEffect, useCallback, useRef, memo } from 'react'
+import { Table, Input, Button, Tag, DatePicker, message } from 'antd'
 import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
+import { payrollAPI } from '../../../services/api'
+import dayjs from 'dayjs'
 import '../../../styles/pages/accountance/payroll.css'
 
 const statusFilters = [
@@ -16,68 +18,153 @@ const STATUS_CONFIG = {
   pending: { color: '#c2410c', bg: '#fff4e6', text: 'Đang xử lý' }
 }
 
-const payrollData = [
-  {
-    id: 1,
-    name: 'Hoàng Thị Khánh Ly',
-    phone: '0919866874',
-    baseSalary: 20000000,
-    allowance: 2000000,
-    deduction: 500000,
-    netSalary: 21500000,
-    status: 'paid'
-  },
-  {
-    id: 2,
-    name: 'Nguyễn Văn Minh',
-    phone: '0913336432',
-    baseSalary: 20000000,
-    allowance: 2000000,
-    deduction: 0,
-    netSalary: 22000000,
-    status: 'paid'
-  },
-  {
-    id: 3,
-    name: 'Phạm Văn B',
-    phone: '0123456789',
-    baseSalary: 20000000,
-    allowance: 2000000,
-    deduction: 0,
-    netSalary: 22000000,
-    status: 'paid'
-  },
-  {
-    id: 4,
-    name: 'Lê Thị C',
-    phone: '0987623455',
-    baseSalary: 20000000,
-    allowance: 2000000,
-    deduction: 0,
-    netSalary: 22000000,
-    status: 'pending'
-  }
-]
+// Memoized DatePicker component to prevent re-render
+const PayrollDatePicker = memo(({ value, onChange }) => {
+  return (
+    <DatePicker
+      picker="month"
+      placeholder="Tháng"
+      value={value}
+      onChange={onChange}
+      format="MM/YYYY"
+      className="payroll-month-picker"
+    />
+  )
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if value actually changed
+  return prevProps.value?.format('MM/YYYY') === nextProps.value?.format('MM/YYYY') &&
+         prevProps.onChange === nextProps.onChange
+})
+
+PayrollDatePicker.displayName = 'PayrollDatePicker'
 
 export default function PayrollForManager() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
-  const [month, setMonth] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(dayjs()) // Default to current month
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [payrollData, setPayrollData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const prevDateRef = useRef(null)
 
-  const filtered = useMemo(() => {
-    return payrollData
-      .filter((item) => {
-        const matchesQuery =
-          !query ||
-          item.name.toLowerCase().includes(query.toLowerCase()) ||
-          item.phone.includes(query)
-        const matchesStatus = status === 'all' || item.status === status
-        return matchesQuery && matchesStatus
-      })
-      .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query, status])
+  // Memoize fetchPayrollData to prevent re-creation on every render
+  const fetchPayrollData = useCallback(async () => {
+    try {
+      setLoading(true)
+      const month = selectedDate.month() + 1 // dayjs month is 0-based, API expects 1-based
+      const year = selectedDate.year()
+
+      console.log('=== Fetching Payroll Preview ===')
+      console.log('Month:', month)
+      console.log('Year:', year)
+      console.log('===============================')
+
+      const { data, error } = await payrollAPI.getPreview(month, year)
+
+      if (error) {
+        console.error('=== Payroll API Error ===')
+        console.error('Error:', error)
+        console.error('Error message:', error?.message || error)
+        console.error('========================')
+        
+        // Check for specific backend errors
+        const errorMessage = error?.message || error || ''
+        const errorString = typeof error === 'string' ? error : JSON.stringify(error)
+        
+        if (errorString.includes('getDailySalary') || errorString.includes('null')) {
+          message.error('Một số nhân viên chưa có thông tin lương cơ bản. Vui lòng kiểm tra lại dữ liệu nhân viên.')
+        } else {
+          message.error(errorMessage || 'Không thể tải dữ liệu lương')
+        }
+        
+        setPayrollData([])
+        return
+      }
+
+      console.log('API Response:', data)
+
+      if (data && data.result && data.result.items) {
+        // Transform API response to match table format
+        const transformedData = data.result.items.map((item) => {
+          // Map status: PENDING_MANAGER_APPROVAL -> 'pending', others -> 'paid'
+          const status = item.status === 'PENDING_MANAGER_APPROVAL' ? 'pending' : 'paid'
+
+          return {
+            id: item.employeeId,
+            name: item.employeeName || 'Không rõ',
+            phone: item.phone || '',
+            baseSalary: item.baseSalary || 0,
+            allowance: item.allowance || 0,
+            deduction: item.deduction || 0,
+            advanceSalary: item.advanceSalary || 0,
+            netSalary: item.netSalary || 0,
+            workingDays: item.workingDays || 0,
+            status
+          }
+        })
+
+        console.log('Transformed data:', transformedData.length, 'employees')
+        setPayrollData(transformedData)
+      } else {
+        console.warn('No items in API response')
+        setPayrollData([])
+      }
+    } catch (err) {
+      console.error('=== Exception fetching payroll ===')
+      console.error('Error:', err)
+      console.error('Error message:', err?.message || err)
+      console.error('==================================')
+      
+      // Check for specific backend errors
+      const errorMessage = err?.message || err?.response?.data?.message || ''
+      const errorString = typeof err === 'string' ? err : JSON.stringify(err)
+      
+      if (errorString.includes('getDailySalary') || errorString.includes('null') || errorMessage.includes('getDailySalary')) {
+        message.error('Một số nhân viên chưa có thông tin lương cơ bản. Vui lòng kiểm tra lại dữ liệu nhân viên.')
+      } else if (err?.response?.status === 500) {
+        message.error('Lỗi server khi tính toán lương. Vui lòng thử lại sau.')
+      } else {
+        message.error(errorMessage || 'Đã xảy ra lỗi khi tải dữ liệu lương')
+      }
+      
+      setPayrollData([])
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedDate])
+
+  // Fetch payroll data on mount and when date actually changes
+  useEffect(() => {
+    if (!selectedDate) return
+    
+    // Check if date actually changed (compare month and year)
+    const currentMonthYear = `${selectedDate.month()}-${selectedDate.year()}`
+    const prevMonthYear = prevDateRef.current ? `${prevDateRef.current.month()}-${prevDateRef.current.year()}` : null
+    
+    // Call API on mount (prevMonthYear is null) or when month/year actually changes
+    if (prevMonthYear === null || currentMonthYear !== prevMonthYear) {
+      prevDateRef.current = selectedDate
+      fetchPayrollData()
+    }
+  }, [selectedDate, fetchPayrollData])
+
+  // Memoize date change handler to prevent DatePicker re-render
+  const handleDateChange = useCallback((date) => {
+    setSelectedDate(date || dayjs())
+  }, [])
+
+  // Calculate filtered data directly (no useMemo)
+  const filtered = payrollData
+    .filter((item) => {
+      const matchesQuery =
+        !query ||
+        item.name.toLowerCase().includes(query.toLowerCase()) ||
+        item.phone.includes(query)
+      const matchesStatus = status === 'all' || item.status === status
+      return matchesQuery && matchesStatus
+    })
+    .map((item, index) => ({ ...item, key: item.id || index }))
 
   const columns = [
     {
@@ -171,12 +258,9 @@ export default function PayrollForManager() {
           </div>
 
           <div className="payroll-filters" style={{ gap: 16 }}>
-            <DatePicker
-              picker="month"
-              placeholder="Tháng"
-              value={month}
-              onChange={setMonth}
-              className="payroll-month-picker"
+            <PayrollDatePicker
+              value={selectedDate}
+              onChange={handleDateChange}
             />
             <div className="status-filters">
               {statusFilters.map((item) => (
@@ -210,6 +294,7 @@ export default function PayrollForManager() {
               className="payroll-table"
               columns={columns}
               dataSource={filtered}
+              loading={loading}
               pagination={{
                 current: page,
                 pageSize,

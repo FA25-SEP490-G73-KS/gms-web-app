@@ -2,6 +2,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'rea
 import HomePage from './pages/home/HomePage';
 import AboutPage from './pages/home/about';
 import ContactPage from './pages/home/contact';
+import BlogList from './pages/blog/BlogList';
+import BlogDetail from './pages/blog/BlogDetail';
 import AppointmentService from './pages/customer/appointment/appointmentservice';
 import Login from './pages/auth/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
@@ -65,6 +67,8 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/blog" element={<BlogList />} />
+        <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/appointment" element={<AppointmentService />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />

@@ -56,7 +56,6 @@ export default function CreateTicket() {
   const location = useLocation()
   const appointmentPrefill = location.state || {}
   const appointmentVehicle = appointmentPrefill.vehicle || {}
-  const existingTicketId = appointmentPrefill.ticketId || null
 
   const customerTypeSelected = Form.useWatch('customerType', form) || 'CA_NHAN'
 
@@ -83,19 +82,51 @@ export default function CreateTicket() {
   }
 
   useEffect(() => {
-    if (appointmentPrefill?.customer || appointmentPrefill?.phone) {
-      const phoneValue = displayPhoneFrom84(appointmentPrefill.phone || '')
+    if (appointmentPrefill?.fromAppointment) {
+      // Data from appointment modal
+      const phoneValue = displayPhoneFrom84(appointmentPrefill.customer?.phone || '')
       const appointmentVehicle = appointmentPrefill.vehicle || {}
 
       form.setFieldsValue({
         phone: phoneValue,
-        name: appointmentPrefill.customer || '',
-        plate: appointmentPrefill.licensePlate || '',
-        note: appointmentPrefill.note || '',
-        customerType: appointmentPrefill.customerType || appointmentPrefill.customer?.customerType || 'DOANH_NGHIEP',
+        name: appointmentPrefill.customer?.fullName || '',
+        address: appointmentPrefill.customer?.address || '',
+        customerType: appointmentPrefill.customer?.customerType || 'DOANH_NGHIEP',
+        plate: appointmentVehicle.licensePlate || '',
+        brand: appointmentVehicle.brandId || undefined,
+        model: appointmentVehicle.modelId || undefined,
         vin: appointmentVehicle.vin || '',
         year: appointmentVehicle.year || 2020,
+        note: appointmentPrefill.receiveCondition || '',
+        service: appointmentPrefill.serviceTypeIds || [],
+        techs: appointmentPrefill.assignedTechnicianIds || [],
       })
+
+      // Set customerId if exists
+      if (appointmentPrefill.customer?.customerId) {
+        setCustomerId(appointmentPrefill.customer.customerId)
+        setCustomerExists(true)
+        setCustomerDiscountPolicyId(appointmentPrefill.customer?.discountPolicyId || 0)
+      }
+
+      // Set selected brand/model for fetching models
+      if (appointmentVehicle.brandId) {
+        setSelectedBrandId(appointmentVehicle.brandId)
+        handleBrandChange(appointmentVehicle.brandId)
+      }
+
+      if (appointmentVehicle.modelId) {
+        setSelectedModelId(appointmentVehicle.modelId)
+      }
+
+      // Set expected delivery date
+      if (appointmentPrefill.expectedDeliveryAt) {
+        const parsedDate = dayjs(appointmentPrefill.expectedDeliveryAt, 'YYYY-MM-DD')
+        if (parsedDate.isValid()) {
+          setSelectedDate(parsedDate.toDate())
+          form.setFieldsValue({ receiveDate: parsedDate.toDate() })
+        }
+      }
 
       if (phoneValue) {
         setCurrentPhone(phoneValue)
@@ -250,10 +281,10 @@ export default function CreateTicket() {
     setLoading(true)
 
     console.log('=== [CreateTicket] Form Submit ===')
-    console.log('existingTicketId:', existingTicketId)
+    console.log('appointmentPrefill:', appointmentPrefill)
     console.log('Form values:', values)
 
-    let expectedDeliveryAt = ''
+    let expectedDeliveryAt = null
     if (values.receiveDate) {
       if (values.receiveDate instanceof Date) {
         expectedDeliveryAt = dayjs(values.receiveDate).format('YYYY-MM-DD')
@@ -262,6 +293,8 @@ export default function CreateTicket() {
       } else if (values.receiveDate.format) {
         expectedDeliveryAt = values.receiveDate.format('YYYY-MM-DD')
       }
+    } else if (appointmentPrefill.expectedDeliveryAt) {
+      expectedDeliveryAt = appointmentPrefill.expectedDeliveryAt
     }
 
     // Kiểm tra nếu chưa có customerId thì cần tạo khách hàng trước
@@ -272,26 +305,21 @@ export default function CreateTicket() {
     }
 
     // Lấy brandId và modelId từ state hoặc form values
-    const finalBrandId = selectedBrandId || values.brand || null
-    const finalModelId = selectedModelId || values.model || null
+    const finalBrandId = selectedBrandId || values.brand || appointmentPrefill.vehicle?.brandId || null
+    const finalModelId = selectedModelId || values.model || appointmentPrefill.vehicle?.modelId || null
 
     // Tìm brandName và modelName từ danh sách đã fetch
     const selectedBrand = brands.find(b => b.id === Number(finalBrandId))
     const selectedModel = models.find(m => m.id === Number(finalModelId))
 
-    // Kiểm tra phải có ticketId từ modal lịch hẹn
-    if (!existingTicketId) {
-      message.error('Không tìm thấy ID phiếu dịch vụ. Vui lòng tạo từ lịch hẹn.')
-      setLoading(false)
-      return
-    }
-
-    console.log('=== [CreateTicket] Calling PATCH API ===')
-    console.log('Ticket ID:', existingTicketId)
+    console.log('=== [CreateTicket] Calling POST API ===')
     console.log('Form values breakdown:')
+    console.log('  - appointmentId:', appointmentPrefill.appointmentId)
+    console.log('  - customerId:', customerId)
     console.log('  - name:', values.name)
     console.log('  - phone:', values.phone, '→', normalizePhoneTo84(values.phone))
     console.log('  - address:', values.address)
+    console.log('  - customerType:', values.customerType)
     console.log('  - plate:', values.plate)
     console.log('  - brand:', values.brand, '→ brandId:', finalBrandId, 'brandName:', selectedBrand?.name)
     console.log('  - model:', values.model, '→ modelId:', finalModelId, 'modelName:', selectedModel?.name)
@@ -299,44 +327,109 @@ export default function CreateTicket() {
     console.log('  - year:', values.year)
     console.log('  - service:', values.service)
     console.log('  - techs:', values.techs)
-    console.log('  - vehicleId from appointment:', appointmentVehicle.vehicleId)
+    console.log('  - receiveCondition:', values.note)
+    console.log('  - expectedDeliveryAt:', expectedDeliveryAt)
     
-    const updatePayload = {
-      assignedTechnicianId: (values.techs || []).map((id) => Number(id)),  // ← Sửa lại: bỏ "s"
+    
+    const vehiclePayload = {
       brandId: finalBrandId ? Number(finalBrandId) : null,
-      brandName: selectedBrand?.name || '',
-      customerName: values.name,
-      customerPhone: normalizePhoneTo84(values.phone),
+      brandName: selectedBrand?.name || (finalBrandId ? 'string' : ''),
       licensePlate: values.plate ? String(values.plate).toUpperCase() : '',
       modelId: finalModelId ? Number(finalModelId) : null,
-      modelName: selectedModel?.name || '',
-      serviceTypeIds: (values.service || []).map((id) => Number(id)),
-      vehicleId: appointmentVehicle.vehicleId || null,
-      vin: values.vin ? String(values.vin).trim() : null
-      // ← Bỏ year và customerAddress vì backend không hỗ trợ
+      modelName: selectedModel?.name || (finalModelId ? 'string' : ''),
+      vehicleId: null, 
+      vin: values.vin ? String(values.vin).trim() : null,
+      year: values.year ? Number(values.year) : (values.year === 0 ? 0 : 2020)
     }
 
-    console.log('=== PATCH Payload ===')
-    console.log(JSON.stringify(updatePayload, null, 2))
-    console.log('=====================')
+    const createPayload = {
+      appointmentId: appointmentPrefill.appointmentId || 0,
+      assignedTechnicianIds: (values.techs || []).map((id) => Number(id)),
+      customer: {
+        address: values.address || '',
+        customerId: customerId,
+        customerType: values.customerType || 'DOANH_NGHIEP',
+        discountPolicyId: customerDiscountPolicyId || 0,
+        fullName: values.name || '',
+        phone: normalizePhoneTo84(values.phone)
+      },
+      expectedDeliveryAt: expectedDeliveryAt,
+      forceAssignVehicle: true,
+      receiveCondition: values.note || '',
+      serviceTypeIds: (values.service || []).map((id) => Number(id)),
+      vehicle: vehiclePayload
+    }
 
-    const { data, error } = await serviceTicketAPI.update(existingTicketId, updatePayload)
+    console.log('=== POST Payload ===')
+    console.log(JSON.stringify(createPayload, null, 2))
+    console.log('Vehicle ID in payload:', createPayload.vehicle.vehicleId, '(always null)')
+    console.log('====================')
+
+    const { data, error } = await serviceTicketAPI.create(createPayload)
     setLoading(false)
 
     if (error) {
-      console.error('=== PATCH Error ===')
+      console.error('=== POST Error ===')
       console.error(error)
-      console.error('===================')
-      message.error(error || 'Cập nhật phiếu không thành công')
+      console.error('==================')
+      
+      
+      const errorMessage = error?.message || error || ''
+      const errorString = typeof error === 'string' ? error : JSON.stringify(error)
+      
+      if (errorString.includes('Duplicate entry') && errorString.includes('appointment_id')) {
+        message.error('Lịch hẹn này đã được tạo phiếu dịch vụ rồi. Vui lòng kiểm tra lại danh sách phiếu dịch vụ.')
+      } else if (errorString.includes('Duplicate entry')) {
+        message.error('Dữ liệu đã tồn tại. Vui lòng kiểm tra lại.')
+      } else {
+        message.error(errorMessage || 'Tạo phiếu dịch vụ không thành công')
+      }
       return
     }
 
-    console.log('=== PATCH Success ===')
+    console.log('=== POST Success ===')
     console.log('Response:', JSON.stringify(data, null, 2))
-    console.log('=====================')
+    console.log('====================')
+
+    const ticketId = data?.result?.serviceTicketId
     
-    message.success('Cập nhật phiếu dịch vụ thành công')
-    navigate(`/service-advisor/orders/${existingTicketId}`)
+    if (ticketId) {
+      
+      const updatePayload = {
+        assignedTechnicianId: (values.techs || []).map((id) => Number(id)),
+        brandId: finalBrandId ? Number(finalBrandId) : 0,
+        brandName: selectedBrand?.name || '',
+        customerName: values.name || '',
+        customerPhone: normalizePhoneTo84(values.phone),
+        licensePlate: values.plate ? String(values.plate).toUpperCase() : '',
+        modelId: finalModelId ? Number(finalModelId) : 0,
+        modelName: selectedModel?.name || '',
+        serviceTypeIds: (values.service || []).map((id) => Number(id)),
+        vehicleId: appointmentPrefill.vehicle?.vehicleId || 0,
+        vin: values.vin ? String(values.vin).trim() : '',
+        year: values.year ? Number(values.year) : 2020
+      }
+
+      console.log('=== Updating Ticket After Create ===')
+      console.log('Ticket ID:', ticketId)
+      console.log('Update Payload:', JSON.stringify(updatePayload, null, 2))
+      console.log('====================================')
+
+      const { error: updateError } = await serviceTicketAPI.update(ticketId, updatePayload)
+      
+      if (updateError) {
+        console.warn('Update after create failed:', updateError)
+        // Không hiển thị error vì ticket đã tạo thành công
+        // Chỉ log để debug
+      } else {
+        console.log('✓ Ticket updated successfully after create')
+      }
+
+      message.success('Tạo phiếu dịch vụ thành công')
+      navigate(`/service-advisor/orders/${ticketId}`)
+    } else {
+      message.warning('Tạo phiếu thành công nhưng không có ID')
+    }
   }
 
   const cardTitle = (

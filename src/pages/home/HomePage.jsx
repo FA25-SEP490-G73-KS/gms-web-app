@@ -83,7 +83,7 @@ export default function HomePage() {
   return (
     <CustomerLayout>
       <article itemScope itemType="https://schema.org/AutomotiveBusiness">
-        <header className="home-hero" id="home" aria-label="Hero section">
+        <header className="home-hero" id="home" aria-label="Hero section" style={{ margin: 0, padding: 0 }}>
           <div className="hero-full">
             <HeroSlider />
           </div>

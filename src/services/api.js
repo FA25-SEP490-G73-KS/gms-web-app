@@ -226,7 +226,7 @@ export const vehiclesAPI = {
 
 export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
-  update: (id, payload) => put(`/price-quotations/${id}`, payload),
+  update: (id, payload) => patch(`/price-quotations/${id}`, payload),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
   getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
   confirmItem: (itemId, payload) => patch(`/quotation-items/${itemId}/confirm/update`, payload),
@@ -317,4 +317,8 @@ export const attendanceAPI = {
   mark: (data) => post('/attendances/mark', data),
   getDaily: (date) => get(`/attendances/daily?date=${date}`),
   getSummary: (startDate, endDate) => get(`/attendances/summary?startDate=${startDate}&endDate=${endDate}`),
+};
+
+export const payrollAPI = {
+  getPreview: (month, year) => get(`/payroll/preview?month=${month}&year=${year}`),
 };

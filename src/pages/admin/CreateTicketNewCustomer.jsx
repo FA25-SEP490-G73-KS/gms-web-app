@@ -424,7 +424,7 @@ export default function CreateTicketNewCustomer() {
     const selectedModel = models.find(m => m.id === Number(finalModelId))
 
     const payload = {
-      appointmentId: 0,
+      appointmentId: null,
       assignedTechnicianIds: (values.techs || []).map((id) => Number(id)),
       customer: {
         customerId: customerId || null,

@@ -63,7 +63,6 @@ export default function AppointmentService() {
     if (step === 3 && form.date) {
       fetchTimeSlots()
     } else if (step === 3) {
-      // Reset time slots when date is cleared
       setTimeSlots([])
       setForm({ ...form, time: '' })
     }
@@ -146,7 +145,6 @@ export default function AppointmentService() {
     setOtpLoading(true)
     setOtpError('')
     
-    // Combine prefix and number: +84 -> 84, then add phone number
     const fullPhone = '84' + cleanedNumber
     
     const { data: response, error } = await otpAPI.send(fullPhone, 'APPOINTMENT')
@@ -158,7 +156,6 @@ export default function AppointmentService() {
     }
 
     if (response && (response.statusCode === 200 || response.result)) {
-      // Update form with full phone number
       setForm({ ...form, phone: fullPhone })
       message.success('Mã OTP đã được gửi đến số điện thoại của bạn!')
       next()
@@ -190,9 +187,7 @@ export default function AppointmentService() {
         return
       }
 
-      // Check if OTP is valid (result should be true)
       if (data && (data.result === true || data.result === 'true' || data.statusCode === 200)) {
-        // OTP verified successfully, proceed to next step
         message.success('Xác thực OTP thành công!')
         next()
       } else {
@@ -211,7 +206,6 @@ export default function AppointmentService() {
       return
     }
 
-    // Validate that a time slot is selected
     const selectedSlot = timeSlots.find(slot => slot.value === parseInt(form.time))
     if (!selectedSlot) {
       message.warning('Vui lòng chọn khung giờ hợp lệ')
@@ -221,7 +215,6 @@ export default function AppointmentService() {
     setLoading(true)
     
     try {
-      // Format date as YYYY-MM-DD
       const appointmentDate = form.date
       
       const serviceTypeId = parseInt(form.service, 10)
@@ -231,7 +224,6 @@ export default function AppointmentService() {
         return
       }
 
-      // Get timeSlotIndex from selected slot (originalIndex from API response)
       const timeSlotIndex = selectedSlot?.originalIndex !== undefined 
         ? selectedSlot.originalIndex 
         : parseInt(form.time)
@@ -246,13 +238,7 @@ export default function AppointmentService() {
         timeSlotIndex: timeSlotIndex
       }
 
-      console.log('Creating appointment with payload:', payload)
-      console.log('Selected slot:', selectedSlot)
-      console.log('Time slot index:', timeSlotIndex)
-
       const { data: response, error, statusCode } = await appointmentAPI.create(payload)
-      
-      console.log('API Response:', { response, error, statusCode })
       
       if (error) {
         let errorMessage = error
@@ -264,13 +250,11 @@ export default function AppointmentService() {
         return
       }
 
-      // Check if appointment was created successfully
       if (response && (response.statusCode === 200 || response.statusCode === 201 || response.result)) {
-        // Save appointment result with customer name from form (backend may return null)
         const appointmentData = response.result || response
         setAppointmentResult({
           ...appointmentData,
-          customerName: form.fullName, // Use form.fullName because backend returns null
+          customerName: form.fullName,
           customerPhone: appointmentData.customerPhone || form.phone,
           licensePlate: appointmentData.licensePlate || form.license,
           appointmentDate: appointmentData.appointmentDate || form.date,
@@ -290,11 +274,73 @@ export default function AppointmentService() {
 
   return (
     <CustomerLayout>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px 0' }}>
-        <div style={{ color: '#CBB081', fontWeight: 700, marginBottom: 8 }}>Đặt dịch vụ của chúng tôi!</div>
+      <style>{`
+        @media (max-width: 768px) {
+          .appointment-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .appointment-container {
+            margin: 0 12px !important;
+            padding: 16px !important;
+          }
+          .appointment-buttons {
+            flex-direction: column !important;
+          }
+          .appointment-buttons button {
+            width: 100% !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .appointment-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .appointment-container {
+            margin: 0 8px !important;
+            padding: 16px !important;
+          }
+          .appointment-buttons {
+            flex-direction: column !important;
+            gap: 8px !important;
+          }
+          .appointment-buttons button {
+            width: 100% !important;
+            padding: 12px 16px !important;
+            font-size: 14px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .appointment-container {
+            margin: 0 4px !important;
+            padding: 12px !important;
+          }
+          .appointment-grid input,
+          .appointment-grid select,
+          .appointment-grid textarea {
+            font-size: 14px !important;
+            padding: 8px 10px !important;
+          }
+        }
+      `}</style>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        padding: 'clamp(20px, 5vw, 40px) clamp(8px, 2vw, 0)',
+        minHeight: '100vh',
+        marginTop: '20px'
+      }}>
+        <div style={{ color: '#CBB081', fontWeight: 700, marginBottom: 8, fontSize: 'clamp(18px, 4vw, 24px)' }}>Đặt dịch vụ của chúng tôi!</div>
 
-        <div style={{ width: 720, maxWidth: '92%', background: '#fff', borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,.08)', padding: 20 }}>
-          <div style={{ maxWidth: 560, margin: '0 auto' }}>
+        <div className="appointment-container" style={{ 
+          width: '100%', 
+          maxWidth: 720, 
+          background: '#fff', 
+          borderRadius: 12, 
+          boxShadow: '0 10px 30px rgba(0,0,0,.08)', 
+          padding: '20px',
+          margin: '0 16px'
+        }}>
+          <div style={{ maxWidth: 560, margin: '0 auto', width: '100%' }}>
             <Stepper step={step} />
 
             <div style={{ minHeight: 420 }}>
@@ -312,11 +358,9 @@ export default function AppointmentService() {
                   value={form.phoneNumber} 
                   onChange={(e) => {
                     let value = e.target.value.replace(/\D/g, '')
-                    // Bỏ số 0 đầu tiên nếu có
                     if (value.startsWith('0')) {
                       value = value.slice(1)
                     }
-                    // Giới hạn tối đa 10 ký tự
                     value = value.slice(0, 10)
                     setForm({ ...form, phoneNumber: value })
                   }}
@@ -324,7 +368,7 @@ export default function AppointmentService() {
                   style={{ ...inputStyle, flex: 1 }} 
                 />
               </div>
-              <div style={rowBtns}>
+              <div className="appointment-buttons" style={rowBtns}>
                 <button style={btnGhost} onClick={() => (window.location.href = '/')}>Trang chủ</button>
                 <button style={btnPrimary} onClick={handleSendOTP} disabled={otpLoading}>
                   {otpLoading ? 'Đang gửi...' : 'Gửi mã OTP'}
@@ -353,7 +397,7 @@ export default function AppointmentService() {
                   {otpError}
                 </div>
               )}
-              <div style={rowBtns}>
+              <div className="appointment-buttons" style={rowBtns}>
                 <button style={btnGhost} onClick={back}>Quay lại</button>
                 <button 
                   style={btnPrimary} 
@@ -368,8 +412,8 @@ export default function AppointmentService() {
 
           {step === 3 && (
             <div>
-              <div style={{ color: '#CBB081', fontWeight: 600, marginBottom: 14 }}>Bước 3/4: Đặt lịch sửa chữa</div>
-              <div style={grid2}>
+              <div style={{ color: '#CBB081', fontWeight: 600, marginBottom: 14, fontSize: 'clamp(14px, 3vw, 16px)' }}>Bước 3/4: Đặt lịch sửa chữa</div>
+              <div className="appointment-grid" style={grid2}>
                 <div>
                   <label style={labelStyle}>Họ và tên *</label>
                   <input value={form.fullName} onChange={update('fullName')} placeholder="VD: Đặng Thị Huyền" style={inputStyle} />
@@ -433,7 +477,7 @@ export default function AppointmentService() {
                   <textarea value={form.note} onChange={update('note')} placeholder="Nhập mô tả thêm.." style={{ ...inputStyle, height: 96 }} />
                 </div>
               </div>
-              <div style={rowBtns}>
+              <div className="appointment-buttons" style={rowBtns}>
                 <button style={btnGhost} onClick={back}>Quay lại</button>
                 <button style={btnPrimary} onClick={handleSubmit} disabled={loading}>
                   {loading ? 'Đang xử lý...' : 'Xác nhận'}
@@ -552,8 +596,20 @@ const inputStyle = {
 }
 
 const labelStyle = { fontSize: 14, marginBottom: 6, display: 'block' }
-const grid2 = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }
-const rowBtns = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginTop: 14, width: '100%' }
+const grid2 = { 
+  display: 'grid', 
+  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+  gap: 12 
+}
+const rowBtns = { 
+  display: 'flex', 
+  justifyContent: 'space-between', 
+  alignItems: 'center', 
+  gap: 12, 
+  marginTop: 14, 
+  width: '100%',
+  flexWrap: 'wrap'
+}
 const btnGhost = { background: '#fff', border: '1px solid #ddd', color: '#111', padding: '10px 18px', borderRadius: 12, cursor: 'pointer' }
 const btnPrimary = { background: '#CBB081', border: 'none', color: '#111', padding: '10px 18px', borderRadius: 12, cursor: 'pointer', fontWeight: 600 }
 const infoRow = { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }

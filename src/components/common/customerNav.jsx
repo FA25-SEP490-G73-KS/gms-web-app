@@ -1,8 +1,19 @@
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function CustomerNav() {
   const location = useLocation()
   const navigate = useNavigate()
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const items = [
     { label: 'Trang chủ', to: '/#home' },
@@ -13,7 +24,6 @@ export default function CustomerNav() {
   ]
 
   const isActive = (to) => {
-    // Default active for Home when path is '/' and no hash
     if (to === '/#home') {
       if (location.pathname === '/' && (!location.hash || location.hash === '#home')) {
         return true
@@ -29,8 +39,7 @@ export default function CustomerNav() {
   const handleNavigate = (to) => (e) => {
     e.preventDefault()
     if (to.startsWith('/#')) {
-      const hash = to.replace('/','') // like #about
-      // navigate to home route first (SPA), then smooth scroll to section
+      const hash = to.replace('/','')
       if (location.pathname !== '/') {
         navigate('/')
       }
@@ -39,7 +48,6 @@ export default function CustomerNav() {
         if (target) {
           target.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
-        // update URL hash without reloading
         window.history.replaceState(null, '', `/${hash}`)
       }, 0)
       return
@@ -70,6 +78,10 @@ export default function CustomerNav() {
   const itemActive = {
     background: '#CBB081',
     color: '#111',
+  }
+
+  if (isMobile) {
+    return null
   }
 
   return (
