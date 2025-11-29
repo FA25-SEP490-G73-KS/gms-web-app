@@ -2,11 +2,11 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
   Row, Col, Card, Button, Table, Space, 
-  DatePicker, Modal, message, Tabs, Calendar 
+  DatePicker, Modal, message, Tabs, Calendar, Input
 } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI } from '../../services/api'
+import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI, invoiceAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/modals/ticketdetail.css'
 import dayjs from 'dayjs'
@@ -90,6 +90,9 @@ export default function TicketDetailPage() {
   const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
   const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
   const [sendToCustomerLoading, setSendToCustomerLoading] = useState(false)
+  const [exportPDFLoading, setExportPDFLoading] = useState(false)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   const quotationStatusRaw = ticketData?.priceQuotation?.status
   const normalizedQuotationStatus = quotationStatusRaw
@@ -783,6 +786,174 @@ export default function TicketDetailPage() {
     }
   }
 
+  const handleExportPDF = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+
+    setExportPDFLoading(true)
+    try {
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const { data, error } = await priceQuotationAPI.exportPDF(quotationId)
+      
+      if (error) {
+        message.error(error || 'Xuất PDF thất bại. Vui lòng thử lại.')
+        return
+      }
+      
+      if (!data) {
+        message.error('Không nhận được dữ liệu PDF')
+        return
+      }
+      
+      if (data instanceof Blob) {
+        if (data.type === 'application/json' || data.size < 100) {
+          const text = await data.text()
+          try {
+            const errorJson = JSON.parse(text)
+            const errorMsg = errorJson.message || errorJson.error || 'Lỗi tạo PDF'
+            message.error(errorMsg)
+            return
+          } catch (e) {
+            message.error('Lỗi tạo PDF. Vui lòng thử lại.')
+            return
+          }
+        }
+        
+        const url = window.URL.createObjectURL(data)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `BaoGia_${ticketData.serviceTicketCode || quotationId}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        
+        message.success('Đã xuất PDF thành công')
+      } else if (typeof data === 'string') {
+        try {
+          const errorJson = JSON.parse(data)
+          const errorMsg = errorJson.message || errorJson.error || 'Lỗi tạo PDF'
+          message.error(errorMsg)
+        } catch (e) {
+          const byteCharacters = atob(data)
+          const byteNumbers = new Array(byteCharacters.length)
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i)
+          }
+          const byteArray = new Uint8Array(byteNumbers)
+          const blob = new Blob([byteArray], { type: 'application/pdf' })
+          
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `BaoGia_${ticketData.serviceTicketCode || quotationId}.pdf`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+          
+          message.success('Đã xuất PDF thành công')
+        }
+      } else {
+        message.error('Định dạng dữ liệu không hợp lệ')
+      }
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+      const errorMsg = error?.message || 'Đã xảy ra lỗi khi xuất PDF'
+      message.error(errorMsg)
+    } finally {
+      setExportPDFLoading(false)
+    }
+  }
+
+  const handleConfirmQuotation = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+    if (!id && !ticketData?.serviceTicketId) {
+      message.error('Không tìm thấy ID phiếu dịch vụ.')
+      return
+    }
+    try {
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const serviceTicketId = id || ticketData.serviceTicketId
+      
+      const { data, error } = await priceQuotationAPI.confirmQuotation(quotationId)
+      
+      if (error) {
+        message.error(error || 'Không thể xác nhận báo giá')
+        return
+      }
+      
+      const { error: invoiceError } = await invoiceAPI.create(serviceTicketId, quotationId)
+      
+      if (invoiceError) {
+        console.error('Error creating invoice:', invoiceError)
+        message.warning('Đã xác nhận báo giá nhưng không thể tạo phiếu thanh toán. Vui lòng thử lại.')
+      } else {
+        message.success('Đã xác nhận báo giá và tạo phiếu thanh toán thành công')
+      }
+      
+      await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error confirming quotation:', err)
+      message.error('Đã xảy ra lỗi khi xác nhận')
+    }
+  }
+
+  const handleOpenRejectModal = () => {
+    setRejectReason('')
+    setRejectModalOpen(true)
+  }
+
+  const handleRejectQuotation = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+
+    if (!rejectReason || rejectReason.trim() === '') {
+      message.error('Vui lòng nhập lý do từ chối')
+      return
+    }
+
+    try {
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const { data, error } = await priceQuotationAPI.rejectQuotation(quotationId, rejectReason)
+      
+      if (error) {
+        message.error(error || 'Không thể từ chối báo giá')
+        return
+      }
+      
+      message.success('Đã xác nhận khách hàng từ chối báo giá')
+      setRejectModalOpen(false)
+      setRejectReason('')
+      await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error rejecting quotation:', err)
+      message.error('Đã xảy ra lỗi khi từ chối')
+    }
+  }
+
+  const handleCloseRejectModal = () => {
+    setRejectModalOpen(false)
+    setRejectReason('')
+  }
+
+  const handleQuotationActionChange = (e) => {
+    const value = e.target.value
+    if (value === 'confirm') {
+      handleConfirmQuotation()
+    } else if (value === 'reject') {
+      handleOpenRejectModal()
+    }
+    e.target.value = ''
+  }
+
   const confirmSendQuote = async () => {
     if (!expectedDate) {
       message.error('Vui lòng chọn ngày dự đoán giao xe')
@@ -1158,6 +1329,43 @@ export default function TicketDetailPage() {
 
   return (
     <AdminLayout>
+      <style>{`
+        .quotation-action-select {
+          padding: 6px 32px 6px 12px;
+          border-radius: 8px;
+          border: 1px solid #d1d5db;
+          background: #fff;
+          font-size: 13px;
+          font-weight: 500;
+          color: #111;
+          cursor: pointer;
+          outline: none;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%234b5563' d='M7 10L2 5h10z'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 10px center;
+          transition: all 0.2s ease;
+          min-width: 160px;
+        }
+        .quotation-action-select:hover {
+          border-color: #CBB081;
+          background-color: #fafafa;
+        }
+        .quotation-action-select:focus {
+          border-color: #CBB081;
+          box-shadow: 0 0 0 3px rgba(203, 176, 129, 0.1);
+        }
+        .quotation-action-select option {
+          padding: 8px 12px;
+          font-size: 13px;
+        }
+        .quotation-action-select option[value="confirm"] {
+          color: #16a34a;
+        }
+        .quotation-action-select option[value="reject"] {
+          color: #dc2626;
+        }
+      `}</style>
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
           <Button 
@@ -1258,19 +1466,32 @@ export default function TicketDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>BÁO GIÁ</h2>
                 {ticketData?.priceQuotation?.status && (
-                  <span
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: '999px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      backgroundColor: quotationStatusConfig.badgeBg,
-                      color: quotationStatusConfig.badgeColor
-                    }}
-                  >
-                    {quotationStatusConfig.label}
-                  </span>
+                  <>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        backgroundColor: quotationStatusConfig.badgeBg,
+                        color: quotationStatusConfig.badgeColor
+                      }}
+                    >
+                      {quotationStatusConfig.label}
+                    </span>
+                    {normalizedQuotationStatus === 'WAITING_CUSTOMER_CONFIRM' && (
+                      <select
+                        onChange={handleQuotationActionChange}
+                        className="quotation-action-select"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Chọn hành động</option>
+                        <option value="confirm">Khách đã xác nhận</option>
+                        <option value="reject">Khách từ chối</option>
+                      </select>
+                    )}
+                  </>
                 )}
             </div>
           </div>
@@ -1412,21 +1633,39 @@ export default function TicketDetailPage() {
                     {actionButtonLabel}
                           </Button>
                   {canSendToCustomer && (
-                    <Button
-                      onClick={handleSendToCustomer}
-                      loading={sendToCustomerLoading}
-                      disabled={sendToCustomerLoading}
-                      style={{
-                        background: '#2563eb',
-                        borderColor: '#2563eb',
-                        color: '#fff',
-                        fontWeight: 600,
-                        padding: '0 24px',
-                        height: '40px'
-                      }}
-                    >
-                      Gửi báo giá
-                    </Button>
+                    <>
+                      <Button
+                        onClick={handleExportPDF}
+                        loading={exportPDFLoading}
+                        disabled={exportPDFLoading}
+                        icon={<FilePdfOutlined />}
+                        style={{
+                          background: '#ef4444',
+                          borderColor: '#ef4444',
+                          color: '#fff',
+                          fontWeight: 600,
+                          padding: '0 24px',
+                          height: '40px'
+                        }}
+                      >
+                        Xuất PDF
+                      </Button>
+                      <Button
+                        onClick={handleSendToCustomer}
+                        loading={sendToCustomerLoading}
+                        disabled={sendToCustomerLoading}
+                        style={{
+                          background: '#2563eb',
+                          borderColor: '#2563eb',
+                          color: '#fff',
+                          fontWeight: 600,
+                          padding: '0 24px',
+                          height: '40px'
+                        }}
+                      >
+                        Gửi báo giá
+                      </Button>
+                    </>
                   )}
                         </Space>
               ) : (
@@ -1491,6 +1730,87 @@ export default function TicketDetailPage() {
         </Button>
         <div style={{ marginTop: '12px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
           Báo giá sẽ được gửi cho khách hàng qua Zalo
+        </div>
+      </Modal>
+
+      {/* Modal Từ chối báo giá */}
+      <Modal
+        open={rejectModalOpen}
+        onCancel={handleCloseRejectModal}
+        footer={null}
+        closable={false}
+        width={450}
+        styles={{ 
+          body: { padding: 0 },
+          content: { borderRadius: 0, padding: 0 },
+          header: { padding: 0 }
+        }}
+        style={{ top: 100 }}
+      >
+        <div style={{ 
+          background: '#CBB081', 
+          padding: '14px 20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center'
+        }}>
+          <span style={{ fontWeight: 700, fontSize: '15px', color: '#000', letterSpacing: '0.5px' }}>
+            TỪ CHỐI BÁO GIÁ
+          </span>
+          <CloseOutlined 
+            style={{ cursor: 'pointer', color: '#000', fontSize: '16px', fontWeight: 700 }} 
+            onClick={handleCloseRejectModal} 
+          />
+        </div>
+        
+        <div style={{ padding: '20px 24px', background: '#fff' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: '#000', marginBottom: '8px' }}>
+              Lý do từ chối <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Input.TextArea 
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Nhập lý do từ chối..."
+              style={{ 
+                fontSize: '13px',
+                border: '1px solid #D9D9D9'
+              }} 
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <Button 
+              onClick={handleCloseRejectModal}
+              style={{
+                background: '#fff',
+                borderColor: '#D9D9D9',
+                color: '#111',
+                fontWeight: 600,
+                height: '38px',
+                minWidth: '100px',
+                fontSize: '13px'
+              }}
+            >
+              Hủy
+            </Button>
+            <Button 
+              type="primary"
+              onClick={handleRejectQuotation}
+              style={{
+                background: '#DC2626',
+                borderColor: '#DC2626',
+                fontWeight: 600,
+                height: '38px',
+                minWidth: '100px',
+                fontSize: '13px',
+                boxShadow: 'none'
+              }}
+            >
+              Xác nhận
+            </Button>
+          </div>
         </div>
       </Modal>
     </AdminLayout>

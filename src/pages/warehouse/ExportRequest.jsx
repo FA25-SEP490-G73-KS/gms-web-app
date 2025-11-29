@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Input, Space, Button, DatePicker, Tag, message, Modal, Form, Select, Checkbox } from 'antd'
+import { Table, Input, Space, Button, DatePicker, Tag, message, Modal, Form, Select, Checkbox, Dropdown } from 'antd'
 import { SearchOutlined, CalendarOutlined, DownOutlined, UpOutlined, InboxOutlined, CloseOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -47,6 +47,9 @@ export default function ExportRequest() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [selectedPart, setSelectedPart] = useState(null)
   const [confirmForm] = Form.useForm()
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [selectedQuotationId, setSelectedQuotationId] = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   // Fetch data from API
   useEffect(() => {
@@ -75,6 +78,7 @@ export default function ExportRequest() {
         licensePlate: item.licensePlate || 'N/A',
         createDate: item.createdAt || 'N/A',
         status: mapQuotationStatus(item.status),
+        statusKey: item.status, // Lưu status gốc từ API
         parts: (item.items || []).map((partItem) => ({
           id: partItem.priceQuotationItemId || partItem.partId,
           name: partItem.partName || partItem.itemName || 'N/A',
@@ -268,6 +272,74 @@ export default function ExportRequest() {
     confirmForm.resetFields()
   }
 
+  const handleConfirmQuotation = async (quotationId) => {
+    try {
+      console.log('=== Confirm Quotation ===')
+      console.log('Quotation ID:', quotationId)
+      console.log('=======================')
+      
+      const { data, error } = await priceQuotationAPI.confirmQuotation(quotationId)
+      
+      if (error) {
+        message.error(error || 'Không thể xác nhận báo giá')
+        return
+      }
+      
+      message.success('Đã xác nhận khách hàng đã xác nhận báo giá')
+      fetchPendingQuotations()
+    } catch (err) {
+      console.error('Error confirming quotation:', err)
+      message.error('Đã xảy ra lỗi khi xác nhận')
+    }
+  }
+
+  const handleOpenRejectModal = (quotationId) => {
+    setSelectedQuotationId(quotationId)
+    setRejectReason('')
+    setRejectModalOpen(true)
+  }
+
+  const handleRejectQuotation = async () => {
+    if (!selectedQuotationId) {
+      message.error('Không tìm thấy ID báo giá')
+      return
+    }
+
+    if (!rejectReason || rejectReason.trim() === '') {
+      message.error('Vui lòng nhập lý do từ chối')
+      return
+    }
+
+    try {
+      console.log('=== Reject Quotation ===')
+      console.log('Quotation ID:', selectedQuotationId)
+      console.log('Reason:', rejectReason)
+      console.log('========================')
+      
+      const { data, error } = await priceQuotationAPI.rejectQuotation(selectedQuotationId, rejectReason)
+      
+      if (error) {
+        message.error(error || 'Không thể từ chối báo giá')
+        return
+      }
+      
+      message.success('Đã xác nhận khách hàng từ chối báo giá')
+      setRejectModalOpen(false)
+      setSelectedQuotationId(null)
+      setRejectReason('')
+      fetchPendingQuotations()
+    } catch (err) {
+      console.error('Error rejecting quotation:', err)
+      message.error('Đã xảy ra lỗi khi từ chối')
+    }
+  }
+
+  const handleCloseRejectModal = () => {
+    setRejectModalOpen(false)
+    setSelectedQuotationId(null)
+    setRejectReason('')
+  }
+
   // Filter data
   const filteredData = exportRequests
     .filter(item => {
@@ -344,25 +416,66 @@ export default function ExportRequest() {
       title: 'Trạng Thái',
       dataIndex: 'status',
       key: 'status',
-      width: 180,
-      render: (status) => {
+      width: 280,
+      render: (status, record) => {
         const config = getStatusConfig(status)
+        const isWaitingCustomerConfirm = record.statusKey === 'WAITING_CUSTOMER_CONFIRM'
+        
+        const dropdownMenu = {
+          items: [
+            {
+              key: 'confirm',
+              label: (
+                <span style={{ color: '#16a34a', fontWeight: 500 }}>
+                  Khách đã xác nhận
+                </span>
+              ),
+              onClick: () => handleConfirmQuotation(record.id)
+            },
+            {
+              key: 'reject',
+              label: (
+                <span style={{ color: '#dc2626', fontWeight: 500 }}>
+                  Khách từ chối
+                </span>
+              ),
+              onClick: () => handleOpenRejectModal(record.id)
+            }
+          ]
+        }
+        
         return (
-          <Tag
-            style={{
-              color: config.color,
-              backgroundColor: config.bgColor,
-              borderColor: config.borderColor,
-              border: '1px solid',
-              borderRadius: '6px',
-              padding: '4px 12px',
-              fontWeight: 500,
-              fontSize: '14px',
-              margin: 0
-            }}
-          >
-            {config.text}
-          </Tag>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Tag
+              style={{
+                color: config.color,
+                backgroundColor: config.bgColor,
+                borderColor: config.borderColor,
+                border: '1px solid',
+                borderRadius: '6px',
+                padding: '4px 12px',
+                fontWeight: 500,
+                fontSize: '14px',
+                margin: 0
+              }}
+            >
+              {config.text}
+            </Tag>
+            {isWaitingCustomerConfirm && (
+              <Dropdown menu={dropdownMenu} trigger={['click']}>
+                <Button
+                  type="text"
+                  icon={<DownOutlined />}
+                  style={{
+                    padding: '0 8px',
+                    height: 'auto',
+                    fontSize: '14px',
+                    color: '#666'
+                  }}
+                />
+              </Dropdown>
+            )}
+          </div>
         )
       }
     }
@@ -815,6 +928,87 @@ export default function ExportRequest() {
               </Button>
             </div>
           </Form>
+        </div>
+      </Modal>
+
+      {/* Modal Từ chối báo giá */}
+      <Modal
+        open={rejectModalOpen}
+        onCancel={handleCloseRejectModal}
+        footer={null}
+        closable={false}
+        width={450}
+        styles={{ 
+          body: { padding: 0 },
+          content: { borderRadius: 0, padding: 0 },
+          header: { padding: 0 }
+        }}
+        style={{ top: 100 }}
+      >
+        <div style={{ 
+          background: '#CBB081', 
+          padding: '14px 20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center'
+        }}>
+          <span style={{ fontWeight: 700, fontSize: '15px', color: '#000', letterSpacing: '0.5px' }}>
+            TỪ CHỐI BÁO GIÁ
+          </span>
+          <CloseOutlined 
+            style={{ cursor: 'pointer', color: '#000', fontSize: '16px', fontWeight: 700 }} 
+            onClick={handleCloseRejectModal} 
+          />
+        </div>
+        
+        <div style={{ padding: '20px 24px', background: '#fff' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: '#000', marginBottom: '8px' }}>
+              Lý do từ chối <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Input.TextArea 
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Nhập lý do từ chối..."
+              style={{ 
+                fontSize: '13px',
+                border: '1px solid #D9D9D9'
+              }} 
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <Button 
+              onClick={handleCloseRejectModal}
+              style={{
+                background: '#fff',
+                borderColor: '#D9D9D9',
+                color: '#111',
+                fontWeight: 600,
+                height: '38px',
+                minWidth: '100px',
+                fontSize: '13px'
+              }}
+            >
+              Hủy
+            </Button>
+            <Button 
+              type="primary"
+              onClick={handleRejectQuotation}
+              style={{
+                background: '#DC2626',
+                borderColor: '#DC2626',
+                fontWeight: 600,
+                height: '38px',
+                minWidth: '100px',
+                fontSize: '13px',
+                boxShadow: 'none'
+              }}
+            >
+              Xác nhận
+            </Button>
+          </div>
         </div>
       </Modal>
 

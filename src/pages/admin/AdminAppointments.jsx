@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Table, Input, Card, Badge, Modal, Space, Button, DatePicker, Row, Col, message } from 'antd'
 import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
@@ -12,6 +12,7 @@ import dayjs from 'dayjs'
 const { Search } = Input
 
 const STATUS_ITEMS = [
+  { key: 'ALL', label: 'Tất cả', color: '#6b7280' },
   { key: 'CANCELLED', label: 'Hủy', color: '#ef4444' },
   { key: 'ARRIVED', label: 'Đã đến', color: '#16a34a' },
   { key: 'CONFIRMED', label: 'Chờ', color: '#e89400' },
@@ -111,13 +112,83 @@ export default function AdminAppointments() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [selectedFull, setSelectedFull] = useState(null)
-  const [statusFilter, setStatusFilter] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('ALL')
   const [selectedDate, setSelectedDate] = useState(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
+  const [timeSlots, setTimeSlots] = useState([])
+  const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
 
   useEffect(() => {
     fetchAppointments()
   }, [])
+
+  useEffect(() => {
+    if (selectedDate) {
+      fetchTimeSlots()
+    } else {
+      setTimeSlots([])
+    }
+  }, [selectedDate])
+
+  const fetchTimeSlots = async () => {
+    if (!selectedDate) {
+      setTimeSlots([])
+      return
+    }
+
+    setTimeSlotsLoading(true)
+    try {
+      const dateStr = typeof selectedDate === 'string' 
+        ? selectedDate 
+        : dayjs(selectedDate).format('YYYY-MM-DD')
+      
+      console.log('Fetching time slots for date:', dateStr)
+      const { data: response, error } = await appointmentAPI.getTimeSlots(dateStr)
+      
+      if (error) {
+        console.error('Error fetching time slots:', error)
+        // Fallback to default time slots if API fails
+        const defaultSlots = [
+          { timeSlotId: 1, label: '7:30 - 9:30', startTime: '7:30', endTime: '9:30', maxCapacity: 5, booked: 0 },
+          { timeSlotId: 2, label: '9:30 - 11:30', startTime: '9:30', endTime: '11:30', maxCapacity: 5, booked: 0 },
+          { timeSlotId: 3, label: '13:30 - 15:30', startTime: '13:30', endTime: '15:30', maxCapacity: 5, booked: 0 },
+          { timeSlotId: 4, label: '15:30 - 17:30', startTime: '15:30', endTime: '17:30', maxCapacity: 5, booked: 0 }
+        ]
+        setTimeSlots(defaultSlots)
+        setTimeSlotsLoading(false)
+        return
+      }
+
+      console.log('Time slots response:', response)
+      if (response && response.result && Array.isArray(response.result)) {
+        setTimeSlots(response.result)
+      } else if (Array.isArray(response)) {
+        setTimeSlots(response)
+      } else {
+        // Fallback to default time slots
+        const defaultSlots = [
+          { timeSlotId: 1, label: '7:30 - 9:30', startTime: '7:30', endTime: '9:30', maxCapacity: 5, booked: 0 },
+          { timeSlotId: 2, label: '9:30 - 11:30', startTime: '9:30', endTime: '11:30', maxCapacity: 5, booked: 0 },
+          { timeSlotId: 3, label: '13:30 - 15:30', startTime: '13:30', endTime: '15:30', maxCapacity: 5, booked: 0 },
+          { timeSlotId: 4, label: '15:30 - 17:30', startTime: '15:30', endTime: '17:30', maxCapacity: 5, booked: 0 }
+        ]
+        setTimeSlots(defaultSlots)
+      }
+    } catch (err) {
+      console.error('Error fetching time slots:', err)
+      // Fallback to default time slots
+      const defaultSlots = [
+        { timeSlotId: 1, label: '7:30 - 9:30', startTime: '7:30', endTime: '9:30', maxCapacity: 5, booked: 0 },
+        { timeSlotId: 2, label: '9:30 - 11:30', startTime: '9:30', endTime: '11:30', maxCapacity: 5, booked: 0 },
+        { timeSlotId: 3, label: '13:30 - 15:30', startTime: '13:30', endTime: '15:30', maxCapacity: 5, booked: 0 },
+        { timeSlotId: 4, label: '15:30 - 17:30', startTime: '15:30', endTime: '17:30', maxCapacity: 5, booked: 0 }
+      ]
+      setTimeSlots(defaultSlots)
+    } finally {
+      setTimeSlotsLoading(false)
+    }
+  }
 
   const fetchAppointments = async () => {
     setLoading(true)
@@ -238,64 +309,58 @@ export default function AdminAppointments() {
     }
   }
 
-  const filtered = useMemo(() => {
-    let result = data
+  let filtered = data
 
-    // Filter by search query
-    if (query) {
-      const q = query.toLowerCase()
-      result = result.filter(
-        (r) =>
-          (r.license && r.license.toLowerCase().includes(q)) ||
-          (r.customer && r.customer.toLowerCase().includes(q)) ||
-          (r.phone && r.phone.toLowerCase().includes(q))
-      )
-    }
+  // Filter by search query
+  if (query) {
+    const q = query.toLowerCase()
+    filtered = filtered.filter(
+      (r) =>
+        (r.license && r.license.toLowerCase().includes(q)) ||
+        (r.customer && r.customer.toLowerCase().includes(q)) ||
+        (r.phone && r.phone.toLowerCase().includes(q))
+    )
+  }
 
-    // Filter by status
-    if (statusFilter) {
-      result = result.filter((r) => r.statusKey === statusFilter)
-    }
+  // Filter by status
+  if (statusFilter && statusFilter !== 'ALL') {
+    filtered = filtered.filter((r) => r.statusKey === statusFilter)
+  }
 
-    // Filter by date
-    if (selectedDate) {
-      const filterDate = selectedDate.format('DD/MM/YYYY')
-      result = result.filter((r) => r.date === filterDate)
-    }
-
-    return result
-  }, [query, data, statusFilter, selectedDate])
+  // Filter by date
+  if (selectedDate) {
+    const filterDate = typeof selectedDate === 'string' 
+      ? dayjs(selectedDate).format('DD/MM/YYYY')
+      : dayjs(selectedDate).format('DD/MM/YYYY')
+    filtered = filtered.filter((r) => r.date === filterDate)
+  }
 
   // Group appointments by time slot for timeline
-  const timelineData = useMemo(() => {
-    // Nếu chưa chọn ngày, mặc định lấy ngày hôm nay hoặc hiển thị tất cả (tùy logic business)
-    // Ở đây tôi để mặc định hiển thị theo ngày được chọn, nếu không chọn thì hiển thị trống hoặc hiển thị của data đầu tiên
-    const displayDate = selectedDate ? selectedDate.format('DD/MM/YYYY') : (data.length > 0 ? data[0].date : '')
-    
-    if (!displayDate) return []
-
+  const displayDate = selectedDate 
+    ? (typeof selectedDate === 'string' ? dayjs(selectedDate).format('DD/MM/YYYY') : dayjs(selectedDate).format('DD/MM/YYYY'))
+    : null
+  
+  let timelineData = []
+  if (displayDate && timeSlots.length > 0) {
     const dayAppointments = data.filter((r) => r.date === displayDate)
 
-    const timeSlots = [
-      { time: '7:30 - 9:30', appointments: [] },
-      { time: '9:30 - 11:30', appointments: [] },
-      { time: '13:30 - 15:30', appointments: [] },
-      { time: '15:30 - 17:30', appointments: [] },
-    ]
-
-    dayAppointments.forEach((apt) => {
-      // Tìm slot gần đúng hoặc chính xác
-      const slot = timeSlots.find((s) => apt.time.includes(s.time) || s.time.includes(apt.time))
-      if (slot) {
-        slot.appointments.push(apt)
-      } else {
-        // Nếu không khớp cứng, có thể thêm logic flexible hoặc đưa vào slot "Khác"
-        // Ở đây đơn giản hóa là bỏ qua nếu không khớp format
+    const slotsWithAppointments = timeSlots.map((slot) => {
+      const slotLabel = slot.label || `${slot.startTime} - ${slot.endTime}`
+      const appointments = dayAppointments.filter((apt) => {
+        const aptTime = apt.time || apt.timeSlotLabel || ''
+        return aptTime.includes(slotLabel) || slotLabel.includes(aptTime) ||
+               (slot.startTime && aptTime.includes(slot.startTime)) ||
+               (slot.endTime && aptTime.includes(slot.endTime))
+      })
+      return {
+        ...slot,
+        time: slotLabel,
+        appointments: appointments
       }
     })
 
-    return timeSlots.filter((s) => s.appointments.length > 0)
-  }, [data, selectedDate])
+    timelineData = slotsWithAppointments
+  }
 
   const handleCreateTicket = async () => {
     console.log('=== [AdminAppointments] Navigate to CreateTicket - START ===')
@@ -490,6 +555,26 @@ export default function AdminAppointments() {
     await fetchAppointmentDetail(record.id)
   }
 
+  const handleStatusChange = async (appointmentId, newStatus) => {
+    if (!appointmentId || !newStatus) return
+    
+    setUpdatingStatusId(appointmentId)
+    try {
+      const { error } = await appointmentAPI.updateStatus(appointmentId, newStatus)
+      if (error) {
+        message.error('Cập nhật trạng thái thất bại')
+        return
+      }
+      message.success('Cập nhật trạng thái thành công')
+      await fetchAppointments()
+    } catch (err) {
+      console.error('Error updating status:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật trạng thái')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
   const columns = [
     {
       title: 'STT',
@@ -519,10 +604,41 @@ export default function AdminAppointments() {
       title: 'Trạng Thái',
       dataIndex: 'status',
       key: 'status',
-      width: 120,
-      render: (status) => {
+      width: 150,
+      render: (status, record) => {
         const config = getStatusConfig(status)
-        return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
+        const statusKey = record.statusKey || 'CONFIRMED'
+        const isUpdating = updatingStatusId === record.id
+        
+        const statusOptions = [
+          { value: 'CONFIRMED', label: 'Chờ', color: '#e89400' },
+          { value: 'ARRIVED', label: 'Đã đến', color: '#16a34a' },
+          { value: 'CANCELLED', label: 'Hủy', color: '#ef4444' }
+        ]
+        
+        return (
+          <select
+            onChange={(e) => {
+              const newStatus = e.target.value
+              if (newStatus && newStatus !== statusKey) {
+                handleStatusChange(record.id, newStatus)
+              }
+            }}
+            disabled={isUpdating}
+            className="status-select-dropdown"
+            value={statusKey}
+            style={{
+              color: config.color,
+              opacity: isUpdating ? 0.6 : 1
+            }}
+          >
+            {statusOptions.map((opt) => (
+              <option key={opt.value} value={opt.value} style={{ color: opt.color }}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        )
       }
     },
     {
@@ -577,7 +693,7 @@ export default function AdminAppointments() {
                     key={item.key}
                     type={statusFilter === item.key ? 'primary' : 'default'}
                     className={statusFilter === item.key ? 'status-btn active' : 'status-btn'}
-                    onClick={() => setStatusFilter(statusFilter === item.key ? null : item.key)}
+                    onClick={() => setStatusFilter(item.key)}
                   >
                     {item.label}
                   </Button>
@@ -590,8 +706,10 @@ export default function AdminAppointments() {
                 format="DD/MM/YYYY"
                 size="large"
                 suffixIcon={<CalendarOutlined />}
-                value={selectedDate}
-                onChange={setSelectedDate}
+                value={selectedDate ? dayjs(selectedDate) : null}
+                onChange={(date) => {
+                  setSelectedDate(date ? date.format('YYYY-MM-DD') : null)
+                }}
                 style={{ width: '160px' }}
               />
             </Col>
@@ -605,7 +723,7 @@ export default function AdminAppointments() {
                 borderRadius: '16px', 
                 boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
                 background: '#fff',
-                padding: '24px'
+                padding: '16px'
               }} 
               bodyStyle={{ padding: 0 }}
             >
@@ -627,6 +745,7 @@ export default function AdminAppointments() {
                 }}
                 size="middle"
                 components={goldTableHeader}
+                style={{ padding: 0 }}
               />
             </Card>
           </Col>
@@ -642,7 +761,7 @@ export default function AdminAppointments() {
                     Lịch trình
                   </div>
                   <div style={{ fontSize: '18px', fontWeight: 700, color: '#04091e' }}>
-                    {selectedDate ? selectedDate.format('DD/MM/YYYY') : 'Tất cả lịch hẹn'}
+                    {displayDate || 'Tất cả lịch hẹn'}
                   </div>
                 </div>
                 <div
@@ -661,42 +780,63 @@ export default function AdminAppointments() {
                 </div>
               </div>
 
-              {timelineData.length > 0 ? (
+              {timeSlotsLoading ? (
+                <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
+                  <div>Đang tải...</div>
+                </div>
+              ) : (timeSlots.length > 0 || selectedDate) ? (
                 <div style={{ position: 'relative', paddingLeft: '36px', minHeight: '320px' }}>
                   <div
                     style={{
                       position: 'absolute',
-                      left: '16px',
-                      top: '8px',
-                      bottom: '8px',
-                      width: '2px',
-                      background: '#e5d9c8'
+                      left: '46px',
+                      top: '0',
+                      bottom: '0',
+                      width: '4px',
+                      background: '#CBB081',
+                      borderRadius: '2px',
+                      zIndex: 0,
+                      transform: 'translateX(-50%)'
                     }}
                   />
-                  {timelineData.map((slot, index) => (
-                    <div key={index} style={{ display: 'flex', gap: '16px', marginBottom: index === timelineData.length - 1 ? 0 : '32px' }}>
-                      <div style={{ position: 'relative' }}>
-                        <div
-                          style={{
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '50%',
-                            background: '#bea685',
-                            border: '2px solid #fff',
-                            boxShadow: '0 0 0 3px #f5efe7',
-                            position: 'relative',
-                            zIndex: 1
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: '16px', fontWeight: 600, color: '#04091e' }}>{slot.time}</div>
-                        <div style={{ fontSize: '14px', color: '#6b7280', marginTop: '4px' }}>
-                          {slot.appointments.length} lịch hẹn
+                  {timeSlots.map((slot, index) => {
+                    const slotLabel = slot.label || `${slot.startTime} - ${slot.endTime}`
+                    const slotAppointments = timelineData.find(t => t.time === slotLabel)?.appointments || []
+                    const totalCapacity = slot.maxCapacity || 1
+                    const booked = slot.booked || slotAppointments.length
+                    const progressPercent = totalCapacity > 0 ? (booked / totalCapacity) * 100 : 0
+                    const isLast = index === timeSlots.length - 1
+                    const progressColor = progressPercent >= 100 ? '#ef4444' : progressPercent >= 80 ? '#f59e0b' : '#16a34a'
+                    
+                    return (
+                      <div key={slot.timeSlotId || index} style={{ display: 'flex', gap: '16px', marginBottom: isLast ? 0 : '48px', position: 'relative', zIndex: 1 }}>
+                        <div style={{ position: 'relative', width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', flexShrink: 0 }}>
+                          <div
+                            style={{
+                              width: '16px',
+                              height: '16px',
+                              borderRadius: '50%',
+                              background: progressColor,
+                              border: '3px solid #fff',
+                              boxShadow: '0 0 0 2px #e5e7eb',
+                              position: 'relative',
+                              zIndex: 2,
+                              marginLeft: '0',
+                              marginTop: '0'
+                            }}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: '16px', fontWeight: 600, color: '#04091e', marginBottom: '4px' }}>
+                            {slotLabel}
+                          </div>
+                          <div style={{ fontSize: '14px', color: '#6b7280' }}>
+                            {slotAppointments.length} lịch hẹn
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
@@ -783,23 +923,31 @@ export default function AdminAppointments() {
             </div>
             
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
-              <Button
-                type="primary"
-                size="large"
-                onClick={handleCreateTicket}
-                loading={updatingStatus}
-                disabled={updatingStatus}
-                style={{
-                  background: '#22c55e',
-                  borderColor: '#22c55e',
-                  height: '45px',
-                  padding: '0 40px',
-                  fontWeight: 600,
-                  fontSize: '16px'
-                }}
-              >
-                Tạo Phiếu Dịch Vụ
-              </Button>
+              {(() => {
+                const currentStatus = selectedFull?.status || selected?.statusKey || 'CONFIRMED'
+                const isCancelled = currentStatus === 'CANCELLED'
+                return (
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={handleCreateTicket}
+                    loading={updatingStatus}
+                    disabled={updatingStatus || isCancelled}
+                    style={{
+                      background: isCancelled ? '#d1d5db' : '#22c55e',
+                      borderColor: isCancelled ? '#d1d5db' : '#22c55e',
+                      height: '45px',
+                      padding: '0 40px',
+                      fontWeight: 600,
+                      fontSize: '16px',
+                      cursor: isCancelled ? 'not-allowed' : 'pointer',
+                      opacity: isCancelled ? 0.6 : 1
+                    }}
+                  >
+                    Tạo Phiếu Dịch Vụ
+                  </Button>
+                )
+              })()}
             </div>
             
           </div>

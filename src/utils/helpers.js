@@ -51,3 +51,34 @@ export function normalizePhoneTo0(phone) {
   return `0${cleaned}`;
 }
 
+export function decodeJWT(token) {
+  try {
+    if (!token) return null;
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('Error decoding JWT:', error);
+    return null;
+  }
+}
+
+export function getUserNameFromToken() {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    if (!token) return null;
+    const decoded = decodeJWT(token);
+    return decoded?.fullName || decoded?.name || null;
+  } catch (error) {
+    console.error('Error getting user name from token:', error);
+    return null;
+  }
+}
+

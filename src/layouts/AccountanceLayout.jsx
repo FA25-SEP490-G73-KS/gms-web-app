@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken } from '../utils/helpers'
 import '../styles/layout/warehouse-layout.css'
 
 export default function AccountanceLayout({ children }) {
@@ -223,10 +224,10 @@ export default function AccountanceLayout({ children }) {
             }}
           >
             <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
             </div>
             <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
             </div>
           </button>
           

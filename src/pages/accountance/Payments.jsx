@@ -1,101 +1,121 @@
-import React, { useMemo, useState } from 'react'
-import { Table, Input, Button } from 'antd'
-import { SearchOutlined, CloseOutlined } from '@ant-design/icons'
+import React, { useMemo, useState, useEffect } from 'react'
+import { Table, Input, Button, message } from 'antd'
+import { SearchOutlined, EyeOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { invoiceAPI } from '../../services/api'
+import dayjs from 'dayjs'
 import '../../styles/pages/accountance/payments.css'
 
-const paymentsData = [
-  {
-    id: 1,
-    paymentCode: 'PTT-2025-000001',
-    ticketCode: 'PTT-2025-000001',
-    customer: 'Phạm Văn A',
-    licensePlate: '25A-123456',
-    totalAmount: 2000000,
-    totalDebt: 10000000
-  },
-  {
-    id: 2,
-    paymentCode: 'PTT-2025-000002',
-    ticketCode: 'PTT-2025-000002',
-    customer: 'Phạm Văn A',
-    licensePlate: '25A-123456',
-    totalAmount: 2000000,
-    totalDebt: 10000000
-  },
-  {
-    id: 3,
-    paymentCode: 'PTT-2025-000003',
-    ticketCode: 'PTT-2025-000003',
-    customer: 'Phạm Văn A',
-    licensePlate: '25A-123456',
-    totalAmount: 2000000,
-    totalDebt: 10000000
-  },
-  {
-    id: 4,
-    paymentCode: 'PTT-2025-000004',
-    ticketCode: 'PTT-2025-000004',
-    customer: 'Phạm Văn A',
-    licensePlate: '25A-123456',
-    totalAmount: 2000000,
-    totalDebt: 10000000
-  },
-  {
-    id: 5,
-    paymentCode: 'PTT-2025-000005',
-    ticketCode: 'PTT-2025-000005',
-    customer: 'Nguyễn Văn B',
-    licensePlate: '30A-789012',
-    totalAmount: 5000000,
-    totalDebt: 15000000
-  }
-]
-
 export function AccountancePaymentsContent() {
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+
+  useEffect(() => {
+    fetchInvoices()
+  }, [page, pageSize])
+
+  const fetchInvoices = async () => {
+    setLoading(true)
+    try {
+      const { data: response, error } = await invoiceAPI.getAll(page - 1, pageSize, 'createdAt,desc')
+      
+      if (error) {
+        message.error('Không thể tải danh sách phiếu thanh toán')
+        setLoading(false)
+        return
+      }
+
+      const result = response?.result || {}
+      const content = result.content || []
+      
+      const mapServiceStatus = (status) => {
+        const statusMap = {
+          'CREATED': 'Đã tạo',
+          'WAITING_FOR_QUOTATION': 'Chờ báo giá',
+          'WAITING_FOR_DELIVERY': 'Chờ giao xe',
+          'COMPLETED': 'Hoàn thành',
+          'CANCELED': 'Hủy'
+        }
+        return statusMap[status] || status || ''
+      }
+
+      const transformedData = content.map((item) => ({
+        id: item.id || item.invoiceId,
+        paymentCode: item.code || item.invoiceCode || 'N/A',
+        ticketCode: item.serviceTicketCode || 'N/A',
+        customer: item.customerName || 'N/A',
+        createdDate: item.createdAt || '',
+        totalAmount: item.finalAmount || item.totalAmount || 0,
+        serviceStatus: mapServiceStatus(item.serviceTicketStatus)
+      }))
+
+      setData(transformedData)
+      setTotal(result.totalElements || 0)
+    } catch (err) {
+      console.error('Failed to fetch invoices:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => {
-    return paymentsData
+    return data
       .filter((item) => {
         const matchesQuery =
           !query ||
           item.paymentCode.toLowerCase().includes(query.toLowerCase()) ||
           item.ticketCode.toLowerCase().includes(query.toLowerCase()) ||
-          item.customer.toLowerCase().includes(query.toLowerCase()) ||
-          item.licensePlate.toLowerCase().includes(query.toLowerCase())
+          item.customer.toLowerCase().includes(query.toLowerCase())
         return matchesQuery
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query])
+  }, [query, data])
 
   const columns = [
     {
-      title: 'Mã thanh toán',
+      title: 'Mã hóa đơn',
       dataIndex: 'paymentCode',
       key: 'paymentCode',
       width: 180,
-      render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
+      render: (text, record) => (
+        <span 
+          style={{ color: '#2563eb', textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 }}
+          onClick={() => navigate(`/accountance/payments/${record.id}`)}
+        >
+          {text}
+        </span>
+      )
     },
     {
-      title: 'Mã phiếu',
+      title: 'Mã dịch vụ',
       dataIndex: 'ticketCode',
       key: 'ticketCode',
-      width: 180,
-      render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
+      width: 180
     },
     {
       title: 'Khách Hàng',
       dataIndex: 'customer',
       key: 'customer',
-      width: 200
+      width: 200,
+      render: (text) => <span style={{ color: '#6b7280' }}>{text}</span>
     },
     {
-      title: 'Biển Số Xe',
-      dataIndex: 'licensePlate',
-      key: 'licensePlate',
-      width: 150
+      title: 'Ngày tạo',
+      dataIndex: 'createdDate',
+      key: 'createdDate',
+      width: 150,
+      render: (date) => {
+        if (!date) return 'N/A'
+        return dayjs(date).format('D/M/YYYY')
+      }
     },
     {
       title: 'Tổng tiền',
@@ -103,29 +123,50 @@ export function AccountancePaymentsContent() {
       key: 'totalAmount',
       width: 150,
       align: 'right',
-      render: (value) => value.toLocaleString('vi-VN')
+      render: (value) => value ? value.toLocaleString('vi-VN') : '0'
     },
     {
-      title: 'Tổng nợ',
-      dataIndex: 'totalDebt',
-      key: 'totalDebt',
+      title: 'Trạng thái DV',
+      dataIndex: 'serviceStatus',
+      key: 'serviceStatus',
       width: 150,
-      align: 'right',
-      render: (value) => value.toLocaleString('vi-VN')
+      render: (status) => {
+        if (!status) return ''
+        const getStatusColor = (statusText) => {
+          switch (statusText) {
+            case 'Chờ báo giá':
+              return '#16a34a'
+            case 'Đã tạo':
+              return '#6b7280'
+            case 'Chờ giao xe':
+              return '#f59e0b'
+            case 'Hoàn thành':
+              return '#22c55e'
+            case 'Hủy':
+              return '#ef4444'
+            default:
+              return '#666'
+          }
+        }
+        return <span style={{ color: getStatusColor(status) }}>{status}</span>
+      }
     },
     {
       title: 'Thao tác',
       key: 'action',
       width: 100,
       align: 'center',
-      render: () => (
-        <Button
-          type="text"
-          danger
-          icon={<CloseOutlined />}
-          style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        />
-      )
+      render: (_, record) => {
+        if (!record.serviceStatus) return null
+        return (
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => navigate(`/accountance/payments/${record.id}`)}
+          />
+        )
+      }
     }
   ]
 
@@ -156,13 +197,18 @@ export function AccountancePaymentsContent() {
             className="payments-table"
             columns={columns}
             dataSource={filtered}
+            loading={loading}
             pagination={{
-              pageSize: 10,
-              current: 1,
-              total: filtered.length,
+              current: page,
+              pageSize: pageSize,
+              total: total,
               showTotal: (total) => `0 of ${total} row(s) selected.`,
               showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100']
+              pageSizeOptions: ['10', '20', '50', '100'],
+              onChange: (p, ps) => {
+                setPage(p)
+                setPageSize(ps)
+              }
             }}
             components={goldTableHeader}
             rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-even' : 'table-row-odd')}

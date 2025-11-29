@@ -231,6 +231,9 @@ export const priceQuotationAPI = {
   getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
   confirmItem: (itemId, payload) => patch(`/quotation-items/${itemId}/confirm/update`, payload),
   rejectItem: (itemId, reason) => patch(`/quotation-items/${itemId}/reject`, reason),
+  confirmQuotation: (id) => post(`/price-quotations/${id}/confirm`),
+  rejectQuotation: (id, reason) => post(`/price-quotations/${id}/reject`, reason),
+  exportPDF: (id) => get(`/price-quotations/${id}/pdf`, { responseType: 'blob' }),
 };
 
 export const znsNotificationsAPI = {
@@ -238,14 +241,21 @@ export const znsNotificationsAPI = {
     post(`/zns-notifications/quotation/${quotationId}/send`),
 };
 
+export const invoiceAPI = {
+  create: (serviceTicketId, quotationId) => 
+    post(`/invoices?serviceTicketId=${serviceTicketId}&quotationId=${quotationId}`),
+  getAll: (page = 0, size = 6, sort = 'createdAt,desc') => 
+    get(`/invoices?page=${page}&size=${size}&sort=${sort}`),
+  getById: (id) => get(`/invoices/${id}`),
+  pay: (id, payload) => post(`/invoices/${id}/pay`, payload),
+};
+
 export const authAPI = {
   login: (phone, password) => post('/auth/login', { phone, password }, { skipAuth: true }),
   logout: () => post('/auth/logout', {}, { skipAuth: false }),
   refreshToken: (refreshToken) => post('/auth/refresh', { refreshToken }, { skipAuth: true }),
   resetPassword: (phone) => post('/auth/reset-password', { phone }, { skipAuth: true }),
-  // Note: This API endpoint needs to be created in the backend
-  // Expected: POST /api/auth/update-password
-  // Body: { phone: string, otpCode: string, newPassword: string }
+ 
   updatePassword: (phone, otpCode, newPassword) => post('/auth/update-password', { phone, otpCode, newPassword }, { skipAuth: true }),
   changePassword: (currentPassword, newPassword) => put('/auth/change-password', { currentPassword, newPassword }),
 };

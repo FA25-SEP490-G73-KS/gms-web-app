@@ -24,6 +24,7 @@ import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
 import AccountanceMaterials from './pages/accountance/Materials';
 import AccountancePayments from './pages/accountance/Payments';
+import InvoiceDetailPage from './pages/accountance/InvoiceDetailPage';
 
 import AccountanceServices from './pages/accountance/Services';
 import ManagerSuppliers from './pages/manager/Suppliers';
@@ -109,6 +110,7 @@ function App() {
         <Route path="/accountance/hr/attendance" element={<AccountanceAttendance />} />
         <Route path="/accountance/hr/payroll" element={<AccountancePayroll />} />
         <Route path="/accountance/payments" element={<AccountancePayments />} />
+        <Route path="/accountance/payments/:id" element={<InvoiceDetailPage />} />
         <Route path="/accountance/debts" element={<AccountanceDebts />} />
         <Route path="/accountance/inventory" element={<AccountanceMaterials />} />
         <Route path="/accountance/forms" element={<AccountanceCreateForm />} />

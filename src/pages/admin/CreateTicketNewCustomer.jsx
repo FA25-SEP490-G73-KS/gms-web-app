@@ -443,7 +443,7 @@ export default function CreateTicketNewCustomer() {
         licensePlate: values.plate?.toUpperCase() || '',
         modelId: finalModelId ? Number(finalModelId) : null,
         modelName: selectedModel?.name || '',
-        vehicleId: null,
+        vehicleId: '',
         vin: values.vin ? String(values.vin).trim() : null,
         year: values.year ? Number(values.year) : 2020
       }

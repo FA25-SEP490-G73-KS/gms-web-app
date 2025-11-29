@@ -309,20 +309,25 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       const brandOption = brands.find((brand) => String(brand.id) === String(values.brandId))
       const modelOption = models.find((model) => String(model.id) === String(values.modelId))
       
+      const finalBrandId = values.brandId ? Number(values.brandId) : null
+      const finalModelId = values.modelId ? Number(values.modelId) : null
+      const finalBrandName = brandOption?.name || (finalBrandId ? 'string' : '')
+      const finalModelName = modelOption?.name || (finalModelId ? 'string' : '')
+      
       const payload = {
         assignedTechnicianId: (values.assignedTechnicianIds || []).length
           ? values.assignedTechnicianIds.map((id) => Number(id))
           : [0],
-        brandId: values.brandId ? Number(values.brandId) : 0,
-        brandName: brandOption?.name || vehicleInfo.brandName || '',
+        brandId: finalBrandId || 0,
+        brandName: finalBrandName,
         customerName: values.customerName || '',
         customerPhone: normalizePhoneTo84(values.phone),
         licensePlate: (values.licensePlate || '').toUpperCase(),
-        modelId: values.modelId ? Number(values.modelId) : 0,
-        modelName: modelOption?.name || vehicleInfo.modelName || '',
+        modelId: finalModelId || 0,
+        modelName: finalModelName,
         serviceTypeIds: (values.serviceTypes || []).map((id) => Number(id)),
-        vehicleId: vehicleInfo.vehicleId || 0,
-        vin: values.chassisNumber || vehicleInfo.vin || '',
+        vehicleId: '',
+        vin: values.chassisNumber ? String(values.chassisNumber).trim() : (vehicleInfo.vin || ''),
         year: values.year ? Number(values.year) : (vehicleInfo.year || 2020)
       }
 
@@ -340,7 +345,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       console.log('Assigned Technician IDs:', payload.assignedTechnicianId)
       console.log('====================================')
       
-      const { error } = await serviceTicketAPI.update(ticketId, payload)
+      const { data, error } = await serviceTicketAPI.update(ticketId, payload)
       setLoading(false)
       
       if (error) {
@@ -352,6 +357,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       }
       
       console.log('=== [UpdateTicketModal] SUCCESS ===')
+      console.log('Response:', JSON.stringify(data, null, 2))
       console.log('Cập nhật phiếu thành công')
       console.log('====================================')
       message.success('Cập nhật phiếu thành công')

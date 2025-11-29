@@ -331,16 +331,33 @@ export default function CreateTicket() {
     console.log('  - expectedDeliveryAt:', expectedDeliveryAt)
     
     
+    const appointmentVehicleId = appointmentPrefill.vehicle?.vehicleId
+    const finalVehicleId = (appointmentVehicleId !== null && appointmentVehicleId !== undefined && appointmentVehicleId !== '') 
+      ? Number(appointmentVehicleId) 
+      : ''
+
     const vehiclePayload = {
       brandId: finalBrandId ? Number(finalBrandId) : null,
       brandName: selectedBrand?.name || (finalBrandId ? 'string' : ''),
       licensePlate: values.plate ? String(values.plate).toUpperCase() : '',
       modelId: finalModelId ? Number(finalModelId) : null,
       modelName: selectedModel?.name || (finalModelId ? 'string' : ''),
-      vehicleId: null, 
+      vehicleId: finalVehicleId,
       vin: values.vin ? String(values.vin).trim() : null,
-      year: values.year ? Number(values.year) : (values.year === 0 ? 0 : 2020)
+      year: values.year ? Number(values.year) : (values.year === 0 ? 0 : (values.year === '' || values.year === undefined ? null : 2020))
     }
+
+    console.log('=== Vehicle Payload Details ===')
+    console.log('vehicleId from appointment:', appointmentVehicleId)
+    console.log('finalVehicleId:', finalVehicleId)
+    console.log('brandId:', vehiclePayload.brandId)
+    console.log('brandName:', vehiclePayload.brandName)
+    console.log('modelId:', vehiclePayload.modelId)
+    console.log('modelName:', vehiclePayload.modelName)
+    console.log('vin:', vehiclePayload.vin)
+    console.log('year:', vehiclePayload.year)
+    console.log('licensePlate:', vehiclePayload.licensePlate)
+    console.log('================================')
 
     const createPayload = {
       appointmentId: appointmentPrefill.appointmentId || 0,
@@ -362,7 +379,8 @@ export default function CreateTicket() {
 
     console.log('=== POST Payload ===')
     console.log(JSON.stringify(createPayload, null, 2))
-    console.log('Vehicle ID in payload:', createPayload.vehicle.vehicleId, '(always null)')
+    console.log('Vehicle ID in payload:', createPayload.vehicle.vehicleId, typeof finalVehicleId === 'number' ? '(existing vehicle)' : '(empty string for new vehicle)')
+    console.log('forceAssignVehicle:', createPayload.forceAssignVehicle)
     console.log('====================')
 
     const { data, error } = await serviceTicketAPI.create(createPayload)
@@ -394,37 +412,6 @@ export default function CreateTicket() {
     const ticketId = data?.result?.serviceTicketId
     
     if (ticketId) {
-      
-      const updatePayload = {
-        assignedTechnicianId: (values.techs || []).map((id) => Number(id)),
-        brandId: finalBrandId ? Number(finalBrandId) : 0,
-        brandName: selectedBrand?.name || '',
-        customerName: values.name || '',
-        customerPhone: normalizePhoneTo84(values.phone),
-        licensePlate: values.plate ? String(values.plate).toUpperCase() : '',
-        modelId: finalModelId ? Number(finalModelId) : 0,
-        modelName: selectedModel?.name || '',
-        serviceTypeIds: (values.service || []).map((id) => Number(id)),
-        vehicleId: appointmentPrefill.vehicle?.vehicleId || 0,
-        vin: values.vin ? String(values.vin).trim() : '',
-        year: values.year ? Number(values.year) : 2020
-      }
-
-      console.log('=== Updating Ticket After Create ===')
-      console.log('Ticket ID:', ticketId)
-      console.log('Update Payload:', JSON.stringify(updatePayload, null, 2))
-      console.log('====================================')
-
-      const { error: updateError } = await serviceTicketAPI.update(ticketId, updatePayload)
-      
-      if (updateError) {
-        console.warn('Update after create failed:', updateError)
-        // Không hiển thị error vì ticket đã tạo thành công
-        // Chỉ log để debug
-      } else {
-        console.log('✓ Ticket updated successfully after create')
-      }
-
       message.success('Tạo phiếu dịch vụ thành công')
       navigate(`/service-advisor/orders/${ticketId}`)
     } else {
