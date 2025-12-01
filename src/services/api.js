@@ -369,3 +369,7 @@ export const stockReceiptAPI = {
     return get(`/stock-receipt${suffix}`)
   },
 };
+
+export const transactionAPI = {
+  manualCallback: (payload) => post('/transactions/manual-callback', payload),
+};

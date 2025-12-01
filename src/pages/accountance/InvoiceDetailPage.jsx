@@ -4,7 +4,7 @@ import { Card, Button, Table, message, Spin, Input, Row, Col, Modal, Tabs } from
 import { ArrowLeftOutlined, CloseOutlined } from '@ant-design/icons'
 import { usePayOS } from '@payos/payos-checkout'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
-import { invoiceAPI } from '../../services/api'
+import { invoiceAPI, transactionAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import dayjs from 'dayjs'
 
@@ -27,9 +27,32 @@ export default function InvoiceDetailPage() {
     ELEMENT_ID: 'payos-checkout-container',
     CHECKOUT_URL: '',
     embedded: true,
-    onSuccess: (event) => {
+    onSuccess: async (event) => {
       console.log('Payment successful:', event)
-      message.success('Thanh toán thành công!')
+      
+      let callbackSuccess = true
+      try {
+        const { data: response, error } = await transactionAPI.manualCallback({
+          orderCode: event?.orderCode,
+        })
+        
+        if (error) {
+          console.error('Error calling manual callback:', error)
+          callbackSuccess = false
+        } else {
+          console.log('Manual callback response:', response)
+        }
+      } catch (err) {
+        console.error('Error calling manual callback:', err)
+        callbackSuccess = false
+      }
+      
+      if (callbackSuccess) {
+        message.success('Thanh toán thành công!')
+      } else {
+        message.warning('Thanh toán thành công nhưng có lỗi khi cập nhật giao dịch')
+      }
+      
       setPaymentData(null)
       setShowDepositForm(false)
       setDepositAmount('')
