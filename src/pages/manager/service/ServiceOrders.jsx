@@ -1,24 +1,27 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Card, DatePicker, Input, Select, Space, Table, Tag, message } from 'antd'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { Card, Input, Space, Table, Tag, message } from 'antd'
+import { CalendarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { serviceTicketAPI } from '../../../services/api'
 import { goldTableHeader } from '../../../utils/tableComponents'
+import dayjs from 'dayjs'
+import './ServiceOrders.css'
 
 const STATUS_CONFIG = {
   CREATED: { color: '#475467', label: 'Đã tạo' },
-  WAITING_QUOTE: { color: '#F59E0B', label: 'Chờ báo giá' },
-  WAITING_HANDOVER: { color: '#FACC15', label: 'Chờ bàn giao xe' },
-  CANCELLED: { color: '#EF4444', label: 'Hủy' },
+  WAITING_FOR_QUOTATION: { color: '#F59E0B', label: 'Chờ báo giá' },
+  WAITING_FOR_DELIVERY: { color: '#FACC15', label: 'Chờ bàn giao xe' },
+  CANCELED: { color: '#EF4444', label: 'Hủy' },
   COMPLETED: { color: '#22C55E', label: 'Hoàn thành' },
 }
 
 const formatTicket = (ticket, index) => ({
-  key: ticket.code || `ticket-${index}`,
-  rawId: ticket.id || index,
-  code: ticket.code || `STK-${ticket.id || index}`,
+  key: ticket.serviceTicketCode || `ticket-${index}`,
+  rawId: ticket.serviceTicketId || index,
+  code: ticket.serviceTicketCode || `STK-${ticket.serviceTicketId || index}`,
   customerName: ticket.customer?.fullName || ticket.customerName || '—',
-  licensePlate: ticket.customerVehicle?.licensePlate || ticket.licensePlate || '—',
+  licensePlate: ticket.vehicle?.licensePlate || ticket.licensePlate || '—',
   status: ticket.status || 'CREATED',
   createdAt: ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('vi-VN') : '—',
 })
@@ -31,8 +34,12 @@ export default function ManagerServiceOrders() {
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [search, setSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState()
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = dayjs()
+    return `${now.year()}-${String(now.month() + 1).padStart(2, '0')}`
+  })
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const monthInputRef = useRef(null)
 
   const fetchTickets = async (pageIndex = 0, size = 10) => {
     setLoading(true)
@@ -63,10 +70,10 @@ export default function ManagerServiceOrders() {
   const filteredTickets = useMemo(() => {
     return tickets
       .filter((item) => {
-        if (statusFilter !== 'ALL') {
-          return item.status === statusFilter
+        if (statusFilter === 'ALL') {
+          return true
         }
-        return true
+        return item.status === statusFilter
       })
       .filter((item) => {
         if (!search) return true
@@ -77,7 +84,14 @@ export default function ManagerServiceOrders() {
           item.licensePlate.toLowerCase().includes(text)
         )
       })
-  }, [tickets, search, statusFilter])
+      .filter((item) => {
+        if (!selectedMonth) return true
+        const itemDate = item.createdAt ? new Date(item.createdAt) : null
+        if (!itemDate) return false
+        const itemMonth = `${itemDate.getFullYear()}-${String(itemDate.getMonth() + 1).padStart(2, '0')}`
+        return itemMonth === selectedMonth
+      })
+  }, [tickets, search, statusFilter, selectedMonth])
 
   const statusCounts = useMemo(() => {
     return tickets.reduce(
@@ -148,9 +162,9 @@ export default function ManagerServiceOrders() {
 
   const summaryCards = [
     { key: 'total', label: 'Đơn đã tạo', value: statusCounts.total || 0, theme: '#fdfaf5' },
-    { key: 'WAITING_QUOTE', label: 'Chờ báo giá', value: statusCounts.WAITING_QUOTE || 0, theme: '#e6f0ff' },
-    { key: 'WAITING_HANDOVER', label: 'Chờ bàn giao xe', value: statusCounts.WAITING_HANDOVER || 0, theme: '#fff9e6' },
-    { key: 'CANCELLED', label: 'Hủy', value: statusCounts.CANCELLED || 0, theme: '#ffecec' },
+    { key: 'WAITING_FOR_QUOTATION', label: 'Chờ báo giá', value: statusCounts.WAITING_FOR_QUOTATION || 0, theme: '#e6f0ff' },
+    { key: 'WAITING_FOR_DELIVERY', label: 'Chờ bàn giao xe', value: statusCounts.WAITING_FOR_DELIVERY || 0, theme: '#fff9e6' },
+    { key: 'CANCELED', label: 'Hủy', value: statusCounts.CANCELED || 0, theme: '#ffecec' },
     { key: 'COMPLETED', label: 'Hoàn thành', value: statusCounts.COMPLETED || 0, theme: '#eefaf0' },
   ]
 
@@ -188,28 +202,63 @@ export default function ManagerServiceOrders() {
               gap: 12,
               justifyContent: 'space-between',
               marginBottom: 16,
+              alignItems: 'center',
             }}
           >
-            <Space wrap>
-              <DatePicker
-                format="DD/MM/YYYY"
-                placeholder="Ngày/Tháng/Năm"
-                value={dateFilter}
-                onChange={setDateFilter}
-              />
-              <Select
-                style={{ width: 200 }}
-                value={statusFilter}
-                onChange={setStatusFilter}
-                options={[
-                  { label: 'Tất cả trạng thái', value: 'ALL' },
-                  ...Object.entries(STATUS_CONFIG).map(([key, value]) => ({
-                    label: value.label,
-                    value: key,
-                  })),
-                ]}
-              />
-            </Space>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div className="service-orders-month-picker-wrapper">
+                <select
+                  ref={monthInputRef}
+                  value={selectedMonth}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    setSelectedMonth(e.target.value)
+                  }}
+                  className="service-orders-month-select"
+                >
+                  {(() => {
+                    const options = []
+                    const currentYear = dayjs().year()
+                    const years = [currentYear - 1, currentYear, currentYear + 1]
+                    
+                    years.forEach(year => {
+                      for (let month = 1; month <= 12; month++) {
+                        const monthStr = String(month).padStart(2, '0')
+                        const value = `${year}-${monthStr}`
+                        const monthName = dayjs(`${year}-${monthStr}-01`).format('MM/YYYY')
+                        options.push(
+                          <option key={value} value={value}>
+                            {monthName}
+                          </option>
+                        )
+                      }
+                    })
+                    
+                    return options
+                  })()}
+                </select>
+                <CalendarOutlined className="service-orders-month-icon" />
+              </div>
+              <div className="service-orders-status-filters">
+                <button
+                  type="button"
+                  className={`service-orders-status-btn ${statusFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('ALL')}
+                >
+                  Tất cả
+                </button>
+                {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`service-orders-status-btn ${statusFilter === key ? 'active' : ''}`}
+                    onClick={() => setStatusFilter(key)}
+                  >
+                    {config.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <Input
               allowClear
               placeholder="Tìm kiếm"

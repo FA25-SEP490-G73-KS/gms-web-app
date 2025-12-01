@@ -7,20 +7,22 @@ import '../styles/layout/admin-layout.css'
 export default function AdminLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  // Keep dropdown open if we're on any orders route
-  const isOnOrdersRoute = location.pathname.startsWith('/service-advisor/orders')
-  const [openService, setOpenService] = useState(isOnOrdersRoute)
+  // Giữ trạng thái mở/đóng của nhóm "Phiếu dịch vụ" giữa các màn service-advisor
+  const [openService, setOpenService] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('admin_open_service')
+    return stored ? stored === 'true' : true
+  })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
   const { user, logout } = useAuthStore()
-  
-  // Update state when route changes
+
+  // Persist trạng thái dropdown "Phiếu dịch vụ"
   useEffect(() => {
-    if (isOnOrdersRoute) {
-      setOpenService(true)
-    }
-  }, [isOnOrdersRoute])
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('admin_open_service', String(openService))
+  }, [openService])
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -116,10 +118,6 @@ export default function AdminLayout({ children }) {
             <button
               className={`admin-nav-item ${location.pathname.startsWith('/service-advisor/orders') ? 'active' : ''}`}
               onClick={() => {
-                // Don't allow closing if we're on an orders route
-                if (isOnOrdersRoute) {
-                  return
-                }
                 setOpenService((v) => !v)
               }}
             >
@@ -169,25 +167,17 @@ export default function AdminLayout({ children }) {
           <button 
             className="admin-user-info" 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+            <div className="admin-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+            <div className="admin-user-text">
+              <div className="admin-user-name">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
+              <div className="admin-user-role">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
             </div>
           </button>
           

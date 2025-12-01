@@ -173,6 +173,12 @@ export const inventoryAPI = {
 export const stockExportAPI = {
   getAll: (page = 0, size = 6) => get(`/stock-exports?page=${page}&size=${size}`),
   getById: (id) => get(`/stock-exports/${id}`),
+ 
+  getQuotationDetail: (id) => get(`/stock-exports/quotation/${id}`),
+ 
+  exportItem: (itemId, payload) => post(`/stock-exports/item/${itemId}/export`, payload),
+  
+  getExportItemDetail: (exportItemId) => get(`/stock-exports/item/${exportItemId}`),
   create: (data) => post('/stock-exports', data),
   update: (id, data) => put(`/stock-exports/${id}`, data),
 };
@@ -222,6 +228,13 @@ export const vehiclesAPI = {
   getBrands: () => get('/vehicles/brands'),
   getModelsByBrand: (brandId) => get(`/vehicles/brands/${brandId}/models`),
   getByLicensePlate: (licensePlate) => get(`/vehicles?licensePlate=${encodeURIComponent(licensePlate)}`),
+  
+  checkPlate: (plate, customerId) => {
+    const params = new URLSearchParams()
+    if (plate) params.append('plate', plate)
+    if (customerId != null) params.append('customerId', customerId)
+    return get(`/vehicles/check-plate?${params.toString()}`)
+  },
 };
 
 export const priceQuotationAPI = {
@@ -229,7 +242,11 @@ export const priceQuotationAPI = {
   update: (id, payload) => patch(`/price-quotations/${id}`, payload),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
   getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
-  confirmItem: (itemId, payload) => patch(`/quotation-items/${itemId}/confirm/update`, payload),
+  getItemById: (id) => get(`/quotation-items/${id}`),
+  
+  confirmItem: (itemId, note) => patch(`/quotation-items/${itemId}/confirm`, note),
+  confirmItemUpdate: (itemId, payload) => patch(`/quotation-items/${itemId}/confirm/update`, payload),
+  confirmCreateItem: (itemId, payload) => post(`/quotation-items/${itemId}/confirm/create`, payload),
   rejectItem: (itemId, reason) => patch(`/quotation-items/${itemId}/reject`, reason),
   confirmQuotation: (id) => post(`/price-quotations/${id}/confirm`),
   rejectQuotation: (id, reason) => post(`/price-quotations/${id}/reject`, reason),
@@ -308,6 +325,11 @@ export const customersAPI = {
 };
 
 export const manualVoucherAPI = {
+  getAll: (page = 0, size = 6) => {
+    const query = buildQueryString({ page, size })
+    const suffix = query ? `?${query}` : ''
+    return get(`/manual-vouchers${suffix}`)
+  },
   create: (payload, file) => {
     const formData = new FormData();
     formData.append('data', JSON.stringify(payload));
@@ -331,4 +353,19 @@ export const attendanceAPI = {
 
 export const payrollAPI = {
   getPreview: (month, year) => get(`/payroll/preview?month=${month}&year=${year}`),
+  getDetail: (employeeId, month, year) => get(`/payroll/detail?employeeId=${employeeId}&month=${month}&year=${year}`),
+  createAllowance: (payload) => post(`/allowance/create`, payload),
+  createDeduction: (payload) => post(`/deduction`, payload),
+  paySalary: (payrollId, accountantId) => post(`/payroll/${payrollId}/pay?accountant=${accountantId}`),
+  submit: (month, year, accountantId) => post(`/payroll/submit?month=${month}&year=${year}&accountant=${accountantId}`),
+  approve: (payrollId, managerId) => post(`/payroll/${payrollId}/approve?manager=${managerId}`),
+  reject: (payrollId, managerId, reason) => post(`/payroll/${payrollId}/reject?manager=${managerId}`, { reason }),
+};
+
+export const stockReceiptAPI = {
+  getAll: (page = 0, size = 10, search = '') => {
+    const query = buildQueryString({ page, size, search: search || undefined })
+    const suffix = query ? `?${query}` : ''
+    return get(`/stock-receipt${suffix}`)
+  },
 };

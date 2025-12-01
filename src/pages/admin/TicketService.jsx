@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Input, Card, Badge, Space, message, Button, DatePicker, Row, Col, Form, Select, Modal } from 'antd'
+import { Table, Input, Card, Badge, Space, message, Button, Row, Col, Form, Select, Modal } from 'antd'
 import { EyeOutlined, SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
@@ -58,7 +58,9 @@ export default function TicketService() {
   const [updateTicketId, setUpdateTicketId] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState(isHistoryPage ? null : 'CREATED')
+  // Không lọc theo trạng thái mặc định để luôn hiển thị mọi phiếu,
+  // tránh trường hợp backend trả về status mới (VD: WAITING_FOR_QUOTATION) mà không map kịp.
+  const [statusFilter, setStatusFilter] = useState(null)
   const [dateFilter, setDateFilter] = useState(null)
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -530,10 +532,14 @@ export default function TicketService() {
     <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
             {isHistoryPage ? 'Lịch sử sửa chữa' : 'Danh sách phiếu'}
           </h1>
-          
+          <p style={{ margin: '0 0 20px 0', fontSize: 14, color: '#6b7280' }}>
+            {isHistoryPage
+              ? 'Tra cứu lại các phiếu dịch vụ đã hoàn tất hoặc đã hủy theo biển số xe và ngày tạo.'
+              : 'Quản lý danh sách phiếu dịch vụ hiện tại theo trạng thái, ngày tạo và biển số xe.'}
+          </p>
           <Row gutter={16} style={{ marginBottom: '20px' }}>
             <Col flex="auto">
               <Search
@@ -550,13 +556,28 @@ export default function TicketService() {
               />
             </Col>
             <Col>
-              <DatePicker
+              <input
+                type="date"
                 placeholder="Ngày tạo"
-                format="DD/MM/YYYY"
-                suffixIcon={<CalendarOutlined />}
-                value={dateFilter}
-                onChange={setDateFilter}
-                style={{ width: '150px' }}
+                value={dateFilter ? dateFilter.format('YYYY-MM-DD') : ''}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (!value) {
+                    setDateFilter(null)
+                    return
+                  }
+                  // Lưu lại dưới dạng dayjs để logic filter bên dưới không phải sửa nhiều
+                  const dayjs = require('dayjs')
+                  setDateFilter(dayjs(value, 'YYYY-MM-DD'))
+                }}
+                style={{
+                  width: 150,
+                  height: 32,
+                  borderRadius: 8,
+                  border: '1px solid #d9d9d9',
+                  padding: '4px 8px',
+                  fontSize: 14
+                }}
               />
             </Col>
             {!isHistoryPage && (
@@ -820,7 +841,22 @@ export default function TicketService() {
                 label="Ngày nhận xe"
                 name="receiveDate"
               >
-                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                <input
+                  type="date"
+                  style={{
+                    width: '100%',
+                    height: 32,
+                    borderRadius: 8,
+                    border: '1px solid #d9d9d9',
+                    padding: '4px 8px',
+                    fontSize: 14
+                  }}
+                  value={createForm.getFieldValue('receiveDate') || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    createForm.setFieldsValue({ receiveDate: value })
+                  }}
+                />
               </Form.Item>
 
               <Form.Item

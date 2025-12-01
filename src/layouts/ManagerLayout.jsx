@@ -20,40 +20,61 @@ export default function ManagerLayout({ children }) {
   const location = useLocation()
   const { logout, user } = useAuthStore()
   
-  // State for collapsible menu groups
-  const [openFinance, setOpenFinance] = useState(
-    location.pathname.startsWith('/manager/accountance/finance') ||
-      location.pathname.startsWith('/manager/accountance/payments')
-  )
-  const [openCustomers, setOpenCustomers] = useState(location.pathname.startsWith('/manager/customers'))
-  const [openHR, setOpenHR] = useState(location.pathname.startsWith('/manager/accountance/hr'))
-  const [openPromotion, setOpenPromotion] = useState(location.pathname.startsWith('/manager/promotions'))
-  const [openService, setOpenService] = useState(location.pathname.startsWith('/manager/service'))
+  // State for collapsible menu groups (persisted, không auto đóng/mở theo route)
+  const [openFinance, setOpenFinance] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('manager_open_finance')
+    return v ? v === 'true' : true
+  })
+  const [openCustomers, setOpenCustomers] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('manager_open_customers')
+    return v ? v === 'true' : true
+  })
+  const [openHR, setOpenHR] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('manager_open_hr')
+    return v ? v === 'true' : true
+  })
+  const [openPromotion, setOpenPromotion] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const v = window.localStorage.getItem('manager_open_promotion')
+    return v ? v === 'true' : false
+  })
+  const [openService, setOpenService] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const v = window.localStorage.getItem('manager_open_service')
+    return v ? v === 'true' : false
+  })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
-  
-  // Update state when route changes
+
+  // Lưu lại trạng thái mở/đóng group vào localStorage
   useEffect(() => {
-    if (
-      location.pathname.startsWith('/manager/accountance/finance') ||
-      location.pathname.startsWith('/manager/accountance/payments')
-    ) {
-      setOpenFinance(true)
-    }
-    if (location.pathname.startsWith('/manager/customers')) {
-      setOpenCustomers(true)
-    }
-    if (location.pathname.startsWith('/manager/accountance/hr')) {
-      setOpenHR(true)
-    }
-    if (location.pathname.startsWith('/manager/promotions')) {
-      setOpenPromotion(true)
-    }
-    if (location.pathname.startsWith('/manager/service')) {
-      setOpenService(true)
-    }
-  }, [location.pathname])
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_finance', String(openFinance))
+  }, [openFinance])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_customers', String(openCustomers))
+  }, [openCustomers])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_hr', String(openHR))
+  }, [openHR])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_promotion', String(openPromotion))
+  }, [openPromotion])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_service', String(openService))
+  }, [openService])
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
@@ -155,9 +176,6 @@ export default function ManagerLayout({ children }) {
       <aside className="manager-sidebar">
         <div className="manager-brand" onClick={() => navigate('/manager')}>
           <img src="/image/mainlogo.png" alt="Logo" />
-          <div style={{ fontSize: '12px', color: '#CBB081', fontWeight: 600 }}>
-            Manager
-          </div>
         </div>
         
         <nav className="manager-nav">
@@ -337,25 +355,17 @@ export default function ManagerLayout({ children }) {
           <button 
             className="manager-user-info" 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+            <div className="manager-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+            <div className="manager-user-text">
+              <div className="manager-user-name">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
+              <div className="manager-user-role">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
             </div>
           </button>
           

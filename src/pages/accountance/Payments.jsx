@@ -159,13 +159,13 @@ export function AccountancePaymentsContent() {
       render: (_, record) => {
         if (!record.serviceStatus) return null
         return (
-          <Button
-            type="text"
+        <Button
+          type="text"
             icon={<EyeOutlined />}
-            style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={() => navigate(`/accountance/payments/${record.id}`)}
-          />
-        )
+        />
+      )
       }
     }
   ]

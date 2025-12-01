@@ -1,19 +1,25 @@
-import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Tag, DatePicker } from 'antd'
-import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { Table, Input, Button, Tag, message } from 'antd'
+import { SearchOutlined, FilterOutlined, EyeOutlined, CalendarOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { payrollAPI } from '../../services/api'
+import { getUserIdFromToken } from '../../utils/helpers'
+import dayjs from 'dayjs'
 import '../../styles/pages/accountance/payroll.css'
 
 const statusFilters = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'paid', label: 'Đã chi trả' },
-  { key: 'pending', label: 'Đang xử lý' }
+  { key: 'pending_manager_approval', label: 'Chờ quản lý duyệt' },
+  { key: 'approved', label: 'Duyệt' },
+  { key: 'paid', label: 'Đã thanh toán' }
 ]
 
 const STATUS_CONFIG = {
-  paid: { color: '#5b8def', bg: '#eef4ff', text: 'Đã chi trả' },
-  pending: { color: '#b45309', bg: '#fff4e6', text: 'Đang xử lý' }
+  pending_manager_approval: { color: '#b45309', bg: '#fff4e6', text: 'Chờ quản lý duyệt' },
+  approved: { color: '#5b8def', bg: '#eef4ff', text: 'Duyệt' },
+  paid: { color: '#22c55e', bg: '#f0fdf4', text: 'Đã thanh toán' }
 }
 
 const payrollData = [
@@ -60,11 +66,141 @@ const payrollData = [
 ]
 
 export function AccountancePayrollContent() {
+  const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
-  const [month, setMonth] = useState(null)
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [payrollData, setPayrollData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [submitting, setSubmitting] = useState(false)
+  const monthInputRef = useRef(null)
+
+  useEffect(() => {
+    fetchPayrollData()
+  }, [selectedMonth, page, pageSize])
+
+  const fetchPayrollData = async () => {
+    if (!selectedMonth) return
+    
+    setLoading(true)
+    try {
+      const monthYear = selectedMonth.split('-')
+      const month = parseInt(monthYear[1], 10)
+      const year = parseInt(monthYear[0], 10)
+
+      const { data: response, error } = await payrollAPI.getPreview(month, year)
+      
+      if (error) {
+        message.error('Không thể tải danh sách lương')
+        setLoading(false)
+        return
+      }
+
+      const result = response?.result || {}
+      const items = result.items || result.content || (Array.isArray(result) ? result : [])
+      
+      // Transform API data to match UI structure
+      const transformedData = items.map((item) => {
+        // Map status từ API (enum hoặc text tiếng Việt) sang key trong STATUS_CONFIG
+        const rawStatus = String(item.status || '').trim()
+        
+        // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
+        const statusMap = {
+          'Chờ quản lý duyệt': 'pending_manager_approval',
+          'PENDING_MANAGER_APPROVAL': 'pending_manager_approval',
+          'Đã duyệt': 'approved',
+          'Duyệt': 'approved',
+          'APPROVED': 'approved',
+          'Đã thanh toán': 'paid',
+          'Đã chi trả': 'paid',
+          'PAID': 'paid'
+        }
+        
+        // Tìm status key: ưu tiên exact match
+        let statusKey = statusMap[rawStatus]
+        
+        // Nếu không tìm thấy exact match, thử case-insensitive
+        if (!statusKey) {
+          const foundKey = Object.keys(statusMap).find(key => 
+            key.toLowerCase() === rawStatus.toLowerCase()
+          )
+          statusKey = foundKey ? statusMap[foundKey] : 'pending_manager_approval'
+        }
+
+        // Debug log để kiểm tra
+        console.log('Mapping status:', { 
+          rawStatus, 
+          statusKey, 
+          itemStatus: item.status 
+        })
+        
+        return {
+          id: item.employeeId,
+          name: item.employeeName || 'Không rõ',
+          phone: item.phone || '',
+          baseSalary: item.baseSalary || 0,
+          allowance: item.allowance || 0,
+          deduction: item.deduction || 0,
+          netSalary: item.netSalary || 0,
+          status: statusKey,
+          employeeId: item.employeeId,
+          workingDays: item.workingDays || 0,
+          advanceSalary: item.advanceSalary || 0
+        }
+      })
+
+      setPayrollData(transformedData)
+      setTotal(items.length || 0)
+    } catch (err) {
+      console.error('Failed to fetch payroll:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmitPayroll = async () => {
+    if (!selectedMonth) {
+      message.warning('Vui lòng chọn tháng')
+      return
+    }
+
+    const accountantId = getUserIdFromToken()
+    if (!accountantId) {
+      message.error('Không thể lấy thông tin kế toán')
+      return
+    }
+
+    const monthYear = selectedMonth.split('-')
+    const month = parseInt(monthYear[1], 10)
+    const year = parseInt(monthYear[0], 10)
+
+    setSubmitting(true)
+    try {
+      const { data: response, error } = await payrollAPI.submit(
+        month,
+        year,
+        parseInt(accountantId, 10)
+      )
+
+      if (error) {
+        message.error(error || 'Không thể nộp bảng lương')
+        return
+      }
+
+      message.success('Nộp bảng lương thành công!')
+      // Refresh dữ liệu sau khi nộp
+      fetchPayrollData()
+    } catch (err) {
+      console.error('Failed to submit payroll:', err)
+      message.error('Đã xảy ra lỗi khi nộp bảng lương')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     return payrollData
@@ -77,7 +213,7 @@ export function AccountancePayrollContent() {
         return matchesQuery && matchesStatus
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query, status])
+  }, [payrollData, query, status])
 
   const columns = [
     {
@@ -131,7 +267,7 @@ export function AccountancePayrollContent() {
       key: 'status',
       width: 140,
       render: (value) => {
-        const config = STATUS_CONFIG[value]
+        const config = STATUS_CONFIG[value] || STATUS_CONFIG.pending_manager_approval
         return (
           <Tag
             style={{
@@ -152,7 +288,22 @@ export function AccountancePayrollContent() {
       title: '',
       key: 'actions',
       width: 80,
-      render: () => <i className="bi bi-eye payroll-view-icon" />
+      render: (_, record) => {
+        const monthYear = selectedMonth.split('-')
+        const month = parseInt(monthYear[1], 10)
+        const year = parseInt(monthYear[0], 10)
+        
+        return (
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            onClick={() => {
+              navigate(`/accountance/hr/payroll/${record.employeeId}/${month}/${year}`)
+            }}
+            style={{ padding: 0 }}
+          />
+        )
+      }
     }
   ]
 
@@ -163,13 +314,39 @@ export function AccountancePayrollContent() {
         </div>
 
         <div className="payroll-filters">
-          <DatePicker
-            picker="month"
-            placeholder="Tháng"
-            value={month}
-            onChange={setMonth}
-            className="payroll-month-picker"
-          />
+          <div className="payroll-month-picker-wrapper">
+            <select
+              ref={monthInputRef}
+              value={selectedMonth}
+              onChange={(e) => {
+                e.stopPropagation()
+                setSelectedMonth(e.target.value)
+              }}
+              className="payroll-month-select"
+            >
+              {(() => {
+                const options = []
+                const currentYear = dayjs().year()
+                const years = [currentYear - 1, currentYear, currentYear + 1]
+                
+                years.forEach(year => {
+                  for (let month = 1; month <= 12; month++) {
+                    const monthStr = String(month).padStart(2, '0')
+                    const value = `${year}-${monthStr}`
+                    const monthName = dayjs(`${year}-${monthStr}-01`).format('MM/YYYY')
+                    options.push(
+                      <option key={value} value={value}>
+                        {monthName}
+                      </option>
+                    )
+                  }
+                })
+                
+                return options
+              })()}
+            </select>
+            <CalendarOutlined className="payroll-month-icon" />
+          </div>
           <div className="status-filters">
             {statusFilters.map((item) => (
               <Button
@@ -202,10 +379,11 @@ export function AccountancePayrollContent() {
             className="payroll-table"
             columns={columns}
             dataSource={filtered}
+            loading={loading}
             pagination={{
               current: page,
               pageSize,
-              total: filtered.length,
+              total: total,
               showSizeChanger: true,
               showTotal: (total) => `0 of ${total} row(s) selected.`,
               pageSizeOptions: ['10', '20', '50', '100'],
@@ -216,6 +394,24 @@ export function AccountancePayrollContent() {
             }}
             components={goldTableHeader}
           />
+        </div>
+
+        <div className="payroll-footer">
+          <div className="payroll-total">
+            <span className="payroll-total-label">Tổng:</span>
+            <span className="payroll-total-amount">
+              {filtered.reduce((sum, item) => sum + (item.netSalary || 0), 0).toLocaleString('vi-VN')}
+            </span>
+          </div>
+          <Button
+            type="primary"
+            size="large"
+            className="payroll-submit-btn"
+            onClick={handleSubmitPayroll}
+            loading={submitting}
+          >
+            Nộp
+          </Button>
         </div>
       </div>
   )

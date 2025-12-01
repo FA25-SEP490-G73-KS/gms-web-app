@@ -1,24 +1,26 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import dayjs from 'dayjs'
 import {
   Table,
   Input,
   Button,
   Tag,
   Space,
-  Select,
   Modal,
   Form,
   InputNumber,
   Upload,
-  message
+  message,
+  Row,
+  Col
 } from 'antd'
 import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { manualVoucherAPI } from '../../services/api'
+import { getUserNameFromToken } from '../../utils/helpers'
 import '../../styles/pages/accountance/finance.css'
 
-const { Option } = Select
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -27,12 +29,6 @@ const STATUS_FILTERS = [
   { key: 'rejected', label: 'Từ chối' }
 ]
 
-const TICKET_TYPES = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'thu', label: 'Thu' },
-  { value: 'chi', label: 'Chi' },
-  { value: 'ung_luong', label: 'Ứng lương' }
-]
 
 const initialFinanceData = [
   {
@@ -113,13 +109,91 @@ const getStatusConfig = (status) => {
 export function AccountanceFinanceContent() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
-  const [ticketType, setTicketType] = useState('all')
-  const [data, setData] = useState(initialFinanceData)
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [uploadFile, setUploadFile] = useState(null)
   const [fileList, setFileList] = useState([])
   const [creating, setCreating] = useState(false)
   const [form] = Form.useForm()
+  const [creatorName, setCreatorName] = useState('')
+  const [selectedTicketType, setSelectedTicketType] = useState('')
+
+  useEffect(() => {
+    const userName = getUserNameFromToken()
+    setCreatorName(userName || '')
+    // Set creator in form when userName is available
+    if (userName) {
+      form.setFieldsValue({ creator: userName })
+    }
+  }, [form])
+
+  // Watch ticket type to update category options
+  const ticketType = Form.useWatch('type', form)
+  
+  useEffect(() => {
+    setSelectedTicketType(ticketType || '')
+    // Reset category when ticket type changes
+    if (ticketType) {
+      form.setFieldsValue({ category: '' })
+    }
+  }, [ticketType, form])
+
+  // Get category options based on ticket type
+  const getCategoryOptions = () => {
+    if (selectedTicketType === 'Phiếu thu') {
+      return [{ value: 'other', label: 'Khác' }]
+    } else if (selectedTicketType === 'Phiếu chi') {
+      return [
+        { value: 'Nhà cung cấp', label: 'Nhà cung cấp' },
+        { value: 'Tiền điện', label: 'Tiền điện' },
+        { value: 'Khác', label: 'Khác' }
+      ]
+    }
+    return []
+  }
+
+  useEffect(() => {
+    fetchVouchers()
+  }, [page, pageSize])
+
+  const fetchVouchers = async () => {
+    setLoading(true)
+    try {
+      const { data: response, error } = await manualVoucherAPI.getAll(page - 1, pageSize)
+      
+      if (error) {
+        message.error('Không thể tải danh sách phiếu thu-chi')
+        setLoading(false)
+        return
+      }
+
+      const result = response?.result || {}
+      const content = result.content || (Array.isArray(response?.result) ? response.result : [])
+      
+      // Transform API data to match UI structure
+      const transformedData = content.map((item) => ({
+        id: item.id || 0,
+        code: item.code || 'N/A',
+        type: (item.type || '').toLowerCase(),
+        subject: item.targetName || 'N/A',
+        amount: item.amount || 0,
+        createdAt: item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY') : 'N/A',
+        status: (item.status || '').toLowerCase()
+      }))
+
+      setData(transformedData)
+      setTotal(result.totalElements || content.length || 0)
+    } catch (err) {
+      console.error('Failed to fetch vouchers:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     return data
@@ -131,13 +205,10 @@ export function AccountanceFinanceContent() {
         const matchesStatus =
           status === 'all' ||
           item.status === status
-        const matchesType =
-          ticketType === 'all' ||
-          item.type === ticketType
-        return matchesQuery && matchesStatus && matchesType
+        return matchesQuery && matchesStatus
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query, status, ticketType])
+  }, [data, query, status])
 
   const columns = [
     {
@@ -235,7 +306,8 @@ export function AccountanceFinanceContent() {
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <Space>
               {STATUS_FILTERS.map((filter) => (
                 <Button
@@ -261,25 +333,23 @@ export function AccountanceFinanceContent() {
               onChange={(e) => setQuery(e.target.value)}
               style={{ width: 260 }}
             />
+            </div>
             <Button
               type="primary"
               icon={<PlusOutlined />}
               style={{ background: '#22c55e', borderColor: '#22c55e', fontWeight: 600 }}
-              onClick={() => setCreateModalVisible(true)}
+              onClick={() => {
+                setSelectedTicketType('')
+                form.setFieldsValue({
+                  type: 'THU',
+                  createdAt: dayjs().format('DD/MM/YYYY'),
+                  creator: creatorName || ''
+                })
+                setCreateModalVisible(true)
+              }}
             >
               Tạo phiếu
             </Button>
-            <Select
-              value={ticketType}
-              onChange={setTicketType}
-              style={{ width: 150 }}
-            >
-              {TICKET_TYPES.map(type => (
-                <Option key={type.value} value={type.value}>
-                  {type.label}
-                </Option>
-              ))}
-            </Select>
           </div>
         </div>
 
@@ -293,13 +363,18 @@ export function AccountanceFinanceContent() {
             className="finance-table"
             columns={columns}
             dataSource={filtered}
+            loading={loading}
             pagination={{
-              pageSize: 10,
-              current: 1,
-              total: filtered.length,
+              current: page,
+              pageSize: pageSize,
+              total: total,
               showTotal: (total) => `0 of ${total} row(s) selected.`,
               showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100']
+              pageSizeOptions: ['10', '20', '50', '100'],
+              onChange: (newPage, newPageSize) => {
+                setPage(newPage)
+                setPageSize(newPageSize)
+              }
             }}
             components={goldTableHeader}
             rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-even' : 'table-row-odd')}
@@ -310,7 +385,21 @@ export function AccountanceFinanceContent() {
       <Modal
         title="Tạo phiếu Thu/Chi"
         open={createModalVisible}
-        onCancel={() => setCreateModalVisible(false)}
+        styles={{
+          header: { marginBottom: '16px' }
+        }}
+        onCancel={() => {
+          form.resetFields()
+          setUploadFile(null)
+          setFileList([])
+          setSelectedTicketType('')
+          form.setFieldsValue({
+            type: 'THU',
+            createdAt: dayjs().format('DD/MM/YYYY'),
+            creator: creatorName || ''
+          })
+          setCreateModalVisible(false)
+        }}
         okText="Tạo phiếu"
         confirmLoading={creating}
         onOk={async () => {
@@ -322,8 +411,7 @@ export function AccountanceFinanceContent() {
               amount: Number(values.amount),
               target: values.target,
               description: values.description,
-              attachmentUrl: values.attachmentUrl || undefined,
-              approvedByEmployeeId: values.approvedByEmployeeId
+              category: values.category || undefined
             }
             const { data: response, error } = await manualVoucherAPI.create(payload, uploadFile)
             if (error) {
@@ -341,12 +429,20 @@ export function AccountanceFinanceContent() {
                 : new Date().toLocaleDateString('vi-VN'),
               status: (result?.status || 'pending').toLowerCase()
             }
-            setData((prev) => [newRecord, ...prev])
             message.success('Tạo phiếu thành công')
             form.resetFields()
             setUploadFile(null)
             setFileList([])
+            setSelectedTicketType('')
             setCreateModalVisible(false)
+            // Reset form với giá trị mặc định
+            form.setFieldsValue({
+              type: 'THU',
+              createdAt: dayjs().format('DD/MM/YYYY'),
+              creator: creatorName || ''
+            })
+            // Refresh data after creating
+            fetchVouchers()
           } catch (err) {
             if (err?.errorFields) {
               return
@@ -358,80 +454,172 @@ export function AccountanceFinanceContent() {
         }}
         destroyOnClose
       >
-        <Form layout="vertical" form={form} initialValues={{ type: 'THU' }}>
-          <Form.Item
-            name="type"
-            label="Loại phiếu"
-            rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
-          >
-            <Select options={[
-              { value: 'THU', label: 'Thu' },
-              { value: 'CHI', label: 'Chi' }
-            ]} />
-          </Form.Item>
-          <Form.Item
-            name="amount"
-            label="Số tiền"
-            rules={[
-              { required: true, message: 'Vui lòng nhập số tiền' },
-              { type: 'number', min: 1, message: 'Số tiền phải lớn hơn 0' }
-            ]}
-          >
-            <InputNumber
-              style={{ width: '100%' }}
-              formatter={(value) =>
-                `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-              }
-              parser={(value) => value?.replace(/\./g, '')}
-            />
-          </Form.Item>
-          <Form.Item
-            name="target"
-            label="Đối tượng"
-            rules={[{ required: true, message: 'Vui lòng nhập đối tượng' }]}
-          >
-            <Input placeholder="Nhà cung cấp A" />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="Nội dung"
-            rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
-          >
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item
-            name="approvedByEmployeeId"
-            label="Người duyệt (ID nhân viên)"
-            rules={[{ required: true, message: 'Vui lòng nhập người duyệt' }]}
-          >
-            <Input placeholder="ID nhân viên" />
-          </Form.Item>
-          <Form.Item
-            name="attachmentUrl"
-            label="Link chứng từ (nếu có)"
-          >
-            <Input placeholder="https://example.com/file.pdf" />
-          </Form.Item>
-          <Form.Item label="Tệp chứng từ">
-            <Upload
-              beforeUpload={(file) => {
-                setUploadFile(file)
-                setFileList([{
-                  uid: file.uid || file.name,
-                  name: file.name,
-                  status: 'done'
-                }])
-                return false
-              }}
-              onRemove={() => {
-                setUploadFile(null)
-                setFileList([])
-              }}
-              fileList={fileList}
-            >
-              <Button icon={<UploadOutlined />}>Chọn tệp</Button>
-            </Upload>
-          </Form.Item>
+        <Form 
+          layout="vertical" 
+          form={form} 
+          initialValues={{ 
+            type: 'THU',
+            createdAt: dayjs().format('DD/MM/YYYY'),
+            creator: creatorName || ''
+          }}
+        >
+          <Row gutter={24} style={{ display: 'flex', alignItems: 'stretch' }}>
+            {/* Left Column */}
+            <Col span={12} style={{ display: 'flex', flexDirection: 'column' }}>
+              <Form.Item
+                name="type"
+                label={<span>Loại phiếu <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
+              >
+                <select
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    color: '#262626',
+                    cursor: 'pointer',
+                    backgroundColor: '#fff',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                  onChange={(e) => {
+                    setSelectedTicketType(e.target.value)
+                    form.setFieldsValue({ category: '' })
+                  }}
+                >
+                  <option value="">Chọn loại phiếu</option>
+                  <option value="Phiếu thu">Thu</option>
+                  <option value="Phiếu chi">Chi</option>
+                </select>
+              </Form.Item>
+
+              <Form.Item
+                name="category"
+                label={<span>Danh mục <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
+              >
+                <select
+                  disabled={!selectedTicketType}
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '8px 12px',
+                    fontSize: '14px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    color: selectedTicketType ? '#262626' : '#9ca3af',
+                    cursor: selectedTicketType ? 'pointer' : 'not-allowed',
+                    backgroundColor: selectedTicketType ? '#fff' : '#f9fafb',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    if (selectedTicketType) {
+                      e.target.style.borderColor = '#3b82f6'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                >
+                  <option value="">
+                    {selectedTicketType ? 'Chọn danh mục' : 'Vui lòng chọn loại phiếu trước'}
+                  </option>
+                  {getCategoryOptions().map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Form.Item>
+
+              <Form.Item
+                name="target"
+                label={<span>Đối tượng <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng nhập đối tượng' }]}
+              >
+                <Input placeholder="VD: Công ty Điện lực" />
+              </Form.Item>
+
+              <Form.Item
+                name="amount"
+                label={<span>Số tiền <span style={{ color: 'red' }}>*</span></span>}
+                rules={[
+                  { required: true, message: 'Vui lòng nhập số tiền' },
+                  { type: 'number', min: 1, message: 'Số tiền phải lớn hơn 0' }
+                ]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  placeholder="VD: 2.000.000"
+                  formatter={(value) =>
+                    `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                  }
+                  parser={(value) => value?.replace(/\./g, '')}
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Right Column */}
+            <Col span={12} style={{ display: 'flex', flexDirection: 'column' }}>
+              <Form.Item
+                name="createdAt"
+                label="Ngày tạo"
+              >
+                <Input 
+                  value={dayjs().format('DD/MM/YYYY')}
+                  disabled
+                  style={{ 
+                    background: '#f5f5f5',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="creator"
+                label="Người tạo"
+              >
+                <Input 
+                  disabled
+                  style={{ 
+                    background: '#f5f5f5',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="description"
+                label={<span>Nội dung <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+              >
+                <Input.TextArea 
+                  rows={4} 
+                  placeholder="VD: Xe bị xì lốp"
+                  style={{ 
+                    resize: 'none',
+                    minHeight: '100px',
+                    flex: 1
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </>

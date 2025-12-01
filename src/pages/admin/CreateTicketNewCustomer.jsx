@@ -7,7 +7,7 @@ import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
 import dayjs from 'dayjs'
-import { CalendarOutlined } from '@ant-design/icons'
+import { CalendarOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import ReactSelect from 'react-select'
 
 const { TextArea } = Input
@@ -45,6 +45,9 @@ export default function CreateTicketNewCustomer() {
 
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false)
   const [newCustomer, setNewCustomer] = useState({ phone: '', fullName: '', address: '' })
+
+  // Cảnh báo biển số đã thuộc khách khác
+  const [plateConflict, setPlateConflict] = useState(null)
 
   const navigate = useNavigate()
 
@@ -396,6 +399,30 @@ export default function CreateTicketNewCustomer() {
     }
   }
 
+  const submitCreateTicket = async (payload) => {
+    setLoading(true)
+    const { data, error } = await serviceTicketAPI.create(payload)
+    setLoading(false)
+
+    if (error) {
+      message.error(error || 'Tạo phiếu không thành công')
+      return
+    }
+
+    const ticketId = data?.result?.serviceTicketId
+    message.success('Tạo phiếu dịch vụ thành công')
+
+    // Navigate đến trang chi tiết để cập nhật thông tin
+    if (ticketId) {
+      navigate(`/service-advisor/orders/${ticketId}`)
+    } else {
+      form.resetFields()
+      setCustomerId(null)
+      setCustomerExists(false)
+      navigate('/service-advisor/orders')
+    }
+  }
+
   const handleCreate = async (values) => {
     if (!Array.isArray(values.service) || values.service.length === 0) {
       message.warning('Vui lòng chọn ít nhất một loại dịch vụ')
@@ -406,8 +433,6 @@ export default function CreateTicketNewCustomer() {
       message.warning('Vui lòng chọn ngày nhận xe')
       return
     }
-
-    setLoading(true)
 
     const expectedDeliveryAt = values.receiveDate
       ? dayjs(values.receiveDate).format('YYYY-MM-DD')
@@ -449,26 +474,37 @@ export default function CreateTicketNewCustomer() {
       }
     }
 
-    const { data, error } = await serviceTicketAPI.create(payload)
-    setLoading(false)
-
-    if (error) {
-      message.error(error || 'Tạo phiếu không thành công')
-      return
+    // 1) Gọi API check biển số TRƯỚC khi tạo phiếu (cho khách mới, customerId chưa chắc có)
+    const plate = values.plate || form.getFieldValue('plate')
+    if (plate) {
+      try {
+        const { data: checkRes, error: checkError } = await vehiclesAPI.checkPlate(
+          plate,
+          customerId || null
+        )
+        if (checkError) {
+          console.warn('Check plate (new customer) error:', checkError)
+        } else {
+          console.log('Check plate (new customer) response:', checkRes)
+          const status = checkRes?.result?.status || checkRes?.message
+          const owner = checkRes?.result?.owner || checkRes?.result?.customer
+          // Nếu biển số đã thuộc khách khác thì mở modal cảnh báo, KHÔNG tạo phiếu ngay
+          if (status === 'OWNED_BY_OTHER' && owner?.customerId) {
+            setPlateConflict({
+              plate,
+              owner,
+              payload
+            })
+            return
+          }
+        }
+      } catch (err) {
+        console.warn('Check plate (new customer) exception:', err)
+      }
     }
 
-    const ticketId = data?.result?.serviceTicketId
-    message.success('Tạo phiếu dịch vụ thành công')
-    
-    // Navigate đến trang chi tiết để cập nhật thông tin
-    if (ticketId) {
-      navigate(`/service-advisor/orders/${ticketId}`)
-    } else {
-      form.resetFields()
-      setCustomerId(null)
-      setCustomerExists(false)
-      navigate('/service-advisor/orders')
-    }
+    // 2) Không conflict → tạo phiếu luôn
+    await submitCreateTicket(payload)
   }
 
   const cardTitle = (
@@ -801,6 +837,68 @@ export default function CreateTicketNewCustomer() {
               </Col>
             </Row>
           </Form>
+
+          {/* Modal cảnh báo biển số đã thuộc khách khác */}
+          <Modal
+            open={!!plateConflict}
+            onCancel={() => setPlateConflict(null)}
+            footer={null}
+            title={null}
+          >
+            {plateConflict && (
+              <div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginBottom: 12
+                  }}
+                >
+                  <ExclamationCircleOutlined style={{ color: '#f59e0b', fontSize: 20 }} />
+                  <span style={{ fontWeight: 700, fontSize: 18 }}>Cảnh báo</span>
+                </div>
+                <div style={{ marginBottom: 12 }}>
+                  Biển số <b>{plateConflict.plate}</b> thuộc khách hàng khác:
+                </div>
+                <div
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 6,
+                    border: '1px solid #e5e7eb',
+                    marginBottom: 16,
+                    background: '#f9fafb'
+                  }}
+                >
+                  {plateConflict.owner?.fullName} — {plateConflict.owner?.phone}
+                </div>
+                <div style={{ marginBottom: 16 }}>Bạn muốn tiếp tục với khách hàng hiện tại?</div>
+                <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+                  <Button
+                    onClick={() => {
+                      form.setFieldsValue({ plate: '' })
+                      setPlateConflict(null)
+                    }}
+                  >
+                    Nhập lại biển số
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={async () => {
+                      const payload = {
+                        ...plateConflict.payload,
+                        forceAssignVehicle: true
+                      }
+                      setPlateConflict(null)
+                      await submitCreateTicket(payload)
+                    }}
+                  >
+                    Tiếp tục
+                  </Button>
+                </Space>
+              </div>
+            )}
+          </Modal>
 
           <Modal
             title="Tạo khách hàng mới"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Input, Card, Badge, Modal, Space, Button, DatePicker, Row, Col, message } from 'antd'
+import { Table, Input, Card, Badge, Modal, Space, Button, Row, Col, message } from 'antd'
 import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import { appointmentAPI, serviceTicketAPI } from '../../services/api'
@@ -311,29 +311,29 @@ export default function AdminAppointments() {
 
   let filtered = data
 
-  // Filter by search query
-  if (query) {
-    const q = query.toLowerCase()
+    // Filter by search query
+    if (query) {
+      const q = query.toLowerCase()
     filtered = filtered.filter(
-      (r) =>
-        (r.license && r.license.toLowerCase().includes(q)) ||
-        (r.customer && r.customer.toLowerCase().includes(q)) ||
-        (r.phone && r.phone.toLowerCase().includes(q))
-    )
-  }
+        (r) =>
+          (r.license && r.license.toLowerCase().includes(q)) ||
+          (r.customer && r.customer.toLowerCase().includes(q)) ||
+          (r.phone && r.phone.toLowerCase().includes(q))
+      )
+    }
 
-  // Filter by status
+    // Filter by status
   if (statusFilter && statusFilter !== 'ALL') {
     filtered = filtered.filter((r) => r.statusKey === statusFilter)
-  }
+    }
 
-  // Filter by date
-  if (selectedDate) {
+    // Filter by date
+    if (selectedDate) {
     const filterDate = typeof selectedDate === 'string' 
       ? dayjs(selectedDate).format('DD/MM/YYYY')
       : dayjs(selectedDate).format('DD/MM/YYYY')
     filtered = filtered.filter((r) => r.date === filterDate)
-  }
+    }
 
   // Group appointments by time slot for timeline
   const displayDate = selectedDate 
@@ -382,7 +382,7 @@ export default function AdminAppointments() {
 
     console.log('Appointment ID:', appointmentId)
     console.log('Appointment Data:', appointmentData)
-    
+
     setUpdatingStatus(true)
 
     try {
@@ -458,8 +458,8 @@ export default function AdminAppointments() {
       if (statusError) {
         console.error('Update status error:', statusError)
         message.error('Cập nhật trạng thái lịch hẹn thất bại')
-        setUpdatingStatus(false)
-        return
+      setUpdatingStatus(false)
+      return
       }
       console.log('✓ Appointment status updated to ARRIVED')
 
@@ -521,8 +521,8 @@ export default function AdminAppointments() {
       message.success('Đang chuyển sang trang tạo phiếu dịch vụ...')
       
       // Clean up first
-      setSelected(null)
-      setSelectedFull(null)
+    setSelected(null)
+    setSelectedFull(null)
       setUpdatingStatus(false)
       
       // Navigate to CreateTicket page - API POST sẽ gọi ở đó
@@ -669,8 +669,10 @@ export default function AdminAppointments() {
     <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 20px 0', color: '#111' }}>Quản lý Lịch hẹn</h1>
-          
+          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>Quản lý Lịch hẹn</h1>
+          <p style={{ margin: '0 0 20px 0', fontSize: 14, color: '#6b7280' }}>
+            Theo dõi và quản lý lịch hẹn sửa chữa của khách hàng theo ngày, trạng thái và khung giờ.
+          </p>
           <Row gutter={16} align="middle">
             <Col flex="auto">
               <Search
@@ -701,17 +703,30 @@ export default function AdminAppointments() {
               </Space>
             </Col>
             <Col>
-              <DatePicker
-                placeholder="Chọn ngày"
-                format="DD/MM/YYYY"
-                size="large"
-                suffixIcon={<CalendarOutlined />}
-                value={selectedDate ? dayjs(selectedDate) : null}
-                onChange={(date) => {
-                  setSelectedDate(date ? date.format('YYYY-MM-DD') : null)
-                }}
-                style={{ width: '160px' }}
-              />
+              <div className="appointment-date-picker">
+                {!selectedDate && (
+                  <span className="appointment-date-placeholder">Chọn ngày</span>
+                )}
+                <input
+                  type="date"
+                  className={`appointment-date-input${selectedDate ? ' has-value' : ''}`}
+                  value={selectedDate || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSelectedDate(value || null)
+                  }}
+                />
+                {selectedDate && (
+                  <button
+                    type="button"
+                    className="appointment-date-clear"
+                    onClick={() => setSelectedDate(null)}
+                  >
+                    ×
+                  </button>
+                )}
+                <CalendarOutlined className="appointment-date-icon" />
+              </div>
             </Col>
           </Row>
         </div>
@@ -751,7 +766,7 @@ export default function AdminAppointments() {
           </Col>
           
           <Col span={8}>
-            <Card
+            <Card 
               style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
               bodyStyle={{ padding: '24px' }}
             >
@@ -775,7 +790,7 @@ export default function AdminAppointments() {
                     justifyContent: 'center',
                     color: '#04091e'
                   }}
-                >
+            >
                   <CalendarOutlined />
                 </div>
               </div>
@@ -829,21 +844,21 @@ export default function AdminAppointments() {
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: '16px', fontWeight: 600, color: '#04091e', marginBottom: '4px' }}>
                             {slotLabel}
-                          </div>
+                             </div>
                           <div style={{ fontSize: '14px', color: '#6b7280' }}>
                             {slotAppointments.length} lịch hẹn
-                          </div>
-                        </div>
+                         </div>
                       </div>
+                    </div>
                     )
                   })}
                 </div>
-              ) : (
+                ) : (
                 <div style={{ textAlign: 'center', color: '#9ca3af', padding: '40px 0' }}>
-                  <CalendarOutlined style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }} />
-                  {selectedDate ? 'Không có lịch hẹn ngày này' : 'Vui lòng chọn ngày để xem lịch trình'}
-                </div>
-              )}
+                    <CalendarOutlined style={{ fontSize: '32px', marginBottom: '8px', display: 'block' }} />
+                    {selectedDate ? 'Không có lịch hẹn ngày này' : 'Vui lòng chọn ngày để xem lịch trình'}
+                  </div>
+                )}
             </Card>
           </Col>
         </Row>
@@ -927,25 +942,25 @@ export default function AdminAppointments() {
                 const currentStatus = selectedFull?.status || selected?.statusKey || 'CONFIRMED'
                 const isCancelled = currentStatus === 'CANCELLED'
                 return (
-                  <Button
-                    type="primary"
-                    size="large"
-                    onClick={handleCreateTicket}
-                    loading={updatingStatus}
+              <Button
+                type="primary"
+                size="large"
+                onClick={handleCreateTicket}
+                loading={updatingStatus}
                     disabled={updatingStatus || isCancelled}
-                    style={{
+                style={{
                       background: isCancelled ? '#d1d5db' : '#22c55e',
                       borderColor: isCancelled ? '#d1d5db' : '#22c55e',
-                      height: '45px',
-                      padding: '0 40px',
-                      fontWeight: 600,
+                  height: '45px',
+                  padding: '0 40px',
+                  fontWeight: 600,
                       fontSize: '16px',
                       cursor: isCancelled ? 'not-allowed' : 'pointer',
                       opacity: isCancelled ? 0.6 : 1
-                    }}
-                  >
-                    Tạo Phiếu Dịch Vụ
-                  </Button>
+                }}
+              >
+                Tạo Phiếu Dịch Vụ
+              </Button>
                 )
               })()}
             </div>

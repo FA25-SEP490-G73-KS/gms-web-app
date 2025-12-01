@@ -326,16 +326,23 @@ export default function TicketDetailPage() {
   }
 
   const buildQuotationItemsPayload = () => {
-    const partItems = replaceItems.map(item => ({
-      itemName: item.categoryLabel || item.category || '',
-      partId: item.category || null,
-      priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
-      quantity: Number(item.quantity) || 0,
-      totalPrice: Number(item.total) || 0,
-      type: 'PART',
-      unit: item.unit || '',
-      unitPrice: Number(item.unitPrice) || 0
-    }))
+    const partItems = replaceItems.map(item => {
+   
+      const partOption = getPartOption(item.category)
+      const isPartInList = partOption?.part !== undefined
+      
+      return {
+        itemName: item.categoryLabel || item.category || '',
+      
+        partId: isPartInList ? item.category : null,
+        priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
+        quantity: Number(item.quantity) || 0,
+        totalPrice: Number(item.total) || 0,
+        type: 'PART',
+        unit: item.unit || '',
+        unitPrice: Number(item.unitPrice) || 0
+      }
+    })
 
     const servicePayload = serviceItems.map(item => {
       const unitPrice = Number(item.unitPrice) || 0
@@ -772,10 +779,11 @@ export default function TicketDetailPage() {
       if (sendError) {
         throw new Error(sendError)
       }
-      const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
-      if (znsError) {
-        throw new Error(znsError)
-      }
+      // Tạm thời tắt phần gửi Zalo
+      // const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
+      // if (znsError) {
+      //   throw new Error(znsError)
+      // }
       message.success('Đã gửi báo giá cho khách hàng')
       await fetchTicketDetail()
     } catch (error) {
@@ -971,7 +979,8 @@ export default function TicketDetailPage() {
     }
 
     const payload = {
-      discount: ticketData?.priceQuotation?.discountPercent ?? ticketData?.priceQuotation?.discount ?? 0,
+      // Backend trả về discount là số tiền, nên khi lưu cũng gửi đúng theo amount
+      discount: ticketData?.priceQuotation?.discount ?? 0,
       estimateAmount: grandTotal,
       items: buildQuotationItemsPayload()
     }
@@ -1320,12 +1329,14 @@ export default function TicketDetailPage() {
   const totalReplacement = replaceItems.reduce((sum, item) => sum + (item.total || 0), 0)
   const totalService = serviceItems.reduce((sum, item) => sum + (item.total || 0), 0)
   const grandTotal = totalReplacement + totalService
-  const discountPercent =
-    ticketData?.priceQuotation?.discountPercent ??
-    ticketData?.priceQuotation?.discountRate ??
-    0
-  const discountAmount = Math.round((grandTotal * discountPercent) / 100)
-  const finalAmount = grandTotal - discountAmount
+
+  // Hiển thị discount đúng theo response: priceQuotation.discount là số tiền giảm
+  const discountAmountFromResponse =
+    ticketData?.priceQuotation?.discount != null
+      ? Number(ticketData.priceQuotation.discount)
+      : 0
+  const safeDiscountAmount = Number.isNaN(discountAmountFromResponse) ? 0 : discountAmountFromResponse
+  const finalAmount = grandTotal - safeDiscountAmount
 
   return (
     <AdminLayout>
@@ -1596,12 +1607,7 @@ export default function TicketDetailPage() {
                 <div>
                   <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Giảm giá</div>
                   <div style={{ fontSize: '16px', fontWeight: 600 }}>
-                    {discountPercent ? `${discountPercent}%` : '0%'}{' '}
-                    {discountAmount > 0 && (
-                      <span style={{ color: '#6b7280', fontWeight: 400 }}>
-                        ({formatCurrency(discountAmount)} đ)
-                      </span>
-                    )}
+                    {formatCurrency(safeDiscountAmount)} đ
                   </div>
                 </div>
                 <div>
@@ -1728,9 +1734,10 @@ export default function TicketDetailPage() {
         >
           Gửi báo giá
         </Button>
-        <div style={{ marginTop: '12px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
+        {/* Tạm thời tắt phần hiển thị thông báo Zalo */}
+        {/* <div style={{ marginTop: '12px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
           Báo giá sẽ được gửi cho khách hàng qua Zalo
-        </div>
+        </div> */}
       </Modal>
 
       {/* Modal Từ chối báo giá */}

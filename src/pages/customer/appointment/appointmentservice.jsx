@@ -454,7 +454,13 @@ export default function AppointmentService() {
                 </div>
                 <div>
                   <label style={labelStyle}>Ngày đặt *</label>
-                  <input type="date" value={form.date} onChange={update('date')} style={inputStyle} />
+                  <input
+                    type="date"
+                    value={form.date}
+                    onChange={update('date')}
+                    style={inputStyle}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
                 </div>
                 <div>
                   <label style={labelStyle}>Khung giờ *</label>

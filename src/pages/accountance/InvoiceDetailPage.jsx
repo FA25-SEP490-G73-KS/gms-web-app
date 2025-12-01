@@ -35,6 +35,15 @@ export default function InvoiceDetailPage() {
       setDepositAmount('')
       setPayOSInitialized(false)
       fetchInvoiceDetail()
+
+     
+      try {
+        if (window.opener && !window.opener.closed) {
+          window.close()
+        }
+      } catch (e) {
+        console.warn('Không thể tự đóng tab thanh toán:', e)
+      }
     },
     onExit: (event) => {
       console.log('User exited payment:', event)

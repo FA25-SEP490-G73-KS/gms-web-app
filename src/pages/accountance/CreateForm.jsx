@@ -1,13 +1,12 @@
-import React, { useState } from 'react'
-import { Form, Input, Select, DatePicker, Button, Upload, Row, Col, Tag, Space, message } from 'antd'
-import { InboxOutlined, CloseOutlined, PlusOutlined } from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { Form, Input, Button, Upload, Row, Col, message } from 'antd'
+import { InboxOutlined, CloseOutlined, CalendarOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { manualVoucherAPI } from '../../services/api'
+import { getUserNameFromToken } from '../../utils/helpers'
 import dayjs from 'dayjs'
 import '../../styles/pages/accountance/create-form.css'
 
-const { TextArea } = Input
-const { Option } = Select
 const { Dragger } = Upload
 
 const TICKET_TYPES = [
@@ -16,50 +15,36 @@ const TICKET_TYPES = [
   { value: 'ung_luong', label: 'Ứng lương' }
 ]
 
-const APPROVERS = [
-  { value: 101, label: 'HTK Ly' },
-  { value: 102, label: 'DT Huyền' },
-  { value: 103, label: 'Nguyễn Văn A' },
-  { value: 104, label: 'Trần Thị B' }
-]
-
-const CREATORS = [
-  { value: 201, label: 'DT Huyền' },
-  { value: 202, label: 'HTK Ly' },
-  { value: 203, label: 'Nguyễn Văn A' }
-]
 
 export default function CreateForm() {
   const [form] = Form.useForm()
-  const [selectedApprovers, setSelectedApprovers] = useState([101, 102])
   const [fileList, setFileList] = useState([])
   const [loading, setLoading] = useState(false)
+  const [creatorName, setCreatorName] = useState('')
+
+  useEffect(() => {
+    const userName = getUserNameFromToken()
+    setCreatorName(userName || '')
+    form.setFieldsValue({
+      creator: userName || '',
+      createdAt: dayjs().format('DD/MM/YYYY')
+    })
+  }, [form])
 
   const handleSubmit = async (values) => {
     try {
-      
       if (values.ticketType === 'ung_luong') {
         message.error('Loại phiếu "Ứng lương" chưa được hỗ trợ. Vui lòng chọn "Thu" hoặc "Chi".')
         return
       }
 
-      // Validate approvers
-      if (!selectedApprovers || selectedApprovers.length === 0) {
-        message.error('Vui lòng chọn ít nhất một người duyệt')
-        return
+      // Map ticketType to API enum values
+      const typeMap = {
+        'thu': 'Phiếu thu',
+        'chi': 'Phiếu chi',
+        'ung_luong': 'Ứng lương'
       }
-
-      // Lấy người duyệt đầu tiên (API chỉ nhận 1 người duyệt)
-      const approverId = selectedApprovers[0]
-      const approvedByEmployeeId = Number(approverId)
-
-      if (!Number.isFinite(approvedByEmployeeId)) {
-        message.error('Người duyệt phải có ID hợp lệ')
-        return
-      }
-
-      // Map ticketType: 'thu' -> 'THU', 'chi' -> 'CHI'
-      const type = values.ticketType.toUpperCase()
+      const type = typeMap[values.ticketType] || values.ticketType
 
       // Parse amount - loại bỏ dấu chấm và phẩy (format VN: 2.000.000 hoặc 2,000,000)
       let amount = 0
@@ -78,8 +63,7 @@ export default function CreateForm() {
         type,
         amount,
         target: values.subject || '',
-        description: values.content || '',
-            approvedByEmployeeId
+        description: values.content || ''
       }
 
       // Lấy file đầu tiên nếu có
@@ -96,21 +80,17 @@ export default function CreateForm() {
 
       message.success('Tạo phiếu thành công!')
       form.resetFields()
-      setSelectedApprovers([])
       setFileList([])
+      // Reset form với giá trị mặc định
+      form.setFieldsValue({
+        creator: creatorName || '',
+        createdAt: dayjs().format('DD/MM/YYYY')
+      })
     } catch (err) {
       message.error(err.message || 'Không thể tạo phiếu. Vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleApproverChange = (value) => {
-    setSelectedApprovers(value)
-  }
-
-  const handleRemoveApprover = (removedApprover) => {
-    setSelectedApprovers(selectedApprovers.filter(a => a !== removedApprover))
   }
 
   const handleFileRemove = (file) => {
@@ -155,172 +135,137 @@ export default function CreateForm() {
             layout="vertical"
             onFinish={handleSubmit}
             initialValues={{
-              createdAt: dayjs('2025-10-11'),
-          creator: 201
+              createdAt: dayjs().format('DD/MM/YYYY'),
+              creator: creatorName || ''
             }}
             className="create-form"
           >
             <Row gutter={24}>
+              {/* Left Column */}
               <Col span={12}>
                 <Form.Item
-                  label={<span>Loại Phiếu <span style={{ color: 'red' }}>*</span></span>}
+                  label="Loại Phiếu *"
                   name="ticketType"
                   rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
                 >
-                  <Select placeholder="Chọn loại phiếu">
+                  <select
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      color: '#262626',
+                      cursor: 'pointer'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3b82f6'
+                      e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#d9d9d9'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    <option value="">Chọn loại phiếu</option>
                     {TICKET_TYPES.map(type => (
-                      <Option key={type.value} value={type.value}>
+                      <option key={type.value} value={type.value}>
                         {type.label}
-                      </Option>
+                      </option>
                     ))}
-                  </Select>
+                  </select>
                 </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={<span>Ngày tạo <span style={{ color: 'red' }}>*</span></span>}
-                  name="createdAt"
-                  rules={[{ required: true, message: 'Vui lòng chọn ngày tạo' }]}
-                >
-                  <DatePicker
-                    style={{ width: '100%' }}
-                    format="DD/MM/YYYY"
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
 
-            <Row gutter={24}>
-              <Col span={12}>
                 <Form.Item
-                  label={<span>Đối tượng <span style={{ color: 'red' }}>*</span></span>}
+                  label="Danh mục *"
+                  name="category"
+                  rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
+                >
+                  <select
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '8px 12px',
+                      fontSize: '14px',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      color: '#262626',
+                      cursor: 'pointer'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#3b82f6'
+                      e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#d9d9d9'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    <option value="">Chọn danh mục</option>
+                    <option value="supplier">Nhà cung cấp</option>
+                    <option value="customer">Khách hàng</option>
+                    <option value="employee">Nhân viên</option>
+                    <option value="other">Khác</option>
+                  </select>
+                </Form.Item>
+
+                <Form.Item
+                  label="Đối tượng *"
                   name="subject"
                   rules={[{ required: true, message: 'Vui lòng nhập đối tượng' }]}
                 >
                   <Input placeholder="VD: Công ty Điện lực" />
                 </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  label={<span>Người tạo <span style={{ color: 'red' }}>*</span></span>}
-                  name="creator"
-                  rules={[{ required: true, message: 'Vui lòng chọn người tạo' }]}
-                >
-                  <Select>
-                    {CREATORS.map(creator => (
-                      <Option key={creator.value} value={creator.value}>
-                        {creator.label}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
 
-            <Row gutter={24}>
-              <Col span={12}>
                 <Form.Item
-                  label={<span>Số tiền <span style={{ color: 'red' }}>*</span></span>}
+                  label="Số tiền *"
                   name="amount"
                   rules={[{ required: true, message: 'Vui lòng nhập số tiền' }]}
                 >
                   <Input placeholder="VD: 2.000.000" />
                 </Form.Item>
               </Col>
+
+              {/* Right Column */}
               <Col span={12}>
                 <Form.Item
-                  label={<span>Người duyệt <span style={{ color: 'red' }}>*</span></span>}
-                  name="approvers"
-                  rules={[{ required: true, message: 'Vui lòng chọn người duyệt' }]}
+                  label="Ngày tạo *"
+                  name="createdAt"
+                  rules={[{ required: true, message: 'Vui lòng nhập ngày tạo' }]}
                 >
-                  <Select
-                    mode="multiple"
-                    value={selectedApprovers}
-                    onChange={handleApproverChange}
-                    placeholder="Chọn người duyệt"
-                    dropdownRender={(menu) => (
-                      <>
-                        {menu}
-                        <div style={{ padding: '8px', borderTop: '1px solid #f0f0f0' }}>
-                          <span style={{ color: '#666', fontSize: '12px' }}>
-                            {APPROVERS.length} người duyệt có sẵn
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  >
-                    {APPROVERS.map(approver => (
-                      <Option key={approver.value} value={approver.value}>
-                        {approver.label}
-                      </Option>
-                    ))}
-                  </Select>
+                  <Input 
+                    value={dayjs().format('DD/MM/YYYY')}
+                    disabled
+                    style={{ 
+                      background: '#f5f5f5',
+                      cursor: 'not-allowed'
+                    }}
+                  />
                 </Form.Item>
-                {selectedApprovers.length > 0 && (
-                  <div style={{ 
-                    marginTop: '12px', 
-                    display: 'flex', 
-                    flexWrap: 'wrap', 
-                    gap: '8px',
-                    padding: '12px',
-                    background: '#fafafa',
-                    borderRadius: '8px',
-                    border: '1px solid #f0f0f0'
-                  }}>
-                    {selectedApprovers.map(approverId => {
-                      const approver = APPROVERS.find(a => a.value === approverId)
-                      return (
-                        <Tag
-                          key={approverId}
-                          closable
-                          onClose={() => handleRemoveApprover(approverId)}
-                          style={{
-                            padding: '6px 12px',
-                            borderRadius: '6px',
-                            background: '#e6f7ff',
-                            border: '1px solid #91d5ff',
-                            color: '#1890ff',
-                            fontSize: '14px',
-                            fontWeight: 500
-                          }}
-                        >
-                          {approver?.label}
-                        </Tag>
-                      )
-                    })}
-                    {APPROVERS.length > selectedApprovers.length && (
-                      <Tag
-                        style={{
-                          padding: '6px 12px',
-                          borderRadius: '6px',
-                          background: '#f0f0f0',
-                          border: '1px solid #d9d9d9',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          color: '#666'
-                        }}
-                        onClick={() => {
-                          const select = document.querySelector('.ant-select-selector')
-                          select?.click()
-                        }}
-                      >
-                        +{APPROVERS.length - selectedApprovers.length}
-                      </Tag>
-                    )}
-                  </div>
-                )}
-              </Col>
-            </Row>
 
-            <Row gutter={24}>
-              <Col span={24}>
                 <Form.Item
-                  label={<span>Nội dung <span style={{ color: 'red' }}>*</span></span>}
+                  label="Người tạo *"
+                  name="creator"
+                  rules={[{ required: true, message: 'Vui lòng nhập người tạo' }]}
+                >
+                  <Input 
+                    disabled
+                    style={{ 
+                      background: '#f5f5f5',
+                      cursor: 'not-allowed'
+                    }}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label="Nội dung *"
                   name="content"
                   rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
                 >
-                  <TextArea
+                  <Input.TextArea
                     rows={4}
                     placeholder="VD: Xe bị xì lốp"
                     style={{ resize: 'none' }}
@@ -432,8 +377,12 @@ export default function CreateForm() {
                 size="large"
                 onClick={() => {
                   form.resetFields()
-                  setSelectedApprovers([])
                   setFileList([])
+                  // Reset form với giá trị mặc định
+                  form.setFieldsValue({
+                    creator: creatorName || '',
+                    createdAt: dayjs().format('DD/MM/YYYY')
+                  })
                 }}
                 style={{
                   borderRadius: '8px',

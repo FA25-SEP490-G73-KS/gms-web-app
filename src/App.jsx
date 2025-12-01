@@ -17,6 +17,7 @@ import TicketDetailPage from './pages/admin/TicketDetailPage';
 import Reports from './pages/admin/Reports';
 import AccountanceEmployeeList from './pages/accountance/EmployeeList';
 import AccountancePayroll from './pages/accountance/Payroll';
+import PayrollDetailPage from './pages/accountance/PayrollDetailPage';
 import AccountanceAttendance from './pages/accountance/Attendance';
 import AccountancePlaceholder from './pages/accountance/Placeholder';
 import AccountanceDebts from './pages/accountance/Debts';
@@ -42,6 +43,7 @@ import PayrollForManager from './pages/manager/accountance/Payroll';
 import ManagerServiceAdvisorHome from './pages/manager/ManagerServiceAdvisorHome';
 import ManagerServiceOrders from './pages/manager/service/ServiceOrders';
 import ManagerServiceTypes from './pages/manager/service/ServiceTypes';
+import ManagerTicketDetailPage from './pages/manager/service/ManagerTicketDetailPage';
 import Inventory from './pages/admin/Inventory';
 import ManagerHome from './pages/manager/ManagerHome';
 
@@ -52,6 +54,7 @@ import ImportList from './pages/warehouse/ImportList';
 import ImportRequest from './pages/warehouse/ImportRequest';
 import CreateImportForm from './pages/warehouse/CreateImportForm';
 import ExportList from './pages/warehouse/ExportList';
+import ExportParts from './pages/warehouse/ExportParts';
 import ExportRequest from './pages/warehouse/ExportRequest';
 import CreateExportForm from './pages/warehouse/CreateExportForm';
 
@@ -101,14 +104,14 @@ function App() {
         <Route path="/warehouse/import/create" element={<CreateImportForm />} />
         <Route path="/warehouse/export/list" element={<ExportList />} />
         <Route path="/warehouse/export/request" element={<ExportRequest />} />
-
-        <Route path="/warehouse/export/create" element={<Navigate to="/warehouse/ticket/create" replace />} />
+        <Route path="/warehouse/export/create" element={<ExportParts />} />
 
         <Route path="/accountance" element={<AccountancePlaceholder title="Thống kê" />} />
         <Route path="/accountance/finance" element={<AccountanceFinance />} />
         <Route path="/accountance/hr/list" element={<AccountanceEmployeeList />} />
         <Route path="/accountance/hr/attendance" element={<AccountanceAttendance />} />
         <Route path="/accountance/hr/payroll" element={<AccountancePayroll />} />
+        <Route path="/accountance/hr/payroll/:employeeId/:month/:year" element={<PayrollDetailPage />} />
         <Route path="/accountance/payments" element={<AccountancePayments />} />
         <Route path="/accountance/payments/:id" element={<InvoiceDetailPage />} />
         <Route path="/accountance/debts" element={<AccountanceDebts />} />
@@ -139,7 +142,7 @@ function App() {
         {/* Manager - Dịch vụ */}
         <Route path="/manager/service" element={<ManagerServiceAdvisorHome />} />
         <Route path="/manager/service/orders" element={<ManagerServiceOrders />} />
-        <Route path="/manager/service/orders/:id" element={<TicketDetailPage />} />
+        <Route path="/manager/service/orders/:id" element={<ManagerTicketDetailPage />} />
         <Route path="/manager/service/types" element={<ManagerServiceTypes />} />
         
         {/* Manager - Khuyến mãi */}

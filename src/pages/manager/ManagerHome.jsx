@@ -16,7 +16,10 @@ export default function ManagerHome() {
   return (
     <ManagerLayout>
       <div style={{ padding: '24px' }}>
-        <Title level={2} style={{ marginBottom: 24 }}>Dashboard - Manager</Title>
+        <Title level={2} style={{ marginBottom: 4 }}>Dashboard - Manager</Title>
+        <p style={{ margin: '0 0 24px 0', fontSize: 14, color: '#6b7280' }}>
+          Tổng quan nhanh về hoạt động garage: lịch hẹn, phiếu dịch vụ, doanh thu và nhân sự.
+        </p>
         
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col xs={24} sm={12} lg={6}>

@@ -11,7 +11,8 @@ const { Search } = Input
 export default function ExportList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('Đang xuất hàng')
+  // Mặc định hiển thị tất cả trạng thái
+  const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -41,7 +42,8 @@ export default function ExportList() {
       // Transform API data to match UI structure
       const transformedData = content.map((item) => ({
         id: item.priceQuotationId || item.id,
-        code: item.code || 'N/A',
+        // Hiển thị mã báo giá từ API thay vì N/A
+        code: item.priceQuotationCode || item.code || 'N/A',
         customer: item.customerName || 'N/A',
         licensePlate: item.licensePlate || 'N/A',
         createDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'N/A',
@@ -96,6 +98,13 @@ export default function ExportList() {
   const handleExportItem = (recordId, partId) => {
     console.log('Export item:', recordId, partId)
     // Handle export logic here
+  }
+
+  const toggleExpandRow = (record) => {
+    const key = record.key ?? record.id
+    setExpandedRowKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    )
   }
 
   // Filter data
@@ -189,6 +198,28 @@ export default function ExportList() {
           >
             {config.text}
           </Tag>
+        )
+      }
+    },
+    {
+      title: '',
+      key: 'expand',
+      width: 60,
+      align: 'right',
+      render: (_, record) => {
+        const key = record.key ?? record.id
+        const isExpanded = expandedRowKeys.includes(key)
+        return (
+          <Button
+            type="text"
+            icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+            onClick={() => toggleExpandRow(record)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          />
         )
       }
     }
@@ -396,7 +427,7 @@ export default function ExportList() {
             columns={columns}
             dataSource={filteredData}
             rowClassName={(record, index) => {
-              const isExpanded = expandedRowKeys.includes(record.key?.toString())
+              const isExpanded = expandedRowKeys.includes(record.key)
               const baseClass = index % 2 === 0 ? 'table-row-even' : 'table-row-odd'
               return isExpanded ? `${baseClass} table-row-expanded` : baseClass
             }}
@@ -404,24 +435,7 @@ export default function ExportList() {
               expandedRowRender,
               expandedRowKeys,
               onExpandedRowsChange: setExpandedRowKeys,
-              expandIcon: ({ expanded, onExpand, record }) => (
-                <Button
-                  type="text"
-                  icon={expanded ? <UpOutlined /> : <DownOutlined />}
-                  onClick={(e) => onExpand(record, e)}
-                  style={{ 
-                    padding: '4px 8px',
-                    width: 'auto',
-                    height: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: expanded ? '#1677ff' : '#666',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}
-                />
-              ),
+              expandIcon: () => null,
               indentSize: 0,
               expandRowByClick: false
             }}

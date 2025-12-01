@@ -82,3 +82,15 @@ export function getUserNameFromToken() {
   }
 }
 
+export function getUserIdFromToken() {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    if (!token) return null;
+    const decoded = decodeJWT(token);
+    return decoded?.userId || decoded?.id || decoded?.employeeId || decoded?.sub || null;
+  } catch (error) {
+    console.error('Error getting user ID from token:', error);
+    return null;
+  }
+}
+

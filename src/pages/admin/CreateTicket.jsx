@@ -278,8 +278,6 @@ export default function CreateTicket() {
   }
 
   const handleCreate = async (values) => {
-    setLoading(true)
-
     console.log('=== [CreateTicket] Form Submit ===')
     console.log('appointmentPrefill:', appointmentPrefill)
     console.log('Form values:', values)
@@ -295,13 +293,6 @@ export default function CreateTicket() {
       }
     } else if (appointmentPrefill.expectedDeliveryAt) {
       expectedDeliveryAt = appointmentPrefill.expectedDeliveryAt
-    }
-
-    // Kiểm tra nếu chưa có customerId thì cần tạo khách hàng trước
-    if (!customerId) {
-      message.warning('Vui lòng kiểm tra hoặc tạo khách hàng trước khi tạo phiếu')
-      setLoading(false)
-      return
     }
 
     // Lấy brandId và modelId từ state hoặc form values
@@ -383,6 +374,37 @@ export default function CreateTicket() {
     console.log('forceAssignVehicle:', createPayload.forceAssignVehicle)
     console.log('====================')
 
+    // 1) Gọi API check biển số TRƯỚC khi tạo phiếu
+    const plate = values.plate || form.getFieldValue('plate')
+    if (plate) {
+      try {
+        const { data: checkRes, error: checkError } = await vehiclesAPI.checkPlate(
+          plate,
+          customerId
+        )
+        if (checkError) {
+          console.warn('Check plate error:', checkError)
+        } else {
+          console.log('Check plate response:', checkRes)
+          const status = checkRes?.result?.status || checkRes?.message
+          const owner = checkRes?.result?.owner || checkRes?.result?.customer
+          // Nếu biển số thuộc khách khác thì chặn tạo phiếu
+          if (status === 'OWNED_BY_OTHER' && owner?.customerId && owner.customerId !== customerId) {
+            message.error(
+              `Biển số này đã thuộc khách hàng khác: ${owner.fullName || ''} – ${
+                owner.phone || ''
+              }. Vui lòng kiểm tra lại.`
+            )
+            return
+          }
+        }
+      } catch (err) {
+        console.warn('Check plate exception:', err)
+      }
+    }
+
+    // 2) Sau khi check xong mới gọi tạo phiếu
+    setLoading(true)
     const { data, error } = await serviceTicketAPI.create(createPayload)
     setLoading(false)
 
@@ -413,6 +435,26 @@ export default function CreateTicket() {
     
     if (ticketId) {
       message.success('Tạo phiếu dịch vụ thành công')
+      // Sau khi tạo phiếu, gọi API check biển số (không chặn luồng)
+      const plate = values.plate || form.getFieldValue('plate')
+      const currentCustomerId =
+        data?.result?.customer?.customerId || customerId || null
+      if (plate) {
+        try {
+          const { data: checkRes, error: checkError } = await vehiclesAPI.checkPlate(
+            plate,
+            currentCustomerId
+          )
+          if (checkError) {
+            console.warn('Check plate error:', checkError)
+          } else {
+            console.log('Check plate response:', checkRes)
+            // TODO: hiển thị modal cảnh báo nếu status = "OWNED_BY_OTHER"
+          }
+        } catch (err) {
+          console.warn('Check plate exception:', err)
+        }
+      }
       navigate(`/service-advisor/orders/${ticketId}`)
     } else {
       message.warning('Tạo phiếu thành công nhưng không có ID')
@@ -420,9 +462,14 @@ export default function CreateTicket() {
   }
 
   const cardTitle = (
-    <span style={{ fontSize: '20px', fontWeight: 600, display: 'block' }}>
-      Tạo phiếu dịch vụ
-    </span>
+    <div>
+      <span style={{ fontSize: '20px', fontWeight: 600, display: 'block' }}>
+        Tạo phiếu dịch vụ
+      </span>
+      <span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
+        Sử dụng khi khách hàng đã tồn tại trong hệ thống. Vui lòng kiểm tra và chọn đúng thông tin khách.
+      </span>
+    </div>
   )
 
   return (

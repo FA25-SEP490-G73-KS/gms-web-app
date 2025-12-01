@@ -1,5 +1,6 @@
-import { useMemo, useState, useEffect } from 'react'
-import { Button, Checkbox, Input, Tabs, Table, message, Select } from 'antd'
+import { useMemo, useState, useEffect, useRef } from 'react'
+import { Button, Checkbox, Input, Tabs, Table, message } from 'antd'
+import { CalendarOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
 import { attendanceAPI, employeeAPI } from '../../../services/api'
@@ -46,30 +47,17 @@ const fallbackOverview = fallbackEmployees.map((emp, idx) => {
   }
 })
 
-// Generate month options dynamically (last 6 months + next 6 months)
-const generateMonthOptions = () => {
-  const options = []
-  const now = dayjs()
-  
-  for (let i = -6; i <= 6; i++) {
-    const month = now.add(i, 'month')
-    const value = month.format('MM/YYYY')
-    const label = `Tháng ${month.format('M/YYYY')}`
-    options.push({ label, value })
-  }
-  
-  return options
-}
 
 export default function AttendanceForManager() {
   const [activeTab, setActiveTab] = useState('checkin')
   const [search, setSearch] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('MM/YYYY')) // Current month
+  const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM')) // Current month
   const [overviewData, setOverviewData] = useState([])
   const [overviewLoading, setOverviewLoading] = useState(false)
   const [employees, setEmployees] = useState([])
   const [employeesLoading, setEmployeesLoading] = useState(false)
   const [attendance, setAttendance] = useState([])
+  const monthInputRef = useRef(null)
 
   const filtered = useMemo(() => {
     if (!search || search.trim() === '') return attendance
@@ -148,6 +136,9 @@ export default function AttendanceForManager() {
         console.log('Total:', transformedEmployees.length)
         console.log('First 3 employees:', transformedEmployees.slice(0, 3))
         console.log('========================')
+        
+        // Fetch today's attendance after employees are loaded
+        fetchTodayAttendanceForEmployees(transformedEmployees)
       } else {
         console.warn('No content in API response, using fallback')
         setEmployees(fallbackEmployees)
@@ -163,13 +154,103 @@ export default function AttendanceForManager() {
     }
   }
 
+  const fetchTodayAttendanceForEmployees = async (employeesList) => {
+    try {
+      const today = dayjs().format('YYYY-MM-DD')
+      console.log('=== Fetching Today Attendance ===')
+      console.log('Date:', today)
+      
+      const { data, error } = await attendanceAPI.getDaily(today)
+      
+      if (error) {
+        console.log('No attendance data for today or error:', error)
+        return // No attendance data yet, that's fine
+      }
+
+      console.log('Today Attendance Response:', data)
+
+      if (data && data.result && Array.isArray(data.result)) {
+        // Update attendance state with today's data
+        const updatedAttendance = employeesList.map((emp) => {
+          const todayRecord = data.result.find(
+            (record) => Number(record.employeeId) === Number(emp.id)
+          )
+          
+          if (todayRecord) {
+            return {
+              ...emp,
+              present: todayRecord.isPresent || false,
+              note: todayRecord.note || ''
+            }
+          }
+          
+          return emp
+        })
+        
+        setAttendance(updatedAttendance)
+        
+        console.log('=== Today Attendance Loaded ===')
+        console.log('Records found:', data.result.length)
+        console.log('===============================')
+      }
+    } catch (err) {
+      console.error('Exception fetching today attendance:', err)
+      // Don't show error message, just log it
+    }
+  }
+
+  const fetchTodayAttendance = async () => {
+    try {
+      const today = dayjs().format('YYYY-MM-DD')
+      console.log('=== Fetching Today Attendance ===')
+      console.log('Date:', today)
+      
+      const { data, error } = await attendanceAPI.getDaily(today)
+      
+      if (error) {
+        console.log('No attendance data for today or error:', error)
+        return // No attendance data yet, that's fine
+      }
+
+      console.log('Today Attendance Response:', data)
+
+      if (data && data.result && Array.isArray(data.result)) {
+        // Update attendance state with today's data
+        setAttendance((prev) => {
+          return prev.map((emp) => {
+            const todayRecord = data.result.find(
+              (record) => Number(record.employeeId) === Number(emp.id)
+            )
+            
+            if (todayRecord) {
+              return {
+                ...emp,
+                present: todayRecord.isPresent || false,
+                note: todayRecord.note || ''
+              }
+            }
+            
+            return emp
+          })
+        })
+        
+        console.log('=== Today Attendance Loaded ===')
+        console.log('Records found:', data.result.length)
+        console.log('===============================')
+      }
+    } catch (err) {
+      console.error('Exception fetching today attendance:', err)
+      // Don't show error message, just log it
+    }
+  }
+
   const fetchOverviewData = async () => {
     try {
       setOverviewLoading(true)
       
-      // Convert "11/2025" to start and end dates for API
-      const [month, year] = selectedMonth.split('/')
-      const startDate = dayjs(`${year}-${month.padStart(2, '0')}-01`)
+      // Convert "YYYY-MM" to start and end dates for API
+      const [year, month] = selectedMonth.split('-')
+      const startDate = dayjs(`${year}-${month}-01`)
       const endDate = startDate.endOf('month')
       const daysInMonth = endDate.date()
       
@@ -276,7 +357,7 @@ export default function AttendanceForManager() {
     {
       title: (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <Checkbox
+        <Checkbox
             checked={allChecked}
             onChange={(e) => handleCheckAll(e.target.checked)}
             style={{ transform: 'scale(1.2)' }}
@@ -351,14 +432,8 @@ export default function AttendanceForManager() {
       console.log('Success:', data)
       message.success(`Đã điểm danh thành công cho ${attendanceRecords.length} nhân viên`)
       
-      // Reset attendance state after successful save
-      setAttendance((prev) =>
-        prev.map((item) => ({
-          ...item,
-          present: false,
-          note: ''
-        }))
-      )
+      // Fetch today's attendance again to update checkboxes
+      await fetchTodayAttendance()
     } catch (error) {
       console.error('Error marking attendance:', error)
       message.error('Không thể lưu điểm danh. Vui lòng thử lại')
@@ -518,12 +593,76 @@ export default function AttendanceForManager() {
           ) : (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-                <Select
+                <div style={{ position: 'relative', width: 180 }}>
+                  <select
+                    ref={monthInputRef}
                   value={selectedMonth}
-                  onChange={setSelectedMonth}
-                  options={generateMonthOptions()}
-                  style={{ width: 180 }}
+                    onChange={(e) => {
+                      e.stopPropagation()
+                      setSelectedMonth(e.target.value)
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '8px 12px',
+                      paddingRight: '40px',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '8px',
+                      outline: 'none',
+                      color: '#262626',
+                      background: '#fff',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      appearance: 'none',
+                      WebkitAppearance: 'none',
+                      MozAppearance: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = '#CBB081'
+                      e.target.style.boxShadow = '0 0 0 2px rgba(203, 176, 129, 0.2)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = '#d9d9d9'
+                      e.target.style.boxShadow = 'none'
+                    }}
+                  >
+                    {(() => {
+                      const options = []
+                      const currentYear = dayjs().year()
+                      const years = [currentYear - 1, currentYear, currentYear + 1]
+                      
+                      years.forEach(year => {
+                        for (let month = 1; month <= 12; month++) {
+                          const monthStr = String(month).padStart(2, '0')
+                          const value = `${year}-${monthStr}`
+                          const monthName = dayjs(`${year}-${monthStr}-01`).format('MM/YYYY')
+                          options.push(
+                            <option key={value} value={value}>
+                              {monthName}
+                            </option>
+                          )
+                        }
+                      })
+                      
+                      return options
+                    })()}
+                  </select>
+                  <CalendarOutlined 
+                    style={{ 
+                      position: 'absolute', 
+                      right: '12px', 
+                      top: '50%', 
+                      transform: 'translateY(-50%)',
+                      color: '#9ca3af',
+                      pointerEvents: 'none',
+                      fontSize: '16px',
+                      transition: 'color 0.2s ease',
+                      zIndex: 1
+                    }} 
                 />
+                </div>
                 <div style={{ display: 'flex', gap: 16 }}>
                   {[
                     { color: STATUS_COLORS.present, label: 'Có mặt' },

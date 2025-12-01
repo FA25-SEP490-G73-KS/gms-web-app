@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Input, Space, Button, DatePicker, Tag, message, Modal, Form, Select, Checkbox, Dropdown } from 'antd'
+import { Table, Input, Space, Button, Tag, message, Modal, Form, Select, Checkbox, Dropdown, Spin } from 'antd'
 import { SearchOutlined, CalendarOutlined, DownOutlined, UpOutlined, InboxOutlined, CloseOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { priceQuotationAPI } from '../../services/api'
+import { priceQuotationAPI, partCategoriesAPI, marketsAPI, suppliersAPI, unitsAPI, vehiclesAPI, partsAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 
 const { Search } = Input
@@ -37,7 +38,7 @@ const customTableStyles = `
 export default function ExportRequest() {
   const [searchTerm, setSearchTerm] = useState('')
   const [dateFilter, setDateFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('Đang xuất hàng')
+  const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -50,11 +51,130 @@ export default function ExportRequest() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [selectedQuotationId, setSelectedQuotationId] = useState(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [categories, setCategories] = useState([])
+  const [markets, setMarkets] = useState([])
+  const [suppliers, setSuppliers] = useState([])
+  const [units, setUnits] = useState([])
+  const [brands, setBrands] = useState([])
+  const [models, setModels] = useState([])
+  const [selectedBrandId, setSelectedBrandId] = useState(null)
+  const [loadingOptions, setLoadingOptions] = useState(false)
+  const [partDetailLoading, setPartDetailLoading] = useState(false)
+  // specialPart: đúng theo field backend. Rule hiện tại:
+  // - part == null  => được sửa hết (create)
+  // - part != null & specialPart == false => KHÓA hết trường trừ ghi chú (update bằng dữ liệu cũ)
+  // - part != null & specialPart == true  => được sửa hết (update linh kiện đặc biệt)
+  const [partModalConfig, setPartModalConfig] = useState({ hasPart: false, specialPart: false })
+
+  // Có part & specialPart == false  => !hasPart(false) || !specialPart(true) = false  => khóa fields
+  // Có part & specialPart == true   => !hasPart(false) || !specialPart(false) = true => mở fields
+  // Không có part                   => !hasPart(true)  || ... = true                 => mở fields
+  const canEditPartFields = !partModalConfig.hasPart || partModalConfig.specialPart
 
   // Fetch data from API
   useEffect(() => {
     fetchPendingQuotations()
+    fetchOptions()
   }, [page, pageSize])
+
+  const fetchOptions = async () => {
+    setLoadingOptions(true)
+    try {
+      // Fetch categories
+      const { data: categoriesData, error: categoriesError } = await partCategoriesAPI.getAll()
+      if (!categoriesError && categoriesData?.result) {
+        setCategories(Array.isArray(categoriesData.result) ? categoriesData.result : [])
+      } else if (!categoriesError && Array.isArray(categoriesData)) {
+        setCategories(categoriesData)
+      }
+
+      // Fetch markets
+      const { data: marketsData, error: marketsError } = await marketsAPI.getAll()
+      if (!marketsError && marketsData?.result) {
+        setMarkets(Array.isArray(marketsData.result) ? marketsData.result : [])
+      } else if (!marketsError && Array.isArray(marketsData)) {
+        setMarkets(marketsData)
+      }
+
+      // Fetch suppliers (fetch all pages)
+      const allSuppliers = []
+      let currentPage = 0
+      let hasMore = true
+      while (hasMore) {
+        const { data: suppliersData, error: suppliersError } = await suppliersAPI.getAll(currentPage, 20)
+        if (suppliersError) break
+        
+        // Handle different response structures
+        let suppliersList = []
+        if (suppliersData?.result?.content) {
+          suppliersList = suppliersData.result.content
+        } else if (suppliersData?.content) {
+          suppliersList = suppliersData.content
+        } else if (suppliersData?.result && Array.isArray(suppliersData.result)) {
+          suppliersList = suppliersData.result
+        } else if (Array.isArray(suppliersData)) {
+          suppliersList = suppliersData
+        }
+        
+        allSuppliers.push(...suppliersList)
+        
+        // Check if last page
+        const isLast = suppliersData?.result?.last ?? suppliersData?.last ?? suppliersList.length < 20
+        if (isLast) {
+          hasMore = false
+        } else {
+          currentPage += 1
+        }
+      }
+      setSuppliers(allSuppliers)
+
+      // Fetch units
+      const { data: unitsData, error: unitsError } = await unitsAPI.getAll({ page: 0, size: 100 })
+      if (!unitsError && unitsData?.result?.content) {
+        setUnits(unitsData.result.content)
+      } else if (!unitsError && unitsData?.result && Array.isArray(unitsData.result)) {
+        setUnits(unitsData.result)
+      } else if (!unitsError && Array.isArray(unitsData)) {
+        setUnits(unitsData)
+      }
+
+      // Fetch brands
+      const { data: brandsData, error: brandsError } = await vehiclesAPI.getBrands()
+      if (!brandsError && brandsData?.result) {
+        setBrands(Array.isArray(brandsData.result) ? brandsData.result : [])
+      } else if (!brandsError && Array.isArray(brandsData)) {
+        setBrands(brandsData)
+      }
+    } catch (err) {
+      console.error('Error fetching options:', err)
+    } finally {
+      setLoadingOptions(false)
+    }
+  }
+
+  const fetchModelsByBrand = async (brandId) => {
+    if (!brandId) {
+      setModels([])
+      return []
+    }
+    try {
+      const { data: modelsData, error: modelsError } = await vehiclesAPI.getModelsByBrand(brandId)
+      let list = []
+      if (!modelsError && modelsData?.result) {
+        list = Array.isArray(modelsData.result) ? modelsData.result : []
+      } else if (!modelsError && Array.isArray(modelsData)) {
+        list = modelsData
+      } else {
+        list = []
+      }
+      setModels(list)
+      return list
+    } catch (err) {
+      console.error('Error fetching models:', err)
+      setModels([])
+      return []
+    }
+  }
 
   const fetchPendingQuotations = async () => {
     setLoading(true)
@@ -74,14 +194,20 @@ export default function ExportRequest() {
       const transformedData = content.map((item) => ({
         id: item.priceQuotationId || item.id,
         code: item.code || item.serviceTicketCode || 'N/A',
-        customer: 'N/A', // API doesn't return customer name in list
+        customer: item.customerName || 'N/A',
         licensePlate: item.licensePlate || 'N/A',
         createDate: item.createdAt || 'N/A',
         status: mapQuotationStatus(item.status),
         statusKey: item.status, // Lưu status gốc từ API
         parts: (item.items || []).map((partItem) => ({
-          id: partItem.priceQuotationItemId || partItem.partId,
-          name: partItem.partName || partItem.itemName || 'N/A',
+          id: partItem.priceQuotationItemId || partItem.partId || partItem.part?.partId,
+          name: partItem.partName || partItem.itemName || partItem.part?.name || 'N/A',
+          sku: partItem.sku
+            || partItem.partSku
+            || partItem.skuCode
+            || partItem.partCode
+            || partItem.part?.sku
+            || '',
           quantity: partItem.quantity || 0,
           itemType: partItem.itemType || 'PART',
           inventoryStatus: partItem.inventoryStatus || 'AVAILABLE',
@@ -158,25 +284,131 @@ export default function ExportRequest() {
     return statusMap[status] || 'Không rõ'
   }
 
-  const handleOpenConfirmModal = (part) => {
-    setSelectedPart(part)
+  const handleOpenConfirmModal = async (part) => {
+    if (!part?.id) {
+      message.error('Không tìm thấy thông tin mục báo giá')
+      return
+    }
+
     setConfirmModalOpen(true)
-    
-    const isUnknownStatus = part.inventoryStatus === 'UNKNOWN' || !part.inventoryStatus
-    
-    // Pre-fill form with part data, default to useForAllModels = true
-    confirmForm.setFieldsValue({
-      partName: part.name,
-      category: isUnknownStatus ? '' : 'Dầu – Hóa chất',
-      origin: isUnknownStatus ? '' : 'MohI',
-      supplier: isUnknownStatus ? '' : 'Petrolimex Lubricants',
-      sellPrice: isUnknownStatus ? '' : 130000,
-      buyPrice: isUnknownStatus ? '' : 120000,
-      unit: isUnknownStatus ? '' : 'lít',
-      useForAllModels: true, // Mặc định là dùng chung tất cả dòng xe
-      inventoryStatus: getInventoryStatusText(part.inventoryStatus),
-      quantity: part.quantity || ''
-    })
+    setPartDetailLoading(true)
+    setSelectedBrandId(null)
+    setModels([])
+
+    try {
+      const { data, error } = await priceQuotationAPI.getItemById(part.id)
+
+      if (error) {
+        message.error(error || 'Không thể tải thông tin linh kiện')
+        handleCloseConfirmModal()
+        return
+      }
+
+      const detail = data?.result || data || {}
+      const partInfo = detail.part || {}
+
+      let extendedPart = partInfo
+      if (partInfo?.partId) {
+        try {
+          const { data: partDetail, error: partError } = await partsAPI.getById(partInfo.partId)
+          if (!partError && partDetail) {
+            extendedPart = partDetail?.result || partDetail || partInfo
+          }
+        } catch (err) {
+          console.warn('Không thể lấy chi tiết linh kiện:', err)
+        }
+      }
+
+      const hasExistingPart = !!extendedPart && Object.keys(extendedPart).length > 0
+      const specialPart = hasExistingPart ? Boolean(extendedPart.specialPart) : false
+      setPartModalConfig({
+        hasPart: hasExistingPart,
+        specialPart
+      })
+
+      const inventoryStatusText = getInventoryStatusText(detail.inventoryStatus || part.inventoryStatus)
+      const useForAllModelsValue = hasExistingPart
+        ? (typeof extendedPart.universal === 'boolean'
+            ? extendedPart.universal
+            : typeof partInfo.universal === 'boolean'
+              ? partInfo.universal
+              : true)
+        : true
+
+      let brandValue = ''
+      let modelValue = ''
+      let modelsList = []
+
+      const resolveBrandIdFromName = (brandName) => {
+        if (!brandName) return ''
+        const matched = brands.find(
+          (b) => (b.name || '').toLowerCase() === brandName.toLowerCase()
+        )
+        return matched ? String(matched.id) : ''
+      }
+
+      if (hasExistingPart && !useForAllModelsValue) {
+        const brandIdFromPart = extendedPart.brandId || extendedPart.vehicleBrandId || partInfo.brandId
+        const brandNameFromPart = extendedPart.brandName || partInfo.brandName
+        const modelIdFromPart = extendedPart.modelId || extendedPart.vehicleModelId || partInfo.modelId
+        const modelNameFromPart = extendedPart.modelName || partInfo.modelName
+
+        brandValue = brandIdFromPart ? String(brandIdFromPart) : resolveBrandIdFromName(brandNameFromPart)
+
+        if (brandValue) {
+          setSelectedBrandId(Number(brandValue))
+          modelsList = await fetchModelsByBrand(brandValue)
+        } else {
+          setSelectedBrandId(null)
+          setModels([])
+        }
+
+        if (modelIdFromPart) {
+          modelValue = String(modelIdFromPart)
+        } else if (modelNameFromPart && Array.isArray(modelsList)) {
+          const matchedModel = modelsList.find(
+            (m) => (m.name || m.modelName || '').toLowerCase() === modelNameFromPart.toLowerCase()
+          )
+          if (matchedModel) {
+            modelValue = String(matchedModel.id)
+          }
+        }
+      } else {
+        setSelectedBrandId(null)
+        setModels([])
+      }
+
+      const normalizedPart = {
+        ...part,
+        ...detail,
+        id: detail.priceQuotationItemId || part.id,
+        inventoryStatus: detail.inventoryStatus || part.inventoryStatus
+      }
+
+      setSelectedPart(normalizedPart)
+
+      confirmForm.setFieldsValue({
+        partName: detail.itemName || extendedPart.name || part.name || '',
+        category: extendedPart.categoryName || '',
+        origin: extendedPart.marketName || '',
+        supplier: extendedPart.supplierName || '',
+        sellPrice: extendedPart.purchasePrice ?? '',
+        buyPrice: extendedPart.sellingPrice ?? '',
+        unit: extendedPart.unitName || detail.unit || '',
+        useForAllModels: useForAllModelsValue,
+        inventoryStatus: inventoryStatusText,
+        quantity: detail.quantity || part.quantity || '',
+        note: detail.warehouseNote || '',
+        brand: brandValue || '',
+        model: modelValue || ''
+      })
+    } catch (err) {
+      console.error('Error fetching quotation item detail:', err)
+      message.error('Đã xảy ra lỗi khi lấy thông tin linh kiện')
+      handleCloseConfirmModal()
+    } finally {
+      setPartDetailLoading(false)
+    }
   }
 
   const handleConfirmSubmit = async (values) => {
@@ -186,33 +418,68 @@ export default function ExportRequest() {
     }
 
     try {
-      const inventoryStatus = values.inventoryStatus
-      const isUnknownStatus = inventoryStatus === 'Không rõ'
+      // Map category name to ID
+      const categoryId = values.category 
+        ? (categories.find(cat => cat.name === values.category || cat.id === Number(values.category))?.id || 0)
+        : 0
 
-      // Build payload theo format API
+      // Map market/origin name to ID
+      const marketId = values.origin
+        ? (markets.find(m => m.name === values.origin || m.id === Number(values.origin))?.id || 0)
+        : 0
+
+      // Map supplier name to ID
+      const supplierId = values.supplier
+        ? (suppliers.find(s => s.name === values.supplier || s.id === Number(values.supplier))?.id || 0)
+        : 0
+
+      // Map unit name to ID
+      const unitId = values.unit
+        ? (units.find(u => u.name === values.unit || u.id === Number(values.unit))?.id || 0)
+        : 0
+
+      // Map brand to ID
+      const brandId = values.brand
+        ? (Number(values.brand) || brands.find(b => b.id === Number(values.brand))?.id || 0)
+        : 0
+
+      // Map model to ID
+      const vehicleModelId = values.model
+        ? (Number(values.model) || models.find(m => m.id === Number(values.model))?.id || 0)
+        : 0
+
       const payload = {
-        categoryId: 0, // TODO: Map from category name to ID
-        marketId: 0, // TODO: Map from origin to ID
-        name: values.partName,
+        brandId,
+        categoryId,
+        marketId,
+        name: values.partName || '',
         note: values.note || '',
         purchasePrice: Number(values.sellPrice) || 0,
-        quantity: isUnknownStatus ? Number(values.quantity) || 0 : 0,
-        reorderLevel: 0,
         sellingPrice: Number(values.buyPrice) || 0,
-        specialPart: false,
-        supplierId: 0, // TODO: Map from supplier name to ID
-        unitId: 0, // TODO: Map from unit to ID
+        specialPart: partModalConfig.specialPart || false,
+        supplierId,
+        unitId,
         universal: values.useForAllModels || false,
-        vehicleModelId: 0, // TODO: Map from model to ID
+        vehicleModelId,
         warehouseNote: values.note || ''
       }
 
-      console.log('=== Confirm Part Payload ===')
-      console.log('Item ID:', selectedPart.id)
-      console.log('Payload:', JSON.stringify(payload, null, 2))
-      console.log('============================')
+      let response
+      // part == null  => create mới Part
+      if (!partModalConfig.hasPart) {
+        response = await priceQuotationAPI.confirmCreateItem(selectedPart.id, payload)
+      }
+      // part != null & specialPart == true  => cập nhật Part theo payload
+      else if (partModalConfig.specialPart) {
+        response = await priceQuotationAPI.confirmItemUpdate(selectedPart.id, payload)
+      }
+      // part != null & specialPart == false => chỉ confirm, merge dữ liệu Part sẵn có, gửi note
+      else {
+        const note = values.note || ''
+        response = await priceQuotationAPI.confirmItem(selectedPart.id, note)
+      }
 
-      const { data, error } = await priceQuotationAPI.confirmItem(selectedPart.id, payload)
+      const { error } = response || {}
 
       if (error) {
         message.error(error || 'Không thể xác nhận linh kiện')
@@ -223,6 +490,9 @@ export default function ExportRequest() {
       setConfirmModalOpen(false)
       confirmForm.resetFields()
       setSelectedPart(null)
+      setSelectedBrandId(null)
+      setModels([])
+      setPartModalConfig({ hasPart: false, isSpecialPart: false })
       fetchPendingQuotations()
     } catch (err) {
       console.error('Error confirming part:', err)
@@ -259,6 +529,7 @@ export default function ExportRequest() {
       setConfirmModalOpen(false)
       confirmForm.resetFields()
       setSelectedPart(null)
+      setPartModalConfig({ hasPart: false, specialPart: false })
       fetchPendingQuotations()
     } catch (err) {
       console.error('Error rejecting part:', err)
@@ -269,6 +540,9 @@ export default function ExportRequest() {
   const handleCloseConfirmModal = () => {
     setConfirmModalOpen(false)
     setSelectedPart(null)
+    setSelectedBrandId(null)
+    setModels([])
+    setPartModalConfig({ hasPart: false, specialPart: false })
     confirmForm.resetFields()
   }
 
@@ -375,7 +649,7 @@ export default function ExportRequest() {
       )
     },
     {
-      title: 'Code',
+      title: 'Mã báo giá',
       dataIndex: 'code',
       key: 'code',
       width: 200,
@@ -446,21 +720,21 @@ export default function ExportRequest() {
         
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Tag
-              style={{
-                color: config.color,
-                backgroundColor: config.bgColor,
-                borderColor: config.borderColor,
-                border: '1px solid',
-                borderRadius: '6px',
-                padding: '4px 12px',
-                fontWeight: 500,
-                fontSize: '14px',
-                margin: 0
-              }}
-            >
-              {config.text}
-            </Tag>
+          <Tag
+            style={{
+              color: config.color,
+              backgroundColor: config.bgColor,
+              borderColor: config.borderColor,
+              border: '1px solid',
+              borderRadius: '6px',
+              padding: '4px 12px',
+              fontWeight: 500,
+              fontSize: '14px',
+              margin: 0
+            }}
+          >
+            {config.text}
+          </Tag>
             {isWaitingCustomerConfirm && (
               <Dropdown menu={dropdownMenu} trigger={['click']}>
                 <Button
@@ -487,7 +761,7 @@ export default function ExportRequest() {
       {
         title: 'STT',
         key: 'index',
-        width: 80,
+        width: 90,
         align: 'center',
         render: (_, __, index) => (
           <span style={{ fontWeight: 600, color: '#666' }}>
@@ -496,9 +770,19 @@ export default function ExportRequest() {
         )
       },
       {
+        title: 'Mã SKU',
+        dataIndex: 'sku',
+        key: 'sku',
+        width: 220,
+        render: (text) => (
+          <span style={{ fontWeight: 500, color: '#666' }}>{text || '—'}</span>
+        )
+      },
+      {
         title: 'Linh kiện',
         dataIndex: 'name',
         key: 'name',
+        width: 260,
         render: (text) => (
           <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
         )
@@ -507,7 +791,7 @@ export default function ExportRequest() {
         title: 'Số lượng',
         dataIndex: 'quantity',
         key: 'quantity',
-        width: 150,
+        width: 160,
         align: 'center',
         render: (value) => (
           <span style={{ fontWeight: 600, color: '#666' }}>
@@ -518,7 +802,7 @@ export default function ExportRequest() {
       {
         title: 'Hành động',
         key: 'action',
-        width: 150,
+        width: 170,
         align: 'center',
         render: (_, part) => {
           // Chỉ hiện nút khi status là PENDING
@@ -572,6 +856,7 @@ export default function ExportRequest() {
           </span>
         </div>
         <Table
+          className="nested-parts-table"
           columns={partsColumns}
           dataSource={record.parts || []}
           pagination={false}
@@ -623,130 +908,137 @@ export default function ExportRequest() {
         </div>
         
         <div style={{ padding: '20px 24px', background: '#fff' }}>
+          <Spin spinning={partDetailLoading}>
           <Form form={confirmForm} layout="vertical" onFinish={handleConfirmSubmit}>
-            {/* Status and Quantity bar */}
-            <Form.Item noStyle shouldUpdate>
-              {({ getFieldValue }) => {
-                const inventoryStatus = getFieldValue('inventoryStatus')
-                const isUnknownStatus = inventoryStatus === 'Không rõ'
-                
-                return (
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
-                    <Form.Item 
-                      label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Trạng thái</span>} 
-                      name="inventoryStatus"
-                      style={{ flex: 1, marginBottom: 0 }}
-                    >
-                      <Input 
-                        disabled 
-                        style={{ 
-                          background: '#F5F5F5', 
-                          height: '38px',
-                          fontSize: '13px',
-                          border: '1px solid #D9D9D9',
-                          color: '#000'
-                        }} 
-                      />
-                    </Form.Item>
-                    
-                    {isUnknownStatus && (
-                      <Form.Item 
-                        label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Số lượng <span style={{ color: 'red' }}>*</span></span>} 
-                        name="quantity"
-                        rules={[{ required: true, message: 'Vui lòng nhập số lượng' }]}
-                        style={{ width: '150px', marginBottom: 0 }}
-                      >
-                        <Input 
-                          type="number"
-                          placeholder="0"
-                          style={{ 
-                            height: '38px',
-                            fontSize: '13px',
-                            border: '1px solid #D9D9D9'
-                          }} 
-                        />
-                      </Form.Item>
-                    )}
-                  </div>
-                )
-              }}
-            </Form.Item>
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '14px' }}>
+              <Form.Item 
+                label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Trạng thái</span>} 
+                name="inventoryStatus"
+                style={{ flex: 1, marginBottom: 0 }}
+              >
+                <Input 
+                  disabled 
+                  style={{ 
+                    background: '#F5F5F5', 
+                    height: '38px',
+                    fontSize: '13px',
+                    border: '1px solid #D9D9D9',
+                    color: '#000'
+                  }} 
+                />
+              </Form.Item>
 
-            {/* Form fields - conditional enable based on status */}
-            <Form.Item noStyle shouldUpdate>
-              {({ getFieldValue }) => {
-                const inventoryStatus = getFieldValue('inventoryStatus')
-                const isUnknownStatus = inventoryStatus === 'Không rõ'
-                
-                return (
-                  <>
-                    <Form.Item 
-                      label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Tên linh kiện {isUnknownStatus && <span style={{ color: 'red' }}>*</span>}</span>} 
-                      name="partName"
-                      rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng nhập tên linh kiện' }] : []}
-                      style={{ marginBottom: '14px' }}
-                    >
-                      <Input 
-                        disabled={!isUnknownStatus}
-                        style={{ 
-                          background: isUnknownStatus ? '#fff' : '#F5F5F5', 
-                          height: '38px',
-                          fontSize: '13px',
-                          border: '1px solid #D9D9D9'
-                        }} 
-                      />
-                    </Form.Item>
+              <Form.Item 
+                label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Số lượng {canEditPartFields && <span style={{ color: 'red' }}>*</span>}</span>} 
+                name="quantity"
+                rules={canEditPartFields ? [{ required: true, message: 'Vui lòng nhập số lượng' }] : []}
+                style={{ width: '150px', marginBottom: 0 }}
+              >
+                <Input 
+                  type="number"
+                  placeholder="0"
+                  disabled={!canEditPartFields}
+                  style={{ 
+                    height: '38px',
+                    fontSize: '13px',
+                    border: '1px solid #D9D9D9',
+                    background: canEditPartFields ? '#fff' : '#f5f5f5'
+                  }} 
+                />
+              </Form.Item>
+            </div>
 
-                    <Form.Item 
-                      label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Loại linh kiện {isUnknownStatus && <span style={{ color: 'red' }}>*</span>}</span>} 
-                      name="category"
-                      rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng chọn loại linh kiện' }] : []}
-                      style={{ marginBottom: '14px' }}
-                    >
-                      <Select 
-                        disabled={!isUnknownStatus}
-                        style={{ fontSize: '13px' }}
-                        suffixIcon={<DownOutlined style={{ fontSize: '12px' }} />}
-                      >
-                        <Option value="Dầu – Hóa chất">Dầu – Hóa chất</Option>
-                        <Option value="Động cơ">Động cơ</Option>
-                        <Option value="Hệ thống phanh">Hệ thống phanh</Option>
-                      </Select>
-                    </Form.Item>
+            <>
+              <Form.Item 
+                label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Tên linh kiện {canEditPartFields && <span style={{ color: 'red' }}>*</span>}</span>} 
+                name="partName"
+                rules={canEditPartFields ? [{ required: true, message: 'Vui lòng nhập tên linh kiện' }] : []}
+                style={{ marginBottom: '14px' }}
+              >
+                <Input 
+                  disabled={!canEditPartFields}
+                  style={{ 
+                    background: canEditPartFields ? '#fff' : '#F5F5F5', 
+                    height: '38px',
+                    fontSize: '13px',
+                    border: '1px solid #D9D9D9'
+                  }} 
+                />
+              </Form.Item>
 
-                    <Form.Item 
-                      label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Xuất xứ {isUnknownStatus && <span style={{ color: 'red' }}>*</span>}</span>} 
-                      name="origin"
-                      rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng chọn xuất xứ' }] : []}
-                      style={{ marginBottom: '14px' }}
-                    >
-                      <Select 
-                        disabled={!isUnknownStatus}
-                        style={{ fontSize: '13px' }}
-                        suffixIcon={<DownOutlined style={{ fontSize: '12px' }} />}
-                      >
-                        <Option value="MohI">MohI</Option>
-                        <Option value="VN">Việt Nam</Option>
-                        <Option value="JP">Nhật Bản</Option>
-                      </Select>
-                    </Form.Item>
+              <Form.Item 
+                label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Loại linh kiện {canEditPartFields && <span style={{ color: 'red' }}>*</span>}</span>} 
+                name="category"
+                rules={canEditPartFields ? [{ required: true, message: 'Vui lòng chọn loại linh kiện' }] : []}
+                style={{ marginBottom: '14px' }}
+              >
+                <select
+                  disabled={!canEditPartFields}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '4px 12px',
+                    fontSize: '13px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '6px',
+                    backgroundColor: !canEditPartFields ? '#f5f5f5' : '#fff',
+                    cursor: !canEditPartFields ? 'not-allowed' : 'pointer',
+                    outline: 'none',
+                    color: '#262626'
+                  }}
+                >
+                  <option value="">Chọn loại linh kiện</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </Form.Item>
 
-                    <Form.Item name="useForAllModels" valuePropName="checked" style={{ marginBottom: '14px' }}>
-                      <Checkbox disabled={!isUnknownStatus} style={{ fontSize: '13px', color: '#000' }}>
-                        <span style={{ fontWeight: 400 }}>Dùng chung tất cả dòng xe</span>
-                      </Checkbox>
-                    </Form.Item>
-                  </>
-                )
-              }}
-            </Form.Item>
+              <Form.Item 
+                label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Xuất xứ {canEditPartFields && <span style={{ color: 'red' }}>*</span>}</span>} 
+                name="origin"
+                rules={canEditPartFields ? [{ required: true, message: 'Vui lòng chọn xuất xứ' }] : []}
+                style={{ marginBottom: '14px' }}
+              >
+                <select
+                  disabled={!canEditPartFields}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '4px 12px',
+                    fontSize: '13px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '6px',
+                    backgroundColor: !canEditPartFields ? '#f5f5f5' : '#fff',
+                    cursor: !canEditPartFields ? 'not-allowed' : 'pointer',
+                    outline: 'none',
+                    color: '#262626'
+                  }}
+                >
+                  <option value="">Chọn xuất xứ</option>
+                  {markets.map((market) => (
+                    <option key={market.id} value={market.name}>
+                      {market.name}
+                    </option>
+                  ))}
+                </select>
+              </Form.Item>
+
+              <Form.Item name="useForAllModels" valuePropName="checked" style={{ marginBottom: '14px' }}>
+                <Checkbox disabled={!canEditPartFields} style={{ fontSize: '13px', color: '#000' }}>
+                  <span style={{ fontWeight: 400 }}>Dùng chung tất cả dòng xe</span>
+                </Checkbox>
+              </Form.Item>
+            </>
 
             {/* Conditional fields based on useForAllModels and status */}
             <Form.Item noStyle shouldUpdate>
               {({ getFieldValue }) => {
                 const useForAllModels = getFieldValue('useForAllModels')
                 const inventoryStatus = getFieldValue('inventoryStatus')
-                const isUnknownStatus = inventoryStatus === 'Không rõ'
+                const isUnknownStatus = canEditPartFields
                 
                 if (!useForAllModels) {
                   return (
@@ -757,16 +1049,46 @@ export default function ExportRequest() {
                         rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng chọn hãng' }] : []}
                         style={{ marginBottom: '14px' }}
                       >
-                        <Select 
+                        <select
                           disabled={!isUnknownStatus}
-                          placeholder="Vinfast" 
-                          style={{ fontSize: '13px' }}
-                          suffixIcon={<DownOutlined style={{ fontSize: '12px' }} />}
+                          style={{
+                            width: '100%',
+                            height: '32px',
+                            padding: '4px 12px',
+                            fontSize: '13px',
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '6px',
+                            backgroundColor: !isUnknownStatus ? '#f5f5f5' : '#fff',
+                            cursor: !isUnknownStatus ? 'not-allowed' : 'pointer',
+                            outline: 'none',
+                            color: '#262626'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3b82f6'
+                            e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#d9d9d9'
+                            e.target.style.boxShadow = 'none'
+                          }}
+                          onChange={(e) => {
+                            const brandId = e.target.value ? Number(e.target.value) : null
+                            setSelectedBrandId(brandId)
+                            confirmForm.setFieldsValue({ model: '' })
+                            if (brandId) {
+                              fetchModelsByBrand(brandId)
+                            } else {
+                              setModels([])
+                            }
+                          }}
                         >
-                          <Option value="Vinfast">Vinfast</Option>
-                          <Option value="Toyota">Toyota</Option>
-                          <Option value="Honda">Honda</Option>
-                        </Select>
+                          <option value="">Chọn hãng</option>
+                          {brands.map((brand) => (
+                            <option key={brand.id} value={brand.id}>
+                              {brand.name}
+                            </option>
+                          ))}
+                        </select>
                       </Form.Item>
                       
                       <Form.Item 
@@ -775,14 +1097,38 @@ export default function ExportRequest() {
                         rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng chọn dòng xe' }] : []}
                         style={{ marginBottom: '14px' }}
                       >
-                        <Select 
-                          disabled={!isUnknownStatus}
-                          style={{ fontSize: '13px' }}
-                          suffixIcon={<DownOutlined style={{ fontSize: '12px' }} />}
+                        <select
+                          disabled={!isUnknownStatus || !selectedBrandId || models.length === 0}
+                          style={{
+                            width: '100%',
+                            height: '32px',
+                            padding: '4px 12px',
+                            fontSize: '13px',
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '6px',
+                            backgroundColor: !isUnknownStatus || !selectedBrandId || models.length === 0 ? '#f5f5f5' : '#fff',
+                            cursor: !isUnknownStatus || !selectedBrandId || models.length === 0 ? 'not-allowed' : 'pointer',
+                            outline: 'none',
+                            color: '#262626'
+                          }}
+                          onFocus={(e) => {
+                            e.target.style.borderColor = '#3b82f6'
+                            e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                          }}
+                          onBlur={(e) => {
+                            e.target.style.borderColor = '#d9d9d9'
+                            e.target.style.boxShadow = 'none'
+                          }}
                         >
-                          <Option value="model1">Model 1</Option>
-                          <Option value="model2">Model 2</Option>
-                        </Select>
+                          <option value="">
+                            {!selectedBrandId ? 'Chọn hãng trước' : models.length === 0 ? 'Đang tải...' : 'Chọn dòng xe'}
+                          </option>
+                          {models.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.name}
+                            </option>
+                          ))}
+                        </select>
                       </Form.Item>
                     </>
                   )
@@ -794,7 +1140,7 @@ export default function ExportRequest() {
             <Form.Item noStyle shouldUpdate>
               {({ getFieldValue }) => {
                 const inventoryStatus = getFieldValue('inventoryStatus')
-                const isUnknownStatus = inventoryStatus === 'Không rõ'
+                const isUnknownStatus = canEditPartFields
                 
                 return (
                   <Form.Item 
@@ -803,14 +1149,36 @@ export default function ExportRequest() {
                     rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng chọn nhà phân phối' }] : []}
                     style={{ marginBottom: '14px' }}
                   >
-                    <Select 
+                    <select
                       disabled={!isUnknownStatus}
-                      style={{ fontSize: '13px' }}
-                      suffixIcon={<DownOutlined style={{ fontSize: '12px' }} />}
+                      style={{
+                        width: '100%',
+                        height: '32px',
+                        padding: '4px 12px',
+                        fontSize: '13px',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '6px',
+                        backgroundColor: !isUnknownStatus ? '#f5f5f5' : '#fff',
+                        cursor: !isUnknownStatus ? 'not-allowed' : 'pointer',
+                        outline: 'none',
+                        color: '#262626'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#3b82f6'
+                        e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#d9d9d9'
+                        e.target.style.boxShadow = 'none'
+                      }}
                     >
-                      <Option value="Petrolimex Lubricants">Petrolimex Lubricants</Option>
-                      <Option value="Supplier 2">Supplier 2</Option>
-                    </Select>
+                      <option value="">Chọn nhà phân phối</option>
+                      {suppliers.map((supplier) => (
+                        <option key={supplier.id} value={supplier.name}>
+                          {supplier.name}
+                        </option>
+                      ))}
+                    </select>
                   </Form.Item>
                 )
               }}
@@ -855,7 +1223,7 @@ export default function ExportRequest() {
             <Form.Item noStyle shouldUpdate>
               {({ getFieldValue }) => {
                 const inventoryStatus = getFieldValue('inventoryStatus')
-                const isUnknownStatus = inventoryStatus === 'Không rõ'
+                const isUnknownStatus = canEditPartFields
                 
                 return (
                   <Form.Item 
@@ -864,22 +1232,47 @@ export default function ExportRequest() {
                     rules={isUnknownStatus ? [{ required: true, message: 'Vui lòng chọn đơn vị' }] : []}
                     style={{ marginBottom: '14px' }}
                   >
-                    <Select 
+                    <select
                       disabled={!isUnknownStatus}
-                      style={{ width: '100px', fontSize: '13px' }} 
-                      suffixIcon={<DownOutlined style={{ fontSize: '12px' }} />}
+                      style={{
+                        width: '100px',
+                        height: '32px',
+                        padding: '4px 12px',
+                        fontSize: '13px',
+                        border: '1px solid #d9d9d9',
+                        borderRadius: '6px',
+                        backgroundColor: !isUnknownStatus ? '#f5f5f5' : '#fff',
+                        cursor: !isUnknownStatus ? 'not-allowed' : 'pointer',
+                        outline: 'none',
+                        color: '#262626'
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#3b82f6'
+                        e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#d9d9d9'
+                        e.target.style.boxShadow = 'none'
+                      }}
                     >
-                      <Option value="lít">lít</Option>
-                      <Option value="cái">cái</Option>
-                      <Option value="bộ">bộ</Option>
-                    </Select>
+                      <option value="">Chọn đơn vị</option>
+                      {units.map((unit) => (
+                        <option key={unit.id} value={unit.name}>
+                          {unit.name}
+                        </option>
+                      ))}
+                    </select>
                   </Form.Item>
                 )
               }}
             </Form.Item>
 
             <Form.Item 
-              label={<span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>Ghi chú/Lý do <span style={{ color: 'red' }}>*</span></span>} 
+              label={
+                <span style={{ fontWeight: 600, fontSize: '13px', color: '#000' }}>
+                  Ghi chú/Lý do <span style={{ color: 'red' }}>*</span>
+                </span>
+              } 
               name="note"
               rules={[{ required: true, message: 'Vui lòng nhập ghi chú' }]}
               style={{ marginBottom: '18px' }}
@@ -928,6 +1321,7 @@ export default function ExportRequest() {
               </Button>
             </div>
           </Form>
+          </Spin>
         </div>
       </Modal>
 
@@ -1018,27 +1412,16 @@ export default function ExportRequest() {
             Xác nhận báo giá
           </h1>
 
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-            <Search
-              placeholder="Tìm kiếm"
-              allowClear
-              prefix={<SearchOutlined />}
-              style={{ width: 250 }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onSearch={setSearchTerm}
-            />
-            
-            <DatePicker
-              placeholder="Ngày tạo"
-              format="DD/MM/YYYY"
-              suffixIcon={<CalendarOutlined />}
-              value={dateFilter}
-              onChange={setDateFilter}
-              style={{ width: 150 }}
-            />
-
-            <Space>
+          <div
+            style={{
+              display: 'flex',
+              gap: '16px',
+              marginBottom: '20px',
+              flexWrap: 'wrap',
+              alignItems: 'center'
+            }}
+          >
+            <Space wrap>
               <Button
                 type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
                 onClick={() => setStatusFilter('Đang xuất hàng')}
@@ -1076,6 +1459,67 @@ export default function ExportRequest() {
                 Tất cả
               </Button>
             </Space>
+            <div
+              style={{
+                marginLeft: 'auto',
+                display: 'flex',
+                gap: '12px',
+                alignItems: 'center',
+                flexWrap: 'wrap'
+              }}
+            >
+              <div style={{ position: 'relative', width: 150 }}>
+                <input
+                  type="date"
+                  value={dateFilter ? dayjs(dateFilter).format('YYYY-MM-DD') : ''}
+                  onChange={(e) => {
+                    const dateValue = e.target.value
+                    if (dateValue) {
+                      setDateFilter(dayjs(dateValue))
+                    } else {
+                      setDateFilter(null)
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    height: '32px',
+                    padding: '4px 12px',
+                    fontSize: '13px',
+                    border: '1px solid #d9d9d9',
+                    borderRadius: '6px',
+                    outline: 'none',
+                    color: '#262626'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6'
+                    e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d9d9d9'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                />
+                <CalendarOutlined 
+                  style={{ 
+                    position: 'absolute', 
+                    right: '12px', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)',
+                    color: '#9ca3af',
+                    pointerEvents: 'none'
+                  }} 
+                />
+              </div>
+              <Search
+                placeholder="Tìm kiếm"
+                allowClear
+                prefix={<SearchOutlined />}
+                style={{ width: 250 }}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onSearch={setSearchTerm}
+              />
+            </div>
           </div>
         </div>
 

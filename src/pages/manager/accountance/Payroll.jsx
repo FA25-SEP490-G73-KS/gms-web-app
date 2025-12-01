@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react'
-import { Table, Input, Button, Tag, DatePicker, message } from 'antd'
-import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
+import { Table, Input, Button, Tag, DatePicker, message, Modal, Tabs, Spin, Row, Col, Form, Input as AntInput, Card } from 'antd'
+import { SearchOutlined, FilterOutlined, CloseOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
 import { payrollAPI } from '../../../services/api'
+import { getUserIdFromToken } from '../../../utils/helpers'
 import dayjs from 'dayjs'
 import '../../../styles/pages/accountance/payroll.css'
+
+const { TextArea } = AntInput
 
 const statusFilters = [
   { key: 'all', label: 'Tất cả' },
@@ -15,7 +18,8 @@ const statusFilters = [
 
 const STATUS_CONFIG = {
   paid: { color: '#3b82f6', bg: '#eef4ff', text: 'Đã chi trả' },
-  pending: { color: '#c2410c', bg: '#fff4e6', text: 'Đang xử lý' }
+  pending: { color: '#c2410c', bg: '#fff4e6', text: 'Chờ quản lý duyệt' },
+  approved: { color: '#5b8def', bg: '#eef4ff', text: 'Đã duyệt' }
 }
 
 // Memoized DatePicker component to prevent re-render
@@ -47,6 +51,16 @@ export default function PayrollForManager() {
   const [payrollData, setPayrollData] = useState([])
   const [loading, setLoading] = useState(false)
   const prevDateRef = useRef(null)
+  
+  // Modal detail states
+  const [showDetailModal, setShowDetailModal] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const [payrollDetail, setPayrollDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [rejectReason, setRejectReason] = useState('')
+  const [showRejectModal, setShowRejectModal] = useState(false)
+  const [processing, setProcessing] = useState(false)
 
   // Memoize fetchPayrollData to prevent re-creation on every render
   const fetchPayrollData = useCallback(async () => {
@@ -87,8 +101,38 @@ export default function PayrollForManager() {
       if (data && data.result && data.result.items) {
         // Transform API response to match table format
         const transformedData = data.result.items.map((item) => {
-          // Map status: PENDING_MANAGER_APPROVAL -> 'pending', others -> 'paid'
-          const status = item.status === 'PENDING_MANAGER_APPROVAL' ? 'pending' : 'paid'
+          // Map status từ API (enum hoặc text tiếng Việt) sang key trong STATUS_CONFIG
+          const rawStatus = String(item.status || '').trim()
+          
+          // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
+          const statusMap = {
+            'Chờ quản lý duyệt': 'pending',
+            'PENDING_MANAGER_APPROVAL': 'pending',
+            'Đã duyệt': 'approved',
+            'Duyệt': 'approved',
+            'APPROVED': 'approved',
+            'Đã thanh toán': 'paid',
+            'Đã chi trả': 'paid',
+            'PAID': 'paid'
+          }
+          
+          // Tìm status key: ưu tiên exact match
+          let statusKey = statusMap[rawStatus]
+          
+          // Nếu không tìm thấy exact match, thử case-insensitive
+          if (!statusKey) {
+            const foundKey = Object.keys(statusMap).find(key => 
+              key.toLowerCase() === rawStatus.toLowerCase()
+            )
+            statusKey = foundKey ? statusMap[foundKey] : 'pending'
+          }
+
+          // Debug log để kiểm tra
+          console.log('Mapping status (Manager):', { 
+            rawStatus, 
+            statusKey, 
+            itemStatus: item.status 
+          })
 
           return {
             id: item.employeeId,
@@ -100,7 +144,7 @@ export default function PayrollForManager() {
             advanceSalary: item.advanceSalary || 0,
             netSalary: item.netSalary || 0,
             workingDays: item.workingDays || 0,
-            status
+            status: statusKey
           }
         })
 
@@ -153,6 +197,127 @@ export default function PayrollForManager() {
   const handleDateChange = useCallback((date) => {
     setSelectedDate(date || dayjs())
   }, [])
+
+  // Handle open detail modal
+  const handleOpenDetail = async (record) => {
+    setSelectedEmployee(record)
+    setShowDetailModal(true)
+    setActiveTab('overview')
+    setDetailLoading(true)
+    
+    try {
+      const month = selectedDate.month() + 1
+      const year = selectedDate.year()
+      
+      const { data: response, error } = await payrollAPI.getDetail(
+        record.employeeId || record.id,
+        month,
+        year
+      )
+      
+      if (error) {
+        message.error('Không thể tải chi tiết lương')
+        setPayrollDetail(null)
+        return
+      }
+      
+      setPayrollDetail(response?.result || null)
+    } catch (err) {
+      console.error('Failed to fetch payroll detail:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+      setPayrollDetail(null)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
+
+  // Handle approve payroll
+  const handleApprove = async () => {
+    if (!selectedEmployee) return
+
+    const managerId = getUserIdFromToken()
+    if (!managerId) {
+      message.error('Không thể lấy thông tin quản lý')
+      return
+    }
+
+    // Tạm dùng employeeId/id làm ID payroll theo backend
+    const payrollId =
+      selectedEmployee.payrollId || selectedEmployee.employeeId || selectedEmployee.id
+    
+    setProcessing(true)
+    try {
+      const { data: response, error } = await payrollAPI.approve(
+        payrollId,
+        parseInt(managerId, 10)
+      )
+      
+      if (error) {
+        message.error(error || 'Không thể duyệt lương')
+        return
+      }
+      
+      message.success('Duyệt lương thành công!')
+      setShowDetailModal(false)
+      setSelectedEmployee(null)
+      setPayrollDetail(null)
+      fetchPayrollData() // Refresh list
+    } catch (err) {
+      console.error('Failed to approve payroll:', err)
+      message.error('Đã xảy ra lỗi khi duyệt lương')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  // Handle reject payroll
+  const handleReject = async () => {
+    if (!selectedEmployee || !rejectReason.trim()) {
+      message.warning('Vui lòng nhập lý do từ chối')
+      return
+    }
+
+    const managerId = getUserIdFromToken()
+    if (!managerId) {
+      message.error('Không thể lấy thông tin quản lý')
+      return
+    }
+
+    // Tạm dùng employeeId/id làm ID payroll theo backend
+    const payrollId =
+      selectedEmployee.payrollId || selectedEmployee.employeeId || selectedEmployee.id
+    
+    setProcessing(true)
+    try {
+      const { data: response, error } = await payrollAPI.reject(
+        payrollId,
+        parseInt(managerId, 10),
+        rejectReason.trim()
+      )
+      
+      if (error) {
+        message.error(error || 'Không thể từ chối lương')
+        return
+      }
+      
+      message.success('Từ chối lương thành công!')
+      setShowDetailModal(false)
+      setShowRejectModal(false)
+      setSelectedEmployee(null)
+      setPayrollDetail(null)
+      setRejectReason('')
+      fetchPayrollData() // Refresh list
+    } catch (err) {
+      console.error('Failed to reject payroll:', err)
+      message.error('Đã xảy ra lỗi khi từ chối lương')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const formatCurrency = (amount) => {
+    return (amount || 0).toLocaleString('vi-VN')
+  }
 
   // Calculate filtered data directly (no useMemo)
   const filtered = payrollData
@@ -216,7 +381,7 @@ export default function PayrollForManager() {
       key: 'status',
       width: 140,
       render: (value) => {
-        const config = STATUS_CONFIG[value]
+        const config = STATUS_CONFIG[value] || STATUS_CONFIG.pending
         return (
           <Tag
             style={{
@@ -237,7 +402,13 @@ export default function PayrollForManager() {
       title: '',
       key: 'actions',
       width: 80,
-      render: () => <i className="bi bi-eye payroll-view-icon" />
+      render: (_, record) => (
+        <i 
+          className="bi bi-eye payroll-view-icon" 
+          style={{ cursor: 'pointer' }}
+          onClick={() => handleOpenDetail(record)}
+        />
+      )
     }
   ]
 
@@ -312,6 +483,266 @@ export default function PayrollForManager() {
           </div>
         </div>
       </div>
+
+      {/* Detail Modal */}
+      <Modal
+        open={showDetailModal}
+        onCancel={() => {
+          setShowDetailModal(false)
+          setSelectedEmployee(null)
+          setPayrollDetail(null)
+          setActiveTab('overview')
+        }}
+        footer={null}
+        width={900}
+        title={null}
+        closable={false}
+        styles={{
+          header: { padding: 0, borderBottom: 'none' },
+          body: { padding: 0 },
+          content: { borderRadius: 0, padding: 0, overflow: 'hidden' }
+        }}
+      >
+        {detailLoading ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <Spin size="large" />
+          </div>
+        ) : payrollDetail ? (
+          <div>
+            {/* Header giống modal Phiếu thanh toán */}
+            <div
+              style={{
+                background: '#CBB081',
+                padding: '16px 24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ flex: 1, textAlign: 'center', marginLeft: 32 }}>
+                <span
+                  style={{
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: '#111827',
+                  }}
+                >
+                  Chi tiết Lương tháng {selectedDate.month() + 1}/{selectedDate.year()}
+                </span>
+              </div>
+              <Button
+                type="text"
+                onClick={() => {
+                  setShowDetailModal(false)
+                  setSelectedEmployee(null)
+                  setPayrollDetail(null)
+                  setActiveTab('overview')
+                }}
+                icon={<CloseOutlined style={{ fontSize: 18, color: '#111827' }} />}
+                style={{
+                  border: 'none',
+                  boxShadow: 'none',
+                  background: 'transparent',
+                }}
+              />
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px' }}>
+              {/* Employee Info Card */}
+              <Card style={{ marginBottom: '24px', borderRadius: '8px' }}>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <strong>Tên nhân viên:</strong> {payrollDetail.employee?.fullName || selectedEmployee?.name || 'N/A'}
+                  </div>
+                  <div style={{ marginBottom: '12px' }}>
+                    <strong>Số điện thoại:</strong> {payrollDetail.employee?.phone || selectedEmployee?.phone || 'N/A'}
+                  </div>
+                </Col>
+                <Col span={12}>
+                  <div style={{ marginBottom: '12px' }}>
+                    <strong>Địa chỉ:</strong> {payrollDetail.employee?.address || 'N/A'}
+                  </div>
+                  <div>
+                    <strong>Chức vụ:</strong> {payrollDetail.employee?.role || 'N/A'}
+                  </div>
+                </Col>
+              </Row>
+              </Card>
+
+            {/* Tabs */}
+            <Tabs
+              activeKey={activeTab}
+              onChange={setActiveTab}
+              items={[
+                {
+                  key: 'overview',
+                  label: 'Tổng quan',
+                  children: (
+                    <Row gutter={16}>
+                      <Col span={12}>
+                        <Card style={{ borderRadius: '8px' }}>
+                          <div style={{ marginBottom: '12px' }}>
+                            <strong>Lương cơ bản:</strong> {formatCurrency(payrollDetail.overview?.baseSalary || 0)}
+                          </div>
+                          <div style={{ marginBottom: '12px' }}>
+                            <strong>Tổng công:</strong> {payrollDetail.overview?.totalWorkingDays || payrollDetail.workingDays || 0}
+                          </div>
+                          <div>
+                            <strong>Nghỉ phép:</strong> {payrollDetail.overview?.leaveDays || payrollDetail.leaveDays || 0}
+                          </div>
+                        </Card>
+                      </Col>
+                      <Col span={12}>
+                        <Card style={{ borderRadius: '8px' }}>
+                          <div style={{ marginBottom: '12px' }}>
+                            <strong>Tổng khấu trừ:</strong> {formatCurrency(payrollDetail.overview?.totalDeduction || 0)}
+                          </div>
+                          <div style={{ marginBottom: '12px' }}>
+                            <strong>Tổng phụ cấp:</strong> {formatCurrency(payrollDetail.overview?.totalAllowance || 0)}
+                          </div>
+                          <div>
+                            <strong>Lương ròng:</strong> {formatCurrency(payrollDetail.overview?.netSalary || 0)}
+                          </div>
+                        </Card>
+                      </Col>
+                    </Row>
+                  )
+                },
+                {
+                  key: 'allowances',
+                  label: 'Phụ cấp',
+                  children: (
+                    <div>
+                      {payrollDetail.allowances && payrollDetail.allowances.length > 0 ? (
+                        <Table
+                          dataSource={payrollDetail.allowances.map((item, index) => ({ ...item, key: index }))}
+                          columns={[
+                            { title: 'Loại phụ cấp', dataIndex: 'type', key: 'type' },
+                            { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v) => formatCurrency(v) },
+                            { title: 'Ngày', dataIndex: 'createdAt', key: 'createdAt', render: (v) => v ? dayjs(v).format('DD/MM/YYYY') : 'N/A' }
+                          ]}
+                          pagination={false}
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                          Không có phụ cấp
+                        </div>
+                      )}
+                    </div>
+                  )
+                },
+                {
+                  key: 'deductions',
+                  label: 'Khấu trừ',
+                  children: (
+                    <div>
+                      {payrollDetail.deductions && payrollDetail.deductions.length > 0 ? (
+                        <Table
+                          dataSource={payrollDetail.deductions.map((item, index) => ({ ...item, key: index }))}
+                          columns={[
+                            { title: 'Loại khấu trừ', dataIndex: 'type', key: 'type' },
+                            { title: 'Số tiền', dataIndex: 'amount', key: 'amount', render: (v) => formatCurrency(v) },
+                            { title: 'Ngày', dataIndex: 'createdAt', key: 'createdAt', render: (v) => v ? dayjs(v).format('DD/MM/YYYY') : 'N/A' }
+                          ]}
+                          pagination={false}
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+                          Không có khấu trừ
+                        </div>
+                      )}
+                    </div>
+                  )
+                }
+              ]}
+            />
+
+            {/* Action Buttons */}
+            {(() => {
+              const status = payrollDetail?.status
+              const isPending =
+                status === 'PENDING_MANAGER_APPROVAL' ||
+                status === 'Chờ quản lý duyệt' ||
+                selectedEmployee?.status === 'pending'
+              const disableActions = processing || !isPending
+
+            return (
+            <div style={{ 
+              marginTop: '24px', 
+              display: 'flex', 
+              justifyContent: 'flex-end', 
+              gap: '12px' 
+            }}>
+              <Button
+                onClick={() => setShowRejectModal(true)}
+                style={{
+                  background: disableActions ? '#e5e7eb' : '#f97316',
+                  borderColor: disableActions ? '#e5e7eb' : '#f97316',
+                  color: disableActions ? '#9ca3af' : '#fff',
+                  height: '40px',
+                  padding: '0 32px',
+                  fontWeight: 600,
+                  cursor: disableActions ? 'not-allowed' : 'pointer'
+                }}
+                disabled={disableActions}
+              >
+                Từ chối
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleApprove}
+                loading={processing}
+                style={{
+                  background: disableActions ? '#e5e7eb' : '#22c55e',
+                  borderColor: disableActions ? '#e5e7eb' : '#22c55e',
+                  height: '40px',
+                  padding: '0 32px',
+                  fontWeight: 600,
+                  color: disableActions ? '#9ca3af' : '#fff',
+                  cursor: disableActions ? 'not-allowed' : 'pointer'
+                }}
+                disabled={disableActions}
+              >
+                Duyệt
+              </Button>
+            </div>
+            )})()}
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
+            Không có dữ liệu
+          </div>
+        )}
+      </Modal>
+
+      {/* Reject Reason Modal */}
+      <Modal
+        open={showRejectModal}
+        onCancel={() => {
+          setShowRejectModal(false)
+          setRejectReason('')
+        }}
+        onOk={handleReject}
+        okText="Xác nhận"
+        cancelText="Hủy"
+        title="Lý do từ chối"
+        okButtonProps={{
+          style: { background: '#f97316', borderColor: '#f97316' },
+          loading: processing
+        }}
+      >
+        <Form.Item label="Lý do từ chối" required>
+          <TextArea
+            rows={4}
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Nhập lý do từ chối..."
+          />
+        </Form.Item>
+      </Modal>
     </ManagerLayout>
   )
 }

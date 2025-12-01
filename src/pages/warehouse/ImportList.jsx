@@ -1,39 +1,82 @@
-import React, { useState } from 'react'
-import { Table, Input, Card, Badge } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Table, Input, Card, Badge, message } from 'antd'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { stockReceiptAPI } from '../../services/api'
+import dayjs from 'dayjs'
 
 const { Search } = Input
 
 export default function ImportList() {
   const [searchTerm, setSearchTerm] = useState('')
+  const [importList, setImportList] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
 
-  const importList = [
-    {
-      id: 1,
-      code: 'STK-2025-000001',
-      vehicleModel: 'Mazda-v3',
-      creator: 'DT Huyền - 190',
-      createDate: '30/10/2025',
-      status: 'Đã nhập',
-      totalParts: 15,
-      totalValue: '2.500.000'
-    },
-    {
-      id: 2,
-      code: 'STK-2025-000002',
-      vehicleModel: 'Toyota Vios',
-      creator: 'HTK Ly - 180',
-      createDate: '29/10/2025',
-      status: 'Đã nhập',
-      totalParts: 20,
-      totalValue: '3.200.000'
+  useEffect(() => {
+    fetchImportList()
+  }, [page, pageSize, searchTerm])
+
+  const fetchImportList = async () => {
+    setLoading(true)
+    try {
+      const { data, error } = await stockReceiptAPI.getAll(page - 1, pageSize, searchTerm)
+      
+      if (error) {
+        message.error('Không thể tải danh sách nhập')
+        setLoading(false)
+        return
+      }
+
+      const result = data?.result || {}
+      const content = result.content || (Array.isArray(data?.result) ? data.result : [])
+      
+      // Transform API data to match UI structure
+      const transformedData = content.map((item) => ({
+        id: item.receiptId || item.id,
+        code: item.code || 'N/A',
+        vehicleModel: item.vehicleModelName || 'N/A',
+        creator: item.createdByName || 'N/A',
+        createDate: item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY') : 'N/A',
+        status: mapStatus(item.status),
+        totalParts: 0, // API không trả về, có thể cần call API khác
+        totalValue: item.totalAmount ? formatCurrency(item.totalAmount) : '0'
+      }))
+
+      setImportList(transformedData)
+      setTotal(result.totalElements || content.length || 0)
+    } catch (err) {
+      console.error('Failed to fetch import list:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
     }
-  ]
+  }
+
+  const mapStatus = (status) => {
+    const statusMap = {
+      'IMPORTED': 'Đã nhập',
+      'PENDING': 'Chờ nhập',
+      'CANCELLED': 'Đã hủy'
+    }
+    return statusMap[status] || status || 'N/A'
+  }
+
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('vi-VN').format(value)
+  }
 
   const getStatusConfig = (status) => {
     if (status === 'Đã nhập') {
       return { color: 'success', text: status }
+    }
+    if (status === 'Chờ nhập') {
+      return { color: 'warning', text: status }
+    }
+    if (status === 'Đã hủy') {
+      return { color: 'error', text: status }
     }
     return { color: 'default', text: status }
   }
@@ -92,11 +135,7 @@ export default function ImportList() {
     }
   ]
 
-  const filteredData = importList.filter(item =>
-    item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.vehicleModel.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.creator.toLowerCase().includes(searchTerm.toLowerCase())
-  ).map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
+  const dataSource = importList.map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
 
   return (
     <WarehouseLayout>
@@ -109,19 +148,29 @@ export default function ImportList() {
             style={{ width: 300 }}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            onSearch={setSearchTerm}
+            onSearch={(value) => {
+              setSearchTerm(value)
+              setPage(1)
+            }}
           />
         }
         style={{ marginBottom: 24 }}
       >
         <Table
           columns={columns}
-          dataSource={filteredData}
+          dataSource={dataSource}
+          loading={loading}
           pagination={{
-            pageSize: 10,
+            current: page,
+            pageSize: pageSize,
+            total: total,
             showSizeChanger: true,
             showTotal: (total) => `Tổng ${total} bản ghi`,
-            showQuickJumper: true
+            showQuickJumper: true,
+            onChange: (newPage, newPageSize) => {
+              setPage(newPage)
+              setPageSize(newPageSize)
+            }
           }}
           size="middle"
           components={goldTableHeader}

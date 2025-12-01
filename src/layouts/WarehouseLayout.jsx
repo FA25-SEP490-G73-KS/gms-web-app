@@ -172,6 +172,12 @@ export default function WarehouseLayout({ children }) {
                 >
                   Xác nhận báo giá
                 </button>
+                <button 
+                  className={`submenu-item ${isActive('/warehouse/export/create') ? 'active' : ''}`}
+                  onClick={() => navigate('/warehouse/export/create')}
+                >
+                  Xuất linh kiện
+                </button>
               </div>
             )}
           </div>

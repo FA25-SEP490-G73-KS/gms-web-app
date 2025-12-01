@@ -79,7 +79,7 @@ export default function Header() {
     <header style={headerStyle}>
       <div style={containerStyle}>
         {!isMobile && (
-          <img src="/image/mainlogo.png" alt="Garage Hoàng Tuấn" style={{ height: 100, width: "auto" }} />
+        <img src="/image/mainlogo.png" alt="Garage Hoàng Tuấn" style={{ height: 100, width: "auto" }} />
         )}
 
         <div style={titleWrapStyle}>
@@ -88,12 +88,12 @@ export default function Header() {
         </div>
 
         {!isMobile && (
-          <div style={hotlineStyle}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.6a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.48-1.19a2 2 0 0 1 2.11-.45c.83.29 1.7.5 2.6.62A2 2 0 0 1 22 16.92z" stroke="#CBB081" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span>Hotline: 0912603603</span>
-          </div>
+        <div style={hotlineStyle}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.9.33 1.77.62 2.6a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.48-1.19a2 2 0 0 1 2.11-.45c.83.29 1.7.5 2.6.62A2 2 0 0 1 22 16.92z" stroke="#CBB081" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>Hotline: 0912603603</span>
+        </div>
         )}
 
         {isMobile && (

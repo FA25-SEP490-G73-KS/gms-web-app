@@ -319,4 +319,77 @@
   color: #fff !important;
 }
 
+.appointment-date-picker {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 180px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 0 40px 0 16px;
+  background: #fff;
+  height: 44px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.appointment-date-input {
+  border: none;
+  background: transparent;
+  width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  /* Ẩn text mặc định dd/mm/yyyy của input date khi chưa chọn ngày,
+     tránh chồng lên placeholder custom */
+  color: transparent;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.appointment-date-input::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 100%;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.appointment-date-placeholder {
+  position: absolute;
+  left: 16px;
+  font-size: 14px;
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+.appointment-date-input.has-value {
+  color: #111;
+}
+
+.appointment-date-icon {
+  position: absolute;
+  right: 12px;
+  font-size: 18px;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.appointment-date-clear {
+  position: absolute;
+  right: 38px;
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  color: #9ca3af;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.appointment-date-clear:hover {
+  color: #6b7280;
+}
+
 
