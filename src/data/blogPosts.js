@@ -1,5 +1,5 @@
 export const blogPosts = [
-  {
+  { 
     id: 'huong-dan-bao-duong-xe-dinh-ky',
     slug: 'huong-dan-bao-duong-xe-dinh-ky',
     title: 'Hướng Dẫn Bảo Dưỡng Xe Ô Tô Định Kỳ Đúng Cách',
