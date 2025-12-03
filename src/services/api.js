@@ -1,13 +1,19 @@
-import axios from 'axios';
+import axios from "axios";
 
 // In development, use relative path to leverage Vite proxy
 // In production, use full URL from env variable
-const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api' : 'http://localhost:8080/api');
+const BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? "/api" : "http://localhost:8080/api");
 
 // Get token from localStorage
 function getToken() {
   try {
-    return localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    return (
+      localStorage.getItem("token") ||
+      localStorage.getItem("accessToken") ||
+      localStorage.getItem("authToken")
+    );
   } catch {
     return null;
   }
@@ -17,29 +23,30 @@ function getToken() {
 const axiosClient = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // List of public endpoints that don't require authentication
 const PUBLIC_ENDPOINTS = [
-  '/auth/login',
-  '/auth/refresh',
-  '/auth/reset-password',
-  '/auth/update-password',
+  "/auth/login",
+  "/auth/refresh",
+  "/auth/reset-password",
+  "/auth/update-password",
 ];
 
 // Request interceptor to add Bearer token automatically
 axiosClient.interceptors.request.use(
   (config) => {
     // Check if skipAuth is set in config (can be boolean true or string 'true')
-    const skipAuth = config.skipAuth === true || config.skipAuth === 'true';
-    
+    const skipAuth = config.skipAuth === true || config.skipAuth === "true";
+
     // Check if endpoint is in public list
-    const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint => 
-      config.url?.includes(endpoint) || config.url?.endsWith(endpoint)
+    const isPublicEndpoint = PUBLIC_ENDPOINTS.some(
+      (endpoint) =>
+        config.url?.includes(endpoint) || config.url?.endsWith(endpoint)
     );
-    
+
     // Only add token if skipAuth is not set and endpoint is not public
     if (!skipAuth && !isPublicEndpoint) {
       const token = getToken();
@@ -47,11 +54,11 @@ axiosClient.interceptors.request.use(
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
-    
+
     // Remove skipAuth from config as it's not a valid axios option
     // This must be done after checking it
     delete config.skipAuth;
-    
+
     return config;
   },
   (error) => {
@@ -59,19 +66,21 @@ axiosClient.interceptors.request.use(
   }
 );
 
-
 axiosClient.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
     if (error.response) {
-   
-      const errorMessage = error.response.data?.message || error.response.data?.error || error.message;
+      const errorMessage =
+        error.response.data?.message ||
+        error.response.data?.error ||
+        error.message;
       return Promise.reject(new Error(errorMessage));
     } else if (error.request) {
-     
-      return Promise.reject(new Error('Không thể kết nối đến server. Vui lòng thử lại.'));
+      return Promise.reject(
+        new Error("Không thể kết nối đến server. Vui lòng thử lại.")
+      );
     } else {
       // Something else happened
       return Promise.reject(error);
@@ -81,9 +90,8 @@ axiosClient.interceptors.response.use(
 
 async function request(method, path, body, init = {}) {
   try {
-    
     const { skipAuth, signal, ...axiosConfig } = init;
-    
+
     const config = {
       method,
       url: path,
@@ -91,150 +99,162 @@ async function request(method, path, body, init = {}) {
       signal,
       ...axiosConfig,
     };
-    
+
     if (body) {
       config.data = body;
     }
-    
+
     const response = await axiosClient.request(config);
-    
-    return { 
-      data: response.data, 
+
+    return {
+      data: response.data,
       error: undefined,
-      statusCode: response.status 
+      statusCode: response.status,
     };
   } catch (err) {
-    const errorMessage = err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.';
-    return { 
-      data: undefined, 
+    const errorMessage = err.message || "Đã xảy ra lỗi. Vui lòng thử lại.";
+    return {
+      data: undefined,
       error: errorMessage,
-      statusCode: err.response?.status 
+      statusCode: err.response?.status,
     };
   }
 }
 
 export async function get(path, init) {
-  return request('GET', path, null, init);
+  return request("GET", path, null, init);
 }
 
 export async function post(path, body, init) {
-  return request('POST', path, body, init);
+  return request("POST", path, body, init);
 }
 
 export async function put(path, body, init) {
-  return request('PUT', path, body, init);
+  return request("PUT", path, body, init);
 }
 
 export async function patch(path, body, init) {
-  return request('PATCH', path, body, init);
+  return request("PATCH", path, body, init);
 }
 
 export async function del(path, init) {
-  return request('DELETE', path, null, init);
+  return request("DELETE", path, null, init);
 }
 
 export const appointmentAPI = {
-  getAll: (page = 0, size = 10) => get(`/appointments?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 10) =>
+    get(`/appointments?page=${page}&size=${size}`),
   getById: (id) => get(`/appointments/${id}`),
-  create: (data) => post('/appointments', data),
-  updateStatus: (id, status) => patch(`/appointments/${id}/status?status=${status}`),
+  create: (data) => post("/appointments", data),
+  updateStatus: (id, status) =>
+    patch(`/appointments/${id}/status?status=${status}`),
   getTimeSlots: (date) => get(`/appointments/time-slots?date=${date}`),
 };
 
 export const serviceTicketAPI = {
-  getAll: (page = 0, size = 10) => get(`/service-tickets?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 10) =>
+    get(`/service-tickets?page=${page}&size=${size}`),
   getById: (id) => get(`/service-tickets/${id}`),
-  create: (data) => post('/service-tickets', data),
+  create: (data) => post("/service-tickets", data),
   update: (id, data) => {
-    console.log('=== [API] serviceTicketAPI.update ===')
-    console.log('Ticket ID:', id)
-    console.log('Sending to backend:', JSON.stringify(data, null, 2))
-    console.log('====================================')
-    return patch(`/service-tickets/${id}`, data)
+    console.log("=== [API] serviceTicketAPI.update ===");
+    console.log("Ticket ID:", id);
+    console.log("Sending to backend:", JSON.stringify(data, null, 2));
+    console.log("====================================");
+    return patch(`/service-tickets/${id}`, data);
   },
-  updateStatus: (id, status) => patch(`/service-tickets/${id}/status?status=${status}`),
-  updateDeliveryAt: (id, date) => patch(`/service-tickets/${id}/delivery-at`, date),
-  getCompletedPerMonth: () => get('/service-tickets/completed-per-month'),
+  updateStatus: (id, status) =>
+    patch(`/service-tickets/${id}/status?status=${status}`),
+  updateDeliveryAt: (id, date) =>
+    patch(`/service-tickets/${id}/delivery-at`, date),
+  getCompletedPerMonth: () => get("/service-tickets/completed-per-month"),
   getCount: (date) => get(`/service-tickets/count?date=${date}`),
-  getCountByType: (year, month) => get(`/service-tickets/count-by-type?year=${year}&month=${month}`),
+  getCountByType: (year, month) =>
+    get(`/service-tickets/count-by-type?year=${year}&month=${month}`),
 };
 
 export const serviceTypeAPI = {
-  getAll: () => get('/services'),
+  getAll: () => get("/services"),
 };
 
 export const inventoryAPI = {
-  getAll: () => get('/inventory'),
+  getAll: () => get("/inventory"),
   getById: (id) => get(`/inventory/${id}`),
-  create: (data) => post('/inventory', data),
+  create: (data) => post("/inventory", data),
   update: (id, data) => put(`/inventory/${id}`, data),
   delete: (id) => del(`/inventory/${id}`),
 };
 
 export const stockExportAPI = {
-  getAll: (page = 0, size = 6) => get(`/stock-exports?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 6) =>
+    get(`/stock-exports?page=${page}&size=${size}`),
   getById: (id) => get(`/stock-exports/${id}`),
- 
+
   getQuotationDetail: (id) => get(`/stock-exports/quotation/${id}`),
- 
-  exportItem: (itemId, payload) => post(`/stock-exports/item/${itemId}/export`, payload),
-  
-  getExportItemDetail: (exportItemId) => get(`/stock-exports/item/${exportItemId}`),
-  create: (data) => post('/stock-exports', data),
+
+  exportItem: (itemId, payload) =>
+    post(`/stock-exports/item/${itemId}/export`, payload),
+
+  getExportItemDetail: (exportItemId) =>
+    get(`/stock-exports/item/${exportItemId}`),
+  create: (data) => post("/stock-exports", data),
   update: (id, data) => put(`/stock-exports/${id}`, data),
 };
 
 export const otpAPI = {
-  send: (phone, purpose, options = {}) => post('/otp/send', { phone, purpose }, options),
-  verify: (phone, otpCode, purpose, options = {}) => post('/otp/verify', { phone, otpCode, purpose }, options),
+  send: (phone, purpose, options = {}) =>
+    post("/otp/send", { phone, purpose }, options),
+  verify: (phone, otpCode, purpose, options = {}) =>
+    post("/otp/verify", { phone, otpCode, purpose }, options),
 };
 
 export const employeeAPI = {
-  getTechnicians: () => get('/employees/technicians'),
+  getTechnicians: () => get("/employees/technicians"),
   getAll: ({ page = 0, size = 20, keyword, role } = {}) => {
-    const query = buildQueryString({ page, size, keyword, role })
-    const suffix = query ? `?${query}` : ''
-    return get(`/employees${suffix}`)
+    const query = buildQueryString({ page, size, keyword, role });
+    const suffix = query ? `?${query}` : "";
+    return get(`/employees${suffix}`);
   },
 };
 
 export const partsAPI = {
   getAll: ({ page = 0, size = 6, keyword, signal } = {}) => {
-    const query = buildQueryString({ page, size, keyword })
-    const suffix = query ? `?${query}` : ''
-    return get(`/parts${suffix}`, { signal })
+    const query = buildQueryString({ page, size, keyword });
+    const suffix = query ? `?${query}` : "";
+    return get(`/parts${suffix}`, { signal });
   },
   getById: (id) => get(`/parts/${id}`),
-  create: (data) => post('/parts', data),
+  create: (data) => post("/parts", data),
   update: (id, data) => patch(`/parts/${id}`, data),
 };
 
 export const unitsAPI = {
   getAll: ({ page = 0, size = 20, sort } = {}) => {
-    const query = buildQueryString({ page, size, sort })
-    const suffix = query ? `?${query}` : ''
-    return get(`/units${suffix}`)
-  }
+    const query = buildQueryString({ page, size, sort });
+    const suffix = query ? `?${query}` : "";
+    return get(`/units${suffix}`);
+  },
 };
 
 export const marketsAPI = {
-  getAll: () => get('/markets')
+  getAll: () => get("/markets"),
 };
 
 export const partCategoriesAPI = {
-  getAll: () => get('/part-category')
+  getAll: () => get("/part-category"),
 };
 
 export const vehiclesAPI = {
-  getBrands: () => get('/vehicles/brands'),
+  getBrands: () => get("/vehicles/brands"),
   getModelsByBrand: (brandId) => get(`/vehicles/brands/${brandId}/models`),
-  getByLicensePlate: (licensePlate) => get(`/vehicles?licensePlate=${encodeURIComponent(licensePlate)}`),
-  
+  getByLicensePlate: (licensePlate) =>
+    get(`/vehicles?licensePlate=${encodeURIComponent(licensePlate)}`),
+
   checkPlate: (plate, customerId) => {
-    const params = new URLSearchParams()
-    if (plate) params.append('plate', plate)
-    if (customerId != null) params.append('customerId', customerId)
-    return get(`/vehicles/check-plate?${params.toString()}`)
+    const params = new URLSearchParams();
+    if (plate) params.append("plate", plate);
+    if (customerId != null) params.append("customerId", customerId);
+    return get(`/vehicles/check-plate?${params.toString()}`);
   },
 };
 
@@ -242,16 +262,23 @@ export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
   update: (id, payload) => patch(`/price-quotations/${id}`, payload),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
-  getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
+  getPending: (page = 0, size = 6) =>
+    get(`/price-quotations/pending?page=${page}&size=${size}`),
   getItemById: (id) => get(`/quotation-items/${id}`),
-  
-  confirmItem: (itemId, note) => patch(`/quotation-items/${itemId}/confirm`, note),
-  confirmItemUpdate: (itemId, payload) => patch(`/quotation-items/${itemId}/confirm/update`, payload),
-  confirmCreateItem: (itemId, payload) => post(`/quotation-items/${itemId}/confirm/create`, payload),
-  rejectItem: (itemId, reason) => patch(`/quotation-items/${itemId}/reject`, reason),
+
+  confirmItem: (itemId, note) =>
+    patch(`/quotation-items/${itemId}/confirm`, note),
+  confirmItemUpdate: (itemId, payload) =>
+    patch(`/quotation-items/${itemId}/confirm/update`, payload),
+  confirmCreateItem: (itemId, payload) =>
+    post(`/quotation-items/${itemId}/confirm/create`, payload),
+  rejectItem: (itemId, reason) =>
+    patch(`/quotation-items/${itemId}/reject`, reason),
   confirmQuotation: (id) => post(`/price-quotations/${id}/confirm`),
-  rejectQuotation: (id, reason) => post(`/price-quotations/${id}/reject`, reason),
-  exportPDF: (id) => get(`/price-quotations/${id}/pdf`, { responseType: 'blob' }),
+  rejectQuotation: (id, reason) =>
+    post(`/price-quotations/${id}/reject`, reason),
+  exportPDF: (id) =>
+    get(`/price-quotations/${id}/pdf`, { responseType: "blob" }),
 };
 
 export const znsNotificationsAPI = {
@@ -260,29 +287,39 @@ export const znsNotificationsAPI = {
 };
 
 export const invoiceAPI = {
-  create: (serviceTicketId, quotationId) => 
-    post(`/invoices?serviceTicketId=${serviceTicketId}&quotationId=${quotationId}`),
-  getAll: (page = 0, size = 6, sort = 'createdAt,desc') => 
+  create: (serviceTicketId, quotationId) =>
+    post(
+      `/invoices?serviceTicketId=${serviceTicketId}&quotationId=${quotationId}`
+    ),
+  getAll: (page = 0, size = 6, sort = "createdAt,desc") =>
     get(`/invoices?page=${page}&size=${size}&sort=${sort}`),
   getById: (id) => get(`/invoices/${id}`),
   pay: (id, payload) => post(`/invoices/${id}/pay`, payload),
 };
 
 export const authAPI = {
-  login: (phone, password) => post('/auth/login', { phone, password }, { skipAuth: true }),
-  logout: () => post('/auth/logout', {}, { skipAuth: false }),
-  refreshToken: (refreshToken) => post('/auth/refresh', { refreshToken }, { skipAuth: true }),
-  resetPassword: (phone) => post('/auth/reset-password', { phone }, { skipAuth: true }),
- 
-  updatePassword: (phone, otpCode, newPassword) => post('/auth/update-password', { phone, otpCode, newPassword }, { skipAuth: true }),
-  changePassword: (currentPassword, newPassword) => put('/auth/change-password', { currentPassword, newPassword }),
-};
+  login: (phone, password) =>
+    post("/auth/login", { phone, password }, { skipAuth: true }),
+  logout: () => post("/auth/logout", {}, { skipAuth: false }),
+  refreshToken: (refreshToken) =>
+    post("/auth/refresh", { refreshToken }, { skipAuth: true }),
+  resetPassword: (phone) =>
+    post("/auth/reset-password", { phone }, { skipAuth: true }),
 
+  updatePassword: (phone, otpCode, newPassword) =>
+    post(
+      "/auth/update-password",
+      { phone, otpCode, newPassword },
+      { skipAuth: true }
+    ),
+  changePassword: (currentPassword, newPassword) =>
+    put("/auth/change-password", { currentPassword, newPassword }),
+};
 
 function buildQueryString(params = {}) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && value !== "") {
       search.append(key, value);
     }
   });
@@ -296,22 +333,29 @@ export const debtsAPI = {
     keyword,
     page = 0,
     size = 10,
-    sort = 'createdAt,desc',
+    sort = "createdAt,desc",
   }) => {
-    const qs = buildQueryString({ customerId, status, keyword, page, size, sort });
+    const qs = buildQueryString({
+      customerId,
+      status,
+      keyword,
+      page,
+      size,
+      sort,
+    });
     return get(`/debts?${qs}`);
   },
 };
 
 export const employeesAPI = {
   getAll: (page = 0, size = 6) => get(`/employees?page=${page}&size=${size}`),
-  getTechnicians: () => get('/employees/technicians'),
+  getTechnicians: () => get("/employees/technicians"),
 };
 
 export const suppliersAPI = {
   getAll: (page = 0, size = 6) => get(`/suppliers?page=${page}&size=${size}`),
   getById: (id) => get(`/suppliers/${id}`),
-  create: (payload) => post('/suppliers', payload),
+  create: (payload) => post("/suppliers", payload),
   update: (id, payload) => put(`/suppliers/${id}`, payload),
   remove: (id) => del(`/suppliers/${id}`),
 };
@@ -319,54 +363,70 @@ export const suppliersAPI = {
 export const customersAPI = {
   getAll: (page = 0, size = 10) => get(`/customers?page=${page}&size=${size}`),
   getById: (id) => get(`/customers/${id}`),
-  getServiceHistory: (phone) => get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
-  getByPhone: (phone) => get(`/customers/phone?phone=${encodeURIComponent(phone)}`),
-  create: (payload) => post('/customers', payload),
+  getServiceHistory: (phone) =>
+    get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
+  getByPhone: (phone) =>
+    get(`/customers/phone?phone=${encodeURIComponent(phone)}`),
+  create: (payload) => post("/customers", payload),
   update: (id, payload) => put(`/customers/${id}`, payload),
 };
 
 export const manualVoucherAPI = {
   getAll: (page = 0, size = 6) => {
-    const query = buildQueryString({ page, size })
-    const suffix = query ? `?${query}` : ''
-    return get(`/manual-vouchers${suffix}`)
+    const query = buildQueryString({ page, size });
+    const suffix = query ? `?${query}` : "";
+    return get(`/manual-vouchers${suffix}`);
   },
   create: (payload, file) => {
     const formData = new FormData();
-    formData.append('data', JSON.stringify(payload));
+    formData.append("data", JSON.stringify(payload));
     if (file) {
-      formData.append('file', file);
+      formData.append("file", file);
     }
 
-    return post('/manual-vouchers', formData, {
+    return post("/manual-vouchers", formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
     });
   },
 };
 
 export const attendanceAPI = {
-  mark: (data) => post('/attendances/mark', data),
+  mark: (data) => post("/attendances/mark", data),
   getDaily: (date) => get(`/attendances/daily?date=${date}`),
-  getSummary: (startDate, endDate) => get(`/attendances/summary?startDate=${startDate}&endDate=${endDate}`),
+  getSummary: (startDate, endDate) =>
+    get(`/attendances/summary?startDate=${startDate}&endDate=${endDate}`),
 };
 
 export const payrollAPI = {
-  getPreview: (month, year) => get(`/payroll/preview?month=${month}&year=${year}`),
-  getDetail: (employeeId, month, year) => get(`/payroll/detail?employeeId=${employeeId}&month=${month}&year=${year}`),
+  getPreview: (month, year) =>
+    get(`/payroll/preview?month=${month}&year=${year}`),
+  getDetail: (employeeId, month, year) =>
+    get(`/payroll/detail?employeeId=${employeeId}&month=${month}&year=${year}`),
   createAllowance: (payload) => post(`/allowance/create`, payload),
   createDeduction: (payload) => post(`/deduction`, payload),
-  paySalary: (payrollId, accountantId) => post(`/payroll/${payrollId}/pay?accountant=${accountantId}`),
-  submit: (month, year, accountantId) => post(`/payroll/submit?month=${month}&year=${year}&accountant=${accountantId}`),
-  approve: (payrollId, managerId) => post(`/payroll/${payrollId}/approve?manager=${managerId}`),
-  reject: (payrollId, managerId, reason) => post(`/payroll/${payrollId}/reject?manager=${managerId}`, { reason }),
+  paySalary: (payrollId, accountantId) =>
+    post(`/payroll/${payrollId}/pay?accountant=${accountantId}`),
+  submit: (month, year, accountantId) =>
+    post(
+      `/payroll/submit?month=${month}&year=${year}&accountant=${accountantId}`
+    ),
+  approve: (payrollId, managerId) =>
+    post(`/payroll/${payrollId}/approve?manager=${managerId}`),
+  reject: (payrollId, managerId, reason) =>
+    post(`/payroll/${payrollId}/reject?manager=${managerId}`, { reason }),
 };
 
 export const stockReceiptAPI = {
-  getAll: (page = 0, size = 10, search = '') => {
-    const query = buildQueryString({ page, size, search: search || undefined })
-    const suffix = query ? `?${query}` : ''
-    return get(`/stock-receipt${suffix}`)
+  getAll: (page = 0, size = 10, search = "") => {
+    const query = buildQueryString({ page, size, search: search || undefined });
+    const suffix = query ? `?${query}` : "";
+    return get(`/stock-receipt${suffix}`);
   },
+};
+
+export const transactionsAPI = {
+  callback: (paymentLinkId) =>
+    post("/transactions/manual-callback", { paymentLinkId }),
 };
