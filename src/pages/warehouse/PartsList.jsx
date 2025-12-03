@@ -4,23 +4,20 @@ import {
   Input,
   Space,
   Button,
-  DatePicker,
   Modal,
   Form,
   InputNumber,
   Select,
   message,
   Checkbox,
-  Badge,
   Card
 } from 'antd'
 import {
   SearchOutlined,
-  CalendarOutlined,
   EditOutlined,
-  PlusOutlined,
   CloseOutlined,
-  DeleteOutlined
+  SortAscendingOutlined,
+  SortDescendingOutlined
 } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -31,27 +28,9 @@ import '../../styles/pages/warehouse/parts-list.css'
 
 const { Search } = Input
 
-const STATUS_OPTIONS = [
-  { label: 'Tất cả', value: 'ALL' },
-  { label: 'Đã nhập', value: 'Đã nhập' },
-  { label: 'Chờ nhập', value: 'Chờ nhập' },
-  { label: 'Còn hàng', value: 'Còn hàng' },
-  { label: 'Sắp hết', value: 'Sắp hết' },
-  { label: 'Hết hàng', value: 'Hết hàng' }
-]
-
-const STATUS_BADGES = {
-  'Đã nhập': { status: 'success', text: 'Đã nhập' },
-  'Chờ nhập': { status: 'default', text: 'Chờ nhập' },
-  'Còn hàng': { status: 'success', text: 'Còn hàng' },
-  'Sắp hết': { status: 'warning', text: 'Sắp hết' },
-  'Hết hàng': { status: 'error', text: 'Hết hàng' }
-}
-
 export default function PartsList() {
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFilter, setDateFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sortOrder, setSortOrder] = useState('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPart, setSelectedPart] = useState(null)
   const [createModalOpen, setCreateModalOpen] = useState(false)
@@ -116,6 +95,7 @@ export default function PartsList() {
         specialPart: item.specialPart || false,
         universal: item.universal || false,
         createdAt: item.createdAt || new Date().toISOString().split('T')[0],
+        sku: item.sku || '—',
         status: item.quantityInStock > 0 ? 'Đã nhập' : 'Chờ nhập',
         originalItem: item
       }))
@@ -140,25 +120,21 @@ export default function PartsList() {
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()))
 
-        const matchesDate =
-          !dateFilter || item.createdAt === dateFilter.format('YYYY-MM-DD')
-
-        const matchesStatus =
-          statusFilter === 'ALL' || item.status === statusFilter
-
-        return matchesSearch && matchesDate && matchesStatus
+        return matchesSearch
+      })
+      .sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase()
+        const nameB = (b.name || '').toLowerCase()
+        if (sortOrder === 'asc') {
+          return nameA.localeCompare(nameB, 'vi')
+        } else {
+          return nameB.localeCompare(nameA, 'vi')
+        }
       })
       .map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
-  }, [parts, searchTerm, dateFilter, statusFilter])
+  }, [parts, searchTerm, sortOrder])
 
   const columns = [
-    {
-      title: 'STT',
-      dataIndex: 'index',
-      key: 'index',
-      width: 70,
-      render: (_, __, index) => String(index + 1).padStart(2, '0')
-    },
     {
       title: 'Tên linh kiện',
       dataIndex: 'name',
@@ -166,16 +142,23 @@ export default function PartsList() {
       width: 240
     },
     {
+      title: 'SKU',
+      dataIndex: 'sku',
+      key: 'sku',
+      width: 220,
+      render: (sku) => sku || '—'
+    },
+    {
       title: 'Số lượng tồn',
       dataIndex: 'quantityOnHand',
       key: 'quantityOnHand',
-      width: 140
+      width: 120
     },
     {
       title: 'Xuất xứ',
       dataIndex: 'origin',
       key: 'origin',
-      width: 120
+      width: 100
     },
     {
       title: 'Hãng',
@@ -187,37 +170,24 @@ export default function PartsList() {
       title: 'Giá nhập',
       dataIndex: 'importPrice',
       key: 'importPrice',
-      width: 140,
+      width: 130,
       render: (value) => `${Number(value).toLocaleString('vi-VN')} đ`
     },
     {
       title: 'Giá bán',
       dataIndex: 'sellingPrice',
       key: 'sellingPrice',
-      width: 140,
+      width: 130,
       render: (value) => `${Number(value).toLocaleString('vi-VN')} đ`
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 140,
-      render: (status) => {
-        const config = STATUS_BADGES[status] || { status: 'default', text: status || 'Không rõ' }
-        return <Badge {...config} />
-      }
     },
     {
       title: 'Hành động',
       key: 'actions',
-      width: 140,
+      width: 100,
       render: (_, record) => (
-        <Space>
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleOpenDetail(record)}>
-            Sửa
-          </Button>
-          <Button type="link" danger icon={<DeleteOutlined />} />
-        </Space>
+        <Button type="link" icon={<EditOutlined />} onClick={() => handleOpenDetail(record)}>
+          Sửa
+        </Button>
       )
     }
   ]
@@ -371,18 +341,12 @@ export default function PartsList() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{ width: 260 }}
               />
-              <DatePicker
-                placeholder="Ngày nhập"
-                suffixIcon={<CalendarOutlined />}
-                value={dateFilter}
-                onChange={setDateFilter}
-              />
-              <Select
-                value={statusFilter}
-                options={STATUS_OPTIONS}
-                onChange={setStatusFilter}
-                style={{ width: 160 }}
-              />
+              <Button
+                icon={sortOrder === 'asc' ? <SortAscendingOutlined /> : <SortDescendingOutlined />}
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              >
+                {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+              </Button>
             </Space>
           }
         >

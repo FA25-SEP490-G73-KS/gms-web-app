@@ -36,7 +36,7 @@
   cursor: pointer;
   border-radius: 6px;
   color: #666;
-  font-size: 18px;
+  font-size: 19px; /* H5: 18-20px */
   transition: all 0.2s ease;
 }
 
@@ -87,7 +87,7 @@
 
 .manager-breadcrumb-separator {
   color: #9ca3af;
-  font-size: 12px;
+  font-size: 12.5px; /* Caption: 12-13px */
 }
 
 .manager-breadcrumb-current {
@@ -113,7 +113,7 @@
   border: 1px solid #e6e8eb;
   cursor: pointer;
   color: #030303;
-  font-size: 18px;
+  font-size: 19px; /* H5: 18-20px */
 }
 
 .manager-header-notification .notification-badge {
@@ -129,7 +129,7 @@
 
 .manager-header-user {
   color: #030303;
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
   font-weight: 500;
   margin-left: 8px;
 }
@@ -155,12 +155,12 @@
   width: 36px;
   height: 36px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: #CBB081;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4b5563;
-  font-size: 18px;
+  color: white;
+  font-size: 19px; /* H5: 18-20px */
   flex-shrink: 0;
 }
 
@@ -172,12 +172,12 @@
 
 .manager-user-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 14.5px; /* Subtext: 14-15px */
   color: #111827;
 }
 
 .manager-user-role {
-  font-size: 12px;
+  font-size: 12.5px; /* Caption: 12-13px */
   color: #6b7280;
 }
 
@@ -266,13 +266,13 @@
   color: #222;
   font-weight: 600;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 14.5px; /* Subtext: 14-15px */
 }
 
 .manager-nav-item i {
   width: 18px;
   color: var(--gold);
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
 }
 
 .manager-nav-item:hover {
@@ -332,7 +332,7 @@
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12.5px; /* Caption: 12-13px */
 }
 
 .submenu-item:hover {
@@ -352,7 +352,7 @@
 .manager-user-info {
   padding: 12px 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  font-size: 12px;
+  font-size: 12.5px; /* Caption: 12-13px */
   color: #222;
   text-align: center;
 }
@@ -364,7 +364,7 @@
 
 .manager-user-info .user-role {
   color: #CBB081;
-  font-size: 11px;
+  font-size: 12.5px; /* Caption: 12-13px */
 }
 
 .manager-logout {
@@ -379,7 +379,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 14.5px; /* Subtext: 14-15px */
 }
 
 .manager-logout i {

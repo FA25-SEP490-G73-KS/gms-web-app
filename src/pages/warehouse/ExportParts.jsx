@@ -248,6 +248,7 @@ export default function ExportParts() {
         const config = getStatusConfig(status)
         return (
           <Tag
+            className="subtext"
             style={{
               color: config.color,
               backgroundColor: config.bgColor,
@@ -256,7 +257,6 @@ export default function ExportParts() {
               borderRadius: '6px',
               padding: '4px 12px',
               fontWeight: 500,
-              fontSize: '14px',
               margin: 0,
             }}
           >
@@ -476,8 +476,8 @@ export default function ExportParts() {
     <WarehouseLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: 16 }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: '0 0 4px 0' }}>Xuất linh kiện</h1>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b7280' }}>
+          <h1 className="h4" style={{ fontWeight: 700, margin: '0 0 4px 0' }}>Xuất linh kiện</h1>
+          <p className="subtext" style={{ margin: 0, color: '#6b7280' }}>
             Theo dõi các báo giá đã duyệt và thực hiện xuất linh kiện từ kho theo từng phiếu.
           </p>
         </div>

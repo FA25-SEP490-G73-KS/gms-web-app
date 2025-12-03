@@ -326,7 +326,6 @@ export default function ExportList() {
           <InboxOutlined style={{ color: '#1677ff', fontSize: '16px' }} />
           <span style={{ 
             fontWeight: 600, 
-            fontSize: '15px', 
             color: '#111' 
           }}>
             Danh sách linh kiện ({record.parts?.length || 0})
@@ -349,10 +348,10 @@ export default function ExportList() {
   }
 
   return (
-    <WarehouseLayout>
+        <WarehouseLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
+          <h1 className="h4" style={{ fontWeight: 700, margin: 0, marginBottom: '20px' }}>
             Danh sách xuất
           </h1>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Table, Input, Card, Badge, Modal, Space, Button, Row, Col, message } from 'antd'
 import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
@@ -6,7 +6,7 @@ import { appointmentAPI, serviceTicketAPI } from '../../services/api'
 import { useNavigate } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/admin-appointments.css'
-import { displayPhoneFrom84, normalizePhoneTo84 } from '../../utils/helpers'
+import { displayPhoneFrom84 } from '../../utils/helpers'
 import dayjs from 'dayjs'
 
 const { Search } = Input
@@ -103,6 +103,20 @@ const extractServiceLabel = (item = {}) => {
   return ''
 }
 
+/**
+ * Helper normalize to ISO 'YYYY-MM-DD'
+ */
+const normalizeToISODate = (d) => {
+  if (!d && d !== 0) return null
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d
+  if (typeof d === 'string' && /^\d{2}\/\d{2}\/\d{4}$/.test(d)) {
+    const parsed = dayjs(d, 'DD/MM/YYYY')
+    return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null
+  }
+  const parsed = dayjs(d)
+  return parsed.isValid() ? parsed.format('YYYY-MM-DD') : null
+}
+
 export default function AdminAppointments() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -113,11 +127,14 @@ export default function AdminAppointments() {
   const [loading, setLoading] = useState(false)
   const [selectedFull, setSelectedFull] = useState(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [selectedDate, setSelectedDate] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'))
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [timeSlots, setTimeSlots] = useState([])
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
+
+  // ref to native input so we can focus/showPicker when clicking icon
+  const dateInputRef = useRef(null)
 
   useEffect(() => {
     fetchAppointments()
@@ -263,20 +280,24 @@ export default function AdminAppointments() {
   const processData = (rawData) => {
     const transformed = rawData.map(item => {
       const serviceLabel = extractServiceLabel(item)
+      const rawDateCandidate = item.appointmentDate || item.date || item.appointment_date || null
+      const dateRawISO = normalizeToISODate(rawDateCandidate)
+      const dateDisplay = dateRawISO ? dayjs(dateRawISO).format('DD/MM/YYYY') : (item.appointmentDate ? String(item.appointmentDate) : '')
       return {
-      id: item.appointmentId || item.id,
-      customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
-      license: formatLicensePlate(item.licensePlate || item.license || ''),
-      phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
-      status: statusMap[item.status] || item.status || 'Chờ',
-      statusKey: item.status || 'CONFIRMED',
-      time: item.timeSlotLabel || item.time || '',
-      date: item.appointmentDate ? new Date(item.appointmentDate).toLocaleDateString('vi-VN') : '',
-      dateRaw: item.appointmentDate,
-      serviceType: serviceLabel || '',
-      note: item.note || '',
-      originalItem: item
-    }})
+        id: item.appointmentId || item.id,
+        customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
+        license: formatLicensePlate(item.licensePlate || item.license || ''),
+        phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
+        status: statusMap[item.status] || item.status || 'Chờ',
+        statusKey: item.status || 'CONFIRMED',
+        time: item.timeSlotLabel || item.time || '',
+        date: dateDisplay,
+        dateRaw: dateRawISO,
+        serviceType: serviceLabel || '',
+        note: item.note || '',
+        originalItem: item
+      }
+    })
     setData(transformed)
   }
 
@@ -327,12 +348,13 @@ export default function AdminAppointments() {
     filtered = filtered.filter((r) => r.statusKey === statusFilter)
     }
 
-    // Filter by date
+    // Filter by date (using ISO comparison)
     if (selectedDate) {
-    const filterDate = typeof selectedDate === 'string' 
-      ? dayjs(selectedDate).format('DD/MM/YYYY')
-      : dayjs(selectedDate).format('DD/MM/YYYY')
-    filtered = filtered.filter((r) => r.date === filterDate)
+      filtered = filtered.filter((r) => {
+        if (r.dateRaw) return r.dateRaw === selectedDate
+        const isoFromDisplay = normalizeToISODate(r.date)
+        return isoFromDisplay === selectedDate
+      })
     }
 
   // Group appointments by time slot for timeline
@@ -703,11 +725,23 @@ export default function AdminAppointments() {
               </Space>
             </Col>
             <Col>
-              <div className="appointment-date-picker">
-                {!selectedDate && (
-                  <span className="appointment-date-placeholder">Chọn ngày</span>
-                )}
+              {/* --- CUSTOM DATE PICKER --- */}
+              <div
+                className="appointment-date-picker"
+                style={{
+                  position: 'relative',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  padding: '6px 10px',
+                  minWidth: 180
+                }}
+              >
+                {!selectedDate && <span style={{ color: '#9ca3af', marginRight: 8, fontSize: 14 }}>dd/mm/yyyy</span>}
                 <input
+                  ref={dateInputRef}
                   type="date"
                   className={`appointment-date-input${selectedDate ? ' has-value' : ''}`}
                   value={selectedDate || ''}
@@ -715,17 +749,62 @@ export default function AdminAppointments() {
                     const value = e.target.value
                     setSelectedDate(value || null)
                   }}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    fontSize: 14,
+                    background: 'transparent',
+                    padding: '6px 8px',
+                    paddingRight: 36,
+                    width: selectedDate ? '140px' : '0px',
+                    opacity: selectedDate ? 1 : 0,
+                    position: selectedDate ? 'relative' : 'absolute'
+                  }}
                 />
+                {/* clear button */}
                 {selectedDate && (
                   <button
                     type="button"
-                    className="appointment-date-clear"
                     onClick={() => setSelectedDate(null)}
+                    style={{
+                      position: 'absolute',
+                      right: 36,
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 16,
+                      lineHeight: 1,
+                      color: '#6b7280'
+                    }}
+                    aria-label="clear date"
                   >
                     ×
                   </button>
                 )}
-                <CalendarOutlined className="appointment-date-icon" />
+                {/* calendar icon: focus/showPicker on input when clicked */}
+                <div
+                  onClick={() => {
+                    const el = dateInputRef.current
+                    if (!el) return
+                    if (typeof el.showPicker === 'function') {
+                      try { el.showPicker(); return } catch (e) { /* ignore */ }
+                    }
+                    el.focus()
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    color: '#6b7280'
+                  }}
+                >
+                  <CalendarOutlined />
+                </div>
               </div>
             </Col>
           </Row>

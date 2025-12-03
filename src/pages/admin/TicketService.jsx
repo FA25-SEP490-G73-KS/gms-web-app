@@ -529,13 +529,13 @@ export default function TicketService() {
   ]
 
   return (
-    <AdminLayout>
+        <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
+          <h1 className="h4" style={{ fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
             {isHistoryPage ? 'Lịch sử sửa chữa' : 'Danh sách phiếu'}
           </h1>
-          <p style={{ margin: '0 0 20px 0', fontSize: 14, color: '#6b7280' }}>
+          <p className="subtext" style={{ margin: '0 0 20px 0', color: '#6b7280' }}>
             {isHistoryPage
               ? 'Tra cứu lại các phiếu dịch vụ đã hoàn tất hoặc đã hủy theo biển số xe và ngày tạo.'
               : 'Quản lý danh sách phiếu dịch vụ hiện tại theo trạng thái, ngày tạo và biển số xe.'}
@@ -838,7 +838,7 @@ export default function TicketService() {
               </Form.Item>
 
               <Form.Item
-                label="Ngày nhận xe"
+                label="Ngày dự đoán nhận xe"
                 name="receiveDate"
               >
                 <input

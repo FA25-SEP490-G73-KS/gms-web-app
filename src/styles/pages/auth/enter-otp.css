@@ -35,13 +35,13 @@
 
 .enter-otp__title-text {
   position: absolute;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-weight: 600;
   top: 19.53%;
   left: 50%;
   transform: translateX(-50%);
   line-height: normal;
-  font-size: 27px;
+  font-size: 27px; /* H3: 24-30px */
   text-align: center;
   margin: 0;
   white-space: nowrap;
@@ -85,10 +85,10 @@
 }
 
 .enter-otp__form-title {
-  font-family: 'Outfit', 'Noto Sans', sans-serif;
+  font-family: 'Inter', 'Noto Sans', sans-serif;
   font-weight: 600;
   line-height: 1.4;
-  font-size: 32px;
+  font-size: 33px; /* H2: 30-36px */
   text-align: center;
   color: #111827;
   margin: 0;
@@ -115,21 +115,21 @@
   width: 100%;
   padding: 16px;
   border-radius: 8px;
-  font-family: 'Outfit', 'Noto Sans', sans-serif;
+  font-family: 'Inter', 'Noto Sans', sans-serif;
   font-weight: 500;
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
   color: #111827;
   outline: none;
   transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
   text-align: center;
   letter-spacing: 8px;
-  font-size: 20px;
+  font-size: 19px; /* H5: 18-20px */
 }
 
 .enter-otp__input::placeholder {
   color: #a0aec0;
   letter-spacing: 0;
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
 }
 
 .enter-otp__input:focus {
@@ -139,7 +139,7 @@
 
 .enter-otp__error-message {
   color: #ef4444;
-  font-size: 14px;
+  font-size: 14.5px; /* Subtext: 14-15px */
   text-align: center;
   width: 100%;
 }
@@ -174,7 +174,7 @@
 .enter-otp__submit-text {
   font-family: 'Urbanist', 'Noto Sans', sans-serif;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
   color: #000;
   text-align: center;
   white-space: nowrap;

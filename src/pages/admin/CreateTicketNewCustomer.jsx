@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, forwardRef } from 'react'
-import { Form, Input, Button, Card, Row, Col, Space, message, Modal, Select, Checkbox } from 'antd'
+import { Form, Input, Button, Card, Row, Col, Space, message, Modal, Checkbox } from 'antd'
 import { useNavigate } from 'react-router-dom'
 import AdminLayout from '../../layouts/AdminLayout'
 import { serviceTicketAPI, employeesAPI, vehiclesAPI, customersAPI, serviceTypeAPI } from '../../services/api'
@@ -14,11 +14,11 @@ const { TextArea } = Input
 
 const DateInput = forwardRef(({ value, onClick }, ref) => (
   <Input
-    size="large"
     placeholder="dd/mm/yyyy"
     value={value}
     onClick={onClick}
     readOnly
+    style={{ height: 40 }}
     suffix={<CalendarOutlined style={{ color: '#9ca3af' }} />}
     ref={ref}
   />
@@ -53,154 +53,50 @@ export default function CreateTicketNewCustomer() {
 
   const customerTypeSelected = Form.useWatch('customerType', form) || 'CA_NHAN'
 
+  // react-select selected states (objects)
+  const [selectedServices, setSelectedServices] = useState([])
+  const [selectedTechs, setSelectedTechs] = useState([])
+
   // Options for selects - memoized to prevent re-render
-  const brandOptions = useMemo(() => 
+  const brandOptions = useMemo(() =>
     brands.map((brand) => ({ label: brand.name, value: brand.id })),
     [brands]
   )
-  
-  const modelOptions = useMemo(() => 
+
+  const modelOptions = useMemo(() =>
     models.map((model) => ({ label: model.name, value: model.id })),
     [models]
   )
-  
+
   const techOptionsStable = useMemo(() => techOptions, [techOptions])
   const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
 
-  const OLD_singleSelectStyles = {
-    control: (base, state) => ({
-      ...base,
-      minHeight: 40,
-      borderRadius: 6,
-      borderColor: state.isFocused ? '#1890ff' : '#d9d9d9',
-      boxShadow: state.isFocused ? '0 0 0 2px rgba(24,144,255,0.2)' : 'none',
-      transition: 'all 0.2s',
-      '&:hover': {
-        borderColor: '#40a9ff'
-      }
-    }),
-    valueContainer: (base) => ({
-      ...base,
-      padding: '4px 11px'
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: '#bfbfbf'
-    }),
-    singleValue: (base) => ({
-      ...base,
-      color: '#000000d9'
-    }),
-    menu: (base) => ({
-      ...base,
-      zIndex: 9999,
-      borderRadius: 6
-    }),
-    menuPortal: (base) => ({
-      ...base,
-      zIndex: 9999
-    }),
-    option: (base, state) => ({
-      ...base,
-      backgroundColor: state.isSelected
-        ? '#e6f7ff'
-        : state.isFocused
-          ? '#f5f5f5'
-          : 'white',
-      color: state.isSelected ? '#1890ff' : '#000000d9',
-      ':active': {
-        backgroundColor: '#bae7ff'
-      }
-    })
-  }
+  const inputHeight = 40
 
   const multiSelectStyles = {
-      control: (base, state) => ({
-        ...base,
-        minHeight: 48,
-        borderRadius: 10,
-        borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-        boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
-        transition: 'all 0.15s ease',
-        '&:hover': {
-          borderColor: '#3b82f6'
-        }
-      }),
-      indicatorsContainer: (base) => ({
-        ...base,
-        paddingRight: 8,
-        gap: 0
-      }),
-      valueContainer: (base) => ({
-        ...base,
-        padding: '6px 8px',
-        gap: 6,
-        flexWrap: 'wrap',
-        alignItems: 'flex-start'
-      }),
-      placeholder: (base) => ({
-        ...base,
-        color: '#9ca3af',
-        fontWeight: 500
-      }),
-      multiValue: (base) => ({
-        ...base,
-        borderRadius: 12,
-        backgroundColor: '#e0f2ff',
-        border: '1px solid #bae6fd'
-      }),
-      multiValueLabel: (base) => ({
-        ...base,
-        color: '#0f172a',
-        fontWeight: 600,
-        padding: '2px 8px',
-        fontSize: 13
-      }),
-      multiValueRemove: (base) => ({
-        ...base,
-        color: '#0ea5e9',
-        borderLeft: '1px solid #bae6fd',
-        padding: '2px 6px',
-        ':hover': {
-          backgroundColor: '#bae6fd',
-          color: '#0284c7'
-        }
-      }),
-      menu: (base) => ({
-        ...base,
-        zIndex: 9999,
-        borderRadius: 12,
-        overflow: 'hidden'
-      }),
-      menuPortal: (base) => ({
-        ...base,
-        zIndex: 9999
-      }),
-      option: (base, state) => ({
-        ...base,
-        backgroundColor: state.isSelected
-          ? '#dbeafe'
-          : state.isFocused
-            ? '#f8fafc'
-            : 'white',
-        color: '#0f172a',
-        fontWeight: state.isSelected ? 600 : 500
-      })
+    control: (base, state) => ({
+      ...base,
+      minHeight: inputHeight,
+      borderRadius: 6,
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      transition: 'all 0.15s ease',
+      '&:hover': { borderColor: '#3b82f6' }
+    }),
+    indicatorsContainer: (base) => ({ ...base, paddingRight: 8, gap: 0 }),
+    valueContainer: (base) => ({ ...base, padding: '4px 8px', gap: 4, flexWrap: 'wrap', alignItems: 'center' }),
+    placeholder: (base) => ({ ...base, color: '#9ca3af', fontWeight: 500 }),
+    multiValue: (base) => ({ ...base, borderRadius: 12, backgroundColor: '#e0f2ff', border: '1px solid #bae6fd' }),
+    multiValueLabel: (base) => ({ ...base, color: '#0f172a', fontWeight: 600, padding: '2px 8px', fontSize: 13 }),
+    multiValueRemove: (base) => ({ ...base, color: '#0ea5e9', borderLeft: '1px solid #bae6fd', padding: '2px 6px', ':hover': { backgroundColor: '#bae6fd', color: '#0284c7' } }),
+    menu: (base) => ({ ...base, zIndex: 9999, borderRadius: 12, overflow: 'hidden' }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    option: (base, state) => ({ ...base, backgroundColor: state.isSelected ? '#dbeafe' : state.isFocused ? '#f8fafc' : 'white', color: '#0f172a', fontWeight: state.isSelected ? 600 : 500 })
   }
 
-  const getServiceSelectValue = () => {
-    if (!Array.isArray(serviceValue)) return []
-    return serviceValue
-      .map((val) => serviceOptions.find((opt) => String(opt.value) === String(val)))
-      .filter(Boolean)
-  }
-
-  const getTechSelectValue = () => {
-    if (!Array.isArray(techValue)) return []
-    return techValue
-      .map((val) => techOptions.find((opt) => String(opt.value) === String(val)))
-      .filter(Boolean)
-  }
+  const formItemStyle = { marginBottom: 12 }
+  const inputStyle = { height: inputHeight }
+  const selectStyle = { width: '100%', height: inputHeight, padding: '0 12px', lineHeight: `${inputHeight}px`, color: '#262626', backgroundColor: '#fff', border: '1px solid #d9d9d9', borderRadius: '6px', transition: 'all 0.2s', cursor: 'pointer', outline: 'none' }
 
   const getBrandOptions = () => {
     return brands.map((brand) => ({
@@ -233,15 +129,17 @@ export default function CreateTicketNewCustomer() {
   }
 
   const handleServiceChange = (selected) => {
-    setSelectedServices(selected || [])
-    const values = (selected || []).map((option) => option.value)
-    form.setFieldsValue({ service: values })
+    const arr = selected || []
+    setSelectedServices(arr)
+    const ids = arr.map((s) => s.value)
+    form.setFieldsValue({ service: ids })
   }
 
   const handleTechChange = (selected) => {
-    setSelectedTechs(selected || [])
-    const values = (selected || []).map((option) => option.value)
-    form.setFieldsValue({ techs: values })
+    const arr = selected || []
+    setSelectedTechs(arr)
+    const ids = arr.map((s) => s.value)
+    form.setFieldsValue({ techs: ids })
   }
 
   const resetCustomerSelection = () => {
@@ -430,7 +328,7 @@ export default function CreateTicketNewCustomer() {
     }
 
     if (!values.receiveDate) {
-      message.warning('Vui lòng chọn ngày nhận xe')
+      message.warning('Vui lòng chọn ngày dự đoán nhận xe')
       return
     }
 
@@ -507,12 +405,27 @@ export default function CreateTicketNewCustomer() {
     await submitCreateTicket(payload)
   }
 
+  // Sync selectedServices/Techs from form values when options arrive or on mount
+  useEffect(() => {
+    const sv = form.getFieldValue('service') || []
+    if (Array.isArray(sv) && serviceOptionsStable.length > 0) {
+      setSelectedServices(serviceOptionsStable.filter(opt => sv.map(String).includes(String(opt.value))))
+    }
+  }, [serviceOptionsStable])
+
+  useEffect(() => {
+    const tv = form.getFieldValue('techs') || []
+    if (Array.isArray(tv) && techOptionsStable.length > 0) {
+      setSelectedTechs(techOptionsStable.filter(opt => tv.map(String).includes(String(opt.value))))
+    }
+  }, [techOptionsStable])
+
   const cardTitle = (
     <div>
-      <span style={{ fontSize: '20px', fontWeight: 600, display: 'block' }}>
+      <span className="h4" style={{ fontWeight: 600, display: 'block' }}>
         Tạo phiếu dịch vụ cho khách mới
       </span>
-      <span style={{ fontSize: '13px', color: '#6b7280', display: 'block', marginTop: '4px' }}>
+      <span className="caption" style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>
         Dành cho khách chưa có tài khoản trong hệ thống. Vui lòng nhập đầy đủ thông tin trước khi tạo phiếu.
       </span>
     </div>
@@ -523,16 +436,30 @@ export default function CreateTicketNewCustomer() {
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <Card title={cardTitle} style={{ borderRadius: '12px' }}>
           <Form form={form} layout="vertical" onFinish={handleCreate}>
-            <Row gutter={24}>
+            <Row gutter={24} align="stretch">
               <Col span={12}>
-                <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin khách hàng</h3>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: 12,
+                    padding: '16px 16px 8px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%'
+                  }}
+                >
+                <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Thông tin khách hàng</h3>
 
                 <Form.Item
                   label="Số điện thoại"
                   name="phone"
                   rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+                  style={formItemStyle}
                 >
                   <Input
+                    style={inputStyle}
                     placeholder={customerLookupLoading ? 'Đang kiểm tra...' : 'VD: 0123456789'}
                     onBlur={(e) => {
                       const raw = e.target.value.trim()
@@ -580,217 +507,85 @@ export default function CreateTicketNewCustomer() {
                   label="Họ và tên"
                   name="name"
                   rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+                  style={formItemStyle}
                 >
-                  <Input placeholder="VD: Đặng Thị Huyền" />
+                  <Input style={inputStyle} placeholder="VD: Đặng Thị Huyền" />
                 </Form.Item>
 
                 <Form.Item
                   label="Địa chỉ"
                   name="address"
                   rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
+                  style={formItemStyle}
                 >
-                  <Input placeholder="VD: Hòa Lạc - Hà Nội" />
+                  <Input style={inputStyle} placeholder="VD: Hòa Lạc - Hà Nội" />
                 </Form.Item>
-
-                <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin xe</h3>
-
-                <Form.Item
-                  label="Biển số xe"
-                  name="plate"
-                  rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
-                >
-                  <Input placeholder="VD: 30A-12345" />
-                </Form.Item>
-
-                <Form.Item
-                  label="Hãng xe"
-                  name="brand"
-                  rules={[{ required: true, message: 'Vui lòng chọn hãng xe' }]}
-                >
-                  <select
-                    className="form-control"
-                    disabled={brandsLoading}
-                    onChange={(e) => {
-                      const value = e.target.value ? Number(e.target.value) : undefined
-                      form.setFieldsValue({ brand: value, model: undefined })
-                      setSelectedBrandId(value)
-                      setSelectedModelId(null)
-                      handleBrandChange(value)
-                    }}
-                    value={selectedBrandId || ''}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      lineHeight: '1.5',
-                      color: '#262626',
-                      backgroundColor: '#fff',
-                      border: '1px solid #d9d9d9',
-                      borderRadius: '6px',
-                      transition: 'all 0.2s',
-                      cursor: 'pointer',
-                      outline: 'none'
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = '#1890ff'
-                      e.target.style.boxShadow = '0 0 0 2px rgba(24, 144, 255, 0.1)'
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#d9d9d9'
-                      e.target.style.boxShadow = 'none'
-                    }}
-                  >
-                    <option value="" style={{ color: '#bfbfbf' }}>
-                      {brandsLoading ? 'Đang tải hãng xe...' : 'Chọn hãng xe'}
-                    </option>
-                    {brandOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Form.Item>
-
-                <Form.Item
-                  label="Loại xe"
-                  name="model"
-                  rules={[{ required: true, message: 'Vui lòng chọn mẫu xe' }]}
-                >
-                  <select
-                    className="form-control"
-                    disabled={models.length === 0 || modelsLoading}
-                    onChange={(e) => {
-                      const value = e.target.value ? Number(e.target.value) : undefined
-                      form.setFieldsValue({ model: value })
-                      setSelectedModelId(value)
-                    }}
-                    value={selectedModelId || ''}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      fontSize: '14px',
-                      lineHeight: '1.5',
-                      color: '#262626',
-                      backgroundColor: models.length === 0 || modelsLoading ? '#f5f5f5' : '#fff',
-                      border: '1px solid #d9d9d9',
-                      borderRadius: '6px',
-                      transition: 'all 0.2s',
-                      cursor: models.length === 0 || modelsLoading ? 'not-allowed' : 'pointer',
-                      outline: 'none',
-                      opacity: models.length === 0 || modelsLoading ? 0.6 : 1
-                    }}
-                    onFocus={(e) => {
-                      if (!(models.length === 0 || modelsLoading)) {
-                        e.target.style.borderColor = '#1890ff'
-                        e.target.style.boxShadow = '0 0 0 2px rgba(24, 144, 255, 0.1)'
-                      }
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = '#d9d9d9'
-                      e.target.style.boxShadow = 'none'
-                    }}
-                  >
-                    <option value="" style={{ color: '#bfbfbf' }}>
-                      {modelsLoading
-                        ? 'Đang tải loại xe...'
-                        : models.length === 0
-                          ? 'Chọn hãng xe trước'
-                          : 'Chọn loại xe'}
-                    </option>
-                    {modelOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </Form.Item>
-
-                <Form.Item label="Số khung" name="vin">
-                  <Input placeholder="VD: RL4XW430089206813" />
-                </Form.Item>
+                </div>
               </Col>
 
               <Col span={12}>
-                <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: 12,
+                    padding: '16px 16px 8px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%'
+                  }}
+                >
+                <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
 
                 <Form.Item
                   label="Loại dịch vụ"
                   name="service"
                   rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 loại dịch vụ' }]}
+                  style={formItemStyle}
                 >
-                  <Checkbox.Group style={{ width: '100%' }}>
-                    <Row gutter={[8, 8]}>
-                      {serviceLoading ? (
-                        <Col span={24}>
-                          <div style={{ padding: '8px', color: '#999' }}>Đang tải dịch vụ...</div>
-                        </Col>
-                      ) : serviceOptionsStable.length === 0 ? (
-                        <Col span={24}>
-                          <div style={{ padding: '8px', color: '#999' }}>Không có dịch vụ</div>
-                        </Col>
-                      ) : (
-                        serviceOptionsStable.map(option => (
-                          <Col span={12} key={option.value}>
-                            <Checkbox 
-                              value={option.value}
-                              style={{ 
-                                padding: '8px 12px',
-                                border: '1px solid #d9d9d9',
-                                borderRadius: '6px',
-                                width: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {option.label}
-                            </Checkbox>
-                          </Col>
-                        ))
-                      )}
-                    </Row>
-                  </Checkbox.Group>
+                  <div>
+                    <ReactSelect
+                      isMulti
+                      options={serviceOptionsStable}
+                      value={selectedServices}
+                      onChange={handleServiceChange}
+                      styles={multiSelectStyles}
+                      placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
+                      isDisabled={serviceLoading || serviceOptionsStable.length === 0}
+                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                      classNamePrefix="react-select"
+                    />
+                    <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                      { (form.getFieldValue('service') || []).length ? `Đã chọn ${ (form.getFieldValue('service') || []).length }` : 'Chưa chọn dịch vụ' }
+                    </div>
+                  </div>
                 </Form.Item>
 
-                <Form.Item label="Kỹ thuật viên sửa chữa" name="techs">
-                  <Checkbox.Group style={{ width: '100%' }}>
-                    <Row gutter={[8, 8]}>
-                      {techLoading ? (
-                        <Col span={24}>
-                          <div style={{ padding: '8px', color: '#999' }}>Đang tải kỹ thuật viên...</div>
-                        </Col>
-                      ) : techOptionsStable.length === 0 ? (
-                        <Col span={24}>
-                          <div style={{ padding: '8px', color: '#999' }}>Không có kỹ thuật viên</div>
-                        </Col>
-                      ) : (
-                        techOptionsStable.map(option => (
-                          <Col span={12} key={option.value}>
-                            <Checkbox 
-                              value={option.value}
-                              style={{ 
-                                padding: '8px 12px',
-                                border: '1px solid #d9d9d9',
-                                borderRadius: '6px',
-                                width: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              {option.label}
-                            </Checkbox>
-                          </Col>
-                        ))
-                      )}
-                    </Row>
-                  </Checkbox.Group>
+                <Form.Item label="Kỹ thuật viên sửa chữa" name="techs" style={formItemStyle}>
+                  <div>
+                    <ReactSelect
+                      isMulti
+                      options={techOptionsStable}
+                      value={selectedTechs}
+                      onChange={handleTechChange}
+                      styles={multiSelectStyles}
+                      placeholder={techLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                      isDisabled={techLoading || techOptionsStable.length === 0}
+                      menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                      classNamePrefix="react-select"
+                    />
+                    <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                      { (form.getFieldValue('techs') || []).length ? `Đã chọn ${ (form.getFieldValue('techs') || []).length }` : 'Chưa chọn kỹ thuật viên' }
+                    </div>
+                  </div>
                 </Form.Item>
 
                 <Form.Item
-                  label="Ngày nhận xe"
+                  label="Ngày dự đoán nhận xe"
                   name="receiveDate"
-                  rules={[{ required: true, message: 'Vui lòng chọn ngày nhận xe' }]}
+                  rules={[{ required: true, message: 'Vui lòng chọn ngày dự đoán nhận xe' }]}
+                  style={formItemStyle}
                 >
                   <DatePicker
                     selected={selectedDate}
@@ -817,24 +612,141 @@ export default function CreateTicketNewCustomer() {
                   />
                 </Form.Item>
 
-                <Form.Item label="Ghi chú" name="note">
-                  <TextArea rows={6} placeholder="Nhập ghi chú..." />
-                </Form.Item>
-
-                <Row justify="end" style={{ marginTop: '32px' }}>
-                  <Space>
-                    <Button onClick={() => navigate('/service-advisor/orders')}>Hủy</Button>
-                    <Button
-                      type="primary"
-                      htmlType="submit"
-                      loading={loading}
-                      style={{ background: '#22c55e', borderColor: '#22c55e' }}
-                    >
-                      Tạo phiếu
-                    </Button>
-                  </Space>
-                </Row>
+                </div>
               </Col>
+            </Row>
+
+            {/* Card: Thông tin xe + Ghi chú */}
+            <Row gutter={24} style={{ marginTop: 16 }}>
+              <Col span={24}>
+                <div
+                  style={{
+                    background: '#ffffff',
+                    borderRadius: 12,
+                    padding: '16px 16px 8px',
+                    border: '1px solid #e5e7eb',
+                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
+                  }}
+                >
+                  <Row gutter={24}>
+                    <Col span={12}>
+                      <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Thông tin xe</h3>
+
+                      <Form.Item
+                        label="Biển số xe"
+                        name="plate"
+                        rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
+                        style={formItemStyle}
+                      >
+                        <Input style={inputStyle} placeholder="VD: 30A-12345" />
+                      </Form.Item>
+
+                      <Form.Item
+                        label="Hãng xe"
+                        name="brand"
+                        rules={[{ required: true, message: 'Vui lòng chọn hãng xe' }]}
+                        style={formItemStyle}
+                      >
+                        <select
+                          className="form-control"
+                          disabled={brandsLoading}
+                          onChange={(e) => {
+                            const value = e.target.value ? Number(e.target.value) : undefined
+                            form.setFieldsValue({ brand: value, model: undefined })
+                            setSelectedBrandId(value)
+                            setSelectedModelId(null)
+                            handleBrandChange(value)
+                          }}
+                          value={selectedBrandId || ''}
+                          style={selectStyle}
+                        >
+                          <option value="" style={{ color: '#bfbfbf' }}>
+                            {brandsLoading ? 'Đang tải hãng xe...' : 'Chọn hãng xe'}
+                          </option>
+                          {brandOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </Form.Item>
+
+                      <Form.Item
+                        label="Loại xe"
+                        name="model"
+                        rules={[{ required: true, message: 'Vui lòng chọn mẫu xe' }]}
+                        style={formItemStyle}
+                      >
+                        <select
+                          className="form-control"
+                          disabled={models.length === 0 || modelsLoading}
+                          onChange={(e) => {
+                            const value = e.target.value ? Number(e.target.value) : undefined
+                            form.setFieldsValue({ model: value })
+                            setSelectedModelId(value)
+                          }}
+                          value={selectedModelId || ''}
+                          style={{
+                            ...selectStyle,
+                            backgroundColor: models.length === 0 || modelsLoading ? '#f5f5f5' : '#fff',
+                            cursor: models.length === 0 || modelsLoading ? 'not-allowed' : 'pointer',
+                            opacity: models.length === 0 || modelsLoading ? 0.6 : 1
+                          }}
+                        >
+                          <option value="" style={{ color: '#bfbfbf' }}>
+                            {modelsLoading
+                              ? 'Đang tải loại xe...'
+                              : models.length === 0
+                                ? 'Chọn hãng xe trước'
+                                : 'Chọn loại xe'}
+                          </option>
+                          {modelOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </Form.Item>
+
+                      <Form.Item label="Số khung" name="vin" style={formItemStyle}>
+                        <Input style={inputStyle} placeholder="VD: RL4XW430089206813" />
+                      </Form.Item>
+                    </Col>
+
+                    <Col span={12}>
+                      <Form.Item label="Ghi chú" name="note">
+                        <TextArea
+                          rows={8}
+                          style={{ minHeight: 320 }}
+                          placeholder="Nhập ghi chú..."
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </div>
+              </Col>
+            </Row>
+
+            {/* Action buttons */}
+            <Row justify="end" style={{ marginTop: 24 }}>
+              <Space>
+                <Button
+                  size="large"
+                  onClick={() => navigate('/service-advisor/orders')}
+                  style={{ paddingInline: 32 }}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="primary"
+                  size="large"
+                  htmlType="submit"
+                  loading={loading}
+                  style={{ background: '#22c55e', borderColor: '#22c55e', paddingInline: 32 }}
+                >
+                  Tạo phiếu
+                </Button>
+              </Space>
             </Row>
           </Form>
 
@@ -969,4 +881,3 @@ export default function CreateTicketNewCustomer() {
     </AdminLayout>
   )
 }
-

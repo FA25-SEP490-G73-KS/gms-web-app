@@ -278,7 +278,7 @@ export default function InvoiceDetailPage() {
         <Row gutter={24}>
           <Col span={showDepositForm ? 16 : 24}>
             <Card style={{ borderRadius: '12px', marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>BÁO GIÁ CHI TIẾT</h2>
+              <h2 className="h4" style={{ fontWeight: 700, marginBottom: '20px' }}>BÁO GIÁ CHI TIẾT</h2>
               <Table
                 columns={quotationColumns}
                 dataSource={quotationItems.map((item, index) => ({ ...item, key: item.id || index }))}
@@ -288,7 +288,7 @@ export default function InvoiceDetailPage() {
             </Card>
 
             <Card style={{ borderRadius: '12px', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '20px' }}>Thanh toán</h2>
+          <h2 className="h4" style={{ fontWeight: 700, marginBottom: '20px' }}>Thanh toán</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Tổng tiền hàng:</span>
@@ -313,8 +313,8 @@ export default function InvoiceDetailPage() {
               paddingTop: '12px',
               borderTop: '1px solid #e5e7eb'
             }}>
-              <span style={{ fontSize: '18px', fontWeight: 700 }}>Thành tiền:</span>
-              <span style={{ fontSize: '18px', fontWeight: 700, color: '#2563eb' }}>
+              <span className="h5" style={{ fontWeight: 700 }}>Thành tiền:</span>
+              <span className="h5" style={{ fontWeight: 700, color: '#2563eb' }}>
                 {formatCurrency(finalAmount)}
               </span>
             </div>
@@ -326,7 +326,7 @@ export default function InvoiceDetailPage() {
         </Card>
 
         <Card style={{ borderRadius: '12px', borderTop: '4px solid #CBB081', marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 700, marginBottom: '16px' }}>Chính sách & điều khoản</h2>
+          <h2 className="h5" style={{ fontWeight: 700, marginBottom: '16px' }}>Chính sách & điều khoản</h2>
           <div style={{ paddingLeft: '20px' }}>
             <ul style={{ margin: 0, padding: 0, listStyle: 'disc', color: '#374151' }}>
               <li style={{ marginBottom: '8px' }}>
@@ -383,11 +383,10 @@ export default function InvoiceDetailPage() {
                 {!paymentData ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div>
-                      <label style={{ 
+                      <label className="subtext" style={{ 
                         display: 'block', 
                         marginBottom: '8px', 
                         fontWeight: 600,
-                        fontSize: '14px',
                         color: '#374151'
                       }}>
                         Khách hàng

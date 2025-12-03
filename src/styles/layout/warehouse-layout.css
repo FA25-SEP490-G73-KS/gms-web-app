@@ -23,13 +23,20 @@
 
 .warehouse-layout.sidebar-collapsed .warehouse-nav-item span,
 .warehouse-layout.sidebar-collapsed .submenu,
-.warehouse-layout.sidebar-collapsed .warehouse-logout span {
+.warehouse-layout.sidebar-collapsed .warehouse-logout span,
+.warehouse-layout.sidebar-collapsed .warehouse-nav-item .caret,
+.warehouse-layout.sidebar-collapsed .warehouse-user-text {
   display: none;
 }
 
 .warehouse-layout.sidebar-collapsed .warehouse-nav-item {
   justify-content: center;
   padding: 10px 8px;
+}
+
+.warehouse-layout.sidebar-collapsed .warehouse-user-info {
+  justify-content: center;
+  padding: 10px;
 }
 
 .warehouse-header {
@@ -272,11 +279,62 @@
 }
 
 .warehouse-user-info {
-  padding: 12px 16px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  font-size: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #eee;
+  borderRadius: 10px;
+  background: #fafafa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.warehouse-user-info:hover {
+  background: #f0f0f2;
+}
+
+.warehouse-user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #CBB081;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.warehouse-user-avatar i {
+  color: white;
+  font-size: 20px;
+}
+
+.warehouse-user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  overflow: hidden;
+}
+
+.warehouse-user-name {
+  font-weight: 600;
+  font-size: 14px;
   color: #222;
-  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.warehouse-user-role {
+  font-size: 12px;
+  color: #666;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .warehouse-logout {

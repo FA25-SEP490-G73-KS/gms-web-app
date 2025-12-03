@@ -128,7 +128,7 @@ export default function CreateForm() {
           padding: '32px',
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '32px', color: '#111' }}>Tạo phiếu</h1>
+          <h1 style={{ margin: 0, marginBottom: '32px', color: '#111' }}>Tạo phiếu</h1>
 
           <Form
             form={form}
@@ -153,7 +153,7 @@ export default function CreateForm() {
                       width: '100%',
                       height: '40px',
                       padding: '8px 12px',
-                      fontSize: '14px',
+                      className: 'subtext',
                       border: '1px solid #d9d9d9',
                       borderRadius: '8px',
                       outline: 'none',
@@ -188,7 +188,7 @@ export default function CreateForm() {
                       width: '100%',
                       height: '40px',
                       padding: '8px 12px',
-                      fontSize: '14px',
+                      className: 'subtext',
                       border: '1px solid #d9d9d9',
                       borderRadius: '8px',
                       outline: 'none',
@@ -310,12 +310,12 @@ export default function CreateForm() {
                             <div style={{ 
                               fontWeight: 600, 
                               marginBottom: '6px',
-                              fontSize: '14px',
+                              className: 'subtext',
                               color: '#111'
                             }}>
                               {file.name}
                             </div>
-                            <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                            <div className="caption" style={{ color: '#666', marginBottom: '8px' }}>
                               {formatFileSize(file.size)} • {getTimeLeft(file.percent)}
                             </div>
                             {file.percent && file.percent < 100 && (

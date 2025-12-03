@@ -144,13 +144,13 @@ export function AccountanceFinanceContent() {
 
   // Get category options based on ticket type
   const getCategoryOptions = () => {
-    if (selectedTicketType === 'Phiếu thu') {
-      return [{ value: 'other', label: 'Khác' }]
-    } else if (selectedTicketType === 'Phiếu chi') {
+    if (selectedTicketType === 'phiếu thu') {
+      return [{ value: 'OTHER', label: 'Khác' }]
+    } else if (selectedTicketType === 'phiếu chi') {
       return [
-        { value: 'Nhà cung cấp', label: 'Nhà cung cấp' },
-        { value: 'Tiền điện', label: 'Tiền điện' },
-        { value: 'Khác', label: 'Khác' }
+        { value: 'SUPPLIER_PAYMENT', label: 'Nhà cung cấp' },
+        { value: 'ELECTRICITY', label: 'Tiền điện' },
+        { value: 'OTHER', label: 'Khác' }
       ]
     }
     return []
@@ -304,7 +304,7 @@ export function AccountanceFinanceContent() {
     <>
     <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
+          <h1 style={{ margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
 
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -341,7 +341,7 @@ export function AccountanceFinanceContent() {
               onClick={() => {
                 setSelectedTicketType('')
                 form.setFieldsValue({
-                  type: 'THU',
+                  type: 'phiếu thu',
                   createdAt: dayjs().format('DD/MM/YYYY'),
                   creator: creatorName || ''
                 })
@@ -394,7 +394,7 @@ export function AccountanceFinanceContent() {
           setFileList([])
           setSelectedTicketType('')
           form.setFieldsValue({
-            type: 'THU',
+            type: 'phiếu thu',
             createdAt: dayjs().format('DD/MM/YYYY'),
             creator: creatorName || ''
           })
@@ -407,11 +407,11 @@ export function AccountanceFinanceContent() {
             const values = await form.validateFields()
             setCreating(true)
             const payload = {
-              type: values.type,
+              type: values.type ? values.type.toUpperCase() : undefined,
               amount: Number(values.amount),
               target: values.target,
               description: values.description,
-              category: values.category || undefined
+              category: values.category ? values.category.toUpperCase() : undefined
             }
             const { data: response, error } = await manualVoucherAPI.create(payload, uploadFile)
             if (error) {
@@ -437,7 +437,7 @@ export function AccountanceFinanceContent() {
             setCreateModalVisible(false)
             // Reset form với giá trị mặc định
             form.setFieldsValue({
-              type: 'THU',
+              type: 'phiếu thu',
               createdAt: dayjs().format('DD/MM/YYYY'),
               creator: creatorName || ''
             })
@@ -458,7 +458,7 @@ export function AccountanceFinanceContent() {
           layout="vertical" 
           form={form} 
           initialValues={{ 
-            type: 'THU',
+            type: 'phiếu thu',
             createdAt: dayjs().format('DD/MM/YYYY'),
             creator: creatorName || ''
           }}
@@ -472,11 +472,11 @@ export function AccountanceFinanceContent() {
                 rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
               >
                 <select
+                  className="subtext"
                   style={{
                     width: '100%',
                     height: '40px',
                     padding: '8px 12px',
-                    fontSize: '14px',
                     border: '1px solid #d1d5db',
                     borderRadius: '8px',
                     outline: 'none',
@@ -499,8 +499,8 @@ export function AccountanceFinanceContent() {
                   }}
                 >
                   <option value="">Chọn loại phiếu</option>
-                  <option value="Phiếu thu">Thu</option>
-                  <option value="Phiếu chi">Chi</option>
+                  <option value="phiếu thu">phiếu thu</option>
+                  <option value="phiếu chi">phiếu chi</option>
                 </select>
               </Form.Item>
 
@@ -511,11 +511,11 @@ export function AccountanceFinanceContent() {
               >
                 <select
                   disabled={!selectedTicketType}
+                  className="subtext"
                   style={{
                     width: '100%',
                     height: '40px',
                     padding: '8px 12px',
-                    fontSize: '14px',
                     border: '1px solid #d1d5db',
                     borderRadius: '8px',
                     outline: 'none',
