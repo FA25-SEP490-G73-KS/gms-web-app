@@ -211,7 +211,7 @@ export default function ExportRequest() {
           quantity: partItem.quantity || 0,
           itemType: partItem.itemType || 'PART',
           inventoryStatus: partItem.inventoryStatus || 'AVAILABLE',
-          warehouseReviewStatus: partItem.warehouseReviewStatus || 'PENDING',
+          warehouseReviewStatus: partItem.warehouseReviewStatus || 'Chờ duyệt',
           warehouseNote: partItem.warehouseNote || ''
         }))
       }))
@@ -805,14 +805,19 @@ export default function ExportRequest() {
         width: 170,
         align: 'center',
         render: (_, part) => {
-          const reviewStatus = part.warehouseReviewStatus || 'PENDING'
+          const reviewStatus = part.warehouseReviewStatus || 'Chờ duyệt'
           
-          // Nếu đã được duyệt, hiển thị "Đã duyệt"
-          if (reviewStatus === 'CONFIRMED' || reviewStatus === 'APPROVED') {
+          // Kiểm tra cả tiếng Việt và tiếng Anh
+          const isConfirmed = reviewStatus === 'CONFIRMED' || 
+                              reviewStatus === 'APPROVED' || 
+                              reviewStatus === 'Đã duyệt' ||
+                              reviewStatus === 'Đã Duyệt'
+          
+          if (isConfirmed) {
             return <span style={{ color: '#16a34a', fontWeight: 500 }}>Đã duyệt</span>
           }
           
-          // Luôn hiển thị nút "Xác nhận" cho các trường hợp còn lại (PENDING, null, undefined, REJECTED, etc.)
+          // Hiển thị nút "Xác nhận" cho các trường hợp còn lại
           return (
             <Button
               type="primary"
@@ -880,7 +885,7 @@ export default function ExportRequest() {
     <WarehouseLayout>
       <style>{customTableStyles}</style>
       
-      {/* Modal Chi tiết linh kiện */}
+   
       <Modal
         open={confirmModalOpen}
         onCancel={handleCloseConfirmModal}
@@ -894,7 +899,7 @@ export default function ExportRequest() {
         }}
         style={{ top: 100 }}
       >
-        {/* Header */}
+       
         <div style={{ 
           background: '#CBB081', 
           padding: '14px 20px', 
@@ -1037,7 +1042,7 @@ export default function ExportRequest() {
               </Form.Item>
             </>
 
-            {/* Conditional fields based on useForAllModels and status */}
+           
             <Form.Item noStyle shouldUpdate>
               {({ getFieldValue }) => {
                 const useForAllModels = getFieldValue('useForAllModels')
@@ -1291,7 +1296,7 @@ export default function ExportRequest() {
               />
             </Form.Item>
 
-            {/* Action buttons */}
+           
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
               <Button 
                 onClick={handleRejectPart}
