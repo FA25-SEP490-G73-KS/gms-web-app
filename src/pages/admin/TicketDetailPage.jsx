@@ -1211,6 +1211,8 @@ export default function TicketDetailPage() {
               }),
               valueContainer: (base) => ({
                 ...base,
+                padding: '0 8px',
+                height: '38px',
                 color: inputsDisabled ? '#9ca3af' : '#262626'
               }),
               singleValue: (base) => ({
@@ -1221,11 +1223,6 @@ export default function TicketDetailPage() {
                 ...base,
                 color: inputsDisabled ? '#9ca3af' : '#9ca3af'
               }),
-              valueContainer: (base) => ({
-                ...base,
-                padding: '0 8px',
-                height: '38px'
-              }),
               input: (base) => ({
                 ...base,
                 margin: 0,
@@ -1234,10 +1231,6 @@ export default function TicketDetailPage() {
               indicatorsContainer: (base) => ({
                 ...base,
                 height: '38px'
-              }),
-              placeholder: (base) => ({
-                ...base,
-                color: '#9ca3af'
               })
             }}
           />

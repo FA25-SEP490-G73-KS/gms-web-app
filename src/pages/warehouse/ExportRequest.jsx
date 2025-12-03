@@ -805,13 +805,19 @@ export default function ExportRequest() {
         width: 170,
         align: 'center',
         render: (_, part) => {
-          // Chỉ hiện nút khi status là PENDING
-          if (part.warehouseReviewStatus === 'PENDING') {
-            return (
+          const reviewStatus = part.warehouseReviewStatus || 'PENDING'
+          
+          // Nếu đã được duyệt, hiển thị "Đã duyệt"
+          if (reviewStatus === 'CONFIRMED' || reviewStatus === 'APPROVED') {
+            return <span style={{ color: '#16a34a', fontWeight: 500 }}>Đã duyệt</span>
+          }
+          
+          // Luôn hiển thị nút "Xác nhận" cho các trường hợp còn lại (PENDING, null, undefined, REJECTED, etc.)
+          return (
             <Button
               type="primary"
               size="small"
-                onClick={() => handleOpenConfirmModal(part)}
+              onClick={() => handleOpenConfirmModal(part)}
               style={{
                 background: '#22c55e',
                 borderColor: '#22c55e',
@@ -822,9 +828,7 @@ export default function ExportRequest() {
             >
               Xác nhận
             </Button>
-        )
-          }
-          return <span style={{ color: '#999' }}>—</span>
+          )
         }
       }
     ]
