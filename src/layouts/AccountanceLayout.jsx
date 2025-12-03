@@ -218,7 +218,7 @@ export default function AccountanceLayout({ children }) {
                 {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
               </div>
               <div className="warehouse-user-role">
-                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
               </div>
             </div>
           </button>

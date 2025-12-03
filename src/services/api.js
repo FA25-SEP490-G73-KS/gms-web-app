@@ -152,6 +152,7 @@ export const serviceTicketAPI = {
     console.log('====================================')
     return patch(`/service-tickets/${id}`, data)
   },
+  updateStatus: (id, status) => patch(`/service-tickets/${id}/status?status=${status}`),
   updateDeliveryAt: (id, date) => patch(`/service-tickets/${id}/delivery-at`, date),
   getCompletedPerMonth: () => get('/service-tickets/completed-per-month'),
   getCount: (date) => get(`/service-tickets/count?date=${date}`),

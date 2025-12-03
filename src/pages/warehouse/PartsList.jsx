@@ -185,9 +185,9 @@ export default function PartsList() {
       key: 'actions',
       width: 100,
       render: (_, record) => (
-        <Button type="link" icon={<EditOutlined />} onClick={() => handleOpenDetail(record)}>
-          Sửa
-        </Button>
+          <Button type="link" icon={<EditOutlined />} onClick={() => handleOpenDetail(record)}>
+            Sửa
+          </Button>
       )
     }
   ]

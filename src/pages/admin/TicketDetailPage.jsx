@@ -4,7 +4,7 @@ import {
   Row, Col, Card, Button, Table, Space, 
   DatePicker, Modal, message, Tabs, Calendar, Input
 } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI, invoiceAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -93,6 +93,7 @@ export default function TicketDetailPage() {
   const [exportPDFLoading, setExportPDFLoading] = useState(false)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [isEditMode, setIsEditMode] = useState(false)
 
   const quotationStatusRaw = ticketData?.priceQuotation?.status
   const normalizedQuotationStatus = quotationStatusRaw
@@ -117,10 +118,17 @@ export default function TicketDetailPage() {
     )
   })()
 
-  const inputsDisabled = isHistoryPage || actionLoading || !quotationStatusConfig.canEdit
-  const actionButtonLabel =
-    quotationStatusConfig.label === 'Kho đã duyệt' ? 'Cập nhật' : 'Lưu'
-  const canSendToCustomer = quotationStatusConfig.label === 'Kho đã duyệt'
+  const isWaitingWarehouse = quotationStatusConfig.label === 'Chờ kho duyệt'
+  const isWarehouseConfirmed = quotationStatusConfig.label === 'Kho đã duyệt'
+  
+  const inputsDisabled = isHistoryPage || actionLoading || 
+    (isWaitingWarehouse ? true : (isWarehouseConfirmed ? !isEditMode : !quotationStatusConfig.canEdit))
+  
+  const actionButtonLabel = isWaitingWarehouse 
+    ? 'Cập nhật' 
+    : (isWarehouseConfirmed ? (isEditMode ? 'Lưu' : 'Cập nhật') : 'Lưu')
+  
+  const canSendToCustomer = isWarehouseConfirmed
 
   const disabledDeliveryDate = (current) => {
     if (!current) return false
@@ -158,8 +166,10 @@ export default function TicketDetailPage() {
     outline: 'none',
     transition: 'border-color 0.2s',
     height: '40px',
-    background: '#fff'
-  }), [])
+    background: inputsDisabled ? '#f5f5f5' : '#fff',
+    color: inputsDisabled ? '#9ca3af' : '#262626',
+    cursor: inputsDisabled ? 'not-allowed' : 'text'
+  }), [inputsDisabled])
 
   const selectStyles = useMemo(() => ({
     control: (provided, state) => ({
@@ -168,13 +178,17 @@ export default function TicketDetailPage() {
       borderRadius: '12px',
       borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
       boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      backgroundColor: inputsDisabled ? '#f5f5f5' : '#fff',
+      color: inputsDisabled ? '#9ca3af' : '#262626',
+      cursor: inputsDisabled ? 'not-allowed' : 'pointer',
       ':hover': {
-        borderColor: '#3b82f6'
+        borderColor: inputsDisabled ? '#d0d7de' : '#3b82f6'
       }
     }),
     valueContainer: (provided) => ({
       ...provided,
-      padding: '0 12px'
+      padding: '0 12px',
+      color: inputsDisabled ? '#9ca3af' : '#262626'
     }),
     menu: (provided) => ({
       ...provided,
@@ -187,8 +201,16 @@ export default function TicketDetailPage() {
       backgroundColor: state.isFocused ? '#f5f5f5' : '#fff',
       color: state.isSelected ? '#111' : '#111',
       fontWeight: state.isSelected ? 600 : 400
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: inputsDisabled ? '#9ca3af' : '#9ca3af'
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: inputsDisabled ? '#9ca3af' : '#262626'
     })
-  }), [])
+  }), [inputsDisabled])
 
   const selectComponentsOverrides = useMemo(() => ({
     IndicatorSeparator: () => null,
@@ -539,6 +561,7 @@ export default function TicketDetailPage() {
         priceQuotation: normalizePriceQuotation(data.priceQuotation)
       }
       setTicketData(normalizedData)
+      setIsEditMode(false) // Reset edit mode khi fetch lại data
       
       const deliveryDate = normalizedData.deliveryAt ? dayjs(normalizedData.deliveryAt) : null
       setExpectedDate(deliveryDate)
@@ -731,6 +754,9 @@ export default function TicketDetailPage() {
       if (!item.category) {
         newErrors[`replace_${item.id}_category`] = 'Trường không được bỏ trống'
       }
+      if (!item.unit) {
+        newErrors[`replace_${item.id}_unit`] = 'Trường không được bỏ trống'
+      }
       if (!item.unitPrice || item.unitPrice === 0) {
         newErrors[`replace_${item.id}_unitPrice`] = 'Trường không được bỏ trống'
       }
@@ -750,11 +776,25 @@ export default function TicketDetailPage() {
   }
 
   const handleSendQuote = () => {
+    if (actionLoading) return
+    
+    // Nếu ở trạng thái "Kho đã duyệt" và chưa ở edit mode, bật edit mode
+    if (isWarehouseConfirmed && !isEditMode) {
+      setIsEditMode(true)
+      return
+    }
+    
+    // Nếu ở trạng thái "Chờ kho duyệt", không làm gì (hoặc có thể có logic khác)
+    if (isWaitingWarehouse) {
+      message.warning('Báo giá đang chờ kho duyệt, không thể chỉnh sửa.')
+      return
+    }
+    
     if (inputsDisabled) {
       message.warning('Báo giá chưa thể chỉnh sửa ở trạng thái hiện tại.')
       return
     }
-    if (actionLoading) return
+    
     if (!validateForm()) {
       message.error('Vui lòng điền đầy đủ thông tin')
       return
@@ -1000,6 +1040,7 @@ export default function TicketDetailPage() {
 
       message.success('Đã lưu báo giá thành công')
         setShowDateModal(false)
+        setIsEditMode(false) // Reset edit mode sau khi lưu thành công
         await fetchTicketDetail()
     } catch (err) {
       console.error('Error sending price quotation:', err)
@@ -1141,16 +1182,71 @@ export default function TicketDetailPage() {
       key: 'unit',
       width: 120,
       render: (_, record) => (
-        <CustomSelect
-          placeholder="Đơn vị"
-          value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
-          options={unitOptions}
-          isClearable
-          isDisabled={inputsDisabled}
-          onChange={(option) =>
-            updateReplaceItem(record.id, { unit: option?.value || '' })
-          }
-        />
+        <div>
+          <CustomSelect
+            placeholder="Đơn vị"
+            value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
+            options={unitOptions}
+            isClearable
+            isDisabled={inputsDisabled}
+            onChange={(option) =>
+              updateReplaceItem(record.id, { unit: option?.value || '' })
+            }
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                border: `1px solid ${errors[`replace_${record.id}_unit`] ? '#ef4444' : (state.isFocused ? '#4096ff' : '#d0d7de')}`,
+                fontSize: '14px',
+                background: inputsDisabled ? '#f5f5f5' : '#fff',
+                color: inputsDisabled ? '#9ca3af' : '#262626',
+                cursor: inputsDisabled ? 'not-allowed' : 'pointer',
+                padding: '0 4px',
+                boxShadow: 'none',
+                '&:hover': {
+                  borderColor: inputsDisabled ? '#d0d7de' : (state.isFocused ? '#4096ff' : '#d0d7de')
+                }
+              }),
+              valueContainer: (base) => ({
+                ...base,
+                color: inputsDisabled ? '#9ca3af' : '#262626'
+              }),
+              singleValue: (base) => ({
+                ...base,
+                color: inputsDisabled ? '#9ca3af' : '#262626'
+              }),
+              placeholder: (base) => ({
+                ...base,
+                color: inputsDisabled ? '#9ca3af' : '#9ca3af'
+              }),
+              valueContainer: (base) => ({
+                ...base,
+                padding: '0 8px',
+                height: '38px'
+              }),
+              input: (base) => ({
+                ...base,
+                margin: 0,
+                padding: 0
+              }),
+              indicatorsContainer: (base) => ({
+                ...base,
+                height: '38px'
+              }),
+              placeholder: (base) => ({
+                ...base,
+                color: '#9ca3af'
+              })
+            }}
+          />
+          {errors[`replace_${record.id}_unit`] && (
+            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+              {errors[`replace_${record.id}_unit`]}
+            </div>
+          )}
+        </div>
       )
     },
     {
@@ -1378,14 +1474,6 @@ export default function TicketDetailPage() {
         }
       `}</style>
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
-        <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Button 
-            type="text" 
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}
-          />
-        </div>
-
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
             {ticketData?.code || `STK-2025-${String(id || 0).padStart(6, '0')}`}
@@ -1531,6 +1619,7 @@ export default function TicketDetailPage() {
                 pagination={false}
                 size="small"
                 components={goldTableHeader}
+                locale={{ emptyText: ' ' }}
                 footer={() =>
                   !isHistoryPage && !inputsDisabled && (
                     <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
@@ -1542,7 +1631,7 @@ export default function TicketDetailPage() {
                               width: '32px', 
                               height: '32px', 
                               borderRadius: '50%', 
-                              border: '1px solid #222',
+                              border: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center'
@@ -1563,6 +1652,7 @@ export default function TicketDetailPage() {
                 pagination={false}
                 size="small"
                 components={goldTableHeader}
+                locale={{ emptyText: ' ' }}
                 footer={() =>
                   !isHistoryPage && !inputsDisabled && (
                     <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
@@ -1574,7 +1664,7 @@ export default function TicketDetailPage() {
                               width: '32px', 
                               height: '32px', 
                               borderRadius: '50%', 
-                              border: '1px solid #222',
+                              border: 'none',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center'
@@ -1591,96 +1681,99 @@ export default function TicketDetailPage() {
               style={{
                 marginTop: '32px',
                 borderTop: '1px solid #edecec',
-                paddingTop: '24px',
-                display: 'flex',
-                flexWrap: 'wrap',
-                justifyContent: 'space-between',
-                gap: '16px',
-                alignItems: 'center'
+                paddingTop: '24px'
               }}
             >
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', marginBottom: '24px' }}>
                 <div>
-                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Tổng cộng</div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Tổng cộng</div>
                   <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
-                        </div>
+                </div>
                 <div>
-                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Giảm giá</div>
-                  <div style={{ fontSize: '16px', fontWeight: 600 }}>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Giảm giá</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>
                     {formatCurrency(safeDiscountAmount)} đ
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase' }}>Thanh toán cuối cùng</div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Thanh toán cuối cùng</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>
                     {formatCurrency(finalAmount)} đ
                   </div>
                 </div>
               </div>
-              {!isHistoryPage ? (
-                <Space size="middle">
-                          <Button 
-                            onClick={handleSendQuote}
-                    disabled={
-                      actionLoading ||
-                      inputsDisabled ||
-                      (replaceItems.length === 0 && serviceItems.length === 0)
-                    }
-                    loading={actionLoading}
-                    style={{
-                      background: '#22c55e',
-                      borderColor: '#22c55e',
-                      color: '#fff',
-                      fontWeight: 600,
-                      padding: '0 24px',
-                      height: '40px'
-                    }}
-                          >
-                    {actionButtonLabel}
-                          </Button>
-                  {canSendToCustomer && (
-                    <>
-                      <Button
-                        onClick={handleExportPDF}
-                        loading={exportPDFLoading}
-                        disabled={exportPDFLoading}
-                        icon={<FilePdfOutlined />}
-                        style={{
-                          background: '#ef4444',
-                          borderColor: '#ef4444',
-                          color: '#fff',
-                          fontWeight: 600,
-                          padding: '0 24px',
-                          height: '40px'
-                        }}
-                      >
-                        Xuất PDF
-                      </Button>
-                      <Button
-                        onClick={handleSendToCustomer}
-                        loading={sendToCustomerLoading}
-                        disabled={sendToCustomerLoading}
-                        style={{
-                          background: '#2563eb',
-                          borderColor: '#2563eb',
-                          color: '#fff',
-                          fontWeight: 600,
-                          padding: '0 24px',
-                          height: '40px'
-                        }}
-                      >
-                        Gửi báo giá
-                      </Button>
-                    </>
-                  )}
-                        </Space>
-              ) : (
-                <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                  {ticketData?.priceQuotation
-                    ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
-                    : 'Báo giá đang ở chế độ chỉ xem'}
-                      </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+                {!isHistoryPage ? (
+                  <Space size="middle">
+                    <Button 
+                      onClick={handleSendQuote}
+                      disabled={
+                        actionLoading ||
+                        isWaitingWarehouse ||
+                        (isWarehouseConfirmed && !isEditMode 
+                          ? false  // Cho phép bấm "Cập nhật" để bật edit mode
+                          : (isWarehouseConfirmed && isEditMode
+                              ? (replaceItems.length === 0 && serviceItems.length === 0)  // Validate khi đang edit
+                              : inputsDisabled))  // Logic cho các trạng thái khác
+                      }
+                      loading={actionLoading}
+                      style={{
+                        background: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
+                        borderColor: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '0 24px',
+                        height: '40px',
+                        cursor: isWaitingWarehouse ? 'not-allowed' : 'pointer'
+                      }}
+                    >
+                      {actionButtonLabel}
+                    </Button>
+                    {canSendToCustomer && (
+                      <>
+                        <Button
+                          onClick={handleExportPDF}
+                          loading={exportPDFLoading}
+                          disabled={exportPDFLoading}
+                          icon={<FilePdfOutlined />}
+                          style={{
+                            background: '#ef4444',
+                            borderColor: '#ef4444',
+                            color: '#fff',
+                            fontWeight: 600,
+                            padding: '0 24px',
+                            height: '40px'
+                          }}
+                        >
+                          Xuất PDF
+                        </Button>
+                        <Button
+                          onClick={handleSendToCustomer}
+                          loading={sendToCustomerLoading}
+                          disabled={sendToCustomerLoading}
+                          style={{
+                            background: '#2563eb',
+                            borderColor: '#2563eb',
+                            color: '#fff',
+                            fontWeight: 600,
+                            padding: '0 24px',
+                            height: '40px'
+                          }}
+                        >
+                          Gửi báo giá
+                        </Button>
+                      </>
                     )}
+                  </Space>
+                ) : (
+                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                    {ticketData?.priceQuotation
+                      ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
+                      : 'Báo giá đang ở chế độ chỉ xem'}
+                  </div>
+                )}
+              </div>
             </div>
                   </>
           )}

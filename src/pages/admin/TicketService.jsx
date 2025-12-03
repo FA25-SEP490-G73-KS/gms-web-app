@@ -19,24 +19,39 @@ const SERVICES = [
 ]
 
 
+const STATUS_MAP = {
+  'CREATED': 'Đã tạo',
+  'WAITING_FOR_QUOTATION': 'Chờ báo giá',
+  'WAITING_FOR_DELIVERY': 'Chờ bàn giao xe',
+  'COMPLETED': 'Hoàn thành',
+  'CANCELED': 'Hủy'
+}
+
 const STATUS_FILTERS = [
   { key: 'CREATED', label: 'Đã tạo' },
-  { key: 'WAITING_QUOTE', label: 'Chờ báo giá' },
-  { key: 'WAITING_HANDOVER', label: 'Chờ bàn giao xe' },
-  { key: 'CANCELLED', label: 'Hủy' },
+  { key: 'WAITING_FOR_QUOTATION', label: 'Chờ báo giá' },
+  { key: 'WAITING_FOR_DELIVERY', label: 'Chờ bàn giao xe' },
+  { key: 'COMPLETED', label: 'Hoàn thành' },
+  { key: 'CANCELED', label: 'Hủy' },
 ]
 
 const getStatusConfig = (status) => {
   switch (status) {
     case 'Hủy':
+    case 'CANCELED':
     case 'CANCELLED':
       return { color: '#ef4444', text: 'Hủy' }
     case 'Chờ báo giá':
+    case 'WAITING_FOR_QUOTATION':
     case 'WAITING_QUOTE':
       return { color: '#ffd65a', text: 'Chờ báo giá' }
     case 'Chờ bàn giao xe':
+    case 'WAITING_FOR_DELIVERY':
     case 'WAITING_HANDOVER':
-      return { color: '#ffd65a', text: 'Chờ bàn giao xe' }
+      return { color: '#3b82f6', text: 'Chờ bàn giao xe' }
+    case 'Hoàn thành':
+    case 'COMPLETED':
+      return { color: '#22c55e', text: 'Hoàn thành' }
     case 'Đã tạo':
     case 'CREATED':
       return { color: '#666', text: 'Đã tạo' }
@@ -58,6 +73,7 @@ export default function TicketService() {
   const [updateTicketId, setUpdateTicketId] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
   // Không lọc theo trạng thái mặc định để luôn hiển thị mọi phiếu,
   // tránh trường hợp backend trả về status mới (VD: WAITING_FOR_QUOTATION) mà không map kịp.
   const [statusFilter, setStatusFilter] = useState(null)
@@ -312,7 +328,29 @@ export default function TicketService() {
     fetchServiceTickets()
   }
 
+  const handleStatusChange = async (ticketId, newStatus, currentStatus) => {
+    if (!ticketId || !newStatus || newStatus === currentStatus) return
+    
+    setUpdatingStatusId(ticketId)
+    try {
+      const { data, error } = await serviceTicketAPI.updateStatus(ticketId, newStatus)
+      
+      if (error) {
+        message.error('Không thể cập nhật trạng thái')
+        return
+      }
+      
+      message.success('Cập nhật trạng thái thành công')
+      await fetchServiceTickets()
+    } catch (err) {
+      console.error('Error updating ticket status:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật trạng thái')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
 
+  
   const handleServiceSelect = (value) => {
     if (!value) return
     
@@ -490,10 +528,61 @@ export default function TicketService() {
       title: 'Trạng Thái',
       dataIndex: 'status',
       key: 'status',
-      width: 180,
+      width: 200,
       render: (status, record) => {
-        const config = getStatusConfig(record.statusKey || status)
-        return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
+        const currentStatus = record.statusKey || status
+        const config = getStatusConfig(currentStatus)
+        const isUpdating = updatingStatusId === record.id
+        
+        if (isHistoryPage) {
+          return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
+        }
+        
+          return (
+            <select
+              value={currentStatus}
+              onChange={(e) => {
+                e.stopPropagation()
+                handleStatusChange(record.id, e.target.value, currentStatus)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              disabled={isUpdating}
+              style={{
+                border: '1px solid #d0d7de',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '13px',
+                outline: 'none',
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                background: '#fff',
+                minWidth: '160px',
+                color: config.color,
+                fontWeight: 600,
+                opacity: isUpdating ? 0.6 : 1
+              }}
+            >
+              {currentStatus === 'WAITING_FOR_QUOTATION' ? (
+                <>
+                  <option value="WAITING_FOR_QUOTATION" style={{ color: '#ffd65a' }}>Chờ báo giá</option>
+                  <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
+                </>
+              ) : currentStatus === 'WAITING_FOR_DELIVERY' ? (
+                <>
+                  <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
+                  <option value="COMPLETED" style={{ color: '#22c55e' }}>Hoàn thành</option>
+                </>
+              ) : (
+                Object.keys(STATUS_MAP).map((key) => {
+                  const optConfig = getStatusConfig(key)
+                  return (
+                    <option key={key} value={key} style={{ color: optConfig.color }}>
+                      {STATUS_MAP[key]}
+                    </option>
+                  )
+                })
+              )}
+            </select>
+          )
       }
     },
     {

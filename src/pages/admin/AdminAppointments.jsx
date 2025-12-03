@@ -23,7 +23,24 @@ const statusMap = {
   'CANCELLED': 'Hủy',
   'ARRIVED': 'Đã đến',
   'OVERDUE': 'Quá hạn',
-  'COMPLETED': 'Hoàn thành'
+  'COMPLETED': 'Hoàn thành',
+  'Đã xác nhận': 'Đã xác nhận',
+  'Đã đến': 'Đã đến',
+  'Hủy': 'Hủy',
+  'Chờ': 'Chờ'
+}
+
+// Map status tiếng Việt từ backend sang key tiếng Anh cho filter
+const statusToKeyMap = {
+  'Đã xác nhận': 'CONFIRMED',
+  'Đã đến': 'ARRIVED',
+  'Hủy': 'CANCELLED',
+  'Chờ': 'CONFIRMED',
+  'CONFIRMED': 'CONFIRMED',
+  'ARRIVED': 'ARRIVED',
+  'CANCELLED': 'CANCELLED',
+  'OVERDUE': 'OVERDUE',
+  'COMPLETED': 'COMPLETED'
 }
 
 const getStatusConfig = (status) => {
@@ -32,6 +49,8 @@ const getStatusConfig = (status) => {
       return { color: '#ef4444', text: status }
     case 'Đã đến':
       return { color: '#16a34a', text: status }
+    case 'Đã xác nhận':
+      return { color: '#e89400', text: status }
     case 'Chờ':
       return { color: '#e89400', text: status }
     case 'Quá hạn':
@@ -283,13 +302,17 @@ export default function AdminAppointments() {
       const rawDateCandidate = item.appointmentDate || item.date || item.appointment_date || null
       const dateRawISO = normalizeToISODate(rawDateCandidate)
       const dateDisplay = dateRawISO ? dayjs(dateRawISO).format('DD/MM/YYYY') : (item.appointmentDate ? String(item.appointmentDate) : '')
+      const rawStatus = item.status || 'CONFIRMED'
+      const normalizedStatus = statusMap[rawStatus] || rawStatus || 'Chờ'
+      const normalizedStatusKey = statusToKeyMap[rawStatus] || statusToKeyMap[normalizedStatus] || 'CONFIRMED'
+      
       return {
         id: item.appointmentId || item.id,
         customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
         license: formatLicensePlate(item.licensePlate || item.license || ''),
         phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
-        status: statusMap[item.status] || item.status || 'Chờ',
-        statusKey: item.status || 'CONFIRMED',
+        status: normalizedStatus,
+        statusKey: normalizedStatusKey,
         time: item.timeSlotLabel || item.time || '',
         date: dateDisplay,
         dateRaw: dateRawISO,
