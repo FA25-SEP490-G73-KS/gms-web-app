@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { message } from 'antd'
 import CustomerLayout from '../../../layouts/CustomerLayout'
 import { appointmentAPI, otpAPI, serviceTypeAPI } from '../../../services/api'
@@ -14,6 +15,7 @@ export default function AppointmentService() {
   const [timeSlots, setTimeSlots] = useState([])
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
   const [appointmentResult, setAppointmentResult] = useState(null)
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     phonePrefix: '+84',
     phoneNumber: '',
@@ -189,6 +191,7 @@ export default function AppointmentService() {
 
       if (data && (data.result === true || data.result === 'true' || data.statusCode === 200)) {
         message.success('Xác thực OTP thành công!')
+        setVerifyOtpLoading(false)
         next()
       } else {
         setOtpError('Mã OTP không đúng hoặc đã hết hạn.')
@@ -369,7 +372,7 @@ export default function AppointmentService() {
                 />
               </div>
               <div className="appointment-buttons" style={rowBtns}>
-                <button style={btnGhost} onClick={() => (window.location.href = '/')}>Trang chủ</button>
+                <button style={btnGhost} onClick={() => navigate('/')}>Trang chủ</button>
                 <button style={btnPrimary} onClick={handleSendOTP} disabled={otpLoading}>
                   {otpLoading ? 'Đang gửi...' : 'Gửi mã OTP'}
                 </button>
@@ -484,7 +487,7 @@ export default function AppointmentService() {
                 </div>
               </div>
               <div className="appointment-buttons" style={rowBtns}>
-                <button style={btnGhost} onClick={back}>Quay lại</button>
+                <button style={btnGhost} onClick={() => navigate('/')}>Trang chủ</button>
                 <button style={btnPrimary} onClick={handleSubmit} disabled={loading}>
                   {loading ? 'Đang xử lý...' : 'Xác nhận'}
                 </button>
@@ -563,7 +566,7 @@ export default function AppointmentService() {
                 </div>
               )}
               
-              <button style={{ ...btnPrimary, width: '60%' }} onClick={() => (window.location.href = '/')}>Trang chủ</button>
+              <button style={{ ...btnPrimary, width: '60%' }} onClick={() => navigate('/')}>Trang chủ</button>
             </div>
           )}
             </div>

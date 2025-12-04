@@ -1,4 +1,5 @@
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import HomePage from './pages/home/HomePage';
 import AboutPage from './pages/home/about';
 import ContactPage from './pages/home/contact';
@@ -58,6 +59,20 @@ import ExportParts from './pages/warehouse/ExportParts';
 import ExportRequest from './pages/warehouse/ExportRequest';
 import CreateExportForm from './pages/warehouse/CreateExportForm';
 
+function ScrollToTop() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Mỗi lần đổi route, cuộn lên đầu trang để navbar luôn hiển thị
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'smooth',
+    });
+  }, [location.pathname]);
+
+  return null;
+}
 
 function AdminOrdersRedirect() {
   const { id } = useParams()
@@ -67,6 +82,7 @@ function AdminOrdersRedirect() {
 function App() {
   return (
     <Router>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />

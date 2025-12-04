@@ -16,7 +16,8 @@ export default function CustomerNav() {
   }, [])
 
   const items = [
-    { label: 'Trang chủ', to: '/#home' },
+    // Trang chủ dẫn thẳng về '/' để luôn cuộn lên đầu trang
+    { label: 'Trang chủ', to: '/' },
     { label: 'Giới thiệu', to: '/about' },
     { label: 'Dịch vụ', to: '/#services' },
     { label: 'Blog', to: '/blog' },
@@ -24,11 +25,11 @@ export default function CustomerNav() {
   ]
 
   const isActive = (to) => {
-    if (to === '/#home') {
-      if (location.pathname === '/' && (!location.hash || location.hash === '#home')) {
-        return true
-      }
+    // Trang chủ: active khi đang ở path '/'
+    if (to === '/') {
+      return location.pathname === '/'
     }
+
     if (to.startsWith('/#')) {
       const hash = to.replace('/', '')
       return location.pathname === '/' && location.hash === hash

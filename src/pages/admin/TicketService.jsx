@@ -350,7 +350,7 @@ export default function TicketService() {
     }
   }
 
-  
+
   const handleServiceSelect = (value) => {
     if (!value) return
     
@@ -535,7 +535,7 @@ export default function TicketService() {
         const isUpdating = updatingStatusId === record.id
         
         if (isHistoryPage) {
-          return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
+        return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
         }
         
           return (
