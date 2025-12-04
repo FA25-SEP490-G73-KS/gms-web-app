@@ -367,6 +367,12 @@ export default function AppointmentService() {
                     value = value.slice(0, 10)
                     setForm({ ...form, phoneNumber: value })
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSendOTP()
+                    }
+                  }}
                   placeholder="VD: 909123456" 
                   style={{ ...inputStyle, flex: 1 }} 
                 />
@@ -390,6 +396,12 @@ export default function AppointmentService() {
                   const value = e.target.value.replace(/\D/g, '').slice(0, 6)
                   setForm({ ...form, otp: value })
                   setOtpError('')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleVerifyOTP()
+                  }
                 }}
                 placeholder="VD: 123456" 
                 style={inputStyle}
