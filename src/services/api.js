@@ -172,14 +172,21 @@ export const inventoryAPI = {
 };
 
 export const stockExportAPI = {
-  getAll: (page = 0, size = 6) => get(`/stock-exports?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 6, keyword = null, status = null, fromDate = null, toDate = null) => {
+    const params = new URLSearchParams({ page, size })
+    if (keyword) params.append('keyword', keyword)
+    if (status) params.append('status', status)
+    if (fromDate) params.append('fromDate', fromDate)
+    if (toDate) params.append('toDate', toDate)
+    return get(`/stock-exports?${params.toString()}`)
+  },
   getById: (id) => get(`/stock-exports/${id}`),
- 
+  getItemHistory: (itemId) => get(`/stock-exports/export-items/${itemId}/history`),
   getQuotationDetail: (id) => get(`/stock-exports/quotation/${id}`),
  
-  exportItem: (itemId, payload) => post(`/stock-exports/item/${itemId}/export`, payload),
+  exportItem: (itemId, payload) => post(`/stock-exports/export-items/${itemId}/export`, payload),
   
-  getExportItemDetail: (exportItemId) => get(`/stock-exports/item/${exportItemId}`),
+  getExportItemDetail: (exportItemId) => get(`/stock-exports/export-items/${exportItemId}`),
   create: (data) => post('/stock-exports', data),
   update: (id, data) => put(`/stock-exports/${id}`, data),
 };
@@ -243,6 +250,7 @@ export const priceQuotationAPI = {
   update: (id, payload) => patch(`/price-quotations/${id}`, payload),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
   getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
+  getById: (id) => get(`/price-quotations/${id}`),
   getItemById: (id) => get(`/quotation-items/${id}`),
   
   confirmItem: (itemId, note) => patch(`/quotation-items/${itemId}/confirm`, note),
@@ -252,6 +260,11 @@ export const priceQuotationAPI = {
   confirmQuotation: (id) => post(`/price-quotations/${id}/confirm`),
   rejectQuotation: (id, reason) => post(`/price-quotations/${id}/reject`, reason),
   exportPDF: (id) => get(`/price-quotations/${id}/pdf`, { responseType: 'blob' }),
+};
+
+export const partAPI = {
+  getAll: (page = 0, size = 10) => get(`/parts?page=${page}&size=${size}`),
+  getById: (id) => get(`/parts/${id}`),
 };
 
 export const znsNotificationsAPI = {
@@ -364,9 +377,15 @@ export const payrollAPI = {
 };
 
 export const stockReceiptAPI = {
-  getAll: (page = 0, size = 10, search = '') => {
-    const query = buildQueryString({ page, size, search: search || undefined })
-    const suffix = query ? `?${query}` : ''
-    return get(`/stock-receipt${suffix}`)
+  getAll: (page = 0, size = 10, keyword = null, status = null, fromDate = null, toDate = null) => {
+    const params = new URLSearchParams({ page, size })
+    if (keyword) params.append('keyword', keyword)
+    if (status) params.append('status', status)
+    if (fromDate) params.append('fromDate', fromDate)
+    if (toDate) params.append('toDate', toDate)
+    return get(`/stock-receipt?${params.toString()}`)
   },
+  getById: (id) => get(`/stock-receipt/${id}`),
+  getItemHistory: (itemId) => get(`/stock-receipt/receipt-items/${itemId}/history`),
+  getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`)
 };
