@@ -3,8 +3,6 @@ name: Deploy
 on:
   push:
     branches: [main, NamTP]
-    paths-ignore:
-      - README.md
 
 jobs:
   build-and-deploy:
@@ -37,5 +35,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           source: "dist/*"
-          target: "~/gms-web-app"
+          target: "/var/www/html/gms"
           strip_components: 1
+          overwrite:
