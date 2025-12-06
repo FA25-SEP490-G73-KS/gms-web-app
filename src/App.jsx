@@ -52,12 +52,15 @@ import WarehouseHome from './pages/warehouse/WarehouseHome';
 import WarehouseReport from './pages/warehouse/WarehouseReport';
 import PartsList from './pages/warehouse/PartsList';
 import ImportList from './pages/warehouse/ImportList';
+import ImportDetail from './pages/warehouse/ImportDetail';
 import ImportRequest from './pages/warehouse/ImportRequest';
 import CreateImportForm from './pages/warehouse/CreateImportForm';
 import ExportList from './pages/warehouse/ExportList';
 import ExportParts from './pages/warehouse/ExportParts';
 import ExportRequest from './pages/warehouse/ExportRequest';
 import CreateExportForm from './pages/warehouse/CreateExportForm';
+import ExportDetail from './pages/warehouse/ExportDetail';
+import CreateTicketWarehouse from './pages/warehouse/CreateTicket';
 
 function ScrollToTop() {
   const location = useLocation();
@@ -116,11 +119,14 @@ function App() {
         <Route path="/warehouse/report" element={<WarehouseReport />} />
         <Route path="/warehouse/parts" element={<PartsList />} />
         <Route path="/warehouse/import/list" element={<ImportList />} />
+        <Route path="/warehouse/import-list/:id" element={<ImportDetail />} />
         <Route path="/warehouse/import/request" element={<ImportRequest />} />
         <Route path="/warehouse/import/create" element={<CreateImportForm />} />
         <Route path="/warehouse/export/list" element={<ExportList />} />
+        <Route path="/warehouse/export/list/:id" element={<ExportDetail />} />
         <Route path="/warehouse/export/request" element={<ExportRequest />} />
         <Route path="/warehouse/export/create" element={<ExportParts />} />
+        <Route path="/warehouse/create-ticket" element={<CreateTicketWarehouse />} />
 
         <Route path="/accountance" element={<AccountancePlaceholder title="Thống kê" />} />
         <Route path="/accountance/finance" element={<AccountanceFinance />} />

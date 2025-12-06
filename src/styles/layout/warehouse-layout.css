@@ -106,6 +106,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 14px;
 }
 
 .breadcrumb-item {
@@ -113,9 +114,19 @@
   font-weight: 500;
 }
 
+.breadcrumb-link {
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.breadcrumb-link:hover {
+  color: var(--gold);
+}
+
 .breadcrumb-separator {
   color: #9ca3af;
   font-size: 12px;
+  user-select: none;
 }
 
 .breadcrumb-current {

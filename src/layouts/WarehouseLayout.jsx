@@ -4,7 +4,7 @@ import useAuthStore from '../store/authStore'
 import { getUserNameFromToken } from '../utils/helpers'
 import '../styles/layout/warehouse-layout.css'
 
-export default function WarehouseLayout({ children }) {
+export default function WarehouseLayout({ children, breadcrumbItems }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [openImport, setOpenImport] = useState(location.pathname.startsWith('/warehouse/import'))
@@ -45,10 +45,10 @@ export default function WarehouseLayout({ children }) {
   // Breadcrumb mapping based on route
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/warehouse/ticket/create')) {
+    if (path.startsWith('/warehouse/create-ticket')) {
       return { parent: '', current: 'Tạo phiếu' }
     } else if (path.startsWith('/warehouse/export/request')) {
-      return { parent: 'Xuất kho', current: 'Yêu cầu xuất hàng' }
+      return { parent: 'Xuất kho', current: 'Xác nhận báo giá' }
     } else if (path.startsWith('/warehouse/export/list')) {
       return { parent: 'Xuất kho', current: 'Danh sách xuất' }
     } else if (path.startsWith('/warehouse/import/request')) {
@@ -78,7 +78,26 @@ export default function WarehouseLayout({ children }) {
               <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
             </button>
             <div className="breadcrumb-divider"></div>
-            {breadcrumb.parent ? (
+            {breadcrumbItems ? (
+              <div className="breadcrumb">
+                {breadcrumbItems.map((item, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && <span className="breadcrumb-separator">&gt;</span>}
+                    {item.path ? (
+                      <span 
+                        className="breadcrumb-item breadcrumb-link"
+                        onClick={() => navigate(item.path)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {item.label}
+                      </span>
+                    ) : (
+                      <span className="breadcrumb-current">{item.label}</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : breadcrumb.parent ? (
               <div className="breadcrumb">
                 <span className="breadcrumb-item">{breadcrumb.parent}</span>
                 <span className="breadcrumb-separator">&gt;</span>
@@ -116,14 +135,6 @@ export default function WarehouseLayout({ children }) {
           >
             <i className="bi bi-calendar-check" />
             <span>Danh sách linh kiện</span>
-          </button>
-
-          <button
-            className={`warehouse-nav-item ${isActive('/warehouse/ticket/create') ? 'active' : ''}`}
-            onClick={() => navigate('/warehouse/ticket/create')}
-          >
-            <i className="bi bi-file-earmark-plus" />
-            <span>Tạo phiếu</span>
           </button>
 
           <div className={`warehouse-nav-group ${openImport ? 'open' : ''}`}>
@@ -172,15 +183,18 @@ export default function WarehouseLayout({ children }) {
                 >
                   Xác nhận báo giá
                 </button>
-                <button 
-                  className={`submenu-item ${isActive('/warehouse/export/create') ? 'active' : ''}`}
-                  onClick={() => navigate('/warehouse/export/create')}
-                >
-                  Xuất linh kiện
-                </button>
               </div>
             )}
           </div>
+
+          {/* Tạo phiếu */}
+          <button 
+            className={`warehouse-nav-item ${isActive('/warehouse/create-ticket') ? 'active' : ''}`}
+            onClick={() => navigate('/warehouse/create-ticket')}
+          >
+            <i className="bi bi-receipt" />
+            <span>Tạo phiếu</span>
+          </button>
         </nav>
         <div className="warehouse-spacer" />
         
