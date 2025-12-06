@@ -58,8 +58,8 @@ export default function AdminLayout({ children }) {
     if (path.startsWith('/service-advisor/appointments')) {
       return { parent: '', current: 'Lịch hẹn' }
     }
-    if (path.startsWith('/service-advisor/warranty')) {
-      return { parent: '', current: 'Bảo hành' }
+    if (path.startsWith('/service-advisor/customers')) {
+      return { parent: '', current: 'Khách hàng' }
     }
     return { parent: '', current: 'Trang chủ' }
   }
@@ -143,7 +143,7 @@ export default function AdminLayout({ children }) {
                   className={`submenu-item ${location.pathname === '/service-advisor/orders/new-customer' ? 'active' : ''}`}
                   onClick={() => navigate('/service-advisor/orders/new-customer')}
                 >
-                  Tạo phiếu khách mới
+                  Tạo phiếu dịch vụ
                 </button>
                 <button 
                   className={`submenu-item ${location.pathname === '/service-advisor/orders/history' ? 'active' : ''}`}
@@ -155,10 +155,14 @@ export default function AdminLayout({ children }) {
             )}
           </div>
 
-          <button className={`admin-nav-item ${isActive('/service-advisor/warranty') ? 'active' : ''}`} onClick={() => navigate('/service-advisor/warranty')}>
-            <i className="bi bi-shield-check" />
-            <span>Bảo hành</span>
+          <button 
+            className={`admin-nav-item ${isActive('/service-advisor/customers') ? 'active' : ''}`}
+            onClick={() => navigate('/service-advisor/customers')}
+          >
+            <i className="bi bi-people" />
+            <span>Khách hàng</span>
           </button>
+
         </nav>
         <div className="admin-spacer" />
         
