@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Input, Button, message } from 'antd'
-import { SearchOutlined, EyeOutlined } from '@ant-design/icons'
+import { Table, Input, Button, message, DatePicker, Space } from 'antd'
+import { SearchOutlined, EyeOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -8,9 +8,18 @@ import { invoiceAPI } from '../../services/api'
 import dayjs from 'dayjs'
 import '../../styles/pages/accountance/payments.css'
 
+const STATUS_FILTERS = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'WAITING_FOR_QUOTATION', label: 'Chờ báo giá' },
+  { key: 'WAITING_FOR_DELIVERY', label: 'Chờ bàn giao' },
+  { key: 'COMPLETED', label: 'Hoàn thành' }
+]
+
 export function AccountancePaymentsContent() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedMonth, setSelectedMonth] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -53,6 +62,7 @@ export function AccountancePaymentsContent() {
         customer: item.customerName || 'N/A',
         createdDate: item.createdAt || '',
         totalAmount: item.finalAmount || item.totalAmount || 0,
+        rawStatus: item.serviceTicketStatus, // Store raw status for filtering
         serviceStatus: mapServiceStatus(item.serviceTicketStatus)
       }))
 
@@ -74,14 +84,19 @@ export function AccountancePaymentsContent() {
           item.paymentCode.toLowerCase().includes(query.toLowerCase()) ||
           item.ticketCode.toLowerCase().includes(query.toLowerCase()) ||
           item.customer.toLowerCase().includes(query.toLowerCase())
-        return matchesQuery
+        
+        const matchesStatus =
+          statusFilter === 'all' ||
+          item.rawStatus === statusFilter
+        
+        return matchesQuery && matchesStatus
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query, data])
+  }, [query, data, statusFilter])
 
   const columns = [
     {
-      title: 'Mã hóa đơn',
+      title: <div style={{ textAlign: 'center' }}>Mã hóa đơn</div>,
       dataIndex: 'paymentCode',
       key: 'paymentCode',
       width: 180,
@@ -95,30 +110,31 @@ export function AccountancePaymentsContent() {
       )
     },
     {
-      title: 'Mã dịch vụ',
+      title: <div style={{ textAlign: 'center' }}>Mã dịch vụ</div>,
       dataIndex: 'ticketCode',
       key: 'ticketCode',
       width: 180
     },
     {
-      title: 'Khách Hàng',
+      title: <div style={{ textAlign: 'center' }}>Khách Hàng</div>,
       dataIndex: 'customer',
       key: 'customer',
       width: 200,
       render: (text) => <span style={{ color: '#6b7280' }}>{text}</span>
     },
     {
-      title: 'Ngày tạo',
+      title: <div style={{ textAlign: 'center' }}>Ngày tạo</div>,
       dataIndex: 'createdDate',
       key: 'createdDate',
       width: 150,
+      align: 'center',
       render: (date) => {
         if (!date) return 'N/A'
         return dayjs(date).format('D/M/YYYY')
       }
     },
     {
-      title: 'Tổng tiền',
+      title: <div style={{ textAlign: 'center' }}>Tổng tiền</div>,
       dataIndex: 'totalAmount',
       key: 'totalAmount',
       width: 150,
@@ -126,10 +142,11 @@ export function AccountancePaymentsContent() {
       render: (value) => value ? value.toLocaleString('vi-VN') : '0'
     },
     {
-      title: 'Trạng thái DV',
+      title: <div style={{ textAlign: 'center' }}>Trạng thái DV</div>,
       dataIndex: 'serviceStatus',
       key: 'serviceStatus',
       width: 150,
+      align: 'center',
       render: (status) => {
         if (!status) return ''
         const getStatusColor = (statusText) => {
@@ -152,7 +169,7 @@ export function AccountancePaymentsContent() {
       }
     },
     {
-      title: 'Thao tác',
+      title: <div style={{ textAlign: 'center' }}>Thao tác</div>,
       key: 'action',
       width: 100,
       align: 'center',
@@ -175,7 +192,8 @@ export function AccountancePaymentsContent() {
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Thanh toán</h1>
 
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            {/* Left side - Search */}
             <Input
               prefix={<SearchOutlined />}
               placeholder="Tìm kiếm"
@@ -184,6 +202,38 @@ export function AccountancePaymentsContent() {
               onChange={(e) => setQuery(e.target.value)}
               style={{ width: 300 }}
             />
+            
+            {/* Right side - Filter buttons and Date picker */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <Space>
+                {STATUS_FILTERS.map((filter) => (
+                  <Button
+                    key={filter.key}
+                    type={statusFilter === filter.key ? 'primary' : 'default'}
+                    onClick={() => setStatusFilter(filter.key)}
+                    style={{
+                      background: statusFilter === filter.key ? '#CBB081' : '#fff',
+                      borderColor: statusFilter === filter.key ? '#CBB081' : '#d9d9d9',
+                      color: statusFilter === filter.key ? '#fff' : '#666',
+                      fontWeight: 500,
+                      borderRadius: 6
+                    }}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
+              </Space>
+              
+              <DatePicker
+                picker="month"
+                placeholder="Tháng"
+                value={selectedMonth}
+                onChange={(date) => setSelectedMonth(date)}
+                suffixIcon={<CalendarOutlined />}
+                style={{ width: 150, borderRadius: 6 }}
+                format="MM/YYYY"
+              />
+            </div>
           </div>
         </div>
 

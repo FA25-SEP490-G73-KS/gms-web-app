@@ -149,6 +149,36 @@ export default function CreateTicketNewCustomer() {
     form.setFieldsValue({ customerType: 'DOANH_NGHIEP' })
   }
 
+  // Hàm format biển số xe tự động thêm dấu -
+  const formatLicensePlate = (value) => {
+    if (!value) return value
+    
+    let cleaned = value.replace(/[-\s]/g, '').toUpperCase()
+    
+    // Giới hạn độ dài tối đa
+    if (cleaned.length > 10) {
+      cleaned = cleaned.substring(0, 10)
+    }
+    
+    // Format theo các pattern phổ biến
+    if (cleaned.length >= 3) {
+
+      if (/^[0-9]{2}[A-Z]/.test(cleaned)) {
+        const part1 = cleaned.substring(0, 3) // 30A
+        const part2 = cleaned.substring(3)    // 12345
+        return part2 ? `${part1}-${part2}` : part1
+      }
+      // Pattern: QĐ-12345 (2 chữ + số)
+      else if (/^[A-Z]{2}/.test(cleaned)) {
+        const part1 = cleaned.substring(0, 2) // QĐ
+        const part2 = cleaned.substring(2)    // 12345
+        return part2 ? `${part1}-${part2}` : part1
+      }
+    }
+    
+    return cleaned
+  }
+
   useEffect(() => {
     form.setFieldsValue({ 
       customerType: 'DOANH_NGHIEP',
@@ -455,12 +485,47 @@ export default function CreateTicketNewCustomer() {
                 <Form.Item
                   label="Số điện thoại"
                   name="phone"
-                  rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        if (!value || value.trim() === '') {
+                          return Promise.reject(new Error('Vui lòng nhập số điện thoại'))
+                        }
+                        
+                        const cleanValue = value.replace(/\s/g, '')
+                        
+                        // Kiểm tra chỉ chứa số
+                        if (/[^0-9]/.test(cleanValue)) {
+                          return Promise.reject(new Error('Số điện thoại chỉ được chứa số'))
+                        }
+                        
+                        // Kiểm tra đầu số Việt Nam hợp lệ TRƯỚC
+                        if (cleanValue.length >= 2 && !/^(03|05|07|08|09)/.test(cleanValue)) {
+                          return Promise.reject(new Error('Số điện thoại phải bắt đầu bằng 0'))
+                        }
+                        
+                        // Kiểm tra độ dài SAU
+                        if (cleanValue.length !== 10) {
+                          return Promise.reject(new Error('Số điện thoại phải có đúng 10 chữ số'))
+                        }
+                        
+                        return Promise.resolve()
+                      }
+                    }
+                  ]}
+                  normalize={(value) => value?.replace(/\s/g, '')} // Loại bỏ khoảng trắng
                   style={formItemStyle}
                 >
                   <Input
                     style={inputStyle}
                     placeholder={customerLookupLoading ? 'Đang kiểm tra...' : 'VD: 0123456789'}
+                    maxLength={10}
+                    onKeyPress={(e) => {
+                      // Chỉ cho phép nhập số
+                      if (!/[0-9]/.test(e.key)) {
+                        e.preventDefault()
+                      }
+                    }}
                     onBlur={(e) => {
                       const raw = e.target.value.trim()
                       if (!raw) {
@@ -506,7 +571,44 @@ export default function CreateTicketNewCustomer() {
                 <Form.Item
                   label="Họ và tên"
                   name="name"
-                  rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        if (!value || value.trim() === '') {
+                          return Promise.reject(new Error('Vui lòng nhập họ và tên'))
+                        }
+                        
+                        const trimmedValue = value.trim()
+                        
+                        // Kiểm tra độ dài
+                        if (trimmedValue.length < 2) {
+                          return Promise.reject(new Error('Họ tên phải có ít nhất 2 ký tự'))
+                        }
+                        
+                        if (trimmedValue.length > 50) {
+                          return Promise.reject(new Error('Họ tên không được vượt quá 50 ký tự'))
+                        }
+                        
+                        // Kiểm tra không chứa số
+                        if (/\d/.test(trimmedValue)) {
+                          return Promise.reject(new Error('Họ tên không được chứa số'))
+                        }
+                        
+                        // Kiểm tra không chứa ký tự đặc biệt
+                        if (/[!@#$%^&*()_+=\[\]{};':"\\|,.<>?/-]/.test(trimmedValue)) {
+                          return Promise.reject(new Error('Họ tên không được chứa ký tự đặc biệt'))
+                        }
+                        
+                        // Kiểm tra chỉ chứa chữ cái và khoảng trắng
+                        if (!/^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵýỷỹ\s]+$/.test(trimmedValue)) {
+                          return Promise.reject(new Error('Họ tên chỉ được chứa chữ cái và khoảng trắng'))
+                        }
+                        
+                        return Promise.resolve()
+                      }
+                    }
+                  ]}
+                  normalize={(value) => value?.replace(/\s+/g, ' ').trim()} // Loại bỏ nhiều khoảng trắng liên tiếp
                   style={formItemStyle}
                 >
                   <Input style={inputStyle} placeholder="VD: Đặng Thị Huyền" />
@@ -515,7 +617,31 @@ export default function CreateTicketNewCustomer() {
                 <Form.Item
                   label="Địa chỉ"
                   name="address"
-                  rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        // Không bắt buộc
+                        if (!value || value.trim() === '') {
+                          return Promise.resolve()
+                        }
+                        
+                        const trimmedValue = value.trim()
+                        
+                        // Kiểm tra độ dài tối đa
+                        if (trimmedValue.length > 150) {
+                          return Promise.reject(new Error('Địa chỉ không được vượt quá 150 ký tự'))
+                        }
+                        
+                        // Kiểm tra chỉ chứa chữ, số, dấu phẩy, gạch ngang và khoảng trắng
+                        if (!/^[a-zA-Z0-9ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵýỷỹ\s,/-]*$/.test(trimmedValue)) {
+                          return Promise.reject(new Error('Địa chỉ chỉ được chứa chữ, số, dấu phẩy, gạch ngang và khoảng trắng'))
+                        }
+                        
+                        return Promise.resolve()
+                      }
+                    }
+                  ]}
+                  normalize={(value) => value?.trim()} // Trim khoảng trắng đầu cuối
                   style={formItemStyle}
                 >
                   <Input style={inputStyle} placeholder="VD: Hòa Lạc - Hà Nội" />
@@ -556,13 +682,20 @@ export default function CreateTicketNewCustomer() {
                       menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                       classNamePrefix="react-select"
                     />
-                    <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-                      { (form.getFieldValue('service') || []).length ? `Đã chọn ${ (form.getFieldValue('service') || []).length }` : 'Chưa chọn dịch vụ' }
-                    </div>
                   </div>
                 </Form.Item>
 
-                <Form.Item label="Kỹ thuật viên sửa chữa" name="techs" style={formItemStyle}>
+                <Form.Item 
+                  label="Kỹ thuật viên sửa chữa" 
+                  name="techs" 
+                  rules={[
+                    { 
+                      required: true, 
+                      message: 'Vui lòng chọn ít nhất 1 kỹ thuật viên' 
+                    }
+                  ]}
+                  style={formItemStyle}
+                >
                   <div>
                     <ReactSelect
                       isMulti
@@ -575,42 +708,10 @@ export default function CreateTicketNewCustomer() {
                       menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                       classNamePrefix="react-select"
                     />
-                    <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-                      { (form.getFieldValue('techs') || []).length ? `Đã chọn ${ (form.getFieldValue('techs') || []).length }` : 'Chưa chọn kỹ thuật viên' }
-                    </div>
                   </div>
                 </Form.Item>
 
-                <Form.Item
-                  label="Ngày dự đoán nhận xe"
-                  name="receiveDate"
-                  rules={[{ required: true, message: 'Vui lòng chọn ngày dự đoán nhận xe' }]}
-                  style={formItemStyle}
-                >
-                  <DatePicker
-                    selected={selectedDate}
-                    onChange={(date) => {
-                      setSelectedDate(date)
-                      form.setFieldsValue({ receiveDate: date })
-                    }}
-                    dateFormat="dd/MM/yyyy"
-                    minDate={new Date()}
-                    placeholderText="dd/mm/yyyy"
-                    customInput={<DateInput />}
-                    popperPlacement="bottom-start"
-                    popperModifiers={[
-                      {
-                        name: 'offset',
-                        options: {
-                          offset: [0, 8]
-                        }
-                      }
-                    ]}
-                    shouldCloseOnSelect
-                    withPortal
-                    portalId="create-ticket-new-customer-date-portal"
-                  />
-                </Form.Item>
+          
 
                 </div>
               </Col>
@@ -635,10 +736,48 @@ export default function CreateTicketNewCustomer() {
                       <Form.Item
                         label="Biển số xe"
                         name="plate"
-                        rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
+                        rules={[
+                          { required: true, message: 'Vui lòng nhập biển số xe' },
+                          {
+                            validator: (_, value) => {
+                              if (!value) return Promise.resolve()
+                              
+                              // Loại bỏ khoảng trắng và dấu gạch ngang để validate
+                              const cleanValue = value.replace(/[\s-]/g, '').toUpperCase()
+                              
+
+            
+                              const patterns = [
+                                /^[0-9]{2}[A-Z]{1}[0-9]{4,5}$/,           
+                                /^[0-9]{2}[A-Z]{1}NG[0-9]{4}$/,          
+                                /^[A-Z]{2}[0-9]{4,5}$/,                 
+                                /^[0-9]{2}NG[0-9]{3,4}$/,               
+                                /^[0-9]{2}[A-Z]{1}[0-9]{3}\.[0-9]{2}$/ 
+                              ]
+                              
+                              const isValid = patterns.some(pattern => pattern.test(cleanValue))
+                              
+                              if (!isValid) {
+                                return Promise.reject(
+                                  new Error('Biển số xe không đúng định dạng (VD: 30A-12345, 51H-98765)')
+                                )
+                              }
+                              
+                              return Promise.resolve()
+                            }
+                          }
+                        ]}
+                        normalize={(value) => formatLicensePlate(value)} // Tự động format và thêm dấu -
                         style={formItemStyle}
                       >
-                        <Input style={inputStyle} placeholder="VD: 30A-12345" />
+                        <Input 
+                          style={inputStyle} 
+                          placeholder="VD: 30A-12345"
+                          onChange={(e) => {
+                            const formatted = formatLicensePlate(e.target.value)
+                            form.setFieldsValue({ plate: formatted })
+                          }}
+                        />
                       </Form.Item>
 
                       <Form.Item
@@ -708,7 +847,41 @@ export default function CreateTicketNewCustomer() {
                         </select>
                       </Form.Item>
 
-                      <Form.Item label="Số khung" name="vin" style={formItemStyle}>
+                      <Form.Item 
+                        label="Số khung" 
+                        name="vin" 
+                        rules={[
+                          {
+                            validator: (_, value) => {
+                              // Không bắt buộc
+                              if (!value || value.trim() === '') {
+                                return Promise.resolve()
+                              }
+                              
+                              const cleanValue = value.replace(/\s/g, '').toUpperCase()
+                              
+                              // Kiểm tra độ dài
+                              if (cleanValue.length !== 17) {
+                                return Promise.reject(new Error('Số khung (VIN) phải có đúng 17 ký tự'))
+                              }
+                              
+                              // Kiểm tra không chứa I, O, Q
+                              if (/[IOQ]/.test(cleanValue)) {
+                                return Promise.reject(new Error('Số khung không được chứa ký tự I, O, hoặc Q'))
+                              }
+                              
+                              // Kiểm tra chỉ chứa chữ cái A-Z (trừ I, O, Q) và số
+                              if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(cleanValue)) {
+                                return Promise.reject(new Error('Số khung chỉ được chứa chữ cái A-Z (trừ I, O, Q) và số'))
+                              }
+                              
+                              return Promise.resolve()
+                            }
+                          }
+                        ]}
+                        normalize={(value) => value?.toUpperCase().replace(/\s/g, '')} // Chuyển hoa và loại bỏ khoảng trắng
+                        style={formItemStyle}
+                      >
                         <Input style={inputStyle} placeholder="VD: RL4XW430089206813" />
                       </Form.Item>
                     </Col>

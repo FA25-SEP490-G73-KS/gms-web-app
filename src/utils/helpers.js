@@ -73,9 +73,14 @@ export function decodeJWT(token) {
 export function getUserNameFromToken() {
   try {
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    console.log('Token found:', token ? 'Yes' : 'No');
     if (!token) return null;
     const decoded = decodeJWT(token);
-    return decoded?.fullName || decoded?.name || null;
+    console.log('Decoded JWT:', decoded);
+    console.log('Available fields:', Object.keys(decoded || {}));
+    const username = decoded?.fullName || decoded?.name || decoded?.username || decoded?.sub || null;
+    console.log('Username extracted:', username);
+    return username;
   } catch (error) {
     console.error('Error getting user name from token:', error);
     return null;
