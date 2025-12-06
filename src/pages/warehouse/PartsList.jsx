@@ -10,23 +10,27 @@ import {
   Select,
   message,
   Checkbox,
-  Card
+  Card,
+  Row,
+  Col
 } from 'antd'
 import {
   SearchOutlined,
   EditOutlined,
   CloseOutlined,
   SortAscendingOutlined,
-  SortDescendingOutlined
+  SortDescendingOutlined,
+  FilterOutlined
 } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { partsAPI } from '../../services/api'
+import { partsAPI, partCategoriesAPI, unitsAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 import '../../styles/pages/warehouse/import-list.css'
 import '../../styles/pages/warehouse/parts-list.css'
 
 const { Search } = Input
+const { Option } = Select
 
 export default function PartsList() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -41,15 +45,94 @@ export default function PartsList() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [units, setUnits] = useState([])
+  const [tempFilters, setTempFilters] = useState({
+    status: [],
+    categoryIds: [],
+    origin: [],
+    vehicleModel: []
+  })
+  const [appliedFilters, setAppliedFilters] = useState({
+    status: [],
+    categoryIds: [],
+    origin: [],
+    vehicleModel: []
+  })
 
   useEffect(() => {
     fetchParts(page - 1, pageSize)
-  }, [page, pageSize])
+  }, [page, pageSize, appliedFilters])
+
+  useEffect(() => {
+    fetchCategories()
+    fetchUnits()
+  }, [])
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await partCategoriesAPI.getAll()
+      if (error) {
+        console.error('Error fetching categories:', error)
+        return
+      }
+      
+      console.log('Categories response:', data)
+      const result = data?.result || data || []
+      console.log('Mapped categories:', result)
+      setCategories(Array.isArray(result) ? result : [])
+    } catch (err) {
+      console.error('Failed to fetch categories:', err)
+      setCategories([])
+    }
+  }
+
+  const fetchUnits = async () => {
+    try {
+      const { data, error } = await unitsAPI.getAll({ page: 0, size: 20 })
+      if (error) {
+        console.error('Error fetching units:', error)
+        return
+      }
+      
+      const result = data?.result?.content || data?.content || []
+      setUnits(Array.isArray(result) ? result : [])
+    } catch (err) {
+      console.error('Failed to fetch units:', err)
+      setUnits([])
+    }
+  }
 
   const fetchParts = async (pageIndex = 0, size = 10) => {
     setLoading(true)
     try {
-      const { data: response, error } = await partsAPI.getAll({ page: pageIndex, size })
+      // Build filter params
+      const params = { 
+        page: pageIndex, 
+        size 
+      }
+      
+      // Add categoryId if filter is applied
+      if (appliedFilters.categoryIds.length > 0) {
+        params.categoryId = appliedFilters.categoryIds[0] // API accepts single categoryId
+      }
+      
+      // Add status if filter is applied - map to backend enum
+      if (appliedFilters.status.length > 0) {
+        const statusMap = {
+          'Đủ hàng': 'IN_STOCK',
+          'Sắp hết': 'LOW_STOCK',
+          'Hết hàng': 'OUT_OF_STOCK'
+        }
+        const mappedStatus = statusMap[appliedFilters.status[0]]
+        if (mappedStatus) {
+          params.status = mappedStatus
+        }
+      }
+      
+      const { data: response, error } = await partsAPI.getAll(params)
       if (error) {
         throw new Error(error)
       }
@@ -79,24 +162,29 @@ export default function PartsList() {
       const mapped = payload.map((item, index) => ({
         id: item.partId || item.id || `part-${index}`,
         name: item.name || '—',
-        origin: item.market || 'VN',
-        brand: item.categoryName || '—',
-        vehicleModel: item.universal ? 'Tất cả' : 'Chỉ định',
-        quantityOnHand: item.quantityInStock ?? item.quantity ?? 0,
+        sku: item.sku || '—',
+        categoryName: item.categoryName || '—',
+        modelName: item.modelName || '',
+        marketName: item.marketName || 'VN',
+        unit: item.unitName || item.unit || '—',
+        quantityOnHand: item.quantity ?? 0,
         reservedQuantity: item.reservedQuantity ?? 0,
+        status: item.status || 'Đủ hàng',
+        // Keep original fields for compatibility
+        origin: item.marketName || item.market || 'VN',
+        brand: item.categoryName || '—',
+        vehicleModel: item.universal ? 'Tất cả' : (item.modelName || 'Chỉ định'),
         alertThreshold: item.reorderLevel ?? 0,
         importPrice: item.purchasePrice ?? 0,
         sellingPrice: item.sellingPrice ?? 0,
-        unit: item.unit || '',
         categoryId: item.categoryId,
-        categoryName: item.categoryName,
         compatibleVehicleModelIds: item.compatibleVehicleIds || item.compatibleVehicleModelIds || [],
         discountRate: item.discountRate || 0,
         specialPart: item.specialPart || false,
         universal: item.universal || false,
+        supplierName: item.supplierName || '',
+        note: item.note || '',
         createdAt: item.createdAt || new Date().toISOString().split('T')[0],
-        sku: item.sku || '—',
-        status: item.quantityInStock > 0 ? 'Đã nhập' : 'Chờ nhập',
         originalItem: item
       }))
 
@@ -118,9 +206,19 @@ export default function PartsList() {
         const matchesSearch =
           !searchTerm ||
           item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (item.brand && item.brand.toLowerCase().includes(searchTerm.toLowerCase()))
+          (item.categoryName && item.categoryName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (item.sku && item.sku.toLowerCase().includes(searchTerm.toLowerCase()))
 
-        return matchesSearch
+        const matchesCategory = 
+          categoryFilter === 'all' || 
+          (item.categoryName && item.categoryName === categoryFilter)
+
+        // Filter by status from modal
+        const matchesStatus = 
+          appliedFilters.status.length === 0 || 
+          appliedFilters.status.includes(item.status)
+
+        return matchesSearch && matchesCategory && matchesStatus
       })
       .sort((a, b) => {
         const nameA = (a.name || '').toLowerCase()
@@ -132,61 +230,90 @@ export default function PartsList() {
         }
       })
       .map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
-  }, [parts, searchTerm, sortOrder])
+  }, [parts, searchTerm, sortOrder, categoryFilter, appliedFilters])
 
   const columns = [
     {
-      title: 'Tên linh kiện',
-      dataIndex: 'name',
-      key: 'name',
-      width: 240
-    },
-    {
-      title: 'SKU',
+      title: <div style={{ textAlign: 'center' }}>Mã SKU</div>,
       dataIndex: 'sku',
       key: 'sku',
-      width: 220,
+      width: 200,
+      align: 'left',
       render: (sku) => sku || '—'
     },
     {
-      title: 'Số lượng tồn',
+      title: 'Danh mục',
+      dataIndex: 'categoryName',
+      key: 'categoryName',
+      width: 150,
+      align: 'center',
+      render: (category) => category || '—'
+    },
+    {
+      title: 'Đơn vị',
+      dataIndex: 'unit',
+      key: 'unit',
+      width: 100,
+      align: 'center',
+      render: (unit) => unit || '—'
+    },
+    {
+      title: 'Tồn kho',
       dataIndex: 'quantityOnHand',
       key: 'quantityOnHand',
-      width: 120
-    },
-    {
-      title: 'Xuất xứ',
-      dataIndex: 'origin',
-      key: 'origin',
-      width: 100
-    },
-    {
-      title: 'Hãng',
-      dataIndex: 'brand',
-      key: 'brand',
-      width: 160
-    },
-    {
-      title: 'Giá nhập',
-      dataIndex: 'importPrice',
-      key: 'importPrice',
-      width: 130,
-      render: (value) => `${Number(value).toLocaleString('vi-VN')} đ`
-    },
-    {
-      title: 'Giá bán',
-      dataIndex: 'sellingPrice',
-      key: 'sellingPrice',
-      width: 130,
-      render: (value) => `${Number(value).toLocaleString('vi-VN')} đ`
-    },
-    {
-      title: 'Hành động',
-      key: 'actions',
       width: 100,
+      align: 'center'
+    },
+    {
+      title: 'Đang giữ',
+      dataIndex: 'reservedQuantity',
+      key: 'reservedQuantity',
+      width: 100,
+      align: 'center'
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 120,
+      align: 'center',
+      render: (status) => {
+        let color = '#52c41a' // Xanh - Đủ hàng (IN_STOCK)
+        let backgroundColor = '#f6ffed'
+        let borderColor = '#b7eb8f'
+        
+        if (status === 'Hết hàng' || status === 'OUT_OF_STOCK') {
+          color = '#ff4d4f' // Đỏ
+          backgroundColor = '#fff1f0'
+          borderColor = '#ffa39e'
+        } else if (status === 'Sắp hết' || status === 'LOW_STOCK') {
+          color = '#faad14' // Vàng
+          backgroundColor = '#fffbe6'
+          borderColor = '#ffe58f'
+        }
+        
+        return (
+          <span style={{
+            color: color,
+            backgroundColor: backgroundColor,
+            border: `1px solid ${borderColor}`,
+            borderRadius: '4px',
+            padding: '2px 8px',
+            fontSize: '12px',
+            fontWeight: 500
+          }}>
+            {status || 'Đủ hàng'}
+          </span>
+        )
+      }
+    },
+    {
+      key: 'actions',
+      width: 60,
+      align: 'center',
       render: (_, record) => (
-          <Button type="link" icon={<EditOutlined />} onClick={() => handleOpenDetail(record)}>
-            Sửa
+          <Button type="link" style={{ padding: 0 }}>
+            -
           </Button>
       )
     }
@@ -196,38 +323,33 @@ export default function PartsList() {
     setSelectedPart(part)
     setModalOpen(true)
 
-    if (part.id && !part.originalItem) {
-      try {
-        const { data: response, error } = await partsAPI.getById(part.id)
-        if (!error && response?.result) {
-          const detail = response.result
-          console.log('=== Part Detail from API ===')
-          console.log('Detail:', detail)
-          console.log('===========================')
-          
-          setSelectedPart((prev) => ({ ...prev, originalItem: detail }))
-          editForm.setFieldsValue({
-            name: detail.name,
-            origin: detail.marketName || detail.market,
-            brand: detail.categoryName,
-            vehicleModel: detail.universal ? 'Tất cả' : (detail.modelName || 'Chỉ định'),
-            quantityOnHand: detail.quantityInStock ?? detail.quantity,
-            reservedQuantity: detail.reservedQuantity,
-            alertThreshold: detail.reorderLevel,
-            sellingPrice: detail.sellingPrice,
-            importPrice: detail.purchasePrice,
-            unit: detail.unitName || detail.unit,
-            useForAllModels: detail.universal,
-            status: (detail.quantityInStock ?? detail.quantity) > 0 ? 'Đã nhập' : 'Chờ nhập',
-            note: detail.note
-          })
-          return
-        }
-      } catch (err) {
-        console.error(err)
+    // Gọi API để lấy chi tiết linh kiện
+    try {
+      const { data: response, error } = await partsAPI.getById(part.id)
+      if (!error && response?.result) {
+        const detail = response.result
+        console.log('=== Part Detail from API ===')
+        console.log('Detail:', detail)
+        console.log('===========================')
+        
+        setSelectedPart((prev) => ({ ...prev, originalItem: detail }))
+        editForm.setFieldsValue({
+          name: detail.name,
+          origin: detail.marketName || detail.market,
+          vehicleBrand: detail.categoryName,
+          vehicleModel: detail.universal ? 'All' : (detail.modelName || ''),
+          sellingPrice: detail.sellingPrice,
+          importPrice: detail.purchasePrice,
+          useForAllModels: detail.universal,
+          unit: detail.unitId || detail.unitName
+        })
+        return
       }
+    } catch (err) {
+      console.error('Error loading part detail:', err)
     }
 
+    // Fallback nếu không load được từ API
     editForm.setFieldsValue({
       name: part.name,
       origin: part.origin,
@@ -296,8 +418,8 @@ export default function PartsList() {
         categoryId: detail.categoryId || detail.category?.id || 1,
         purchasePrice: values.importPrice || 0,
         sellingPrice: values.sellingPrice || 0,
-        reorderLevel: values.alertThreshold || 0,
-        unitId: detail.unitId || detail.unit?.id || 1,
+        reorderLevel: detail.reorderLevel || 0,
+        unitId: values.unit || detail.unitId || detail.unit?.id || 1,
         universal: values.useForAllModels || false,
         specialPart: detail.specialPart || false,
         vehicleModelId: detail.vehicleModelId || detail.vehicleModel?.id || detail.modelId || 1,
@@ -327,29 +449,71 @@ export default function PartsList() {
     createForm.resetFields()
   }
 
+  const handleFilterChange = (filterType, value) => {
+    setTempFilters(prev => {
+      const current = prev[filterType] || []
+      if (current.includes(value)) {
+        return { ...prev, [filterType]: current.filter(v => v !== value) }
+      } else {
+        return { ...prev, [filterType]: [...current, value] }
+      }
+    })
+  }
+
+  const handleApplyFilter = () => {
+    // Apply filters - useEffect will trigger fetchParts automatically
+    setAppliedFilters(tempFilters)
+    setFilterModalOpen(false)
+  }
+
+  const handleResetFilter = () => {
+    const resetFilters = {
+      status: [],
+      categoryIds: [],
+      origin: [],
+      vehicleModel: []
+    }
+    setTempFilters(resetFilters)
+    setAppliedFilters(resetFilters)
+  }
+
   return (
     <WarehouseLayout>
       <div style={{ padding: 24, minHeight: '100vh' }}>
         <Card
           title={<span style={{ fontSize: 20, fontWeight: 600 }}>Danh sách linh kiện</span>}
-          extra={
-            <Space size={12}>
-              <Search
-                placeholder="Tìm kiếm theo tên, hãng"
-                allowClear
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: 260 }}
-              />
-              <Button
-                icon={sortOrder === 'asc' ? <SortAscendingOutlined /> : <SortDescendingOutlined />}
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
-              </Button>
-            </Space>
-          }
+          styles={{ body: { padding: '16px 24px' } }}
         >
+          {/* Search and Filter Row */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: 16 
+          }}>
+            <Search
+              placeholder="Tìm kiếm"
+              allowClear
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ width: 260 }}
+              prefix={<SearchOutlined />}
+            />
+            
+            <Button
+              icon={<FilterOutlined />}
+              onClick={() => setFilterModalOpen(true)}
+              style={{
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              Bộ lọc
+            </Button>
+          </div>
+
           <Table
             columns={columns}
             dataSource={filteredData}
@@ -380,7 +544,7 @@ export default function PartsList() {
         onCancel={() => setModalOpen(false)}
         closable={false}
         footer={null}
-        width={580}
+        width={600}
         styles={{ body: { background: '#fff', padding: 0 } }}
       >
         {selectedPart && (
@@ -389,71 +553,195 @@ export default function PartsList() {
               style={{
                 background: '#CBB081',
                 padding: '16px 20px',
-                margin: '-24px -24px 24px -24px',
+                margin: '-24px -24px 0 -24px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
               }}
             >
-              <span style={{ fontWeight: 700, fontSize: 20 }}>CHI TIẾT LINH KIỆN</span>
-              <CloseOutlined style={{ cursor: 'pointer' }} onClick={() => setModalOpen(false)} />
+              <span style={{ fontWeight: 700, fontSize: 18, color: '#000' }}>CHI TIẾT LINH KIỆN</span>
+              <CloseOutlined 
+                style={{ cursor: 'pointer', fontSize: 16, color: '#000' }} 
+                onClick={() => setModalOpen(false)} 
+              />
             </div>
 
-            <div style={{ padding: 24 }}>
+            <div style={{ padding: '24px 32px' }}>
               <Form layout="vertical" form={editForm} onFinish={handleUpdatePart}>
-                <div style={{ display: 'flex', gap: 16 }}>
-                  <Form.Item label="Trạng thái" name="status" style={{ flex: 1 }}>
-                    <Select
-                      options={[
-                        { value: 'Chờ nhập', label: 'Chờ nhập' },
-                        { value: 'Đã nhập', label: 'Đã nhập' }
-                      ]}
-                    />
-                  </Form.Item>
-                  <Form.Item label="Số lượng" name="quantityOnHand" style={{ flex: 1 }}>
-                    <InputNumber min={0} style={{ width: '100%' }} />
-                  </Form.Item>
-                </div>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="Mã SKU" style={{ marginBottom: 16 }}>
+                      <Input 
+                        value={selectedPart.sku}
+                        disabled
+                        style={{ backgroundColor: '#f5f5f5' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="Nhà cung cấp" style={{ marginBottom: 16 }}>
+                      <Input 
+                        value={selectedPart.supplierName || selectedPart.originalItem?.supplierName || '—'}
+                        disabled
+                        style={{ backgroundColor: '#f5f5f5' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
-                <Form.Item label="Tên linh kiện" name="name" rules={[{ required: true, message: 'Vui lòng nhập tên' }]}>
+                <Form.Item 
+                  label="Tên linh kiện" 
+                  name="name" 
+                  rules={[{ required: true, message: 'Vui lòng nhập tên' }]}
+                  style={{ marginBottom: 16 }}
+                >
                   <Input />
                 </Form.Item>
 
-                <Form.Item label="Xuất xứ" name="origin">
-                  <Select
-                    options={[
-                      { value: 'VN', label: 'Việt Nam' },
-                      { value: 'USA', label: 'USA' },
-                      { value: 'China', label: 'Trung Quốc' },
-                      { value: 'UK', label: 'UK' }
-                    ]}
-                  />
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="Xuất xứ" name="origin" style={{ marginBottom: 16 }}>
+                      <Select
+                        placeholder="Chọn xuất xứ"
+                        options={[
+                          { value: 'VN', label: 'VN' },
+                          { value: 'USA', label: 'USA' },
+                          { value: 'China', label: 'China' },
+                          { value: 'Japan', label: 'Japan' },
+                          { value: 'Korea', label: 'Korea' }
+                        ]}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="Số lượng tồn" style={{ marginBottom: 16 }}>
+                      <Input 
+                        value={selectedPart.quantityOnHand || selectedPart.quantity || 0}
+                        disabled
+                        style={{ backgroundColor: '#f5f5f5' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="Lượng tối thiếu" style={{ marginBottom: 16 }}>
+                      <Input 
+                        value={selectedPart.originalItem?.reorderLevel || 0}
+                        disabled
+                        style={{ backgroundColor: '#f5f5f5' }}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="Đơn vị" name="unit" style={{ marginBottom: 16 }}>
+                      <Select
+                        placeholder="Chọn đơn vị"
+                        showSearch
+                        allowClear
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        options={units.map(unit => ({
+                          value: unit.id,
+                          label: unit.name
+                        }))}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Form.Item name="useForAllModels" valuePropName="checked" style={{ marginBottom: 16 }}>
+                  <Checkbox>Dùng chung</Checkbox>
                 </Form.Item>
 
-                <Form.Item name="useForAllModels" valuePropName="checked">
-                  <Checkbox>Dùng chung tất cả dòng xe</Checkbox>
+                <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.useForAllModels !== currentValues.useForAllModels}>
+                  {({ getFieldValue }) =>
+                    !getFieldValue('useForAllModels') ? (
+                      <Row gutter={16}>
+                        <Col span={12}>
+                          <Form.Item label="Hãng xe" name="vehicleBrand" style={{ marginBottom: 16 }}>
+                            <Select
+                              placeholder="Chọn hãng xe"
+                              options={[
+                                { value: 'Castrol', label: 'Castrol' },
+                                { value: 'Toyota', label: 'Toyota' },
+                                { value: 'Honda', label: 'Honda' },
+                                { value: 'Mazda', label: 'Mazda' }
+                              ]}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col span={12}>
+                          <Form.Item label="Dòng xe" name="vehicleModel" style={{ marginBottom: 16 }}>
+                            <Select
+                              placeholder="Chọn dòng xe"
+                              options={[
+                                { value: 'All', label: 'All' },
+                                { value: 'Camry', label: 'Camry' },
+                                { value: 'Vios', label: 'Vios' },
+                                { value: 'Civic', label: 'Civic' }
+                              ]}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                    ) : null
+                  }
                 </Form.Item>
 
-                <div style={{ display: 'flex', gap: 16 }}>
-                  <Form.Item label="Giá bán" name="sellingPrice" style={{ flex: 1 }}>
-                    <InputNumber min={0} style={{ width: '100%' }} addonAfter="/ đ" />
-                  </Form.Item>
-                  <Form.Item label="Giá nhập" name="importPrice" style={{ flex: 1 }}>
-                    <InputNumber min={0} style={{ width: '100%' }} addonAfter="/ đ" />
-                  </Form.Item>
-                </div>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item label="Giá nhập" name="importPrice" style={{ marginBottom: 16 }}>
+                      <InputNumber 
+                        min={0} 
+                        style={{ width: '100%' }}
+                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                      />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item label="Giá bán" name="sellingPrice" style={{ marginBottom: 16 }}>
+                      <InputNumber 
+                        min={0} 
+                        style={{ width: '100%' }}
+                        formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                      />
+                    </Form.Item>
+                  </Col>
+                </Row>
 
-                <Form.Item label="Đơn vị" name="unit">
-                  <Input placeholder="lít, bộ, cái..." />
-                </Form.Item>
-
-                <Form.Item label="Ghi chú" name="note">
-                  <Input.TextArea rows={3} />
-                </Form.Item>
-
-                <div style={{ textAlign: 'center', marginTop: 8 }}>
-                  <Button type="primary" htmlType="submit">
-                    Cập nhật
+                <div style={{ display: 'flex', gap: 16, marginTop: 24, justifyContent: 'flex-end' }}>
+                  <Button 
+                    style={{
+                      backgroundColor: '#C9A961',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '8px 40px',
+                      height: 'auto',
+                      fontSize: '14px',
+                      fontWeight: 500
+                    }}
+                    onClick={() => setModalOpen(false)}
+                  >
+                    Nhập hàng
+                  </Button>
+                  <Button 
+                    type="primary"
+                    htmlType="submit"
+                    style={{
+                      backgroundColor: '#52c41a',
+                      border: 'none',
+                      padding: '8px 40px',
+                      height: 'auto',
+                      fontSize: '14px',
+                      fontWeight: 500
+                    }}
+                  >
+                    Lưu
                   </Button>
                 </div>
               </Form>
@@ -571,6 +859,131 @@ export default function PartsList() {
               </Button>
             </div>
           </Form>
+        </div>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        title="Bộ lọc sản phẩm"
+        open={filterModalOpen}
+        onCancel={() => setFilterModalOpen(false)}
+        footer={null}
+        width={450}
+      >
+        <div style={{ padding: '8px 0' }}>
+          {/* Trạng thái linh kiện */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Trạng thái linh kiện</div>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Checkbox
+                checked={tempFilters.status.includes('Đủ hàng')}
+                onChange={() => handleFilterChange('status', 'Đủ hàng')}
+              >
+                Đủ hàng
+              </Checkbox>
+              <Checkbox
+                checked={tempFilters.status.includes('Sắp hết')}
+                onChange={() => handleFilterChange('status', 'Sắp hết')}
+              >
+                Sắp hết
+              </Checkbox>
+              <Checkbox
+                checked={tempFilters.status.includes('Hết hàng')}
+                onChange={() => handleFilterChange('status', 'Hết hàng')}
+              >
+                Hết hàng
+              </Checkbox>
+            </Space>
+          </div>
+
+          {/* Loại linh kiện */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Loại linh kiện</div>
+            <Select
+              mode="multiple"
+              allowClear
+              showSearch
+              placeholder="Chọn loại linh kiện"
+              style={{ width: '100%', fontFamily: 'Arial, sans-serif' }}
+              value={tempFilters.categoryIds}
+              onChange={(values) => {
+                console.log('Selected categories:', values)
+                const selectedValues = values || []
+                setTempFilters(prev => {
+                  console.log('Previous filters:', prev)
+                  const newFilters = { ...prev, categoryIds: selectedValues }
+                  console.log('New filters:', newFilters)
+                  return newFilters
+                })
+              }}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+              notFoundContent={categories.length === 0 ? "Đang tải..." : "Không có dữ liệu"}
+              maxTagCount="responsive"
+              maxTagTextLength={50}
+              tagRender={(props) => {
+                const { label, closable, onClose } = props
+                return (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      backgroundColor: '#fafafa',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '4px',
+                      padding: '0 7px',
+                      marginRight: '4px',
+                      fontSize: '14px',
+                      lineHeight: '22px',
+                      fontFamily: 'Arial, sans-serif',
+                      height: '24px'
+                    }}
+                  >
+                    <span style={{ marginRight: closable ? '4px' : '0' }}>{label}</span>
+                    {closable && (
+                      <span
+                        onClick={onClose}
+                        style={{
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          color: '#00000073'
+                        }}
+                      >
+                        ×
+                      </span>
+                    )}
+                  </span>
+                )
+              }}
+              options={categories.map(cat => ({
+                value: cat.id || cat.partCategoryId,
+                label: cat.name
+              }))}
+            />
+          </div>
+
+          {/* Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: 12,
+            marginTop: 24 
+          }}>
+            <Button onClick={handleResetFilter}>
+              Đặt lại
+            </Button>
+            <Button 
+              type="primary" 
+              onClick={handleApplyFilter}
+              style={{
+                backgroundColor: '#1890ff',
+                borderColor: '#1890ff'
+              }}
+            >
+              Tìm kiếm
+            </Button>
+          </div>
         </div>
       </Modal>
     </WarehouseLayout>

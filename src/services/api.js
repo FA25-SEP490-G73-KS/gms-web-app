@@ -222,8 +222,8 @@ export const employeeAPI = {
 };
 
 export const partsAPI = {
-  getAll: ({ page = 0, size = 6, keyword, signal } = {}) => {
-    const query = buildQueryString({ page, size, keyword });
+  getAll: ({ page = 0, size = 6, keyword, categoryId, status, signal } = {}) => {
+    const query = buildQueryString({ page, size, keyword, categoryId, status });
     const suffix = query ? `?${query}` : "";
     return get(`/parts${suffix}`, { signal });
   },
@@ -401,6 +401,14 @@ export const manualVoucherAPI = {
   },
 };
 
+export const ledgerVoucherAPI = {
+  getAll: (page = 0, size = 20) => {
+    const query = buildQueryString({ page, size });
+    const suffix = query ? `?${query}` : "";
+    return get(`/ledger-vouchers${suffix}`);
+  },
+};
+
 export const attendanceAPI = {
   mark: (data) => post("/attendances/mark", data),
   getDaily: (date) => get(`/attendances/daily?date=${date}`),
@@ -444,4 +452,17 @@ export const stockReceiptAPI = {
 export const transactionsAPI = {
   callback: (paymentLinkId) =>
     post("/transactions/manual-callback", { paymentLinkId }),
+};
+
+export const warehouseAPI = {
+  createManualTransaction: (payload) => post('/warehouse/manual-transaction', payload)
+};
+
+export const dashboardAPI = {
+  getWarehouseOverview: (year, month) => {
+    const params = new URLSearchParams()
+    if (year) params.append('year', year)
+    if (month) params.append('month', month)
+    return get(`/dashboard/warehouse/overview?${params.toString()}`)
+  }
 };

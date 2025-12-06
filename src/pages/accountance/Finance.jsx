@@ -14,10 +14,10 @@ import {
   Row,
   Col
 } from 'antd'
-import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined } from '@ant-design/icons'
+import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined, FilterOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { manualVoucherAPI } from '../../services/api'
+import { ledgerVoucherAPI } from '../../services/api'
 import { getUserNameFromToken } from '../../utils/helpers'
 import '../../styles/pages/accountance/finance.css'
 
@@ -163,7 +163,7 @@ export function AccountanceFinanceContent() {
   const fetchVouchers = async () => {
     setLoading(true)
     try {
-      const { data: response, error } = await manualVoucherAPI.getAll(page - 1, pageSize)
+      const { data: response, error } = await ledgerVoucherAPI.getAll(page - 1, pageSize)
       
       if (error) {
         message.error('Không thể tải danh sách phiếu thu-chi')
@@ -212,17 +212,18 @@ export function AccountanceFinanceContent() {
 
   const columns = [
     {
-      title: 'Mã phiếu',
+      title: <div style={{ textAlign: 'center' }}>Mã phiếu</div>,
       dataIndex: 'code',
       key: 'code',
-      width: 180,
+      width: 150,
       render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
     },
     {
-      title: 'Loại Phiếu',
+      title: <div style={{ textAlign: 'center' }}>Loại Phiếu</div>,
       dataIndex: 'type',
       key: 'type',
-      width: 180,
+      width: 150,
+      align: 'center',
       render: (type) => {
         const config = getTypeConfig(type)
         return (
@@ -242,13 +243,13 @@ export function AccountanceFinanceContent() {
       }
     },
     {
-      title: 'Đối tượng',
+      title: <div style={{ textAlign: 'center' }}>Đối tượng</div>,
       dataIndex: 'subject',
       key: 'subject',
       width: 200
     },
     {
-      title: 'Số tiền',
+      title: <div style={{ textAlign: 'center' }}>Số tiền</div>,
       dataIndex: 'amount',
       key: 'amount',
       width: 150,
@@ -256,16 +257,18 @@ export function AccountanceFinanceContent() {
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
-      title: 'Ngày tạo',
+      title: <div style={{ textAlign: 'center' }}>Ngày tạo</div>,
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 140
+      width: 140,
+      align: 'center'
     },
     {
-      title: 'Trạng thái',
+      title: <div style={{ textAlign: 'center' }}>Trạng thái</div>,
       dataIndex: 'status',
       key: 'status',
-      width: 160,
+      width: 150,
+      align: 'center',
       render: (status) => {
         const config = getStatusConfig(status)
         return (
@@ -283,20 +286,6 @@ export function AccountanceFinanceContent() {
           </Tag>
         )
       }
-    },
-    {
-      title: '',
-      key: 'action',
-      width: 60,
-      align: 'center',
-      render: () => (
-        <Button
-          type="text"
-          danger
-          icon={<CloseOutlined />}
-          style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        />
-      )
     }
   ]
 
@@ -306,50 +295,70 @@ export function AccountanceFinanceContent() {
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <Space>
-              {STATUS_FILTERS.map((filter) => (
-                <Button
-                  key={filter.key}
-                  type={status === filter.key ? 'primary' : 'default'}
-                  onClick={() => setStatus(filter.key)}
-                  style={{
-                    background: status === filter.key ? '#CBB081' : '#fff',
-                    borderColor: status === filter.key ? '#CBB081' : '#e6e6e6',
-                    color: status === filter.key ? '#111' : '#666',
-                    fontWeight: 600
-                  }}
-                >
-                  {filter.label}
-                </Button>
-              ))}
-            </Space>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            {/* Left side - Search */}
             <Input
               prefix={<SearchOutlined />}
               placeholder="Tìm kiếm"
               allowClear
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              style={{ width: 260 }}
+              style={{ width: 300 }}
             />
+            
+            {/* Right side - Filter buttons, Sort, and Create */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <Space>
+                {STATUS_FILTERS.map((filter) => (
+                  <Button
+                    key={filter.key}
+                    type={status === filter.key ? 'primary' : 'default'}
+                    onClick={() => setStatus(filter.key)}
+                    style={{
+                      background: status === filter.key ? '#CBB081' : '#fff',
+                      borderColor: status === filter.key ? '#CBB081' : '#d9d9d9',
+                      color: status === filter.key ? '#fff' : '#666',
+                      fontWeight: 500,
+                      borderRadius: 6
+                    }}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
+              </Space>
+              
+              <Button
+                icon={<FilterOutlined />}
+                style={{ 
+                  borderRadius: 6,
+                  borderColor: '#d9d9d9'
+                }}
+              >
+                Sort
+              </Button>
+              
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                style={{ 
+                  background: '#22c55e', 
+                  borderColor: '#22c55e', 
+                  fontWeight: 600,
+                  borderRadius: 6
+                }}
+                onClick={() => {
+                  setSelectedTicketType('')
+                  form.setFieldsValue({
+                    type: 'phiếu thu',
+                    createdAt: dayjs().format('DD/MM/YYYY'),
+                    creator: creatorName || ''
+                  })
+                  setCreateModalVisible(true)
+                }}
+              >
+                Tạo phiếu
+              </Button>
             </div>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              style={{ background: '#22c55e', borderColor: '#22c55e', fontWeight: 600 }}
-              onClick={() => {
-                setSelectedTicketType('')
-                form.setFieldsValue({
-                  type: 'phiếu thu',
-                  createdAt: dayjs().format('DD/MM/YYYY'),
-                  creator: creatorName || ''
-                })
-                setCreateModalVisible(true)
-              }}
-            >
-              Tạo phiếu
-            </Button>
           </div>
         </div>
 

@@ -295,39 +295,39 @@ export default function ExportRequest() {
     }
   }
 
-  const handleOpenModal = async (part, quotationId) => {
-    console.log('handleOpenModal called with:', { part, quotationId })
-    setSelectedPart(part)
+  const handleOpenModal = async (partRecord) => {
+    console.log('handleOpenModal called with partRecord:', partRecord)
+    setSelectedPart(partRecord)
     setIsModalOpen(true)
     setModalLoading(true)
     
+    // Lưu priceQuotationItemId ngay từ đầu
+    const itemId = partRecord.id // partRecord.id chính là priceQuotationItemId
+    setSelectedItemId(itemId)
+    console.log('Selected item ID from partRecord:', itemId)
+    
+    // Check xem đã xác nhận/từ chối chưa để disable form
+    const isReviewed = partRecord.warehouseReviewStatus === 'Xác nhận' || 
+                       partRecord.warehouseReviewStatus === 'Đã xác nhận' ||
+                       partRecord.warehouseReviewStatus === 'Từ chối'
+    
     try {
-      // Load chi tiết báo giá từ API để lấy thông tin đầy đủ nhất
-      console.log('Loading quotation details for ID:', quotationId)
-      const { data, error } = await priceQuotationAPI.getById(quotationId)
+      // Gọi API lấy chi tiết item bằng priceQuotationItemId
+      console.log('Loading item details for ID:', itemId)
+      const { data, error } = await priceQuotationAPI.getItemById(itemId)
       
       if (error) {
-        message.error('Không thể tải chi tiết báo giá')
+        message.error('Không thể tải chi tiết item')
         setModalLoading(false)
         return
       }
 
-      const quotationDetail = data?.result || {}
-      console.log('Quotation detail response:', quotationDetail)
+      const itemDetail = data?.result || {}
+      console.log('Item detail response:', itemDetail)
       
-      // Lấy item đầu tiên từ items array
-      const firstItem = quotationDetail.items?.[0]
-      console.log('First item from API:', firstItem)
-      
-      // Lưu priceQuotationItemId để dùng khi confirm/reject
-      if (firstItem?.priceQuotationItemId) {
-        setSelectedItemId(firstItem.priceQuotationItemId)
-        console.log('Selected item ID:', firstItem.priceQuotationItemId)
-      }
-      
-      if (firstItem?.part) {
+      if (itemDetail?.part) {
         // Có part - fill form từ part object
-        const partData = firstItem.part
+        const partData = itemDetail.part
         console.log('Part data:', partData)
         
         setHasExistingPart(true) // Đánh dấu là có part tồn tại
@@ -343,9 +343,10 @@ export default function ExportRequest() {
           priceImport: partData.purchasePrice || 0,
           priceSell: partData.sellingPrice || 0,
           unit: partData.unitName || '',
-          note: partData.note || '',
-          quantity: partData.quantity || 0,
-          specialPart: partData.specialPart || false
+          note: itemDetail.warehouseNote || partData.note || '',
+          quantity: itemDetail.quantity || partRecord.quantity || 0,
+          specialPart: partData.specialPart || false,
+          isReviewed: isReviewed // Thêm flag để biết đã review chưa
         }
         console.log('Setting form data:', newFormData)
         setFormData(newFormData)
@@ -355,7 +356,7 @@ export default function ExportRequest() {
         setHasExistingPart(false) // Đánh dấu là không có part
         
         setFormData({
-          partName: '',
+          partName: itemDetail.itemName || partRecord.name || '',
           partType: '',
           origin: '',
           usedForAllCars: false,
@@ -364,14 +365,15 @@ export default function ExportRequest() {
           carModel: '',
           priceImport: 0,
           priceSell: 0,
-          unit: '',
-          note: '',
-          quantity: 0,
-          specialPart: false
+          unit: itemDetail.unit || partRecord.unit || '',
+          note: itemDetail.warehouseNote || '',
+          quantity: itemDetail.quantity || partRecord.quantity || 0,
+          specialPart: false,
+          isReviewed: isReviewed // Thêm flag để biết đã review chưa
         })
       }
     } catch (error) {
-      console.error('Error loading quotation details:', error)
+      console.error('Error loading item details:', error)
       message.error('Không thể tải thông tin chi tiết')
     } finally {
       setModalLoading(false)
@@ -642,19 +644,33 @@ export default function ExportRequest() {
         render: (_, partRecord) => {
           const reviewStatus = partRecord.warehouseReviewStatus
           
-          // Nếu đã từ chối - hiển thị tag đỏ
+          // Nếu đã từ chối - hiển thị tag đỏ nhưng vẫn cho xem
           if (reviewStatus === 'Từ chối') {
             return (
-              <Tag color="red" style={{ borderRadius: '6px', fontWeight: 500 }}>
+              <Tag 
+                color="red" 
+                style={{ borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenModal(partRecord)
+                }}
+              >
                 Từ chối
               </Tag>
             )
           }
           
-          // Nếu đã xác nhận - hiển thị tag xanh
+          // Nếu đã xác nhận - hiển thị tag xanh nhưng vẫn cho xem
           if (reviewStatus === 'Xác nhận' || reviewStatus === 'Đã xác nhận') {
             return (
-              <Tag color="green" style={{ borderRadius: '6px', fontWeight: 500 }}>
+              <Tag 
+                color="green" 
+                style={{ borderRadius: '6px', fontWeight: 500, cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleOpenModal(partRecord)
+                }}
+              >
                 Xác nhận
               </Tag>
             )
@@ -670,7 +686,7 @@ export default function ExportRequest() {
               }}
               onClick={(e) => {
                 e.stopPropagation()
-                handleOpenModal(partRecord, record.id)
+                handleOpenModal(partRecord)
               }}
             >
               Xác nhận
@@ -849,7 +865,7 @@ export default function ExportRequest() {
                 value={formData.partName}
                 onChange={(e) => handleFormChange('partName', e.target.value)}
                 placeholder="Dầu máy 5W-30"
-                disabled={hasExistingPart}
+                disabled={hasExistingPart || formData.isReviewed}
                 style={{ marginTop: '4px' }}
               />
             </div>
@@ -862,7 +878,7 @@ export default function ExportRequest() {
               <Select
                 value={formData.partType}
                 onChange={(value) => handleFormChange('partType', value)}
-                disabled={hasExistingPart}
+                disabled={hasExistingPart || formData.isReviewed}
                 style={{ width: '100%', marginTop: '4px' }}
               >
                 <Option value="Dầu – Hóa chất">Dầu – Hóa chất</Option>
@@ -879,7 +895,7 @@ export default function ExportRequest() {
               <Input
                 value={formData.origin}
                 onChange={(e) => handleFormChange('origin', e.target.value)}
-                disabled={hasExistingPart}
+                disabled={hasExistingPart || formData.isReviewed}
                 placeholder="VN, JP, US..."
                 style={{ marginTop: '4px' }}
               />
@@ -890,7 +906,7 @@ export default function ExportRequest() {
               <Checkbox
                 checked={formData.usedForAllCars}
                 onChange={(e) => handleFormChange('usedForAllCars', e.target.checked)}
-                disabled={hasExistingPart}
+                disabled={hasExistingPart || formData.isReviewed}
               >
                 Dùng chung tất cả dòng xe
               </Checkbox>
@@ -904,7 +920,7 @@ export default function ExportRequest() {
               <Select
                 value={formData.manufacturer}
                 onChange={(value) => handleFormChange('manufacturer', value)}
-                disabled={hasExistingPart}
+                disabled={hasExistingPart || formData.isReviewed}
                 style={{ width: '100%', marginTop: '4px' }}
               >
                 {formData.manufacturer && (
@@ -925,7 +941,7 @@ export default function ExportRequest() {
                   <Select
                     value={formData.brand}
                     onChange={(value) => handleFormChange('brand', value)}
-                    disabled={hasExistingPart}
+                    disabled={hasExistingPart || formData.isReviewed}
                     style={{ width: '100%', marginTop: '4px' }}
                   >
                     {formData.brand && (
@@ -942,7 +958,7 @@ export default function ExportRequest() {
                   <Select
                     value={formData.carModel}
                     onChange={(value) => handleFormChange('carModel', value)}
-                    disabled={hasExistingPart}
+                    disabled={hasExistingPart || formData.isReviewed}
                     style={{ width: '100%', marginTop: '4px' }}
                   >
                     {formData.carModel && (
@@ -970,7 +986,7 @@ export default function ExportRequest() {
                   value={formData.priceImport}
                   onChange={(e) => handleFormChange('priceImport', e.target.value)}
                   placeholder="130,000"
-                  disabled={hasExistingPart}
+                  disabled={hasExistingPart || formData.isReviewed}
                 />
                 <span>/ vnđ</span>
               </div>
@@ -987,7 +1003,7 @@ export default function ExportRequest() {
                   value={formData.priceSell}
                   onChange={(e) => handleFormChange('priceSell', e.target.value)}
                   placeholder="120,000"
-                  disabled={hasExistingPart}
+                  disabled={hasExistingPart || formData.isReviewed}
                 />
                 <span>/ vnđ</span>
               </div>
@@ -1001,7 +1017,7 @@ export default function ExportRequest() {
               <Select
                 value={formData.unit}
                 onChange={(value) => handleFormChange('unit', value)}
-                disabled={hasExistingPart}
+                disabled={hasExistingPart || formData.isReviewed}
                 style={{ width: '100%', marginTop: '4px' }}
               >
                 <Option value="lít">lít</Option>
@@ -1020,10 +1036,10 @@ export default function ExportRequest() {
                 onChange={(e) => handleFormChange('note', e.target.value)}
                 placeholder="Nhập nội dung"
                 rows={3}
-                disabled={hasExistingPart && formData.specialPart === true}
+                disabled={(hasExistingPart && formData.specialPart === true) || formData.isReviewed}
                 style={{ 
                   marginTop: '4px',
-                  backgroundColor: (hasExistingPart && formData.specialPart === true) ? '#f5f5f5' : 'white'
+                  backgroundColor: ((hasExistingPart && formData.specialPart === true) || formData.isReviewed) ? '#f5f5f5' : 'white'
                 }}
               />
             </div>
@@ -1032,29 +1048,31 @@ export default function ExportRequest() {
               Linh kiện đặc biệt kiểm tra thông tin
             </div>
 
-            {/* Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <Button
-                danger
-                onClick={handleReject}
-                loading={modalLoading}
-                style={{ minWidth: '100px' }}
-              >
-                Từ chối
-              </Button>
-              <Button
-                type="primary"
-                onClick={handleConfirm}
-                loading={modalLoading}
-                style={{ 
-                  minWidth: '100px',
-                  backgroundColor: '#52c41a',
-                  borderColor: '#52c41a'
-                }}
-              >
-                Duyệt
-              </Button>
-            </div>
+            {/* Buttons - chỉ hiển thị khi chưa review */}
+            {!formData.isReviewed && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <Button
+                  danger
+                  onClick={handleReject}
+                  loading={modalLoading}
+                  style={{ minWidth: '100px' }}
+                >
+                  Từ chối
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={handleConfirm}
+                  loading={modalLoading}
+                  style={{ 
+                    minWidth: '100px',
+                    backgroundColor: '#52c41a',
+                    borderColor: '#52c41a'
+                  }}
+                >
+                  Duyệt
+                </Button>
+              </div>
+            )}
           </div>
         </Modal>
       </div>
