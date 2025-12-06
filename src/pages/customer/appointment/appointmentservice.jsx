@@ -10,6 +10,8 @@ export default function AppointmentService() {
   const [otpLoading, setOtpLoading] = useState(false)
   const [verifyOtpLoading, setVerifyOtpLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
+  const [licenseError, setLicenseError] = useState('')
+  const [fullNameError, setFullNameError] = useState('')
   const [serviceTypes, setServiceTypes] = useState([])
   const [serviceTypesLoading, setServiceTypesLoading] = useState(false)
   const [timeSlots, setTimeSlots] = useState([])
@@ -132,13 +134,141 @@ export default function AppointmentService() {
     return true
   }
 
+  const formatLicensePlate = (value) => {
+    if (!value) return ''
+    
+    // Loại bỏ tất cả ký tự không phải số và chữ cái, chuyển chữ cái thành chữ hoa
+    let cleaned = value.replace(/[^0-9A-Za-z]/g, '').toUpperCase()
+    
+    // Format: 2 số đầu + 1 chữ cái + 6 số cuối = 29A-123456
+    // Tổng: 2 số + 1 chữ + 6 số = 9 ký tự (không tính dấu)
+    
+    if (cleaned.length === 0) return ''
+    
+    // Lấy 2 số đầu (ký hiệu địa phương)
+    const prefix = cleaned.slice(0, 2).replace(/[^0-9]/g, '')
+    if (prefix.length < 2) return cleaned
+    
+    let remaining = cleaned.slice(2)
+    
+    // Tìm chữ cái seri (chữ cái đầu tiên)
+    const letterMatch = remaining.match(/^([A-Z])/)
+    if (!letterMatch) {
+      // Nếu chưa có chữ cái, trả về phần đã có
+      return prefix + remaining.slice(0, 7)
+    }
+    
+    const letter = letterMatch[1]
+    remaining = remaining.slice(1)
+    
+    // Lấy 6 chữ số cuối
+    const numbers = remaining.replace(/[^0-9]/g, '').slice(0, 6)
+    
+    if (numbers.length === 0) {
+      return `${prefix}${letter}`
+    } else {
+      return `${prefix}${letter}-${numbers}`
+    }
+  }
+
+  const validateLicensePlate = (value) => {
+    if (!value) {
+      return {
+        isValid: false,
+        errorMessage: 'Biển số xe không được để trống'
+      }
+    }
+
+    // Trim và chuyển thành chữ hoa
+    const trimmed = value.trim().toUpperCase()
+    
+    if (trimmed.length === 0) {
+      return {
+        isValid: false,
+        errorMessage: 'Biển số xe không được để trống'
+      }
+    }
+
+    // Regex: ^[0-9]{2}[A-Z]-[0-9]{3,6}(\\.[0-9]{2})?$
+    // Format: TT X - YYYYYY hoặc TT X - YYYY.YY
+    const regex = /^[0-9]{2}[A-Z]-[0-9]{3,6}(\.[0-9]{2})?$/
+    
+    if (!regex.test(trimmed)) {
+      return {
+        isValid: false,
+        errorMessage: 'Biển số xe không hợp lệ. Định dạng đúng: 29A-123456 hoặc 29A-1234.56 (2 số - 1 chữ cái - dấu gạch ngang - 3-6 số, có thể có dấu chấm và 2 số cuối)'
+      }
+    }
+
+    return {
+      isValid: true,
+      errorMessage: ''
+    }
+  }
+
+  const formatFullName = (value) => {
+    // Trim và convert 2 khoảng trắng liên tiếp thành 1
+    let formatted = value.trim()
+    formatted = formatted.replace(/\s+/g, ' ')
+    return formatted
+  }
+
+  const validateFullName = (value) => {
+    if (!value) {
+      return {
+        isValid: false,
+        errorMessage: 'Họ tên không được để trống'
+      }
+    }
+
+    // Trim và format
+    const trimmed = formatFullName(value)
+    
+    if (trimmed.length === 0) {
+      return {
+        isValid: false,
+        errorMessage: 'Họ tên không được để trống'
+      }
+    }
+
+    // Kiểm tra độ dài
+    if (trimmed.length < 2 || trimmed.length > 100) {
+      return {
+        isValid: false,
+        errorMessage: 'Họ tên phải từ 2–100 ký tự và không chứa số hoặc ký tự đặc biệt.'
+      }
+    }
+
+    // Chỉ cho phép chữ cái (có dấu) và khoảng trắng
+    // Regex: chỉ chữ cái tiếng Việt (có dấu) và khoảng trắng
+    const regex = /^[a-zA-ZÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵỷỹ\s]+$/
+    
+    if (!regex.test(trimmed)) {
+      return {
+        isValid: false,
+        errorMessage: 'Họ tên phải từ 2–100 ký tự và không chứa số hoặc ký tự đặc biệt.'
+      }
+    }
+
+    return {
+      isValid: true,
+      errorMessage: ''
+    }
+  }
+
   const handleSendOTP = async () => {
     if (!form.phoneNumber) {
       message.warning('Vui lòng nhập số điện thoại')
       return
     }
 
-    const cleanedNumber = form.phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
+    let cleanedNumber = form.phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
+    
+    // Cắt số 0 ở đầu nếu có trước khi gửi API
+    if (cleanedNumber.startsWith('0')) {
+      cleanedNumber = cleanedNumber.slice(1)
+    }
+    
     if (!validatePhone(cleanedNumber)) {
       message.error('Số điện thoại không hợp lệ. Vui lòng nhập 9-10 chữ số')
       return
@@ -209,6 +339,27 @@ export default function AppointmentService() {
       return
     }
 
+    // Format và validate họ tên
+    const formattedFullName = formatFullName(form.fullName)
+    const fullNameValidation = validateFullName(formattedFullName)
+    if (!fullNameValidation.isValid) {
+      setFullNameError(fullNameValidation.errorMessage)
+      message.error(fullNameValidation.errorMessage)
+      return
+    }
+    setFullNameError('')
+    // Cập nhật form với tên đã được format
+    setForm({ ...form, fullName: formattedFullName })
+
+    // Validate biển số xe
+    const licenseValidation = validateLicensePlate(form.license)
+    if (!licenseValidation.isValid) {
+      setLicenseError(licenseValidation.errorMessage)
+      message.error(licenseValidation.errorMessage)
+      return
+    }
+    setLicenseError('')
+
     const selectedSlot = timeSlots.find(slot => slot.value === parseInt(form.time))
     if (!selectedSlot) {
       message.warning('Vui lòng chọn khung giờ hợp lệ')
@@ -228,12 +379,12 @@ export default function AppointmentService() {
       }
 
       const timeSlotIndex = selectedSlot?.originalIndex !== undefined 
-        ? selectedSlot.originalIndex 
-        : parseInt(form.time)
+        ? selectedSlot.originalIndex + 1
+        : parseInt(form.time) + 1
 
       const payload = {
         appointmentDate: appointmentDate,
-        customerName: form.fullName,
+        customerName: formattedFullName,
         licensePlate: form.license,
         note: form.note || '',
         phoneNumber: form.phone,
@@ -361,10 +512,7 @@ export default function AppointmentService() {
                   value={form.phoneNumber} 
                   onChange={(e) => {
                     let value = e.target.value.replace(/\D/g, '')
-                    if (value.startsWith('0')) {
-                      value = value.slice(1)
-                    }
-                    value = value.slice(0, 10)
+                    value = value.slice(0, 11)
                     setForm({ ...form, phoneNumber: value })
                   }}
                   onKeyDown={(e) => {
@@ -373,7 +521,7 @@ export default function AppointmentService() {
                       handleSendOTP()
                     }
                   }}
-                  placeholder="VD: 909123456" 
+                  placeholder="VD: 0909123456" 
                   style={{ ...inputStyle, flex: 1 }} 
                 />
               </div>
@@ -430,15 +578,63 @@ export default function AppointmentService() {
               <div style={{ color: '#CBB081', fontWeight: 600, marginBottom: 14, fontSize: 'clamp(14px, 3vw, 16px)' }}>Bước 3/4: Đặt lịch sửa chữa</div>
               <div className="appointment-grid" style={grid2}>
                 <div>
-                  <label style={labelStyle}>Họ và tên *</label>
-                  <input value={form.fullName} onChange={update('fullName')} placeholder="VD: Đặng Thị Huyền" style={inputStyle} />
+                  <label style={labelStyle}>Họ và tên <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input 
+                    value={form.fullName} 
+                    onChange={(e) => {
+                      let value = e.target.value
+                      // Format: convert 2 khoảng trắng liên tiếp thành 1
+                      value = value.replace(/\s+/g, ' ')
+                      setForm({ ...form, fullName: value })
+                      setFullNameError('')
+                    }}
+                    onBlur={(e) => {
+                      // Trim và validate khi blur
+                      const formatted = formatFullName(e.target.value)
+                      const validation = validateFullName(formatted)
+                      if (!validation.isValid) {
+                        setFullNameError(validation.errorMessage)
+                      } else {
+                        setForm({ ...form, fullName: formatted })
+                        setFullNameError('')
+                      }
+                    }}
+                    placeholder="VD: Đặng Thị Huyền" 
+                    style={{ 
+                      ...inputStyle, 
+                      ...(fullNameError ? { borderColor: '#ef4444' } : {})
+                    }} 
+                  />
+                  {fullNameError && (
+                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                      {fullNameError}
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label style={labelStyle}>Biển số xe *</label>
-                  <input value={form.license} onChange={update('license')} placeholder="VD: 30A-12345" style={inputStyle} />
+                  <label style={labelStyle}>Biển số xe <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input 
+                    value={form.license} 
+                    onChange={(e) => {
+                      const formatted = formatLicensePlate(e.target.value)
+                      setForm({ ...form, license: formatted })
+                      setLicenseError('')
+                    }}
+                    placeholder="VD: 29A-123456" 
+                    style={{ 
+                      ...inputStyle, 
+                      ...(licenseError ? { borderColor: '#ef4444' } : {})
+                    }} 
+                    maxLength={12}
+                  />
+                  {licenseError && (
+                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                      {licenseError}
+                    </div>
+                  )}
                 </div>
                 <div>
-                  <label style={labelStyle}>Số điện thoại *</label>
+                  <label style={labelStyle}>Số điện thoại <span style={{ color: '#ef4444' }}>*</span></label>
                   <input 
                     value={form.phone ? `+${form.phone.substring(0, 2)} ${form.phone.substring(2)}` : ''} 
                     disabled
@@ -447,7 +643,7 @@ export default function AppointmentService() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Loại dịch vụ *</label>
+                  <label style={labelStyle}>Loại dịch vụ <span style={{ color: '#ef4444' }}>*</span></label>
                   <select
                     value={form.service}
                     onChange={update('service')}
@@ -468,7 +664,7 @@ export default function AppointmentService() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Ngày đặt *</label>
+                  <label style={labelStyle}>Ngày đặt <span style={{ color: '#ef4444' }}>*</span></label>
                   <input
                     type="date"
                     value={form.date}
@@ -478,7 +674,7 @@ export default function AppointmentService() {
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Khung giờ *</label>
+                  <label style={labelStyle}>Khung giờ <span style={{ color: '#ef4444' }}>*</span></label>
                   <select 
                     value={form.time} 
                     onChange={update('time')} 
@@ -495,7 +691,7 @@ export default function AppointmentService() {
                 </div>
                 <div style={{ gridColumn: '1 / span 2' }}>
                   <label style={labelStyle}>Mô tả chi tiết</label>
-                  <textarea value={form.note} onChange={update('note')} placeholder="Nhập mô tả thêm.." style={{ ...inputStyle, height: 96 }} />
+                  <textarea value={form.note} onChange={update('note')} placeholder="Nhập mô tả thêm.." style={{ ...inputStyle, height: 96, paddingTop: '10px', paddingBottom: '10px' }} />
                 </div>
               </div>
               <div className="appointment-buttons" style={rowBtns}>
@@ -531,7 +727,9 @@ export default function AppointmentService() {
                   </div>
                   <div style={infoRow}>
                     <div style={infoLabel}>Biển số xe:</div>
-                    <div style={infoValue}>{appointmentResult.licensePlate || form.license || 'N/A'}</div>
+                    <div style={infoValue}>
+                      {formatLicensePlate(appointmentResult.licensePlate || form.license) || 'N/A'}
+                    </div>
                   </div>
                   <div style={infoRow}>
                     <div style={infoLabel}>Ngày đặt:</div>
