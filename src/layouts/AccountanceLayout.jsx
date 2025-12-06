@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken } from '../utils/helpers'
 import '../styles/layout/warehouse-layout.css'
 
 export default function AccountanceLayout({ children }) {
@@ -66,6 +67,9 @@ export default function AccountanceLayout({ children }) {
     if (path.startsWith('/accountance/forms')) {
       return { parent: '', current: 'Tạo phiếu' }
     }
+    if (path.startsWith('/accountance/services')) {
+      return { parent: '', current: 'Dịch vụ' }
+    }
     return { parent: '', current: 'Kế toán' }
   }
 
@@ -104,7 +108,7 @@ export default function AccountanceLayout({ children }) {
 
       {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/accountance')} style={{ marginTop: '57px' }}>
+        <div className="warehouse-brand" onClick={() => navigate('/accountance')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">
@@ -189,6 +193,14 @@ export default function AccountanceLayout({ children }) {
             <i className="bi bi-file-earmark-text" />
             <span>Tạo phiếu</span>
           </button>
+
+          <button
+            className={`warehouse-nav-item ${isActive('/accountance/services') ? 'active' : ''}`}
+            onClick={() => navigate('/accountance/services')}
+          >
+            <i className="bi bi-briefcase" />
+            <span>Dịch vụ</span>
+          </button>
         </nav>
         <div className="warehouse-spacer" />
         
@@ -197,25 +209,17 @@ export default function AccountanceLayout({ children }) {
           <button 
             className="warehouse-user-info" 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            <div className="warehouse-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+            <div className="warehouse-user-text">
+              <div className="warehouse-user-name">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
+              <div className="warehouse-user-role">
+              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
             </div>
           </button>
           

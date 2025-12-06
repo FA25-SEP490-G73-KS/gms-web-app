@@ -1,46 +1,80 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken } from '../utils/helpers'
 import '../styles/layout/manager-layout.css'
 
 /**
  * ManagerLayout - Layout dành cho role MANAGER
- * Manager có quyền truy cập tất cả các module trong hệ thống:
+ * Manager có quyền truy cập các module trong hệ thống:
  * - Dashboard & Báo cáo
- * - Service Advisor (Lịch hẹn, Phiếu dịch vụ)
- * - Warehouse (Nhập/Xuất kho, Linh kiện)
- * - Accountance (Kế toán, Nhân sự, Công nợ)
- * - Quản lý hệ thống
+ * - Thu - chi (Finance, Payments)
+ * - Công nợ (Debts)
+ * - Nhân sự (HR: List, Attendance, Payroll)
+ * - Quản lý khách hàng
+ * - Quản lý nhà cung cấp
+ * - Khuyến mãi
  */
 export default function ManagerLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { logout, user } = useAuthStore()
   
-  // State for collapsible menu groups
-  const [openService, setOpenService] = useState(location.pathname.startsWith('/manager/service-advisor'))
-  const [openWarehouse, setOpenWarehouse] = useState(location.pathname.startsWith('/manager/warehouse'))
-  const [openAccountance, setOpenAccountance] = useState(location.pathname.startsWith('/manager/accountance'))
-  const [openSystem, setOpenSystem] = useState(location.pathname.startsWith('/manager/system'))
+  // State for collapsible menu groups (persisted, không auto đóng/mở theo route)
+  const [openFinance, setOpenFinance] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('manager_open_finance')
+    return v ? v === 'true' : true
+  })
+  const [openCustomers, setOpenCustomers] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('manager_open_customers')
+    return v ? v === 'true' : true
+  })
+  const [openHR, setOpenHR] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const v = window.localStorage.getItem('manager_open_hr')
+    return v ? v === 'true' : true
+  })
+  const [openPromotion, setOpenPromotion] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const v = window.localStorage.getItem('manager_open_promotion')
+    return v ? v === 'true' : false
+  })
+  const [openService, setOpenService] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const v = window.localStorage.getItem('manager_open_service')
+    return v ? v === 'true' : false
+  })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
-  
-  // Update state when route changes
+
+  // Lưu lại trạng thái mở/đóng group vào localStorage
   useEffect(() => {
-    if (location.pathname.startsWith('/manager/service-advisor')) {
-      setOpenService(true)
-    }
-    if (location.pathname.startsWith('/manager/warehouse')) {
-      setOpenWarehouse(true)
-    }
-    if (location.pathname.startsWith('/manager/accountance')) {
-      setOpenAccountance(true)
-    }
-    if (location.pathname.startsWith('/manager/system')) {
-      setOpenSystem(true)
-    }
-  }, [location.pathname])
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_finance', String(openFinance))
+  }, [openFinance])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_customers', String(openCustomers))
+  }, [openCustomers])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_hr', String(openHR))
+  }, [openHR])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_promotion', String(openPromotion))
+  }, [openPromotion])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('manager_open_service', String(openService))
+  }, [openService])
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
@@ -63,95 +97,77 @@ export default function ManagerLayout({ children }) {
 
   const getBreadcrumb = () => {
     const path = location.pathname
-    // Service Advisor routes
-    if (path.startsWith('/manager/service-advisor/orders/history')) {
-      return { parent: 'Service Advisor > Phiếu dịch vụ', current: 'Lịch sử' }
+    if (path.startsWith('/manager/accountance/finance')) {
+      return { parent: 'Thu - chi', current: 'Thu - chi' }
     }
-    if (path.startsWith('/manager/service-advisor/orders')) {
-      return { parent: 'Service Advisor > Phiếu dịch vụ', current: 'Danh sách' }
+    if (path.startsWith('/manager/accountance/payments')) {
+      return { parent: 'Thu - chi', current: 'Thanh toán' }
     }
-    if (path.startsWith('/manager/service-advisor/appointments')) {
-      return { parent: 'Service Advisor', current: 'Lịch hẹn' }
+    if (path.startsWith('/manager/accountance/debts')) {
+      return { parent: '', current: 'Công nợ' }
     }
-    if (path.startsWith('/manager/service-advisor')) {
-      return { parent: 'Service Advisor', current: 'Dashboard' }
+    if (path.startsWith('/manager/accountance/hr/payroll')) {
+      return { parent: 'Nhân sự', current: 'Lương' }
     }
-    // Warehouse routes
-    if (path.startsWith('/manager/warehouse/export')) {
-      return { parent: 'Warehouse > Xuất kho', current: 'Danh sách' }
+    if (path.startsWith('/manager/accountance/hr/attendance')) {
+      return { parent: 'Nhân sự', current: 'Chấm công' }
     }
-    if (path.startsWith('/manager/warehouse/import')) {
-      return { parent: 'Warehouse > Nhập kho', current: 'Danh sách' }
+    if (path.startsWith('/manager/accountance/hr/list')) {
+      return { parent: 'Nhân sự', current: 'Danh sách nhân sự' }
     }
-    if (path.startsWith('/manager/warehouse/parts')) {
-      return { parent: 'Warehouse', current: 'Linh kiện' }
+    if (path.startsWith('/manager/customers/') && !path.includes('/stats')) {
+      return { parent: 'Khách hàng', current: 'Thông tin khách hàng' }
     }
-    if (path.startsWith('/manager/warehouse')) {
-      return { parent: 'Warehouse', current: 'Dashboard' }
+    if (path.startsWith('/manager/customers/stats')) {
+      return { parent: 'Khách hàng', current: 'Thống kê' }
     }
-    // Accountance routes
-    if (path.startsWith('/manager/accountance/hr')) {
-      return { parent: 'Accountance > Nhân sự', current: 'Quản lý' }
+    if (path.startsWith('/manager/customers')) {
+      return { parent: 'Khách hàng', current: 'Danh sách' }
     }
-    if (path.startsWith('/manager/accountance')) {
-      return { parent: 'Accountance', current: 'Dashboard' }
+    if (path.startsWith('/manager/promotions')) {
+      return { parent: 'Khuyến mãi', current: 'Chương trình' }
     }
-    // System routes
-    if (path.startsWith('/manager/system/employees')) {
-      return { parent: 'Hệ thống', current: 'Nhân viên' }
+    if (path.startsWith('/manager/suppliers')) {
+      return { parent: '', current: 'Nhà cung cấp' }
     }
-    if (path.startsWith('/manager/system/settings')) {
-      return { parent: 'Hệ thống', current: 'Cài đặt' }
+    if (path.startsWith('/manager/service/orders')) {
+      return { parent: 'Dịch vụ', current: 'Phiếu dịch vụ' }
     }
-    if (path.startsWith('/manager/system')) {
-      return { parent: 'Hệ thống', current: 'Tổng quan' }
+    if (path.startsWith('/manager/service/types')) {
+      return { parent: 'Dịch vụ', current: 'Loại dịch vụ' }
     }
-    return { parent: '', current: 'Dashboard' }
+    return { parent: '', current: 'Thống kê' }
   }
 
   const breadcrumb = getBreadcrumb()
 
   return (
     <div className={`manager-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-      {/* Header - Full width, no margin/padding */}
       <header className="manager-header">
         <div className="manager-header-content">
-          <div className="manager-header-left">
+          <div className="manager-topbar-left">
             <button
               className="manager-sidebar-toggle"
               onClick={() => setSidebarCollapsed((prev) => !prev)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '32px',
-                height: '32px',
-                border: 'none',
-                background: 'transparent',
-                cursor: 'pointer',
-                borderRadius: '6px',
-                color: '#666',
-                fontSize: '18px'
-              }}
             >
               <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
             </button>
-            <div className="manager-header-logo">
-              <img src="/image/mainlogo.png" alt="Logo" />
-            </div>
-            <div className="manager-header-title">
-              <span className="garage-text">Garage</span>
-              <span className="name-text">Hoàng Tuấn</span>
-            </div>
-            <div className="manager-header-greeting">Xin chào!</div>
+            <div className="manager-breadcrumb-divider"></div>
+            {breadcrumb.parent ? (
+              <div className="manager-breadcrumb">
+                <span className="manager-breadcrumb-item">{breadcrumb.parent}</span>
+                <span className="manager-breadcrumb-separator">&gt;</span>
+                <span className="manager-breadcrumb-current">{breadcrumb.current}</span>
+              </div>
+            ) : (
+              <span className="manager-breadcrumb-current">{breadcrumb.current}</span>
+            )}
           </div>
-          <div className="manager-header-right">
-            <button className="manager-header-zalo">Zalo</button>
+          <div className="manager-topbar-right">
             <button className="manager-header-notification">
               <i className="bi bi-bell"></i>
               <span className="notification-badge"></span>
             </button>
-            <span className="manager-header-user">{user?.name || user?.phone || 'Tên'}</span>
           </div>
         </div>
       </header>
@@ -160,145 +176,38 @@ export default function ManagerLayout({ children }) {
       <aside className="manager-sidebar">
         <div className="manager-brand" onClick={() => navigate('/manager')}>
           <img src="/image/mainlogo.png" alt="Logo" />
-          <div style={{ fontSize: '12px', color: '#CBB081', fontWeight: 600 }}>
-            Manager
-          </div>
         </div>
         
         <nav className="manager-nav">
-          {/* Dashboard */}
           <button
             className={`manager-nav-item ${isActive('/manager') ? 'active' : ''}`}
             onClick={() => navigate('/manager')}
           >
-            <i className="bi bi-grid" />
-            <span>Dashboard</span>
+            <i className="bi bi-bar-chart" />
+            <span>Thống kê</span>
           </button>
 
-          {/* Service Advisor Section */}
-          <div className={`manager-nav-group ${openService ? 'open' : ''}`}>
+          <div className={`manager-nav-group ${openFinance ? 'open' : ''}`}>
             <button
-              className={`manager-nav-item ${isActiveParent('/manager/service-advisor') ? 'active' : ''}`}
-              onClick={() => setOpenService((v) => !v)}
+              className={`manager-nav-item ${
+                isActiveParent('/manager/accountance/finance') || isActiveParent('/manager/accountance/payments')
+                  ? 'active'
+                  : ''
+              }`}
+              onClick={() => setOpenFinance((v) => !v)}
             >
-              <i className="bi bi-tools" />
-              <span>Service Advisor</span>
-              <i className={`bi bi-caret-down-fill caret ${openService ? 'rot' : ''}`} />
+              <i className="bi bi-cash-stack" />
+              <span>Thu - chi</span>
+              <i className={`bi bi-caret-down-fill caret ${openFinance ? 'rot' : ''}`} />
             </button>
-            {openService && (
+            {openFinance && (
               <div className="submenu">
                 <div className="submenu-line" />
-                <button
-                  className={`submenu-item ${isActive('/manager/service-advisor') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/service-advisor')}
-                >
-                  Dashboard
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/service-advisor/appointments') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/service-advisor/appointments')}
-                >
-                  Lịch hẹn
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/service-advisor/orders') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/service-advisor/orders')}
-                >
-                  Phiếu dịch vụ
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/service-advisor/inventory') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/service-advisor/inventory')}
-                >
-                  Kho hàng
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Warehouse Section */}
-          <div className={`manager-nav-group ${openWarehouse ? 'open' : ''}`}>
-            <button
-              className={`manager-nav-item ${isActiveParent('/manager/warehouse') ? 'active' : ''}`}
-              onClick={() => setOpenWarehouse((v) => !v)}
-            >
-              <i className="bi bi-box-seam" />
-              <span>Warehouse</span>
-              <i className={`bi bi-caret-down-fill caret ${openWarehouse ? 'rot' : ''}`} />
-            </button>
-            {openWarehouse && (
-              <div className="submenu">
-                <div className="submenu-line" />
-                <button
-                  className={`submenu-item ${isActive('/manager/warehouse') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/warehouse')}
-                >
-                  Dashboard
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/warehouse/parts') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/warehouse/parts')}
-                >
-                  Linh kiện
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/warehouse/import') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/warehouse/import/list')}
-                >
-                  Nhập kho
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/warehouse/export') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/warehouse/export/list')}
-                >
-                  Xuất kho
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/warehouse/report') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/warehouse/report')}
-                >
-                  Báo cáo
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Accountance Section */}
-          <div className={`manager-nav-group ${openAccountance ? 'open' : ''}`}>
-            <button
-              className={`manager-nav-item ${isActiveParent('/manager/accountance') ? 'active' : ''}`}
-              onClick={() => setOpenAccountance((v) => !v)}
-            >
-              <i className="bi bi-calculator" />
-              <span>Accountance</span>
-              <i className={`bi bi-caret-down-fill caret ${openAccountance ? 'rot' : ''}`} />
-            </button>
-            {openAccountance && (
-              <div className="submenu">
-                <div className="submenu-line" />
-                <button
-                  className={`submenu-item ${isActive('/manager/accountance') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/accountance')}
-                >
-                  Thống kê
-                </button>
                 <button
                   className={`submenu-item ${isActive('/manager/accountance/finance') ? 'active' : ''}`}
                   onClick={() => navigate('/manager/accountance/finance')}
                 >
                   Thu - Chi
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/accountance/hr') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/accountance/hr/list')}
-                >
-                  Nhân sự
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/accountance/debts') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/accountance/debts')}
-                >
-                  Công nợ
                 </button>
                 <button
                   className={`submenu-item ${isActive('/manager/accountance/payments') ? 'active' : ''}`}
@@ -309,41 +218,134 @@ export default function ManagerLayout({ children }) {
               </div>
             )}
           </div>
-
-          {/* System Management Section */}
-          <div className={`manager-nav-group ${openSystem ? 'open' : ''}`}>
+          
+          <div className={`manager-nav-group ${openCustomers ? 'open' : ''}`}>
             <button
-              className={`manager-nav-item ${isActiveParent('/manager/system') ? 'active' : ''}`}
-              onClick={() => setOpenSystem((v) => !v)}
+              className={`manager-nav-item ${isActiveParent('/manager/customers') ? 'active' : ''}`}
+              onClick={() => setOpenCustomers((v) => !v)}
             >
-              <i className="bi bi-gear" />
-              <span>Hệ thống</span>
-              <i className={`bi bi-caret-down-fill caret ${openSystem ? 'rot' : ''}`} />
+              <i className="bi bi-people" />
+              <span>Khách hàng</span>
+              <i className={`bi bi-caret-down-fill caret ${openCustomers ? 'rot' : ''}`} />
             </button>
-            {openSystem && (
+            {openCustomers && (
               <div className="submenu">
                 <div className="submenu-line" />
                 <button
-                  className={`submenu-item ${isActive('/manager/system/employees') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/system/employees')}
+                  className={`submenu-item ${isActive('/manager/customers/stats') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/customers/stats')}
                 >
-                  Quản lý nhân viên
+                  Thống kê
                 </button>
                 <button
-                  className={`submenu-item ${isActive('/manager/system/settings') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/system/settings')}
+                  className={`submenu-item ${isActive('/manager/customers') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/customers')}
                 >
-                  Cài đặt
-                </button>
-                <button
-                  className={`submenu-item ${isActive('/manager/system/reports') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/system/reports')}
-                >
-                  Báo cáo tổng hợp
+                  Danh sách khách hàng
                 </button>
               </div>
             )}
           </div>
+
+          <button
+            className={`manager-nav-item ${isActive('/manager/accountance/debts') ? 'active' : ''}`}
+            onClick={() => navigate('/manager/accountance/debts')}
+          >
+            <i className="bi bi-wallet2" />
+            <span>Công nợ</span>
+          </button>
+
+          <div className={`manager-nav-group ${openHR ? 'open' : ''}`}>
+            <button
+              className={`manager-nav-item ${isActiveParent('/manager/accountance/hr') ? 'active' : ''}`}
+              onClick={() => setOpenHR((v) => !v)}
+            >
+              <i className="bi bi-person-badge" />
+              <span>Nhân sự</span>
+              <i className={`bi bi-caret-down-fill caret ${openHR ? 'rot' : ''}`} />
+            </button>
+            {openHR && (
+              <div className="submenu">
+                <div className="submenu-line" />
+                <button
+                  className={`submenu-item ${isActive('/manager/accountance/hr/list') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/accountance/hr/list')}
+                >
+                  Danh sách nhân sự
+                </button>
+                <button
+                  className={`submenu-item ${isActive('/manager/accountance/hr/attendance') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/accountance/hr/attendance')}
+                >
+                  Chấm công
+                </button>
+                <button
+                  className={`submenu-item ${isActive('/manager/accountance/hr/payroll') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/accountance/hr/payroll')}
+                >
+                  Lương
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className={`manager-nav-group ${openPromotion ? 'open' : ''}`}>
+            <button
+              className={`manager-nav-item ${isActiveParent('/manager/promotions') ? 'active' : ''}`}
+              onClick={() => setOpenPromotion((v) => !v)}
+            >
+              <i className="bi bi-tags" />
+              <span>Khuyến mãi</span>
+              <i className={`bi bi-caret-down-fill caret ${openPromotion ? 'rot' : ''}`} />
+            </button>
+            {openPromotion && (
+              <div className="submenu">
+                <div className="submenu-line" />
+                <button
+                  className={`submenu-item ${isActive('/manager/promotions') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/promotions')}
+                >
+                  Chương trình
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className={`manager-nav-group ${openService ? 'open' : ''}`}>
+            <button
+              className={`manager-nav-item ${isActiveParent('/manager/service') ? 'active' : ''}`}
+              onClick={() => setOpenService((v) => !v)}
+            >
+              <i className="bi bi-wrench" />
+              <span>Dịch vụ</span>
+              <i className={`bi bi-caret-down-fill caret ${openService ? 'rot' : ''}`} />
+            </button>
+            {openService && (
+              <div className="submenu">
+                <div className="submenu-line" />
+                <button
+                  className={`submenu-item ${isActive('/manager/service/orders') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/service/orders')}
+                >
+                  Phiếu dịch vụ
+                </button>
+                <button
+                  className={`submenu-item ${isActive('/manager/service/types') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/service/types')}
+                >
+                  Loại dịch vụ
+                </button>
+              </div>
+            )}
+          </div>
+
+          <button
+            className={`manager-nav-item ${isActive('/manager/suppliers') ? 'active' : ''}`}
+            onClick={() => navigate('/manager/suppliers')}
+          >
+            <i className="bi bi-truck" />
+            <span>Nhà cung cấp</span>
+          </button>
         </nav>
         
         <div className="manager-spacer" />
@@ -353,25 +355,17 @@ export default function ManagerLayout({ children }) {
           <button 
             className="manager-user-info" 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            <div className="manager-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+            <div className="manager-user-text">
+              <div className="manager-user-name">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
+              <div className="manager-user-role">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
             </div>
           </button>
           

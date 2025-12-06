@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { otpAPI } from '../../services/api'
 import '../../styles/pages/auth/forgot-password.css'
+import { normalizePhoneTo84 } from '../../utils/helpers'
 
 const imgImage15 = "http://localhost:3845/assets/e3f06dc74cc8cb44cf93eb05563cb8c82f9ac956.png"
 
@@ -12,39 +13,56 @@ export default function ForgotPassword() {
   const navigate = useNavigate()
 
   const validatePhone = (phoneNumber) => {
-    // Remove spaces and special characters
+    if (!phoneNumber) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+      }
+    }
+
+    // Loại bỏ khoảng trắng và ký tự đặc biệt, chỉ giữ lại số
     const cleaned = phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
-    // Check if it's a valid Vietnamese phone number (10 digits starting with 0)
-    if (cleaned.length < 10 || cleaned.length > 11) {
-      return false
+    
+    if (cleaned.length === 0) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+      }
     }
-    if (!cleaned.startsWith('0')) {
-      return false
+
+    // Regex: ^(0[0-9]{9})$ - 10 chữ số, bắt đầu bằng 0
+    const regex = /^(0[0-9]{9})$/
+    
+    if (!regex.test(cleaned)) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+      }
     }
-    return true
+
+    return {
+      isValid: true,
+      errorMessage: '',
+      cleanedPhone: cleaned
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     
-    if (!phone) {
-      setError('Vui lòng nhập số điện thoại')
-      return
-    }
-
-    // Validate phone number format
-    if (!validatePhone(phone)) {
-      setError('Số điện thoại không hợp lệ. Vui lòng nhập số điện thoại Việt Nam (10-11 chữ số, bắt đầu bằng 0)')
+    const validation = validatePhone(phone)
+    if (!validation.isValid) {
+      setError(validation.errorMessage)
       return
     }
 
     setLoading(true)
     try {
-      // Clean phone number before sending
-      const cleanedPhone = phone.replace(/\s+/g, '').replace(/[^\d]/g, '')
+      // Sử dụng số điện thoại đã được validate và cleaned
+      const cleanedPhone = normalizePhoneTo84(validation.cleanedPhone)
       
-      const { data, error: apiError } = await otpAPI.send(cleanedPhone, 'RESET_PASSWORD')
+      const { data, error: apiError } = await otpAPI.send(cleanedPhone, 'RESET_PASSWORD', { skipAuth: true })
       
       if (apiError) {
         setError(apiError || 'Không thể gửi mã OTP. Vui lòng thử lại.')
@@ -93,9 +111,18 @@ export default function ForgotPassword() {
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) => {
+                // Chỉ cho phép nhập số, tự động loại bỏ ký tự không phải số
+                let value = e.target.value.replace(/\D/g, '')
+                // Giới hạn tối đa 10 chữ số
+                value = value.slice(0, 10)
+                setPhone(value)
+                // Xóa lỗi khi bắt đầu nhập lại
+                if (error) setError('')
+              }}
               placeholder="Số điện thoại"
               className="forgot-password__input"
+              maxLength={10}
             />
           </div>
 
@@ -111,7 +138,7 @@ export default function ForgotPassword() {
             className="forgot-password__submit-btn"
           >
             <div className="forgot-password__submit-text">
-              {loading ? 'Đang gửi...' : 'GỬI'}
+              {loading ? 'Đang gửi...' : 'Gửi'}
             </div>
           </button>
 

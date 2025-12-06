@@ -1,36 +1,75 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
-  Row, Col, Card, Select, InputNumber, Button, Input, Table, Space, 
-  DatePicker, Modal, Form, message, Tabs 
+  Row, Col, Card, Button, Table, Space, 
+  DatePicker, Modal, message, Tabs, Calendar, Input
 } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined, ArrowLeftOutlined, CalendarOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI } from '../../services/api'
+import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI, invoiceAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/modals/ticketdetail.css'
+import dayjs from 'dayjs'
+import Select, { components as selectComponents } from 'react-select'
+import CreatableSelect from 'react-select/creatable'
 
-const { TextArea } = Input
-const { TabPane } = Tabs
-
-const TECHS = [
-  { value: 'Hoàng Văn B', label: 'Hoàng Văn B' },
-  { value: 'Nguyễn Văn B', label: 'Nguyễn Văn B' },
-  { value: 'Phạm Đức Đạt', label: 'Phạm Đức Đạt' },
-]
-
-const UNITS = [
+const DEFAULT_UNITS = [
   { value: 'Cái', label: 'Cái' },
   { value: 'Giờ', label: 'Giờ' },
   { value: 'Bộ', label: 'Bộ' },
 ]
+const PARTS_PAGE_SIZE = 100
+
+const QUOTATION_STATUS_CONFIG = {
+  DRAFT: {
+    label: 'Nháp',
+    badgeBg: '#f3f4f6',
+    badgeColor: '#6b7280',
+    canEdit: true
+  },
+  WAITING_WAREHOUSE_CONFIRM: {
+    label: 'Chờ kho duyệt',
+    badgeBg: '#fef3c7',
+    badgeColor: '#92400e',
+    canEdit: false
+  },
+  WAREHOUSE_CONFIRMED: {
+    label: 'Kho đã duyệt',
+    badgeBg: '#dcfce7',
+    badgeColor: '#15803d',
+    canEdit: true
+  },
+  WAITING_CUSTOMER_CONFIRM: {
+    label: 'Chờ khách xác nhận',
+    badgeBg: '#e0e7ff',
+    badgeColor: '#3730a3',
+    canEdit: false
+  },
+  CUSTOMER_CONFIRMED: {
+    label: 'Khách đã xác nhận',
+    badgeBg: '#d1fae5',
+    badgeColor: '#065f46',
+    canEdit: true
+  },
+  CUSTOMER_REJECTED: {
+    label: 'Khách từ chối',
+    badgeBg: '#fee2e2',
+    badgeColor: '#991b1b',
+    canEdit: true
+  },
+  COMPLETED: {
+    label: 'Hoàn thành',
+    badgeBg: '#dbeafe',
+    badgeColor: '#1e40af',
+    canEdit: false
+  }
+}
 
 export default function TicketDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const location = useLocation()
   const isHistoryPage = location.state?.fromHistory || false
-  const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [ticketData, setTicketData] = useState(null)
   const [activeTab, setActiveTab] = useState('quote')
@@ -39,104 +78,538 @@ export default function TicketDetailPage() {
   const [showDateModal, setShowDateModal] = useState(false)
   const [expectedDate, setExpectedDate] = useState(null)
   const [errors, setErrors] = useState({})
+  const [technicians, setTechnicians] = useState([])
+  const [selectedTechnician, setSelectedTechnician] = useState(null)
+  const [parts, setParts] = useState([])
+  const [partsLoading, setPartsLoading] = useState(false)
+  const [unitOptions, setUnitOptions] = useState(DEFAULT_UNITS)
+  const [partsCache, setPartsCache] = useState({})
+  const [isQuoteExpanded, setIsQuoteExpanded] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+  const [createQuoteLoading, setCreateQuoteLoading] = useState(false)
+  const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
+  const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
+  const [sendToCustomerLoading, setSendToCustomerLoading] = useState(false)
+  const [exportPDFLoading, setExportPDFLoading] = useState(false)
+  const [rejectModalOpen, setRejectModalOpen] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [isEditMode, setIsEditMode] = useState(false)
+
+  const quotationStatusRaw = ticketData?.priceQuotation?.status
+  const normalizedQuotationStatus = quotationStatusRaw
+    ? String(quotationStatusRaw).toUpperCase()
+    : 'CREATED'
+  const quotationStatusConfig = (() => {
+    if (!quotationStatusRaw) {
+      return {
+        label: '',
+        badgeBg: '#e5e7eb',
+        badgeColor: '#4b5563',
+        canEdit: true
+      }
+    }
+    return (
+      QUOTATION_STATUS_CONFIG[normalizedQuotationStatus] || {
+        label: quotationStatusRaw,
+        badgeBg: '#e5e7eb',
+        badgeColor: '#4b5563',
+        canEdit: false
+      }
+    )
+  })()
+
+  const isWaitingWarehouse = quotationStatusConfig.label === 'Chờ kho duyệt'
+  const isWarehouseConfirmed = quotationStatusConfig.label === 'Kho đã duyệt'
+  
+  const inputsDisabled = isHistoryPage || actionLoading || 
+    (isWaitingWarehouse ? true : (isWarehouseConfirmed ? !isEditMode : !quotationStatusConfig.canEdit))
+  
+  const actionButtonLabel = isWaitingWarehouse 
+    ? 'Cập nhật' 
+    : (isWarehouseConfirmed ? (isEditMode ? 'Lưu' : 'Cập nhật') : 'Lưu')
+  
+  const canSendToCustomer = isWarehouseConfirmed
+
+  const disabledDeliveryDate = (current) => {
+    if (!current) return false
+    return current < dayjs().startOf('day')
+  }
+
+  const menuPortalTarget = typeof document !== 'undefined' ? document.body : null
+  const openDeliveryPicker = () => {
+    if (inputsDisabled) return
+    setDeliveryPickerValue(expectedDate || dayjs())
+    setDeliveryPickerVisible(true)
+  }
+
+  const closeDeliveryPicker = () => {
+    setDeliveryPickerVisible(false)
+  }
+
+  const confirmDeliveryPicker = async () => {
+    if (!deliveryPickerValue) {
+      message.warning('Vui lòng chọn ngày dự đoán giao xe')
+      return
+    }
+    const success = await handleUpdateDeliveryDate(deliveryPickerValue)
+    if (success) {
+      setDeliveryPickerVisible(false)
+    }
+  }
+
+  const baseInputStyle = useMemo(() => ({
+    width: '100%',
+    border: '1px solid #d0d7de',
+    borderRadius: '12px',
+    padding: '8px 12px',
+    fontSize: '14px',
+    outline: 'none',
+    transition: 'border-color 0.2s',
+    height: '40px',
+    background: inputsDisabled ? '#f5f5f5' : '#fff',
+    color: inputsDisabled ? '#9ca3af' : '#262626',
+    cursor: inputsDisabled ? 'not-allowed' : 'text'
+  }), [inputsDisabled])
+
+  const selectStyles = useMemo(() => ({
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: '42px',
+      borderRadius: '12px',
+      borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      backgroundColor: inputsDisabled ? '#f5f5f5' : '#fff',
+      color: inputsDisabled ? '#9ca3af' : '#262626',
+      cursor: inputsDisabled ? 'not-allowed' : 'pointer',
+      ':hover': {
+        borderColor: inputsDisabled ? '#d0d7de' : '#3b82f6'
+      }
+    }),
+    valueContainer: (provided) => ({
+      ...provided,
+      padding: '0 12px',
+      color: inputsDisabled ? '#9ca3af' : '#262626'
+    }),
+    menu: (provided) => ({
+      ...provided,
+      borderRadius: '12px',
+      overflow: 'hidden',
+      zIndex: 5
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isFocused ? '#f5f5f5' : '#fff',
+      color: state.isSelected ? '#111' : '#111',
+      fontWeight: state.isSelected ? 600 : 400
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: inputsDisabled ? '#9ca3af' : '#9ca3af'
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: inputsDisabled ? '#9ca3af' : '#262626'
+    })
+  }), [inputsDisabled])
+
+  const selectComponentsOverrides = useMemo(() => ({
+    IndicatorSeparator: () => null,
+    DropdownIndicator: (props) => (
+      <selectComponents.DropdownIndicator {...props}>
+        <span style={{ fontSize: '12px', color: '#64748b' }}>▾</span>
+      </selectComponents.DropdownIndicator>
+    )
+  }), [])
+
+  const cachePartOption = (value, label) => {
+    if (value === undefined || value === null || value === '') return
+    setPartsCache(prev => {
+      if (prev[value]) return prev
+      console.log('[cachePartOption] add cache', value, label)
+      return {
+        ...prev,
+        [value]: {
+          value,
+          label: label || (typeof value === 'string' ? value : String(value)),
+          isFallback: true
+        }
+      }
+    })
+  }
+
+  const addCustomPartOption = useCallback((value, label) => {
+    if (!value) return
+    const normalizedLabel = label || (typeof value === 'string' ? value : String(value))
+    setParts(prev => {
+      if (prev.some(option => String(option.value) === String(value))) return prev
+      return [...prev, { value, label: normalizedLabel, isCustom: true }]
+    })
+    cachePartOption(value, normalizedLabel)
+  }, [cachePartOption])
+
+  const getPartOption = (value) => {
+    if (value === undefined || value === null || value === '') return null
+    return (
+      parts.find(option => String(option.value) === String(value)) ||
+      partsCache[value] ||
+      null
+    )
+  }
+
+  const transformQuotationItems = (items = []) => {
+    const replacementItems = []
+    const serviceItemsResult = []
+
+    items.forEach((item, index) => {
+      if (item.itemType === 'PART') {
+        replacementItems.push({
+          id: item.priceQuotationItemId || `part-${index}-${Date.now()}`,
+          priceQuotationItemId: item.priceQuotationItemId || null,
+          // Ưu tiên itemName, sau đó tới partName/partCode
+          category: item.partId || item.partCode || item.itemName || item.partName || '',
+          categoryLabel: item.itemName || item.partName || item.partCode || '',
+          quantity: item.quantity ?? 1,
+          unit: item.unit || '',
+          unitPrice: item.unitPrice || 0,
+          total: item.totalPrice || 0
+        })
+      } else if (item.itemType === 'SERVICE') {
+        serviceItemsResult.push({
+          id: item.priceQuotationItemId || `service-${index}-${Date.now()}`,
+          priceQuotationItemId: item.priceQuotationItemId || null,
+          // Backend hiện trả partName cho SERVICE, map sang task qua itemName/partName
+          task: item.itemName || item.serviceName || item.partName || item.description || '',
+          quantity: item.quantity ?? 1,
+          unit: item.unit || '',
+          unitPrice: item.unitPrice || 0,
+          total: item.totalPrice || 0
+        })
+      }
+    })
+
+    replacementItems.forEach(item => {
+      if (item.category) {
+        cachePartOption(item.category, item.categoryLabel || item.category)
+      }
+    })
+
+    return { replacementItems, serviceItemsResult }
+  }
+
+  const CustomSelect = (props) => (
+    <Select
+      classNamePrefix="custom-select"
+      menuPortalTarget={menuPortalTarget}
+      styles={selectStyles}
+      components={selectComponentsOverrides}
+      {...props}
+    />
+  )
+
+  const CustomCreatableSelect = (props) => (
+    <CreatableSelect
+      classNamePrefix="custom-select"
+      menuPortalTarget={menuPortalTarget}
+      styles={selectStyles}
+      components={selectComponentsOverrides}
+      {...props}
+    />
+  )
+
+  const parseNumericId = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (!Number.isNaN(parsed)) return parsed
+    }
+    return null
+  }
+
+  const normalizePriceQuotation = (quote) => {
+    if (!quote) return null
+    const numericId = parseNumericId(
+      quote.priceQuotationId ??
+      quote.id ??
+      quote.quotationId
+    )
+
+    return {
+      ...quote,
+      priceQuotationId: numericId
+    }
+  }
+
+  const getQuotationId = () => {
+    return parseNumericId(
+      ticketData?.priceQuotation?.priceQuotationId ??
+      ticketData?.priceQuotation?.id ??
+      ticketData?.priceQuotation?.quotationId
+    )
+  }
+
+  const buildQuotationItemsPayload = () => {
+    const partItems = replaceItems.map(item => {
+   
+      const partOption = getPartOption(item.category)
+      const isPartInList = partOption?.part !== undefined
+      
+      return {
+        itemName: item.categoryLabel || item.category || '',
+      
+        partId: isPartInList ? item.category : null,
+        priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
+        quantity: Number(item.quantity) || 0,
+        totalPrice: Number(item.total) || 0,
+        type: 'PART',
+        unit: item.unit || '',
+        unitPrice: Number(item.unitPrice) || 0
+      }
+    })
+
+    const servicePayload = serviceItems.map(item => {
+      const unitPrice = Number(item.unitPrice) || 0
+      const quantity = 1 
+      const totalPrice = unitPrice * quantity
+
+      return {
+        itemName: item.task || '',
+        partId: null,
+        priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
+        quantity,
+        totalPrice,
+        type: 'SERVICE',
+        unit: null,
+        unitPrice
+      }
+    })
+
+    return [...partItems, ...servicePayload]
+  }
+
+  const handleInputFocus = (e) => {
+    e.target.style.borderColor = '#3b82f6'
+    e.target.style.boxShadow = '0 0 0 2px rgba(59,130,246,0.15)'
+  }
+
+  const handleInputBlur = (e) => {
+    e.target.style.borderColor = '#d0d7de'
+    e.target.style.boxShadow = 'none'
+  }
+
+  const getDisplayValue = (value) => {
+    if (Array.isArray(value)) {
+      const normalized = value
+        .filter(item => item !== null && item !== undefined)
+        .map(item => (typeof item === 'string' ? item.trim() : item))
+        .filter(item => item !== '' && item !== undefined && item !== null)
+      const joined = normalized.join(', ')
+      return joined || 'đang cập nhật'
+    }
+
+    if (value === null || value === undefined) {
+      return 'đang cập nhật'
+    }
+
+    if (typeof value === 'string') {
+      return value.trim() === '' ? 'đang cập nhật' : value
+    }
+
+    return value
+  }
+
+  const formatCurrency = (value) => {
+    const amount = Number(value) || 0
+    return amount.toLocaleString('vi-VN')
+  }
+
+  const normalizeUnitsResponse = (response = {}) => {
+    if (Array.isArray(response?.result?.content)) return response.result.content
+    if (Array.isArray(response?.result)) return response.result
+    if (Array.isArray(response?.content)) return response.content
+    if (Array.isArray(response?.data)) return response.data
+    if (Array.isArray(response)) return response
+    return []
+  }
+
+  const fetchUnits = async () => {
+    try {
+      const { data: response, error } = await unitsAPI.getAll({ page: 0, size: 50 })
+      if (error) throw new Error(error)
+
+      const unitList = normalizeUnitsResponse(response)
+      const mappedUnits = unitList
+        .filter(unit => unit)
+        .map(unit => {
+          const value = unit.id ?? unit.code ?? unit.name ?? ''
+          const label = unit.name ?? unit.label ?? unit.code ?? ''
+          return value && label
+            ? {
+                value: String(value),
+                label,
+                code: unit.code ? String(unit.code).toLowerCase() : undefined,
+                raw: unit
+              }
+            : null
+        })
+        .filter(Boolean)
+
+      if (mappedUnits.length > 0) {
+        setUnitOptions(mappedUnits)
+        return mappedUnits
+      }
+    } catch (err) {
+      console.warn('Unable to fetch units:', err)
+    }
+
+    setUnitOptions(DEFAULT_UNITS)
+    return DEFAULT_UNITS
+  }
 
   useEffect(() => {
     if (id) {
       fetchTicketDetail()
     }
+    fetchAllParts()
+    fetchUnits()
   }, [id])
+
+
+  const normalizePartsResponse = (response = {}) => {
+    if (Array.isArray(response?.result?.content)) return response.result.content
+    if (Array.isArray(response?.result)) return response.result
+    if (Array.isArray(response?.content)) return response.content
+    if (Array.isArray(response?.data)) return response.data
+    if (Array.isArray(response)) return response
+    return []
+  }
+
+  const fetchAllParts = async ({ keyword = '' } = {}) => {
+    setPartsLoading(true)
+    try {
+      const aggregatedOptions = []
+      let currentPage = 0
+      let hasMore = true
+
+      while (hasMore) {
+        const { data: response, error } = await partsAPI.getAll({
+          page: currentPage,
+          size: PARTS_PAGE_SIZE,
+          keyword: keyword || undefined
+        })
+      
+      if (error) {
+          console.error('[fetchParts] API error:', error)
+          throw new Error(error)
+        }
+
+        const fetchedParts = normalizePartsResponse(response)
+        console.log('[fetchParts] keyword:', keyword, 'page:', currentPage, 'items:', fetchedParts?.length || 0)
+      
+        const options = fetchedParts
+        .filter(part => part && (part.partId || part.id) && (part.name || part.partName))
+        .map(part => ({
+          value: part.partId || part.id,
+          label: part.name || part.partName || '',
+            part
+        }))
+      
+        aggregatedOptions.push(...options)
+
+        const isLast =
+          response?.result?.last ??
+          response?.last ??
+          fetchedParts.length < PARTS_PAGE_SIZE
+
+        if (isLast) {
+          hasMore = false
+        } else {
+          currentPage += 1
+        }
+      }
+
+      setParts(aggregatedOptions)
+      const nextCache = {}
+      aggregatedOptions.forEach(option => {
+        nextCache[option.value] = option
+      })
+      setPartsCache(nextCache)
+      console.log('[fetchParts] total options count:', aggregatedOptions.length)
+    } catch (err) {
+      console.error('Error fetching parts:', err)
+      setParts([])
+      setPartsCache({})
+    } finally {
+      setPartsLoading(false)
+    }
+  }
 
   const fetchTicketDetail = async () => {
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getById(id)
     setLoading(false)
     
-    // Fallback data for testing
-    const fallbackTicketData = {
-      serviceTicketId: id,
-      code: `STK-2025-${String(id || 0).padStart(6, '0')}`,
-      customer: {
-        fullName: 'Nguyễn Văn A',
-        phone: '0123456789',
-      },
-      vehicle: {
-        model: 'Mazda-v3',
-        licensePlate: '25A-123456',
-        vin: '1HGCM82633A123456',
-      },
-      createdAt: '2025-10-12',
-      assignedTechnicians: [{ name: 'Nguyễn Văn B' }],
-      quoteItems: [],
-    }
-    
     if (error || !response || !response.result) {
-      console.warn('API error, using fallback data:', error)
-      setTicketData(fallbackTicketData)
-      form.setFieldsValue({
-        customerName: 'Nguyễn Văn A',
-        phone: '0123456789',
-        vehicleType: 'Mazda-v3',
-        licensePlate: '25A-123456',
-        chassisNumber: '1HGCM82633A123456',
-        quoteStaff: 'Hoàng Văn B',
-        receiveDate: '12/10/2025',
-        technician: 'Nguyễn Văn B',
-        serviceType: 'Thay thế phụ tùng',
-      })
-      
-      // Initialize with empty items to show "Tạo báo giá" button
-      setReplaceItems([])
-      setServiceItems([])
+      console.error('Error fetching ticket detail:', error)
+      message.error('Không thể tải thông tin phiếu dịch vụ. Vui lòng thử lại.')
       return
     }
     
     if (response && response.result) {
-      setTicketData(response.result)
-      form.setFieldsValue({
-        customerName: response.result.customer?.fullName || 'Nguyễn Văn A',
-        phone: response.result.customer?.phone || '0123456789',
-        vehicleType: response.result.vehicle?.model || 'Mazda-v3',
-        licensePlate: response.result.vehicle?.licensePlate || '25A-123456',
-        chassisNumber: response.result.vehicle?.vin || '1HGCM82633A123456',
-        quoteStaff: 'Hoàng Văn B',
-        receiveDate: response.result.createdAt ? new Date(response.result.createdAt).toLocaleDateString('vi-VN') : '12/10/2025',
-        technician: response.result.assignedTechnicians?.[0]?.name || 'Nguyễn Văn B',
-        serviceType: 'Thay thế phụ tùng',
-      })
-      
-      // Load quote items if available
-      if (response.result.quoteItems && response.result.quoteItems.length > 0) {
-        setReplaceItems(response.result.quoteItems.filter(item => item.type === 'REPLACEMENT') || [])
-        setServiceItems(response.result.quoteItems.filter(item => item.type === 'SERVICE') || [])
-      } else {
-        // Initialize with empty items
-        setReplaceItems([{ 
-          id: Date.now(), 
-          category: '',
-          quantity: 1, 
-          unit: '',
-          unitPrice: 0,
-          total: 0
-        }])
-        setServiceItems([{ 
-          id: Date.now() + 1, 
-          task: '',
-          quantity: 1, 
-          unit: '',
-          unitPrice: 0,
-          total: 0
-        }])
+      const data = response.result
+      const normalizedData = {
+        ...data,
+        priceQuotation: normalizePriceQuotation(data.priceQuotation)
       }
-    } else {
-      // Use fallback if response structure is unexpected
-      setTicketData(fallbackTicketData)
+      setTicketData(normalizedData)
+      setIsEditMode(false) // Reset edit mode khi fetch lại data
+      
+      const deliveryDate = normalizedData.deliveryAt ? dayjs(normalizedData.deliveryAt) : null
+      setExpectedDate(deliveryDate)
+      
+      const vehicle = normalizedData.vehicle || {}
+      const vehicleModel = vehicle.vehicleModel || {}
+      const brandName = vehicleModel.brandName || vehicle.brand || ''
+      const modelName = vehicleModel.modelName || vehicle.model || ''
+      
+      const techniciansList = Array.isArray(data.technicians) ? data.technicians : []
+      const techniciansOptions = techniciansList.map(tech => ({
+        value: tech,
+        label: tech
+      }))
+      setTechnicians(techniciansOptions)
+      setSelectedTechnician(techniciansList[0] || null)
+      
+      const serviceTypes = Array.isArray(normalizedData.serviceType) ? normalizedData.serviceType.join(', ') : (normalizedData.serviceType || '')
+      
+      const quoteStaffName = data.createdBy || ''
+      const brandNameFromVehicle = vehicle.brandName || ''
+      const modelNameFromVehicle = vehicle.vehicleModelName || modelName
+      
+      // Load quote items from priceQuotation if available
+      if (normalizedData.priceQuotation) {
+        if (Array.isArray(normalizedData.priceQuotation.items)) {
+          const { replacementItems, serviceItemsResult } = transformQuotationItems(normalizedData.priceQuotation.items)
+          setReplaceItems(replacementItems)
+          setServiceItems(serviceItemsResult)
+      } else {
+        setReplaceItems([])
+        setServiceItems([])
+        }
+        setIsQuoteExpanded(true)
+      } else {
+        setReplaceItems([])
+        setServiceItems([])
+        setIsQuoteExpanded(false)
+      }
     }
   }
 
   const addReplaceItem = () => {
     setReplaceItems([...replaceItems, { 
       id: Date.now(), 
+      priceQuotationItemId: null,
       category: '',
+      categoryLabel: '',
       quantity: 1, 
       unit: '',
       unitPrice: 0,
@@ -147,6 +620,7 @@ export default function TicketDetailPage() {
   const addServiceItem = () => {
     setServiceItems([...serviceItems, { 
       id: Date.now(), 
+      priceQuotationItemId: null,
       task: '',
       quantity: 1, 
       unit: '',
@@ -163,21 +637,97 @@ export default function TicketDetailPage() {
     setServiceItems(serviceItems.filter(item => item.id !== id))
   }
 
-  const updateReplaceItem = (id, field, value) => {
-    setReplaceItems(replaceItems.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, [field]: value }
-        if (field === 'quantity' || field === 'unitPrice') {
+  const handleCreateQuote = async () => {
+    if (createQuoteLoading || inputsDisabled) return
+
+    const hide = message.loading('Đang tạo báo giá...', 0)
+    setCreateQuoteLoading(true)
+
+    try {
+      const { data: response, error } = await priceQuotationAPI.create(id)
+
+      if (error) {
+        throw new Error(error || 'Tạo báo giá không thành công. Vui lòng thử lại.')
+      }
+
+      if (!response || (response.statusCode !== 200 && !response.result)) {
+        throw new Error('Tạo báo giá không thành công. Vui lòng thử lại.')
+      }
+
+      const quotationResult = response.result || {}
+      const { replacementItems, serviceItemsResult } = transformQuotationItems(quotationResult.items || [])
+
+      setReplaceItems(replacementItems)
+      setServiceItems(serviceItemsResult)
+      setIsQuoteExpanded(true)
+      setActiveTab('quote')
+
+      const normalizedQuote = normalizePriceQuotation(quotationResult)
+      if (normalizedQuote?.priceQuotationId) {
+        setTicketData(prev => (prev ? { ...prev, priceQuotation: normalizedQuote } : prev))
+      } else {
+        await fetchTicketDetail()
+      }
+
+      message.success('Đã tạo báo giá mới')
+    } catch (err) {
+      console.error('Error creating price quotation:', err)
+      message.error(err?.message || 'Đã xảy ra lỗi khi tạo báo giá.')
+    } finally {
+      hide?.()
+      setCreateQuoteLoading(false)
+    }
+  }
+
+  const handleUpdateDeliveryDate = async (date) => {
+    if (!date) {
+      message.warning('Vui lòng chọn ngày dự đoán giao xe')
+    return false
+    }
+
+    try {
+      const dateStr = date.format('YYYY-MM-DD')
+      const { data: response, error } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
+      
+      if (error) {
+        message.error(error || 'Cập nhật ngày giao xe không thành công')
+      return false
+      }
+
+      if (response && (response.statusCode === 200 || response.result)) {
+        message.success('Cập nhật ngày giao xe thành công')
+        setExpectedDate(date)
+        if (ticketData) {
+          setTicketData({ ...ticketData, deliveryAt: dateStr })
+        }
+      return true
+      } else {
+        message.error('Cập nhật ngày giao xe không thành công')
+      return false
+      }
+    } catch (err) {
+      console.error('Error updating delivery date:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật ngày giao xe')
+    return false
+    }
+  }
+
+  const updateReplaceItem = (id, updates = {}) => {
+    setReplaceItems(prev =>
+      prev.map(item => {
+        if (item.id !== id) return item
+        const updated = { ...item, ...updates }
+        if ('quantity' in updates || 'unitPrice' in updates) {
           updated.total = (updated.quantity || 0) * (updated.unitPrice || 0)
         }
         return updated
-      }
-      return item
-    }))
-    // Clear error for this field
+      })
+    )
+    Object.keys(updates).forEach(field => {
     if (errors[`replace_${id}_${field}`]) {
-      setErrors({ ...errors, [`replace_${id}_${field}`]: null })
+        setErrors(prev => ({ ...prev, [`replace_${id}_${field}`]: null }))
     }
+    })
   }
 
   const updateServiceItem = (id, field, value) => {
@@ -204,12 +754,15 @@ export default function TicketDetailPage() {
       if (!item.category) {
         newErrors[`replace_${item.id}_category`] = 'Trường không được bỏ trống'
       }
+      if (!item.unit) {
+        newErrors[`replace_${item.id}_unit`] = 'Trường không được bỏ trống'
+      }
       if (!item.unitPrice || item.unitPrice === 0) {
         newErrors[`replace_${item.id}_unitPrice`] = 'Trường không được bỏ trống'
       }
     })
     
-    serviceItems.forEach((item, index) => {
+    serviceItems.forEach((item) => {
       if (!item.task) {
         newErrors[`service_${item.id}_task`] = 'Trường không được bỏ trống'
       }
@@ -222,37 +775,280 @@ export default function TicketDetailPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSave = async () => {
+  const handleSendQuote = () => {
+    if (actionLoading) return
+    
+    // Nếu ở trạng thái "Kho đã duyệt" và chưa ở edit mode, bật edit mode
+    if (isWarehouseConfirmed && !isEditMode) {
+      setIsEditMode(true)
+      return
+    }
+    
+    // Nếu ở trạng thái "Chờ kho duyệt", không làm gì (hoặc có thể có logic khác)
+    if (isWaitingWarehouse) {
+      message.warning('Báo giá đang chờ kho duyệt, không thể chỉnh sửa.')
+      return
+    }
+    
+    if (inputsDisabled) {
+      message.warning('Báo giá chưa thể chỉnh sửa ở trạng thái hiện tại.')
+      return
+    }
+    
     if (!validateForm()) {
       message.error('Vui lòng điền đầy đủ thông tin')
       return
     }
     
-    setLoading(true)
-    // Save logic here
-    setLoading(false)
-    message.success('Lưu thành công')
+    if (!expectedDate) {
+      setShowDateModal(true)
+    } else {
+      confirmSendQuote()
+    }
   }
 
-  const handleSendQuote = () => {
-    if (!validateForm()) {
-      message.error('Vui lòng điền đầy đủ thông tin')
+  const handleSendToCustomer = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
       return
     }
-    setShowDateModal(true)
+    try {
+      setSendToCustomerLoading(true)
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const { error: sendError } = await priceQuotationAPI.sendToCustomer(quotationId)
+      if (sendError) {
+        throw new Error(sendError)
+      }
+      // Tạm thời tắt phần gửi Zalo
+      // const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
+      // if (znsError) {
+      //   throw new Error(znsError)
+      // }
+      message.success('Đã gửi báo giá cho khách hàng')
+      await fetchTicketDetail()
+    } catch (error) {
+      console.error('Error sending quotation to customer:', error)
+      message.error(error?.message || 'Gửi báo giá thất bại. Vui lòng thử lại.')
+    } finally {
+      setSendToCustomerLoading(false)
+    }
+  }
+
+  const handleExportPDF = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+
+    setExportPDFLoading(true)
+    try {
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const { data, error } = await priceQuotationAPI.exportPDF(quotationId)
+      
+      if (error) {
+        message.error(error || 'Xuất PDF thất bại. Vui lòng thử lại.')
+        return
+      }
+      
+      if (!data) {
+        message.error('Không nhận được dữ liệu PDF')
+        return
+      }
+      
+      if (data instanceof Blob) {
+        if (data.type === 'application/json' || data.size < 100) {
+          const text = await data.text()
+          try {
+            const errorJson = JSON.parse(text)
+            const errorMsg = errorJson.message || errorJson.error || 'Lỗi tạo PDF'
+            message.error(errorMsg)
+            return
+          } catch (e) {
+            message.error('Lỗi tạo PDF. Vui lòng thử lại.')
+            return
+          }
+        }
+        
+        const url = window.URL.createObjectURL(data)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `BaoGia_${ticketData.serviceTicketCode || quotationId}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(url)
+        
+        message.success('Đã xuất PDF thành công')
+      } else if (typeof data === 'string') {
+        try {
+          const errorJson = JSON.parse(data)
+          const errorMsg = errorJson.message || errorJson.error || 'Lỗi tạo PDF'
+          message.error(errorMsg)
+        } catch (e) {
+          const byteCharacters = atob(data)
+          const byteNumbers = new Array(byteCharacters.length)
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i)
+          }
+          const byteArray = new Uint8Array(byteNumbers)
+          const blob = new Blob([byteArray], { type: 'application/pdf' })
+          
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = `BaoGia_${ticketData.serviceTicketCode || quotationId}.pdf`
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+          
+          message.success('Đã xuất PDF thành công')
+        }
+      } else {
+        message.error('Định dạng dữ liệu không hợp lệ')
+      }
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+      const errorMsg = error?.message || 'Đã xảy ra lỗi khi xuất PDF'
+      message.error(errorMsg)
+    } finally {
+      setExportPDFLoading(false)
+    }
+  }
+
+  const handleConfirmQuotation = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+    if (!id && !ticketData?.serviceTicketId) {
+      message.error('Không tìm thấy ID phiếu dịch vụ.')
+      return
+    }
+    try {
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const serviceTicketId = id || ticketData.serviceTicketId
+      
+      const { data, error } = await priceQuotationAPI.confirmQuotation(quotationId)
+      
+      if (error) {
+        message.error(error || 'Không thể xác nhận báo giá')
+        return
+      }
+      
+      const { error: invoiceError } = await invoiceAPI.create(serviceTicketId, quotationId)
+      
+      if (invoiceError) {
+        console.error('Error creating invoice:', invoiceError)
+        message.warning('Đã xác nhận báo giá nhưng không thể tạo phiếu thanh toán. Vui lòng thử lại.')
+      } else {
+        message.success('Đã xác nhận báo giá và tạo phiếu thanh toán thành công')
+      }
+      
+      await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error confirming quotation:', err)
+      message.error('Đã xảy ra lỗi khi xác nhận')
+    }
+  }
+
+  const handleOpenRejectModal = () => {
+    setRejectReason('')
+    setRejectModalOpen(true)
+  }
+
+  const handleRejectQuotation = async () => {
+    if (!ticketData?.priceQuotation?.priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá.')
+      return
+    }
+
+    if (!rejectReason || rejectReason.trim() === '') {
+      message.error('Vui lòng nhập lý do từ chối')
+      return
+    }
+
+    try {
+      const quotationId = ticketData.priceQuotation.priceQuotationId
+      const { data, error } = await priceQuotationAPI.rejectQuotation(quotationId, rejectReason)
+      
+      if (error) {
+        message.error(error || 'Không thể từ chối báo giá')
+        return
+      }
+      
+      message.success('Đã xác nhận khách hàng từ chối báo giá')
+      setRejectModalOpen(false)
+      setRejectReason('')
+      await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error rejecting quotation:', err)
+      message.error('Đã xảy ra lỗi khi từ chối')
+    }
+  }
+
+  const handleCloseRejectModal = () => {
+    setRejectModalOpen(false)
+    setRejectReason('')
+  }
+
+  const handleQuotationActionChange = (e) => {
+    const value = e.target.value
+    if (value === 'confirm') {
+      handleConfirmQuotation()
+    } else if (value === 'reject') {
+      handleOpenRejectModal()
+    }
+    e.target.value = ''
   }
 
   const confirmSendQuote = async () => {
     if (!expectedDate) {
-      message.error('Vui lòng chọn ngày dự đoán nhận xe')
+      message.error('Vui lòng chọn ngày dự đoán giao xe')
       return
     }
     
-    setLoading(true)
-    // Send quote logic here
-    setLoading(false)
-    setShowDateModal(false)
-    message.success('Đã gửi báo giá cho khách hàng')
+    if (actionLoading) {
+      return
+    }
+    
+    const quotationId = getQuotationId()
+    if (!quotationId) {
+      message.error('Vui lòng tạo báo giá trước khi lưu')
+      return
+    }
+
+    const payload = {
+      // Backend trả về discount là số tiền, nên khi lưu cũng gửi đúng theo amount
+      discount: ticketData?.priceQuotation?.discount ?? 0,
+      estimateAmount: grandTotal,
+      items: buildQuotationItemsPayload()
+    }
+
+    const hide = message.loading('Đang gửi báo giá...', 0)
+    setActionLoading(true)
+    try {
+      const { data: response, error } = await priceQuotationAPI.update(quotationId, payload)
+      
+      if (error) {
+        throw new Error(error || 'Lưu báo giá không thành công. Vui lòng thử lại.')
+      }
+
+      if (!response || (response.statusCode !== 200 && !response.result)) {
+        throw new Error('Lưu báo giá không thành công. Vui lòng thử lại.')
+      }
+
+      message.success('Đã lưu báo giá thành công')
+        setShowDateModal(false)
+        setIsEditMode(false) // Reset edit mode sau khi lưu thành công
+        await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error sending price quotation:', err)
+      message.error(err?.message || 'Đã xảy ra lỗi khi gửi báo giá.')
+    } finally {
+      hide?.()
+      setActionLoading(false)
+    }
   }
 
   const replaceColumns = [
@@ -265,26 +1061,93 @@ export default function TicketDetailPage() {
     {
       title: 'Danh mục',
       key: 'category',
+      width: 350,
       render: (_, record) => (
         <div>
-          <Select
-            placeholder="Chọn danh mục"
-            value={record.category}
-            onChange={(value) => updateReplaceItem(record.id, 'category', value)}
-            style={{ width: '100%' }}
-            showSearch
-            filterOption={(input, option) =>
-              (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+          <CustomCreatableSelect
+            placeholder="Chọn linh kiện"
+            value={
+              getPartOption(record.category) ||
+              (record.category
+                ? {
+                    value: record.category,
+                    label:
+                      record.categoryLabel ||
+                      getPartOption(record.category)?.label ||
+                      String(record.category)
+              }
+                : null)
             }
-            status={errors[`replace_${record.id}_category`] ? 'error' : ''}
-            disabled={isHistoryPage}
-          >
-            <Select.Option value="Linh kiện A">Linh kiện A</Select.Option>
-            <Select.Option value="Linh kiện B">Linh kiện B</Select.Option>
-            <Select.Option value="Má phanh - Nhật">Má phanh - Nhật</Select.Option>
-            <Select.Option value="Mâm xe - Hàn">Mâm xe - Hàn</Select.Option>
-            <Select.Option value="Moay-ơ - USA">Moay-ơ - USA</Select.Option>
-          </Select>
+            options={parts}
+            isSearchable
+            isClearable
+            isDisabled={inputsDisabled}
+            isLoading={partsLoading}
+            noOptionsMessage={() => partsLoading ? 'Đang tải...' : 'Không có linh kiện'}
+            onCreateOption={(inputValue) => {
+              const trimmed = inputValue?.trim()
+              if (!trimmed) return
+              addCustomPartOption(trimmed, trimmed)
+              updateReplaceItem(record.id, {
+                category: trimmed,
+                categoryLabel: trimmed,
+                unit: '',
+                unitPrice: 0
+              })
+            }}
+            onChange={(option) => {
+              const value = option?.value || ''
+              const selectedPart =
+                parts.find(p => String(p.value) === String(value)) ||
+                partsCache[value] ||
+                null
+
+              if (value) {
+                cachePartOption(
+                  value,
+                  option?.label ||
+                    selectedPart?.label ||
+                    selectedPart?.part?.name ||
+                    ''
+                )
+              }
+
+              console.log('[SelectPart] option:', option, 'resolved:', selectedPart)
+
+              const updates = {
+                category: value,
+                categoryLabel:
+                  option?.label ||
+                  selectedPart?.label ||
+                  selectedPart?.part?.name ||
+                  '',
+              }
+
+              if (selectedPart?.part) {
+                const partUnitCode =
+                  selectedPart.part.unitCode ||
+                  selectedPart.part.unit ||
+                  selectedPart.part.unitId
+                let matchedUnit = null
+                if (partUnitCode) {
+                  matchedUnit = unitOptions.find(unit =>
+                    String(unit.value).toLowerCase() ===
+                      String(partUnitCode).toLowerCase() ||
+                    unit.label?.toLowerCase() ===
+                      String(partUnitCode).toLowerCase() ||
+                    unit.code === String(partUnitCode).toLowerCase()
+                  )
+                }
+                updates.unit = matchedUnit?.value || selectedPart.part.unit || ''
+                updates.unitPrice = selectedPart.part.sellingPrice || 0
+              } else {
+                updates.unit = ''
+                updates.unitPrice = 0
+              }
+
+              updateReplaceItem(record.id, updates)
+            }}
+          />
           {errors[`replace_${record.id}_category`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
               {errors[`replace_${record.id}_category`]}
@@ -298,12 +1161,19 @@ export default function TicketDetailPage() {
       key: 'quantity',
       width: 120,
       render: (_, record) => (
-        <InputNumber
+        <input
+          type="number"
           min={1}
-          value={record.quantity}
-          onChange={(value) => updateReplaceItem(record.id, 'quantity', value)}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
+          value={record.quantity ?? 1}
+          onChange={(e) =>
+            updateReplaceItem(record.id, {
+              quantity: Number(e.target.value) || 1
+            })
+          }
+          style={baseInputStyle}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+          disabled={inputsDisabled}
         />
       )
     },
@@ -312,14 +1182,64 @@ export default function TicketDetailPage() {
       key: 'unit',
       width: 120,
       render: (_, record) => (
-        <Select
+        <div>
+        <CustomSelect
           placeholder="Đơn vị"
-          value={record.unit}
-          onChange={(value) => updateReplaceItem(record.id, 'unit', value)}
-          options={UNITS}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
-        />
+          value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
+          options={unitOptions}
+          isClearable
+          isDisabled={inputsDisabled}
+          onChange={(option) =>
+            updateReplaceItem(record.id, { unit: option?.value || '' })
+          }
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                border: `1px solid ${errors[`replace_${record.id}_unit`] ? '#ef4444' : (state.isFocused ? '#4096ff' : '#d0d7de')}`,
+                fontSize: '14px',
+                background: inputsDisabled ? '#f5f5f5' : '#fff',
+                color: inputsDisabled ? '#9ca3af' : '#262626',
+                cursor: inputsDisabled ? 'not-allowed' : 'pointer',
+                padding: '0 4px',
+                boxShadow: 'none',
+                '&:hover': {
+                  borderColor: inputsDisabled ? '#d0d7de' : (state.isFocused ? '#4096ff' : '#d0d7de')
+                }
+              }),
+              valueContainer: (base) => ({
+                ...base,
+                padding: '0 8px',
+                height: '38px',
+                color: inputsDisabled ? '#9ca3af' : '#262626'
+              }),
+              singleValue: (base) => ({
+                ...base,
+                color: inputsDisabled ? '#9ca3af' : '#262626'
+              }),
+              placeholder: (base) => ({
+                ...base,
+                color: inputsDisabled ? '#9ca3af' : '#9ca3af'
+              }),
+              input: (base) => ({
+                ...base,
+                margin: 0,
+                padding: 0
+              }),
+              indicatorsContainer: (base) => ({
+                ...base,
+                height: '38px'
+              })
+            }}
+          />
+          {errors[`replace_${record.id}_unit`] && (
+            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
+              {errors[`replace_${record.id}_unit`]}
+            </div>
+          )}
+        </div>
       )
     },
     {
@@ -328,15 +1248,24 @@ export default function TicketDetailPage() {
       width: 150,
       render: (_, record) => (
         <div>
-          <Input
+          <input
+            type="text"
+            inputMode="numeric"
             placeholder="Số tiền..."
             value={record.unitPrice ? record.unitPrice.toLocaleString('vi-VN') : ''}
             onChange={(e) => {
-              const value = parseInt(e.target.value.replace(/,/g, '')) || 0
-              updateReplaceItem(record.id, 'unitPrice', value)
+              const sanitized = e.target.value.replace(/[^\d]/g, '')
+              updateReplaceItem(record.id, {
+                unitPrice: sanitized ? parseInt(sanitized, 10) : 0
+              })
             }}
-            status={errors[`replace_${record.id}_unitPrice`] ? 'error' : ''}
-            disabled={isHistoryPage}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`replace_${record.id}_unitPrice`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
           />
           {errors[`replace_${record.id}_unitPrice`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -360,7 +1289,7 @@ export default function TicketDetailPage() {
       width: 80,
       render: (_, record) => (
         <Space>
-          {!isHistoryPage && (
+          {!inputsDisabled && (
             <DeleteOutlined
               style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
               onClick={() => deleteReplaceItem(record.id)}
@@ -383,12 +1312,18 @@ export default function TicketDetailPage() {
       key: 'task',
       render: (_, record) => (
         <div>
-          <Input
+          <input
+            type="text"
             placeholder="Tên công việc..."
             value={record.task}
             onChange={(e) => updateServiceItem(record.id, 'task', e.target.value)}
-            status={errors[`service_${record.id}_task`] ? 'error' : ''}
-            disabled={isHistoryPage}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`service_${record.id}_task`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
           />
           {errors[`service_${record.id}_task`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -399,49 +1334,27 @@ export default function TicketDetailPage() {
       )
     },
     {
-      title: 'Số lượng',
-      key: 'quantity',
-      width: 120,
-      render: (_, record) => (
-        <InputNumber
-          min={1}
-          value={record.quantity}
-          onChange={(value) => updateServiceItem(record.id, 'quantity', value)}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
-        />
-      )
-    },
-    {
-      title: 'Đơn vị',
-      key: 'unit',
-      width: 120,
-      render: (_, record) => (
-        <Select
-          placeholder="Đơn vị"
-          value={record.unit}
-          onChange={(value) => updateServiceItem(record.id, 'unit', value)}
-          options={UNITS}
-          style={{ width: '100%' }}
-          disabled={isHistoryPage}
-        />
-      )
-    },
-    {
       title: 'Đơn giá (vnd)',
       key: 'unitPrice',
-      width: 150,
+      width: 180,
       render: (_, record) => (
         <div>
-          <Input
+          <input
+            type="text"
+            inputMode="numeric"
             placeholder="Số tiền..."
             value={record.unitPrice ? record.unitPrice.toLocaleString('vi-VN') : ''}
             onChange={(e) => {
-              const value = parseInt(e.target.value.replace(/,/g, '')) || 0
-              updateServiceItem(record.id, 'unitPrice', value)
+              const sanitized = e.target.value.replace(/[^\d]/g, '')
+              updateServiceItem(record.id, 'unitPrice', sanitized ? parseInt(sanitized, 10) : 0)
             }}
-            status={errors[`service_${record.id}_unitPrice`] ? 'error' : ''}
-            disabled={isHistoryPage}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`service_${record.id}_unitPrice`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
           />
           {errors[`service_${record.id}_unitPrice`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -465,7 +1378,7 @@ export default function TicketDetailPage() {
       width: 80,
       render: (_, record) => (
         <Space>
-          {!isHistoryPage && (
+          {!inputsDisabled && (
             <DeleteOutlined
               style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
               onClick={() => deleteServiceItem(record.id)}
@@ -487,18 +1400,73 @@ export default function TicketDetailPage() {
     )
   }
 
+  const technicianDisplay = getDisplayValue(
+    selectedTechnician ||
+    ticketData?.technicians?.[0] ||
+    null
+  )
+
+  const serviceTypeValue = Array.isArray(ticketData?.serviceType)
+    ? ticketData.serviceType
+    : ticketData?.serviceType || null
+
+  const quoteCreator = getDisplayValue(ticketData?.createdBy)
+  const createdDate = ticketData?.createdAt
+    ? new Date(ticketData.createdAt).toLocaleDateString('vi-VN')
+    : null
+
+  const totalReplacement = replaceItems.reduce((sum, item) => sum + (item.total || 0), 0)
+  const totalService = serviceItems.reduce((sum, item) => sum + (item.total || 0), 0)
+  const grandTotal = totalReplacement + totalService
+
+  // Hiển thị discount đúng theo response: priceQuotation.discount là số tiền giảm
+  const discountAmountFromResponse =
+    ticketData?.priceQuotation?.discount != null
+      ? Number(ticketData.priceQuotation.discount)
+      : 0
+  const safeDiscountAmount = Number.isNaN(discountAmountFromResponse) ? 0 : discountAmountFromResponse
+  const finalAmount = grandTotal - safeDiscountAmount
+
   return (
     <AdminLayout>
+      <style>{`
+        .quotation-action-select {
+          padding: 6px 32px 6px 12px;
+          border-radius: 8px;
+          border: 1px solid #d1d5db;
+          background: #fff;
+          font-size: 13px;
+          font-weight: 500;
+          color: #111;
+          cursor: pointer;
+          outline: none;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%234b5563' d='M7 10L2 5h10z'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 10px center;
+          transition: all 0.2s ease;
+          min-width: 160px;
+        }
+        .quotation-action-select:hover {
+          border-color: #CBB081;
+          background-color: #fafafa;
+        }
+        .quotation-action-select:focus {
+          border-color: #CBB081;
+          box-shadow: 0 0 0 3px rgba(203, 176, 129, 0.1);
+        }
+        .quotation-action-select option {
+          padding: 8px 12px;
+          font-size: 13px;
+        }
+        .quotation-action-select option[value="confirm"] {
+          color: #16a34a;
+        }
+        .quotation-action-select option[value="reject"] {
+          color: #dc2626;
+        }
+      `}</style>
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
-        <div style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <Button 
-            type="text" 
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}
-          />
-          <span style={{ color: '#666' }}>Phiếu dịch vụ {'>'} Danh sách phiếu {'>'} Chi tiết phiếu dịch vụ</span>
-        </div>
-
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
             {ticketData?.code || `STK-2025-${String(id || 0).padStart(6, '0')}`}
@@ -506,57 +1474,79 @@ export default function TicketDetailPage() {
         </div>
 
         <Row gutter={16} style={{ marginBottom: '24px' }}>
-          <Col span={12}>
-            <Card style={{ borderRadius: '12px', background: '#fafafa' }}>
+          <Col span={12} style={{ display: 'flex' }}>
+            <Card style={{ borderRadius: '12px', background: '#fafafa', width: '100%', height: '100%' }}>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Tên khách hàng:</strong>{' '}
-                <span>{ticketData?.customer?.fullName || 'Nguyễn Văn A'}</span>
-                <span style={{ marginLeft: '8px', color: '#ffd65a' }}>★★★</span>
+                <span>{getDisplayValue(ticketData?.customer?.fullName)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Số điện thoại:</strong>{' '}
-                <span>{ticketData?.customer?.phone || '0123456789'}</span>
+                <span>{getDisplayValue(ticketData?.customer?.phone)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Loại xe:</strong>{' '}
-                <span>{ticketData?.vehicle?.model || 'Mazda-v3'}</span>
+                <span>
+                  {getDisplayValue(
+                    ticketData?.vehicle?.vehicleModelName ||
+                    ticketData?.vehicle?.vehicleModel?.modelName ||
+                    ticketData?.vehicle?.model ||
+                    ticketData?.vehicle?.brandName ||
+                    ticketData?.vehicle?.vehicleModel?.brandName
+                  )}
+                </span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Biển số xe:</strong>{' '}
-                <span>{ticketData?.vehicle?.licensePlate || '25A-123456'}</span>
+                <span>{getDisplayValue(ticketData?.vehicle?.licensePlate)}</span>
               </div>
               <div>
                 <strong>Số khung:</strong>{' '}
-                <span>{ticketData?.vehicle?.vin || '1HGCM82633A123456'}</span>
+                <span>{getDisplayValue(ticketData?.vehicle?.vin)}</span>
               </div>
             </Card>
           </Col>
-          <Col span={12}>
-            <Card style={{ borderRadius: '12px', background: '#fafafa' }}>
+          <Col span={12} style={{ display: 'flex' }}>
+            <Card style={{ borderRadius: '12px', background: '#fafafa', width: '100%', height: '100%' }}>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Nhân viên lập báo giá:</strong>{' '}
-                <span>Hoàng Văn B</span>
+                <span>{quoteCreator}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Ngày tạo báo giá:</strong>{' '}
-                <span>{ticketData?.createdAt ? new Date(ticketData.createdAt).toLocaleDateString('vi-VN') : '12/10/2025'}</span>
+                <span>{getDisplayValue(createdDate)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Kỹ thuật viên sửa chữa:</strong>{' '}
-                <Select
-                  defaultValue="Nguyễn Văn B"
-                  options={TECHS}
-                  style={{ width: '100%', marginTop: '4px' }}
-                  disabled={isHistoryPage}
-                />
+                <span>{technicianDisplay}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Loại dịch vụ:</strong>{' '}
-                <span>Thay thế phụ tùng</span>
+                <span>{getDisplayValue(serviceTypeValue)}</span>
               </div>
-              <div>
-                <strong>Ngày dự đoán giao xe:</strong>{' '}
-                <span>{expectedDate ? expectedDate.format('DD/MM/YYYY') : ''}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <strong>Ngày dự đoán giao xe:</strong>
+                <div
+                  onClick={openDeliveryPicker}
+                  style={{
+                    border: '1px solid #d0d7de',
+                    borderRadius: '10px',
+                    padding: '6px 12px',
+                    minWidth: '160px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                    cursor: inputsDisabled ? 'not-allowed' : 'pointer',
+                    background: '#fff',
+                    opacity: inputsDisabled ? 0.6 : 1
+                  }}
+                >
+                  <span style={{ color: expectedDate ? '#111' : '#9ca3af', fontWeight: 500 }}>
+                    {expectedDate ? expectedDate.format('DD/MM/YYYY') : 'Chọn ngày'}
+                  </span>
+                  <CalendarOutlined style={{ color: '#6b7280' }} />
+                </div>
               </div>
             </Card>
           </Col>
@@ -565,137 +1555,243 @@ export default function TicketDetailPage() {
         <Card style={{ borderRadius: '12px' }}>
           <div style={{ marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: 700, margin: 0 }}>BÁO GIÁ</h2>
-              {!isHistoryPage && replaceItems.length === 0 && serviceItems.length === 0 && (
-                <Button
-                  type="primary"
-                  onClick={() => {
-                    setReplaceItems([{ 
-                      id: Date.now(), 
-                      category: '',
-                      quantity: 1, 
-                      unit: '',
-                      unitPrice: 0,
-                      total: 0
-                    }])
-                    setServiceItems([{ 
-                      id: Date.now() + 1, 
-                      task: '',
-                      quantity: 1, 
-                      unit: '',
-                      unitPrice: 0,
-                      total: 0
-                    }])
-                  }}
-                  style={{
-                    background: '#3b82f6',
-                    borderColor: '#3b82f6',
-                    height: '36px',
-                    fontWeight: 600
-                  }}
-                >
-                  <PlusOutlined style={{ marginRight: '8px' }} />
-                  Tạo báo giá
-                </Button>
-              )}
+                {ticketData?.priceQuotation?.status && (
+                  <>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        backgroundColor: quotationStatusConfig.badgeBg,
+                        color: quotationStatusConfig.badgeColor
+                      }}
+                    >
+                      {quotationStatusConfig.label}
+                    </span>
+                    {normalizedQuotationStatus === 'WAITING_CUSTOMER_CONFIRM' && (
+                      <select
+                        onChange={handleQuotationActionChange}
+                        className="quotation-action-select"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Chọn hành động</option>
+                        <option value="confirm">Khách đã xác nhận</option>
+                        <option value="reject">Khách từ chối</option>
+                      </select>
+                    )}
+                  </>
+                )}
             </div>
           </div>
-          
-          <Tabs 
-            activeKey={activeTab} 
-            onChange={setActiveTab}
-            style={{ marginBottom: '20px' }}
-          >
-            <TabPane tab={<span style={{ fontWeight: 700 }}>BÁO GIÁ</span>} key="quote">
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <strong>Thay thế</strong>
-                  {!isHistoryPage && (
-                    <Button 
-                      type="text" 
-                      icon={<PlusOutlined />}
-                      onClick={addReplaceItem}
-                      style={{ 
-                        width: '32px', 
-                        height: '32px', 
-                        borderRadius: '50%', 
-                        border: '1px solid #222',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    />
-                  )}
-                </div>
-                 <Table
-                   columns={replaceColumns}
-                   dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                   pagination={false}
-                   size="small"
-                   components={goldTableHeader}
-                 />
-              </div>
+          </div>
+          {!isQuoteExpanded ? (
+            <div style={{ padding: '24px 0', textAlign: 'left' }}>
+              <Button
+                type="primary"
+                ghost
+                icon={<PlusOutlined />}
+                onClick={handleCreateQuote}
+                loading={createQuoteLoading}
+                disabled={inputsDisabled}
+                style={{ borderColor: '#111', color: '#111', fontWeight: 600 }}
+              >
+                Tạo báo giá
+              </Button>
+            </div>
+          ) : (
+                  <>
+                    <div style={{ marginBottom: '24px' }}>
+              <strong style={{ display: 'block', marginBottom: '12px' }}>Thay thế</strong>
+              <Table
+                columns={replaceColumns}
+                dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                pagination={false}
+                size="small"
+                components={goldTableHeader}
+                locale={{ emptyText: ' ' }}
+                footer={() =>
+                  !isHistoryPage && !inputsDisabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <Button 
+                            type="text" 
+                            icon={<PlusOutlined />}
+                            onClick={addReplaceItem}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '50%', 
+                              border: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                        disabled={inputsDisabled}
+                          />
+                      </div>
+                  )
+                }
+                       />
+                    </div>
 
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                  <strong>Dịch vụ</strong>
-                  {!isHistoryPage && (
-                    <Button 
-                      type="text" 
-                      icon={<PlusOutlined />}
-                      onClick={addServiceItem}
-                      style={{ 
-                        width: '32px', 
-                        height: '32px', 
-                        borderRadius: '50%', 
-                        border: '1px solid #222',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    />
-                  )}
-                </div>
-                 <Table
-                   columns={serviceColumns}
-                   dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-                   pagination={false}
-                   size="small"
-                   components={goldTableHeader}
-                 />
-              </div>
+                    <div>
+              <strong style={{ display: 'block', marginBottom: '12px' }}>Dịch vụ</strong>
+              <Table
+                columns={serviceColumns}
+                dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
+                pagination={false}
+                size="small"
+                components={goldTableHeader}
+                locale={{ emptyText: ' ' }}
+                footer={() =>
+                  !isHistoryPage && !inputsDisabled && (
+                    <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                          <Button 
+                            type="text" 
+                            icon={<PlusOutlined />}
+                            onClick={addServiceItem}
+                            style={{ 
+                              width: '32px', 
+                              height: '32px', 
+                              borderRadius: '50%', 
+                              border: 'none',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
+                        disabled={inputsDisabled}
+                          />
+                      </div>
+                  )
+                }
+                       />
+                    </div>
 
-              {!isHistoryPage && (replaceItems.length > 0 || serviceItems.length > 0) && (
-                <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ color: '#666', fontSize: '12px' }}>
-                    Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá
+            <div
+              style={{
+                marginTop: '32px',
+                borderTop: '1px solid #edecec',
+                paddingTop: '24px'
+              }}
+            >
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', marginBottom: '24px' }}>
+                <div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Tổng cộng</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
+                        </div>
+                <div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Giảm giá</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700 }}>
+                    {formatCurrency(safeDiscountAmount)} đ
                   </div>
-                  <Space>
-                    <Button onClick={() => navigate(isHistoryPage ? '/service-advisor/orders/history' : '/service-advisor/orders')}>Hủy</Button>
-                    <Button 
-                      type="primary" 
-                      onClick={handleSendQuote}
-                      style={{ background: '#3b82f6', borderColor: '#3b82f6' }}
-                    >
-                      Gửi báo giá cho khách hàng →
-                    </Button>
-                  </Space>
                 </div>
-              )}
-            </TabPane>
-            <TabPane tab="Nháp" key="draft">
-              <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                Chưa có bản nháp
+                <div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Thanh toán cuối cùng</div>
+                  <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>
+                    {formatCurrency(finalAmount)} đ
+                  </div>
+                </div>
               </div>
-            </TabPane>
-            <TabPane tab="Kho đã duyệt" key="approved">
-              <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                Chưa có dữ liệu
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
+              {!isHistoryPage ? (
+                <Space size="middle">
+                          <Button 
+                            onClick={handleSendQuote}
+                    disabled={
+                      actionLoading ||
+                        isWaitingWarehouse ||
+                        (isWarehouseConfirmed && !isEditMode 
+                          ? false  // Cho phép bấm "Cập nhật" để bật edit mode
+                          : (isWarehouseConfirmed && isEditMode
+                              ? (replaceItems.length === 0 && serviceItems.length === 0)  // Validate khi đang edit
+                              : inputsDisabled))  // Logic cho các trạng thái khác
+                    }
+                    loading={actionLoading}
+                    style={{
+                        background: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
+                        borderColor: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
+                      color: '#fff',
+                      fontWeight: 600,
+                      padding: '0 24px',
+                        height: '40px',
+                        cursor: isWaitingWarehouse ? 'not-allowed' : 'pointer'
+                    }}
+                          >
+                    {actionButtonLabel}
+                          </Button>
+                  {canSendToCustomer && (
+                    <>
+                      <Button
+                        onClick={handleExportPDF}
+                        loading={exportPDFLoading}
+                        disabled={exportPDFLoading}
+                        icon={<FilePdfOutlined />}
+                        style={{
+                          background: '#ef4444',
+                          borderColor: '#ef4444',
+                          color: '#fff',
+                          fontWeight: 600,
+                          padding: '0 24px',
+                          height: '40px'
+                        }}
+                      >
+                        Xuất PDF
+                      </Button>
+                      <Button
+                        onClick={handleSendToCustomer}
+                        loading={sendToCustomerLoading}
+                        disabled={sendToCustomerLoading}
+                        style={{
+                          background: '#2563eb',
+                          borderColor: '#2563eb',
+                          color: '#fff',
+                          fontWeight: 600,
+                          padding: '0 24px',
+                          height: '40px'
+                        }}
+                      >
+                        Gửi báo giá
+                      </Button>
+                    </>
+                  )}
+                        </Space>
+              ) : (
+                <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                  {ticketData?.priceQuotation
+                    ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
+                    : 'Báo giá đang ở chế độ chỉ xem'}
+                      </div>
+                    )}
               </div>
-            </TabPane>
-          </Tabs>
+            </div>
+                  </>
+          )}
         </Card>
-      </div>
+                  </div>
+
+      <Modal
+        title="Chọn ngày dự đoán giao xe"
+        open={deliveryPickerVisible}
+        onCancel={closeDeliveryPicker}
+        footer={[
+          <Button key="cancel" onClick={closeDeliveryPicker}>Hủy</Button>,
+          <Button key="ok" type="primary" onClick={confirmDeliveryPicker}>
+            Cập nhật
+          </Button>
+        ]}
+        destroyOnClose
+      >
+        <Calendar
+          fullscreen={false}
+          value={deliveryPickerValue || expectedDate || dayjs()}
+          onSelect={(date) => setDeliveryPickerValue(date)}
+          disabledDate={disabledDeliveryDate}
+          />
+      </Modal>
 
       <Modal
         title="Ngày dự đoán nhận xe"
@@ -712,6 +1808,8 @@ export default function TicketDetailPage() {
             value={expectedDate}
             onChange={setExpectedDate}
             style={{ width: '100%' }}
+            disabledDate={disabledDeliveryDate}
+            allowClear={false}
           />
         </div>
         <Button
@@ -722,8 +1820,90 @@ export default function TicketDetailPage() {
         >
           Gửi báo giá
         </Button>
-        <div style={{ marginTop: '12px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
+        {/* Tạm thời tắt phần hiển thị thông báo Zalo */}
+        {/* <div style={{ marginTop: '12px', fontSize: '12px', color: '#666', textAlign: 'center' }}>
           Báo giá sẽ được gửi cho khách hàng qua Zalo
+        </div> */}
+      </Modal>
+
+      {/* Modal Từ chối báo giá */}
+      <Modal
+        open={rejectModalOpen}
+        onCancel={handleCloseRejectModal}
+        footer={null}
+        closable={false}
+        width={450}
+        styles={{ 
+          body: { padding: 0 },
+          content: { borderRadius: 0, padding: 0 },
+          header: { padding: 0 }
+        }}
+        style={{ top: 100 }}
+      >
+        <div style={{ 
+          background: '#CBB081', 
+          padding: '14px 20px', 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center'
+        }}>
+          <span style={{ fontWeight: 700, fontSize: '15px', color: '#000', letterSpacing: '0.5px' }}>
+            TỪ CHỐI BÁO GIÁ
+          </span>
+          <CloseOutlined 
+            style={{ cursor: 'pointer', color: '#000', fontSize: '16px', fontWeight: 700 }} 
+            onClick={handleCloseRejectModal} 
+          />
+        </div>
+        
+        <div style={{ padding: '20px 24px', background: '#fff' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: '#000', marginBottom: '8px' }}>
+              Lý do từ chối <span style={{ color: 'red' }}>*</span>
+            </label>
+            <Input.TextArea 
+              rows={4}
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Nhập lý do từ chối..."
+              style={{ 
+                fontSize: '13px',
+                border: '1px solid #D9D9D9'
+              }} 
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <Button 
+              onClick={handleCloseRejectModal}
+              style={{
+                background: '#fff',
+                borderColor: '#D9D9D9',
+                color: '#111',
+                fontWeight: 600,
+                height: '38px',
+                minWidth: '100px',
+                fontSize: '13px'
+              }}
+            >
+              Hủy
+            </Button>
+            <Button 
+              type="primary"
+              onClick={handleRejectQuotation}
+              style={{
+                background: '#DC2626',
+                borderColor: '#DC2626',
+                fontWeight: 600,
+                height: '38px',
+                minWidth: '100px',
+                fontSize: '13px',
+                boxShadow: 'none'
+              }}
+            >
+              Xác nhận
+            </Button>
+          </div>
         </div>
       </Modal>
     </AdminLayout>

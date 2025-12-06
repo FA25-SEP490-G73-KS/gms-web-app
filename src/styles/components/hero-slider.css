@@ -2,15 +2,16 @@
   width: 100%;
   position: relative;
   overflow: hidden;
-  border-radius: 18px;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  border-radius: 0;
+  box-shadow: none;
   background: #000;
 }
 
 .hero-slider-container {
   position: relative;
   width: 100%;
-  height: 420px;
+  aspect-ratio: 28 / 9;
+  min-height: 120px;
   overflow: hidden;
 }
 
@@ -113,7 +114,8 @@
 
 @media (max-width: 960px) {
   .hero-slider-container {
-    height: 320px;
+    aspect-ratio: 28 / 9;
+    min-height: 100px;
   }
 
   .hero-slider-btn {
@@ -136,11 +138,12 @@
 
 @media (max-width: 640px) {
   .hero-slider-container {
-    height: 240px;
+    aspect-ratio: 28 / 9;
+    min-height: 80px;
   }
 
   .hero-slider {
-    border-radius: 12px;
+    border-radius: 0;
   }
 
   .hero-slider-btn {

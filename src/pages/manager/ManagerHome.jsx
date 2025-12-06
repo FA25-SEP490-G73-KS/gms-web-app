@@ -6,7 +6,6 @@ import {
   DollarOutlined, 
   UserOutlined,
   ShopOutlined,
-  BarChartOutlined,
   SettingOutlined
 } from '@ant-design/icons'
 import ManagerLayout from '../../layouts/ManagerLayout'
@@ -17,7 +16,10 @@ export default function ManagerHome() {
   return (
     <ManagerLayout>
       <div style={{ padding: '24px' }}>
-        <Title level={2} style={{ marginBottom: 24 }}>Dashboard - Manager</Title>
+        <Title level={2} style={{ marginBottom: 4 }}>Dashboard - Manager</Title>
+        <p style={{ margin: '0 0 24px 0', fontSize: 14, color: '#6b7280' }}>
+          Tổng quan nhanh về hoạt động garage: lịch hẹn, phiếu dịch vụ, doanh thu và nhân sự.
+        </p>
         
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col xs={24} sm={12} lg={6}>
@@ -64,39 +66,6 @@ export default function ManagerHome() {
         </Row>
 
         <Row gutter={16} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={12} lg={6}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', cursor: 'pointer' }}
-              onClick={() => window.location.href = '/manager/service-advisor'}
-            >
-              <ShopOutlined style={{ fontSize: 48, color: '#1890ff', marginBottom: 16 }} />
-              <Title level={4}>Service Advisor</Title>
-              <p>Quản lý lịch hẹn và phiếu dịch vụ</p>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', cursor: 'pointer' }}
-              onClick={() => window.location.href = '/manager/warehouse'}
-            >
-              <ShopOutlined style={{ fontSize: 48, color: '#52c41a', marginBottom: 16 }} />
-              <Title level={4}>Warehouse</Title>
-              <p>Quản lý kho và linh kiện</p>
-            </Card>
-          </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card 
-              hoverable
-              style={{ textAlign: 'center', cursor: 'pointer' }}
-              onClick={() => window.location.href = '/manager/accountance'}
-            >
-              <BarChartOutlined style={{ fontSize: 48, color: '#faad14', marginBottom: 16 }} />
-              <Title level={4}>Accountance</Title>
-              <p>Quản lý tài chính và kế toán</p>
-            </Card>
-          </Col>
           <Col xs={24} sm={12} lg={6}>
             <Card 
               hoverable

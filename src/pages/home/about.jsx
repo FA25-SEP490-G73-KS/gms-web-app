@@ -6,7 +6,11 @@ export default function AboutPage() {
     <CustomerLayout>
       <section className="home-hero">
         <div className="hero-full">
-          <img src="/image/ChatGPT Image 07_41_33 19 thg 10, 2025.png" alt="garage" className="hero-full-img" />
+          <img
+            src="/image/gara.png"
+            alt="Garage Hoàng Tuấn - Sơn, bảo dưỡng, phục hồi xe"
+            className="hero-full-img"
+          />
         </div>
       </section>
 

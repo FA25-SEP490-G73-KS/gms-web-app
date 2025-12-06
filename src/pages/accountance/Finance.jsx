@@ -1,11 +1,26 @@
-import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Tag, Space, Select } from 'antd'
-import { SearchOutlined, PlusOutlined, CloseOutlined } from '@ant-design/icons'
+import React, { useMemo, useState, useEffect } from 'react'
+import dayjs from 'dayjs'
+import {
+  Table,
+  Input,
+  Button,
+  Tag,
+  Space,
+  Modal,
+  Form,
+  InputNumber,
+  Upload,
+  message,
+  Row,
+  Col
+} from 'antd'
+import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined, FilterOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { ledgerVoucherAPI } from '../../services/api'
+import { getUserNameFromToken } from '../../utils/helpers'
 import '../../styles/pages/accountance/finance.css'
 
-const { Option } = Select
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -14,14 +29,8 @@ const STATUS_FILTERS = [
   { key: 'rejected', label: 'Từ chối' }
 ]
 
-const TICKET_TYPES = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'thu', label: 'Thu' },
-  { value: 'chi', label: 'Chi' },
-  { value: 'ung_luong', label: 'Ứng lương' }
-]
 
-const financeData = [
+const initialFinanceData = [
   {
     id: 1,
     code: 'PT-2025-000001',
@@ -97,13 +106,97 @@ const getStatusConfig = (status) => {
   return configs[status] || { label: status, color: '#666', bg: '#f3f4f6' }
 }
 
-export default function Finance() {
+export function AccountanceFinanceContent() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
-  const [ticketType, setTicketType] = useState('all')
+  const [data, setData] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+  const [createModalVisible, setCreateModalVisible] = useState(false)
+  const [uploadFile, setUploadFile] = useState(null)
+  const [fileList, setFileList] = useState([])
+  const [creating, setCreating] = useState(false)
+  const [form] = Form.useForm()
+  const [creatorName, setCreatorName] = useState('')
+  const [selectedTicketType, setSelectedTicketType] = useState('')
+
+  useEffect(() => {
+    const userName = getUserNameFromToken()
+    setCreatorName(userName || '')
+    // Set creator in form when userName is available
+    if (userName) {
+      form.setFieldsValue({ creator: userName })
+    }
+  }, [form])
+
+  // Watch ticket type to update category options
+  const ticketType = Form.useWatch('type', form)
+  
+  useEffect(() => {
+    setSelectedTicketType(ticketType || '')
+    // Reset category when ticket type changes
+    if (ticketType) {
+      form.setFieldsValue({ category: '' })
+    }
+  }, [ticketType, form])
+
+  // Get category options based on ticket type
+  const getCategoryOptions = () => {
+    if (selectedTicketType === 'phiếu thu') {
+      return [{ value: 'OTHER', label: 'Khác' }]
+    } else if (selectedTicketType === 'phiếu chi') {
+      return [
+        { value: 'SUPPLIER_PAYMENT', label: 'Nhà cung cấp' },
+        { value: 'ELECTRICITY', label: 'Tiền điện' },
+        { value: 'OTHER', label: 'Khác' }
+      ]
+    }
+    return []
+  }
+
+  useEffect(() => {
+    fetchVouchers()
+  }, [page, pageSize])
+
+  const fetchVouchers = async () => {
+    setLoading(true)
+    try {
+      const { data: response, error } = await ledgerVoucherAPI.getAll(page - 1, pageSize)
+      
+      if (error) {
+        message.error('Không thể tải danh sách phiếu thu-chi')
+        setLoading(false)
+        return
+      }
+
+      const result = response?.result || {}
+      const content = result.content || (Array.isArray(response?.result) ? response.result : [])
+      
+      // Transform API data to match UI structure
+      const transformedData = content.map((item) => ({
+        id: item.id || 0,
+        code: item.code || 'N/A',
+        type: (item.type || '').toLowerCase(),
+        subject: item.targetName || 'N/A',
+        amount: item.amount || 0,
+        createdAt: item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY') : 'N/A',
+        status: (item.status || '').toLowerCase()
+      }))
+
+      setData(transformedData)
+      setTotal(result.totalElements || content.length || 0)
+    } catch (err) {
+      console.error('Failed to fetch vouchers:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filtered = useMemo(() => {
-    return financeData
+    return data
       .filter((item) => {
         const matchesQuery =
           !query ||
@@ -112,27 +205,25 @@ export default function Finance() {
         const matchesStatus =
           status === 'all' ||
           item.status === status
-        const matchesType =
-          ticketType === 'all' ||
-          item.type === ticketType
-        return matchesQuery && matchesStatus && matchesType
+        return matchesQuery && matchesStatus
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query, status, ticketType])
+  }, [data, query, status])
 
   const columns = [
     {
-      title: 'Mã phiếu',
+      title: <div style={{ textAlign: 'center' }}>Mã phiếu</div>,
       dataIndex: 'code',
       key: 'code',
-      width: 180,
+      width: 150,
       render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
     },
     {
-      title: 'Loại Phiếu',
+      title: <div style={{ textAlign: 'center' }}>Loại Phiếu</div>,
       dataIndex: 'type',
       key: 'type',
-      width: 180,
+      width: 150,
+      align: 'center',
       render: (type) => {
         const config = getTypeConfig(type)
         return (
@@ -152,13 +243,13 @@ export default function Finance() {
       }
     },
     {
-      title: 'Đối tượng',
+      title: <div style={{ textAlign: 'center' }}>Đối tượng</div>,
       dataIndex: 'subject',
       key: 'subject',
       width: 200
     },
     {
-      title: 'Số tiền',
+      title: <div style={{ textAlign: 'center' }}>Số tiền</div>,
       dataIndex: 'amount',
       key: 'amount',
       width: 150,
@@ -166,16 +257,18 @@ export default function Finance() {
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
-      title: 'Ngày tạo',
+      title: <div style={{ textAlign: 'center' }}>Ngày tạo</div>,
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 140
+      width: 140,
+      align: 'center'
     },
     {
-      title: 'Trạng thái',
+      title: <div style={{ textAlign: 'center' }}>Trạng thái</div>,
       dataIndex: 'status',
       key: 'status',
-      width: 160,
+      width: 150,
+      align: 'center',
       render: (status) => {
         const config = getStatusConfig(status)
         return (
@@ -193,73 +286,79 @@ export default function Finance() {
           </Tag>
         )
       }
-    },
-    {
-      title: '',
-      key: 'action',
-      width: 60,
-      align: 'center',
-      render: () => (
-        <Button
-          type="text"
-          danger
-          icon={<CloseOutlined />}
-          style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-        />
-      )
     }
   ]
 
   return (
-    <AccountanceLayout>
-      <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
+    <>
+    <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
+          <h1 style={{ margin: 0, marginBottom: '20px' }}>Danh sách phiếu Thu-Chi</h1>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
-            <Space>
-              {STATUS_FILTERS.map((filter) => (
-                <Button
-                  key={filter.key}
-                  type={status === filter.key ? 'primary' : 'default'}
-                  onClick={() => setStatus(filter.key)}
-                  style={{
-                    background: status === filter.key ? '#CBB081' : '#fff',
-                    borderColor: status === filter.key ? '#CBB081' : '#e6e6e6',
-                    color: status === filter.key ? '#111' : '#666',
-                    fontWeight: 600
-                  }}
-                >
-                  {filter.label}
-                </Button>
-              ))}
-            </Space>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+            {/* Left side - Search */}
             <Input
               prefix={<SearchOutlined />}
               placeholder="Tìm kiếm"
               allowClear
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              style={{ width: 260 }}
+              style={{ width: 300 }}
             />
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              style={{ background: '#22c55e', borderColor: '#22c55e', fontWeight: 600 }}
-            >
-              Tạo phiếu
-            </Button>
-            <Select
-              value={ticketType}
-              onChange={setTicketType}
-              style={{ width: 150 }}
-            >
-              {TICKET_TYPES.map(type => (
-                <Option key={type.value} value={type.value}>
-                  {type.label}
-                </Option>
-              ))}
-            </Select>
+            
+            {/* Right side - Filter buttons, Sort, and Create */}
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <Space>
+                {STATUS_FILTERS.map((filter) => (
+                  <Button
+                    key={filter.key}
+                    type={status === filter.key ? 'primary' : 'default'}
+                    onClick={() => setStatus(filter.key)}
+                    style={{
+                      background: status === filter.key ? '#CBB081' : '#fff',
+                      borderColor: status === filter.key ? '#CBB081' : '#d9d9d9',
+                      color: status === filter.key ? '#fff' : '#666',
+                      fontWeight: 500,
+                      borderRadius: 6
+                    }}
+                  >
+                    {filter.label}
+                  </Button>
+                ))}
+              </Space>
+              
+              <Button
+                icon={<FilterOutlined />}
+                style={{ 
+                  borderRadius: 6,
+                  borderColor: '#d9d9d9'
+                }}
+              >
+                Sort
+              </Button>
+              
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                style={{ 
+                  background: '#22c55e', 
+                  borderColor: '#22c55e', 
+                  fontWeight: 600,
+                  borderRadius: 6
+                }}
+                onClick={() => {
+                  setSelectedTicketType('')
+                  form.setFieldsValue({
+                    type: 'phiếu thu',
+                    createdAt: dayjs().format('DD/MM/YYYY'),
+                    creator: creatorName || ''
+                  })
+                  setCreateModalVisible(true)
+                }}
+              >
+                Tạo phiếu
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -273,20 +372,275 @@ export default function Finance() {
             className="finance-table"
             columns={columns}
             dataSource={filtered}
+            loading={loading}
             pagination={{
-              pageSize: 10,
-              current: 1,
-              total: filtered.length,
+              current: page,
+              pageSize: pageSize,
+              total: total,
               showTotal: (total) => `0 of ${total} row(s) selected.`,
               showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100']
+              pageSizeOptions: ['10', '20', '50', '100'],
+              onChange: (newPage, newPageSize) => {
+                setPage(newPage)
+                setPageSize(newPageSize)
+              }
             }}
             components={goldTableHeader}
             rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-even' : 'table-row-odd')}
           />
         </div>
       </div>
-    </AccountanceLayout>
+
+      <Modal
+        title="Tạo phiếu Thu/Chi"
+        open={createModalVisible}
+        styles={{
+          header: { marginBottom: '16px' }
+        }}
+        onCancel={() => {
+          form.resetFields()
+          setUploadFile(null)
+          setFileList([])
+          setSelectedTicketType('')
+          form.setFieldsValue({
+            type: 'phiếu thu',
+            createdAt: dayjs().format('DD/MM/YYYY'),
+            creator: creatorName || ''
+          })
+          setCreateModalVisible(false)
+        }}
+        okText="Tạo phiếu"
+        confirmLoading={creating}
+        onOk={async () => {
+          try {
+            const values = await form.validateFields()
+            setCreating(true)
+            const payload = {
+              type: values.type ? values.type.toUpperCase() : undefined,
+              amount: Number(values.amount),
+              target: values.target,
+              description: values.description,
+              category: values.category ? values.category.toUpperCase() : undefined
+            }
+            const { data: response, error } = await manualVoucherAPI.create(payload, uploadFile)
+            if (error) {
+              throw new Error(error)
+            }
+            const result = response?.result || response?.data || response
+            const newRecord = {
+              id: result?.id || Date.now(),
+              code: result?.code || result?.voucherCode || `TMP-${Date.now()}`,
+              type: (result?.type || values.type || 'thu').toLowerCase(),
+              subject: result?.target || values.target,
+              amount: Number(result?.amount || values.amount),
+              createdAt: result?.createdAt
+                ? new Date(result.createdAt).toLocaleDateString('vi-VN')
+                : new Date().toLocaleDateString('vi-VN'),
+              status: (result?.status || 'pending').toLowerCase()
+            }
+            message.success('Tạo phiếu thành công')
+            form.resetFields()
+            setUploadFile(null)
+            setFileList([])
+            setSelectedTicketType('')
+            setCreateModalVisible(false)
+            // Reset form với giá trị mặc định
+            form.setFieldsValue({
+              type: 'phiếu thu',
+              createdAt: dayjs().format('DD/MM/YYYY'),
+              creator: creatorName || ''
+            })
+            // Refresh data after creating
+            fetchVouchers()
+          } catch (err) {
+            if (err?.errorFields) {
+              return
+            }
+            message.error(err.message || 'Tạo phiếu thất bại')
+          } finally {
+            setCreating(false)
+          }
+        }}
+        destroyOnClose
+      >
+        <Form 
+          layout="vertical" 
+          form={form} 
+          initialValues={{ 
+            type: 'phiếu thu',
+            createdAt: dayjs().format('DD/MM/YYYY'),
+            creator: creatorName || ''
+          }}
+        >
+          <Row gutter={24} style={{ display: 'flex', alignItems: 'stretch' }}>
+            {/* Left Column */}
+            <Col span={12} style={{ display: 'flex', flexDirection: 'column' }}>
+              <Form.Item
+                name="type"
+                label={<span>Loại phiếu <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
+              >
+                <select
+                  className="subtext"
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    color: '#262626',
+                    cursor: 'pointer',
+                    backgroundColor: '#fff',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3b82f6'
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                  onChange={(e) => {
+                    setSelectedTicketType(e.target.value)
+                    form.setFieldsValue({ category: '' })
+                  }}
+                >
+                  <option value="">Chọn loại phiếu</option>
+                  <option value="phiếu thu">phiếu thu</option>
+                  <option value="phiếu chi">phiếu chi</option>
+                </select>
+              </Form.Item>
+
+              <Form.Item
+                name="category"
+                label={<span>Danh mục <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
+              >
+                <select
+                  disabled={!selectedTicketType}
+                  className="subtext"
+                  style={{
+                    width: '100%',
+                    height: '40px',
+                    padding: '8px 12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    color: selectedTicketType ? '#262626' : '#9ca3af',
+                    cursor: selectedTicketType ? 'pointer' : 'not-allowed',
+                    backgroundColor: selectedTicketType ? '#fff' : '#f9fafb',
+                    transition: 'all 0.2s'
+                  }}
+                  onFocus={(e) => {
+                    if (selectedTicketType) {
+                      e.target.style.borderColor = '#3b82f6'
+                      e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)'
+                    }
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db'
+                    e.target.style.boxShadow = 'none'
+                  }}
+                >
+                  <option value="">
+                    {selectedTicketType ? 'Chọn danh mục' : 'Vui lòng chọn loại phiếu trước'}
+                  </option>
+                  {getCategoryOptions().map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Form.Item>
+
+              <Form.Item
+                name="target"
+                label={<span>Đối tượng <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng nhập đối tượng' }]}
+              >
+                <Input placeholder="VD: Công ty Điện lực" />
+              </Form.Item>
+
+              <Form.Item
+                name="amount"
+                label={<span>Số tiền <span style={{ color: 'red' }}>*</span></span>}
+                rules={[
+                  { required: true, message: 'Vui lòng nhập số tiền' },
+                  { type: 'number', min: 1, message: 'Số tiền phải lớn hơn 0' }
+                ]}
+              >
+                <InputNumber
+                  style={{ width: '100%' }}
+                  placeholder="VD: 2.000.000"
+                  formatter={(value) =>
+                    `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                  }
+                  parser={(value) => value?.replace(/\./g, '')}
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Right Column */}
+            <Col span={12} style={{ display: 'flex', flexDirection: 'column' }}>
+              <Form.Item
+                name="createdAt"
+                label="Ngày tạo"
+              >
+                <Input 
+                  value={dayjs().format('DD/MM/YYYY')}
+                  disabled
+                  style={{ 
+                    background: '#f5f5f5',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="creator"
+                label="Người tạo"
+              >
+                <Input 
+                  disabled
+                  style={{ 
+                    background: '#f5f5f5',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="description"
+                label={<span>Nội dung <span style={{ color: 'red' }}>*</span></span>}
+                rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+              >
+                <Input.TextArea 
+                  rows={4} 
+                  placeholder="VD: Xe bị xì lốp"
+                  style={{ 
+                    resize: 'none',
+                    minHeight: '100px',
+                    flex: 1
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+    </>
+  )
+}
+
+export default function AccountanceFinance({ Layout = AccountanceLayout }) {
+  const Wrapper = Layout || (({ children }) => <>{children}</>)
+  return (
+    <Wrapper>
+      <AccountanceFinanceContent />
+    </Wrapper>
   )
 }
 

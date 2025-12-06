@@ -1,19 +1,20 @@
-import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Space, Tag } from 'antd'
-import { SearchOutlined, RightOutlined, DownOutlined } from '@ant-design/icons'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { Table, Input, Button, Space, Tag, message } from 'antd'
+import { SearchOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { debtsAPI } from '../../services/api'
 import '../../styles/pages/accountance/debts.css'
 
 const STATUS_FILTERS = [
-  { key: 'pending', label: 'Chưa hoàn tất' },
-  { key: 'paid', label: 'Đã thanh toán' },
-  { key: 'all', label: 'Tất cả' }
+  { key: 'CON_NO', label: 'Chưa hoàn tất' },
+  { key: 'DA_TAT_TOAN', label: 'Đã thanh toán' },
+  { key: 'ALL', label: 'Tất cả' }
 ]
 
 const STATUS_COLORS = {
-  pending: { color: '#b45309', text: 'Chưa hoàn tất' },
-  paid: { color: '#1f8f4d', text: 'Đã thanh toán' }
+  pending: { color: '#c2410c', bg: '#fff7ed', text: 'Chưa hoàn tất' },
+  paid: { color: '#15803d', bg: '#dcfce7', text: 'Đã thanh toán' }
 }
 
 const detailStatusConfig = {
@@ -21,91 +22,152 @@ const detailStatusConfig = {
   warning: { label: 'Sắp', color: '#f97316', bg: '#ffedd5' }
 }
 
-const debtData = [
-  {
-    id: 1,
-    customer: 'Nguyễn Văn A',
-    phone: '0123456789',
-    totalDebt: 20000000,
-    debtCount: 2,
-    status: 'pending',
-    details: [
-      {
-        id: 1,
-        code: 'STK-2025-000001',
-        createdAt: '12/11/2025',
-        total: 12000000,
-        remain: 5000000,
-        dueDate: '30/11/2025',
-        status: 'done'
-      },
-      {
-        id: 2,
-        code: 'STK-2025-000002',
-        createdAt: '12/11/2025',
-        total: 3000000,
-        remain: 15000000,
-        dueDate: '30/11/2025',
-        status: 'warning'
-      }
-    ]
-  },
-  {
-    id: 2,
-    customer: 'Nguyễn Văn A',
-    phone: '0123456789',
-    totalDebt: 20000000,
-    debtCount: 1,
-    status: 'pending',
-    details: []
-  },
-  {
-    id: 3,
-    customer: 'Nguyễn Văn A',
-    phone: '0123456789',
-    totalDebt: 20000000,
-    debtCount: 1,
-    status: 'paid',
-    details: []
+const normalizeStatus = (rawStatus) => {
+  if (rawStatus === 'DA_TAT_TOAN') return 'paid'
+  return 'pending'
+}
+
+const safeNumber = (value) => {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return 0
   }
-]
+  return Number(value)
+}
 
-export default function Debts() {
+const formatDate = (value) => {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('vi-VN')
+}
+
+export function AccountanceDebtsContent() {
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('pending')
-  const [expandedRowKeys, setExpandedRowKeys] = useState(['1'])
+  const [status, setStatus] = useState('CON_NO')
+  const [expandedRowKeys, setExpandedRowKeys] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [debts, setDebts] = useState([])
+  const [pagination, setPagination] = useState({
+    page: 0,
+    size: 10,
+    total: 0
+  })
 
-  const filtered = useMemo(() => {
-    return debtData
-      .filter((item) => {
-        const matchesQuery =
-          !query ||
-          item.customer.toLowerCase().includes(query.toLowerCase()) ||
-          item.phone.includes(query)
-        const matchesStatus =
-          status === 'all' ||
-          (status === 'pending' && item.status !== 'paid') ||
-          (status === 'paid' && item.status === 'paid')
-        return matchesQuery && matchesStatus
-      })
-      .map((item, index) => ({ ...item, key: item.id, index }))
+  const normalizedDebts = useMemo(() => {
+    return debts.map((item, index) => {
+      const customerName =
+        item.customerName ||
+        item.customer?.fullName ||
+        item.customer?.name ||
+        item.customer ||
+        'Khách hàng'
+      const phone =
+        item.customerPhone ||
+        item.customer?.phone ||
+        item.customer?.phoneNumber ||
+        item.phone ||
+        '—'
+      const details =
+        item.details ||
+        item.debtDetails ||
+        item.items ||
+        []
+      const firstDetail = details[0] || {}
+      const totalAmount = safeNumber(item.totalDebt ?? firstDetail.total ?? item.total ?? item.amount)
+      const remainingAmount = safeNumber(firstDetail.remain ?? item.remainingAmount ?? 0)
+      const paidAmount = Math.max(totalAmount - remainingAmount, 0)
+      return {
+        key: item.id || `debt-${index}`,
+        id: item.id || index,
+        customer: customerName,
+        phone,
+        licensePlate: firstDetail.licensePlate || firstDetail.vehiclePlate || item.licensePlate || '—',
+        totalAmount,
+        paidAmount,
+        remainingAmount,
+        dueDate: formatDate(firstDetail.dueDate || item.dueDate),
+        status: normalizeStatus(item.status),
+        debtCount: item.debtCount ?? details.length ?? 0,
+        details: details.map((detail, detailIndex) => ({
+          key: detail.id || `detail-${detailIndex}`,
+          id: detail.id || detailIndex,
+          code: detail.code || detail.ticketCode || detail.referenceCode || '—',
+          createdAt: formatDate(detail.createdAt || detail.createdDate || detail.createdOn),
+          total: safeNumber(detail.total ?? detail.amount ?? detail.totalAmount),
+          remain: safeNumber(detail.remain ?? detail.outstandingAmount ?? detail.debtAmount),
+          dueDate: formatDate(detail.dueDate || detail.paymentDueDate),
+          status: detail.status || 'warning'
+        }))
+      }
+    })
+  }, [debts])
+
+  const fetchDebts = useCallback(
+    async (page = 0, size = 10) => {
+      setLoading(true)
+      try {
+        const { data, error } = await debtsAPI.list({
+          status: status === 'ALL' ? undefined : status,
+          keyword: query || undefined,
+          page,
+          size,
+          sort: 'createdAt,desc'
+        })
+
+        if (error) {
+          throw new Error(error)
+        }
+
+        const payload = data?.result ?? data?.data ?? data
+        const list =
+          Array.isArray(payload)
+            ? payload
+            : payload?.content ||
+              payload?.items ||
+              payload?.records ||
+              []
+
+        setDebts(list)
+        setPagination((prev) => ({
+          ...prev,
+          page,
+          size,
+          total:
+            payload?.totalElements ??
+            payload?.total ??
+            payload?.totalItems ??
+            list.length
+        }))
+        setExpandedRowKeys([])
+      } catch (err) {
+        message.error(err.message || 'Không thể tải dữ liệu công nợ')
+        setDebts([])
+        setPagination((prev) => ({ ...prev, total: 0, page: 0 }))
+      } finally {
+        setLoading(false)
+      }
+    },
+    [query, status]
+  )
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 0 }))
   }, [query, status])
 
+  useEffect(() => {
+    fetchDebts(0, pagination.size)
+  }, [fetchDebts, pagination.size])
+
+  useEffect(() => {
+    fetchDebts(pagination.page, pagination.size)
+  }, [pagination.page, pagination.size, fetchDebts])
+
   const columns = [
-    {
-      title: 'STT',
-      dataIndex: 'index',
-      key: 'index',
-      width: 70,
-      render: (_, __, index) => (
-        <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
-      )
-    },
     {
       title: 'Khách hàng',
       dataIndex: 'customer',
       key: 'customer',
-      width: 200,
+      width: 220,
       render: (text, record) => (
         <div className="debt-name-cell">
           <div className="avatar-circle">{text.charAt(0)}</div>
@@ -117,31 +179,52 @@ export default function Debts() {
       )
     },
     {
-      title: 'Số điện thoại',
-      dataIndex: 'phone',
-      key: 'phone',
-      width: 150
+      title: 'Biển số xe',
+      dataIndex: 'licensePlate',
+      key: 'licensePlate',
+      width: 140
     },
     {
-      title: 'Tổng nợ',
-      dataIndex: 'totalDebt',
-      key: 'totalDebt',
+      title: 'Tổng cộng',
+      dataIndex: 'totalAmount',
+      key: 'totalAmount',
+      align: 'right',
+      width: 140,
+          render: (value) => value.toLocaleString('vi-VN')
+    },
+    {
+      title: 'Đã thanh toán',
+      dataIndex: 'paidAmount',
+      key: 'paidAmount',
+      align: 'right',
       width: 150,
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
-      title: 'Số phiếu nợ',
-      dataIndex: 'debtCount',
-      key: 'debtCount',
+      title: 'Còn nợ',
+      dataIndex: 'remainingAmount',
+      key: 'remainingAmount',
+      align: 'right',
+      width: 140,
+      render: (value) => (
+        <span style={{ color: value > 0 ? '#d92d20' : '#15803d', fontWeight: 600 }}>
+          {value.toLocaleString('vi-VN')}
+        </span>
+      )
+    },
+    {
+      title: 'Ngày hẹn trả',
+      dataIndex: 'dueDate',
+      key: 'dueDate',
       width: 140
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
-      width: 160,
+      width: 140,
       render: (value) => {
-        const config = STATUS_COLORS[value]
+        const config = STATUS_COLORS[value] || STATUS_COLORS.pending
         return (
           <Tag
             style={{
@@ -149,8 +232,8 @@ export default function Debts() {
               padding: '4px 12px',
               fontWeight: 600,
               color: config.color,
-              background: 'transparent',
-              borderColor: config.color
+              background: config.bg,
+              borderColor: 'transparent'
             }}
           >
             {config.text}
@@ -158,6 +241,21 @@ export default function Debts() {
         )
       }
     },
+    {
+      title: '',
+      key: 'action',
+      width: 70,
+      render: (_, record) => (
+        <Button
+          type="text"
+          icon={<i className="bi bi-eye" />}
+          onClick={() => {
+            const key = record.key
+            setExpandedRowKeys((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+          }}
+        />
+      ),
+    }
   ]
 
   const expandedRowRender = (record) => {
@@ -266,7 +364,6 @@ export default function Debts() {
   }
 
   return (
-    <AccountanceLayout>
       <div className="debts-page">
         <div className="debts-header">
           <h1>Công nợ • Khách hàng</h1>
@@ -280,8 +377,9 @@ export default function Debts() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="debts-search"
+            style={{ maxWidth: 320 }}
           />
-          <Space>
+        <Space wrap>
             {STATUS_FILTERS.map((filter) => (
               <Button
                 key={filter.key}
@@ -299,32 +397,39 @@ export default function Debts() {
           <Table
             className="debts-table"
             columns={columns}
-            dataSource={filtered}
+            dataSource={normalizedDebts.map((item, index) => ({
+              ...item,
+              index
+            }))}
+            loading={loading}
             expandable={{
               expandedRowRender,
               expandedRowKeys,
               onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
-              expandIcon: ({ expanded, onExpand, record }) => (
-                <Button
-                  type="text"
-                  onClick={(e) => onExpand(record, e)}
-                  style={{ padding: 0, width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >
-                  {expanded ? <DownOutlined /> : <RightOutlined />}
-                </Button>
-              )
+              expandIconColumnIndex: -1,
             }}
             pagination={{
-              pageSize: 10,
-              current: 1,
-              total: filtered.length,
-              showTotal: (total) => `0 of ${total} row(s) selected.`
+              pageSize: pagination.size,
+              current: pagination.page + 1,
+              total: pagination.total,
+              showTotal: (total) => `Tổng ${total} bản ghi`,
+              onChange: (page, size) => {
+                fetchDebts(page - 1, size)
+              }
             }}
             components={goldTableHeader}
           />
         </div>
       </div>
-    </AccountanceLayout>
+  )
+}
+
+export default function AccountanceDebts({ Layout = AccountanceLayout }) {
+  const Wrapper = Layout || (({ children }) => <>{children}</>)
+  return (
+    <Wrapper>
+      <AccountanceDebtsContent />
+    </Wrapper>
   )
 }
 

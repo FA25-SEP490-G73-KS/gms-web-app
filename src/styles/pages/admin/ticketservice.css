@@ -1,8 +1,23 @@
-.ts-badge { background: #f5f7fb; color: #3b4754; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; }
+.ts-badge { background: #fff; color: #3b4754; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #e6e6e6; }
 .ts-badge.info { background: #eef3ff; color: #486FE0; }
 .ts-badge.warn { background: #fff3e0; color: #E89400; }
 .ts-badge.gray { background: #eef1f5; color: #5f6b7a; }
 .ts-badge.danger { background: #ffe9ec; color: #ef4444; }
+
+/* status filter buttons */
+.status-btn {
+  border-radius: 24px !important;
+  border-color: #d9d9d9 !important;
+  color: #666 !important;
+}
+
+.status-btn.active,
+.status-btn.ant-btn-primary {
+  background: #cbb081 !important;
+  border-color: #cbb081 !important;
+  color: #111 !important;
+  font-weight: 600;
+}
 
 /* pagination (match appointments) */
 .pagination { display: flex; align-items: center; gap: 8px; }

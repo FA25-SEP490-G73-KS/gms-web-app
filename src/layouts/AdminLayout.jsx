@@ -1,25 +1,28 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken } from '../utils/helpers'
 import '../styles/layout/admin-layout.css'
 
 export default function AdminLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  // Keep dropdown open if we're on any orders route
-  const isOnOrdersRoute = location.pathname.startsWith('/service-advisor/orders')
-  const [openService, setOpenService] = useState(isOnOrdersRoute)
+  // Giữ trạng thái mở/đóng của nhóm "Phiếu dịch vụ" giữa các màn service-advisor
+  const [openService, setOpenService] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('admin_open_service')
+    return stored ? stored === 'true' : true
+  })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
   const { user, logout } = useAuthStore()
-  
-  // Update state when route changes
+
+  // Persist trạng thái dropdown "Phiếu dịch vụ"
   useEffect(() => {
-    if (isOnOrdersRoute) {
-      setOpenService(true)
-    }
-  }, [isOnOrdersRoute])
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('admin_open_service', String(openService))
+  }, [openService])
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -38,7 +41,7 @@ export default function AdminLayout({ children }) {
   }
 
   const items = [
-    { key: 'dashboard', label: 'Doanh thu', to: '/service-advisor', icon: 'bi-grid' },
+    { key: 'dashboard', label: 'Báo cáo', to: '/service-advisor/reports', icon: 'bi-grid' },
     { key: 'appointments', label: 'Lịch hẹn', to: '/service-advisor/appointments', icon: 'bi-calendar3' },
   ]
 
@@ -55,8 +58,8 @@ export default function AdminLayout({ children }) {
     if (path.startsWith('/service-advisor/appointments')) {
       return { parent: '', current: 'Lịch hẹn' }
     }
-    if (path.startsWith('/service-advisor/warranty')) {
-      return { parent: '', current: 'Bảo hành' }
+    if (path.startsWith('/service-advisor/customers')) {
+      return { parent: '', current: 'Khách hàng' }
     }
     return { parent: '', current: 'Trang chủ' }
   }
@@ -96,7 +99,7 @@ export default function AdminLayout({ children }) {
 
       {/* Sidebar - Overlay on header */}
       <aside className="admin-sidebar">
-        <div className="admin-brand" onClick={() => navigate('/service-advisor')} style={{ marginTop: '57px' }}>
+        <div className="admin-brand" onClick={() => navigate('/service-advisor')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="admin-nav">
@@ -115,10 +118,6 @@ export default function AdminLayout({ children }) {
             <button
               className={`admin-nav-item ${location.pathname.startsWith('/service-advisor/orders') ? 'active' : ''}`}
               onClick={() => {
-                // Don't allow closing if we're on an orders route
-                if (isOnOrdersRoute) {
-                  return
-                }
                 setOpenService((v) => !v)
               }}
             >
@@ -141,6 +140,12 @@ export default function AdminLayout({ children }) {
                   Danh sách phiếu
                 </button>
                 <button 
+                  className={`submenu-item ${location.pathname === '/service-advisor/orders/new-customer' ? 'active' : ''}`}
+                  onClick={() => navigate('/service-advisor/orders/new-customer')}
+                >
+                  Tạo phiếu dịch vụ
+                </button>
+                <button 
                   className={`submenu-item ${location.pathname === '/service-advisor/orders/history' ? 'active' : ''}`}
                   onClick={() => navigate('/service-advisor/orders/history')}
                 >
@@ -150,10 +155,14 @@ export default function AdminLayout({ children }) {
             )}
           </div>
 
-          <button className={`admin-nav-item ${isActive('/service-advisor/warranty') ? 'active' : ''}`} onClick={() => navigate('/service-advisor/warranty')}>
-            <i className="bi bi-shield-check" />
-            <span>Bảo hành</span>
+          <button 
+            className={`admin-nav-item ${isActive('/service-advisor/customers') ? 'active' : ''}`}
+            onClick={() => navigate('/service-advisor/customers')}
+          >
+            <i className="bi bi-people" />
+            <span>Khách hàng</span>
           </button>
+
         </nav>
         <div className="admin-spacer" />
         
@@ -162,25 +171,17 @@ export default function AdminLayout({ children }) {
           <button 
             className="admin-user-info" 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            <div className="admin-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+            <div className="admin-user-text">
+              <div className="admin-user-name">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
+              <div className="admin-user-role">
+                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+              </div>
             </div>
           </button>
           

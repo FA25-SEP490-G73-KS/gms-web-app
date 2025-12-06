@@ -1,14 +1,13 @@
 :root { 
   --gold: #CBB081; 
   --sidebar-width: 240px;
-  --sidebar-collapsed-width: 72px;
+  --sidebar-collapsed-width: 90px;
 }
 
 .manager-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7f7f8;
   position: relative;
 }
 
@@ -37,7 +36,7 @@
   cursor: pointer;
   border-radius: 6px;
   color: #666;
-  font-size: 18px;
+  font-size: 19px; /* H5: 18-20px */
   transition: all 0.2s ease;
 }
 
@@ -58,67 +57,48 @@
   min-height: 73px;
 }
 
-.manager-header-left {
+.manager-topbar-left {
   display: flex;
   align-items: center;
   gap: 16px;
+  margin-left: var(--sidebar-width);
 }
 
-.manager-header-logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.manager-layout.sidebar-collapsed .manager-topbar-left {
+  margin-left: var(--sidebar-collapsed-width);
 }
 
-.manager-header-logo img {
-  height: 60px;
-  width: auto;
+.manager-breadcrumb-divider {
+  width: 1px;
+  height: 24px;
+  background: #e6e8eb;
 }
 
-.manager-header-title {
+.manager-breadcrumb {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.manager-header-title .garage-text {
-  color: #CBB081;
-  font-weight: 600;
-  font-size: 20px;
-}
-
-.manager-header-title .name-text {
-  color: #030303;
-  font-weight: 700;
-  font-size: 20px;
-}
-
-.manager-header-greeting {
-  color: #030303;
-  font-size: 16px;
+.manager-breadcrumb-item {
+  color: #6b7280;
   font-weight: 500;
-  margin-left: 16px;
 }
 
-.manager-header-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+.manager-breadcrumb-separator {
+  color: #9ca3af;
+  font-size: 12.5px; /* Caption: 12-13px */
 }
 
-.manager-header-zalo {
+.manager-breadcrumb-current {
+  color: #111827;
+  font-weight: 700;
+}
+
+.manager-topbar-right {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: #0068FF;
-  color: #fff;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  border: none;
+  gap: 12px;
 }
 
 .manager-header-notification {
@@ -133,7 +113,7 @@
   border: 1px solid #e6e8eb;
   cursor: pointer;
   color: #030303;
-  font-size: 18px;
+  font-size: 19px; /* H5: 18-20px */
 }
 
 .manager-header-notification .notification-badge {
@@ -149,9 +129,65 @@
 
 .manager-header-user {
   color: #030303;
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
   font-weight: 500;
   margin-left: 8px;
+}
+
+/* User info at bottom of manager sidebar */
+.manager-user-menu {
+  width: 100%;
+}
+
+.manager-user-info {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fafafa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.manager-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #CBB081;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 19px; /* H5: 18-20px */
+  flex-shrink: 0;
+}
+
+.manager-user-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.manager-user-name {
+  font-weight: 600;
+  font-size: 14.5px; /* Subtext: 14-15px */
+  color: #111827;
+}
+
+.manager-user-role {
+  font-size: 12.5px; /* Caption: 12-13px */
+  color: #6b7280;
+}
+
+/* When manager sidebar collapsed: only show avatar */
+.manager-layout.sidebar-collapsed .manager-sidebar .manager-user-text {
+  display: none;
+}
+
+.manager-layout.sidebar-collapsed .manager-sidebar .manager-user-info {
+  justify-content: center;
 }
 
 .manager-sidebar {
@@ -179,7 +215,7 @@
 }
 
 .manager-layout.sidebar-collapsed .manager-sidebar .manager-brand img {
-  height: 60px;
+  height: 52px;
 }
 
 .manager-layout.sidebar-collapsed .manager-sidebar .manager-nav-item span,
@@ -202,11 +238,11 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  margin-top: 80px; /* Space for header */
+  margin-top: 10px; /* Space for header */
 }
 
 .manager-brand img {
-  height: 80px;
+  height: 76px;
   width: auto;
 }
 
@@ -230,13 +266,13 @@
   color: #222;
   font-weight: 600;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 14.5px; /* Subtext: 14-15px */
 }
 
 .manager-nav-item i {
   width: 18px;
   color: var(--gold);
-  font-size: 16px;
+  font-size: 17px; /* Body: 16-18px */
 }
 
 .manager-nav-item:hover {
@@ -266,6 +302,10 @@
   transform: rotate(180deg);
 }
 
+.manager-layout.sidebar-collapsed .manager-sidebar .manager-nav-group .caret {
+  display: none;
+}
+
 .submenu {
   position: relative;
   padding-left: 24px;
@@ -292,7 +332,7 @@
   border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
-  font-size: 13px;
+  font-size: 12.5px; /* Caption: 12-13px */
 }
 
 .submenu-item:hover {
@@ -312,7 +352,7 @@
 .manager-user-info {
   padding: 12px 16px;
   border-top: 1px solid rgba(0, 0, 0, 0.1);
-  font-size: 12px;
+  font-size: 12.5px; /* Caption: 12-13px */
   color: #222;
   text-align: center;
 }
@@ -324,7 +364,7 @@
 
 .manager-user-info .user-role {
   color: #CBB081;
-  font-size: 11px;
+  font-size: 12.5px; /* Caption: 12-13px */
 }
 
 .manager-logout {
@@ -339,7 +379,7 @@
   padding: 10px 12px;
   border-radius: 10px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 14.5px; /* Subtext: 14-15px */
 }
 
 .manager-logout i {

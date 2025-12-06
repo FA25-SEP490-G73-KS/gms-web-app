@@ -1,34 +1,57 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Input, Card, Badge, Space, message, Button, DatePicker, Row, Col } from 'antd'
-import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
+import { Table, Input, Card, Badge, Space, message, Button, Row, Col, Form, Select, Modal } from 'antd'
+import { EyeOutlined, SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
-import { serviceTicketAPI } from '../../services/api'
+import { serviceTicketAPI, employeeAPI } from '../../services/api'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 import '../../styles/pages/admin/ticketservice.css'
 
 const { Search } = Input
+const { TextArea } = Input
+const SERVICES = [
+  { label: 'Thay thế phụ tùng', value: 1 },
+  { label: 'Sơn', value: 2 },
+  { label: 'Bảo dưỡng', value: 3 }
+]
+
+
+const STATUS_MAP = {
+  'CREATED': 'Đã tạo',
+  'WAITING_FOR_QUOTATION': 'Chờ báo giá',
+  'WAITING_FOR_DELIVERY': 'Chờ bàn giao xe',
+  'COMPLETED': 'Hoàn thành',
+  'CANCELED': 'Hủy'
+}
 
 const STATUS_FILTERS = [
   { key: 'CREATED', label: 'Đã tạo' },
-  { key: 'WAITING_QUOTE', label: 'Chờ báo giá' },
-  { key: 'WAITING_HANDOVER', label: 'Chờ bàn giao xe' },
-  { key: 'CANCELLED', label: 'Hủy' },
+  { key: 'WAITING_FOR_QUOTATION', label: 'Chờ báo giá' },
+  { key: 'WAITING_FOR_DELIVERY', label: 'Chờ bàn giao xe' },
+  { key: 'COMPLETED', label: 'Hoàn thành' },
+  { key: 'CANCELED', label: 'Hủy' },
 ]
 
 const getStatusConfig = (status) => {
   switch (status) {
     case 'Hủy':
+    case 'CANCELED':
     case 'CANCELLED':
       return { color: '#ef4444', text: 'Hủy' }
     case 'Chờ báo giá':
+    case 'WAITING_FOR_QUOTATION':
     case 'WAITING_QUOTE':
       return { color: '#ffd65a', text: 'Chờ báo giá' }
     case 'Chờ bàn giao xe':
+    case 'WAITING_FOR_DELIVERY':
     case 'WAITING_HANDOVER':
-      return { color: '#ffd65a', text: 'Chờ bàn giao xe' }
+      return { color: '#3b82f6', text: 'Chờ bàn giao xe' }
+    case 'Hoàn thành':
+    case 'COMPLETED':
+      return { color: '#22c55e', text: 'Hoàn thành' }
     case 'Đã tạo':
     case 'CREATED':
       return { color: '#666', text: 'Đã tạo' }
@@ -50,12 +73,98 @@ export default function TicketService() {
   const [updateTicketId, setUpdateTicketId] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState(isHistoryPage ? null : 'CREATED')
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
+  // Không lọc theo trạng thái mặc định để luôn hiển thị mọi phiếu,
+  // tránh trường hợp backend trả về status mới (VD: WAITING_FOR_QUOTATION) mà không map kịp.
+  const [statusFilter, setStatusFilter] = useState(null)
   const [dateFilter, setDateFilter] = useState(null)
+
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createForm] = Form.useForm()
+  const [createLoading, setCreateLoading] = useState(false)
+  const [selectedServices, setSelectedServices] = useState([])
+  const [selectKey, setSelectKey] = useState(0)
+  const [currentAppointmentId, setCurrentAppointmentId] = useState(null)
+  const [technicians, setTechnicians] = useState([])
+  const [techniciansLoading, setTechniciansLoading] = useState(false)
+
+  useEffect(() => {
+    fetchServiceTickets()
+  }, [page, pageSize, statusFilter, dateFilter])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchServiceTickets()
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    if (location.state?.appointmentId) {
+      const appointmentId = location.state.appointmentId
+      setCurrentAppointmentId(appointmentId)
+      setCreateModalOpen(true)
+      
+      if (location.state.customer || location.state.phone || location.state.licensePlate) {
+        createForm.setFieldsValue({
+          name: location.state.customer || '',
+          phone: displayPhoneFrom84(location.state.phone || ''),
+          plate: location.state.licensePlate || ''
+        })
+      }
+      
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state])
+
 
   useEffect(() => {
     fetchServiceTickets()
   }, [])
+
+  useEffect(() => {
+    if (createModalOpen) {
+      fetchTechnicians()
+    }
+  }, [createModalOpen])
+
+  const fetchTechnicians = async () => {
+    setTechniciansLoading(true)
+    try {
+      const { data: response, error } = await employeeAPI.getTechnicians()
+      
+      if (error) {
+        console.error('Error fetching technicians:', error)
+        message.error('Không thể tải danh sách kỹ thuật viên. Vui lòng thử lại.')
+        setTechnicians([])
+        setTechniciansLoading(false)
+        return
+      }
+
+      if (response && Array.isArray(response.result)) {
+        const techList = response.result.map(tech => ({
+          value: tech.employeeId,
+          label: tech.fullName
+        }))
+        setTechnicians(techList)
+      } else if (Array.isArray(response)) {
+        const techList = response.map(tech => ({
+          value: tech.employeeId,
+          label: tech.fullName
+        }))
+        setTechnicians(techList)
+      } else {
+        setTechnicians([])
+      }
+    } catch (err) {
+      console.error('Error fetching technicians:', err)
+      message.error('Đã xảy ra lỗi khi tải danh sách kỹ thuật viên.')
+      setTechnicians([])
+    } finally {
+      setTechniciansLoading(false)
+    }
+  }
 
   const fetchServiceTickets = async () => {
     setLoading(true)
@@ -219,6 +328,183 @@ export default function TicketService() {
     fetchServiceTickets()
   }
 
+  const handleStatusChange = async (ticketId, newStatus, currentStatus) => {
+    if (!ticketId || !newStatus || newStatus === currentStatus) return
+    
+    setUpdatingStatusId(ticketId)
+    try {
+      const { data, error } = await serviceTicketAPI.updateStatus(ticketId, newStatus)
+      
+      if (error) {
+        message.error('Không thể cập nhật trạng thái')
+        return
+      }
+      
+      message.success('Cập nhật trạng thái thành công')
+      await fetchServiceTickets()
+    } catch (err) {
+      console.error('Error updating ticket status:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật trạng thái')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
+
+  const handleServiceSelect = (value) => {
+    if (!value) return
+    
+    const service = SERVICES.find(s => s.value === value)
+    if (service) {
+      const isAlreadySelected = selectedServices.some(s => s.value === value)
+      if (!isAlreadySelected) {
+        setSelectedServices([...selectedServices, { ...service, id: `${service.value}-${Date.now()}` }])
+        setSelectKey(prev => prev + 1)
+      }
+    }
+  }
+
+  const handleRemoveService = (id) => {
+    setSelectedServices(selectedServices.filter(s => s.id !== id))
+  }
+
+  const handleCreateTicket = async (values) => {
+    if (!selectedServices || selectedServices.length === 0) {
+      message.error('Vui lòng chọn ít nhất một loại dịch vụ')
+      return
+    }
+
+    setCreateLoading(true)
+    
+    try {
+      const appointmentId = currentAppointmentId ? parseInt(currentAppointmentId) : null
+      
+      const payload = {
+        appointmentId: appointmentId && appointmentId > 0 ? appointmentId : 0,
+        serviceTypeIds: selectedServices.map(s => s.value),
+        customer: {
+          customerId: 0,
+          fullName: values.name || '',
+          phone: normalizePhoneTo84(values.phone || ''),
+          address: values.address || '',
+          customerType: 'CA_NHAN',
+          loyaltyLevel: 'BRONZE'
+        },
+        vehicle: {
+          vehicleId: 0,
+          licensePlate: values.plate || '',
+          brandId: values.brandId || 0,
+          modelId: values.modelId || 0,
+          modelName: values.model || '',
+          vin: values.vin || '',
+          year: values.year ? parseInt(values.year) : 0
+        },
+        assignedTechnicianIds: values.techs && Array.isArray(values.techs) && values.techs.length > 0 ? values.techs : [0],
+        receiveCondition: values.note || ''
+      }
+
+      if (values.receiveDate) {
+        payload.expectedDeliveryAt = values.receiveDate.format('YYYY-MM-DD')
+      }
+
+      console.log('Creating service ticket with payload:', payload)
+
+      const { data, error } = await serviceTicketAPI.create(payload)
+      
+      if (error) {
+        console.error('Error creating service ticket:', error)
+        message.error(error || 'Tạo phiếu không thành công. Vui lòng thử lại.')
+        setCreateLoading(false)
+        return
+      }
+
+      if (data && (data.statusCode === 200 || data.statusCode === 201 || data.result)) {
+        message.success('Tạo phiếu dịch vụ thành công')
+        createForm.resetFields()
+        setSelectedServices([])
+        setCurrentAppointmentId(null)
+        setCreateModalOpen(false)
+        await fetchServiceTickets()
+      } else {
+        message.error('Tạo phiếu không thành công. Vui lòng thử lại.')
+        setCreateLoading(false)
+      }
+    } catch (err) {
+      console.error('Error creating service ticket:', err)
+      message.error('Đã xảy ra lỗi khi tạo phiếu dịch vụ.')
+      setCreateLoading(false)
+    }
+  }
+
+  const handleCreateModalClose = () => {
+    setCreateModalOpen(false)
+    createForm.resetFields()
+    setSelectedServices([])
+    setCurrentAppointmentId(null)
+  }
+
+  const historyColumns = [
+    {
+      title: 'STT',
+      key: 'index',
+      width: 80,
+      render: (_, __, index) => (
+        <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
+      )
+    },
+    {
+      title: 'Code',
+      dataIndex: 'code',
+      key: 'code',
+      width: 180,
+      render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
+    },
+    {
+      title: 'Khách Hàng',
+      dataIndex: 'customer',
+      key: 'customer',
+      width: 200
+    },
+    {
+      title: 'Biển Số Xe',
+      dataIndex: 'license',
+      key: 'license',
+      width: 150
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: () => (
+        <span style={{ color: '#22c55e', fontWeight: 600 }}>Hoàn thành</span>
+      )
+    },
+    {
+      title: 'Ngày Giao Xe',
+      dataIndex: 'deliveryDate',
+      key: 'deliveryDate',
+      width: 150
+    },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      width: 150,
+      render: (_, record) => {
+        const isDone = record.warrantyStatus === 'done'
+        return (
+          <Button
+            size="small"
+            className={`warranty-btn ${isDone ? 'done' : ''}`}
+            type="default"
+          >
+            {isDone ? 'Đã bảo hành' : 'Bảo hành'}
+          </Button>
+        )
+      }
+    }
+  ]
+
   const columns = [
     {
       title: 'Code',
@@ -242,10 +528,61 @@ export default function TicketService() {
       title: 'Trạng Thái',
       dataIndex: 'status',
       key: 'status',
-      width: 180,
+      width: 200,
       render: (status, record) => {
-        const config = getStatusConfig(record.statusKey || status)
+        const currentStatus = record.statusKey || status
+        const config = getStatusConfig(currentStatus)
+        const isUpdating = updatingStatusId === record.id
+        
+        if (isHistoryPage) {
         return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
+        }
+        
+          return (
+            <select
+              value={currentStatus}
+              onChange={(e) => {
+                e.stopPropagation()
+                handleStatusChange(record.id, e.target.value, currentStatus)
+              }}
+              onClick={(e) => e.stopPropagation()}
+              disabled={isUpdating}
+              style={{
+                border: '1px solid #d0d7de',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '13px',
+                outline: 'none',
+                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                background: '#fff',
+                minWidth: '160px',
+                color: config.color,
+                fontWeight: 600,
+                opacity: isUpdating ? 0.6 : 1
+              }}
+            >
+              {currentStatus === 'WAITING_FOR_QUOTATION' ? (
+                <>
+                  <option value="WAITING_FOR_QUOTATION" style={{ color: '#ffd65a' }}>Chờ báo giá</option>
+                  <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
+                </>
+              ) : currentStatus === 'WAITING_FOR_DELIVERY' ? (
+                <>
+                  <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
+                  <option value="COMPLETED" style={{ color: '#22c55e' }}>Hoàn thành</option>
+                </>
+              ) : (
+                Object.keys(STATUS_MAP).map((key) => {
+                  const optConfig = getStatusConfig(key)
+                  return (
+                    <option key={key} value={key} style={{ color: optConfig.color }}>
+                      {STATUS_MAP[key]}
+                    </option>
+                  )
+                })
+              )}
+            </select>
+          )
       }
     },
     {
@@ -281,13 +618,17 @@ export default function TicketService() {
   ]
 
   return (
-    <AdminLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+        <AdminLayout>
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
+          <h1 className="h4" style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
             {isHistoryPage ? 'Lịch sử sửa chữa' : 'Danh sách phiếu'}
           </h1>
-          
+          <p className="subtext" style={{ margin: '0 0 20px 0', color: '#6b7280' }}>
+            {isHistoryPage
+              ? 'Tra cứu lại các phiếu dịch vụ đã hoàn tất hoặc đã hủy theo biển số xe và ngày tạo.'
+              : 'Quản lý danh sách phiếu dịch vụ hiện tại theo trạng thái, ngày tạo và biển số xe.'}
+          </p>
           <Row gutter={16} style={{ marginBottom: '20px' }}>
             <Col flex="auto">
               <Search
@@ -304,13 +645,28 @@ export default function TicketService() {
               />
             </Col>
             <Col>
-              <DatePicker
+              <input
+                type="date"
                 placeholder="Ngày tạo"
-                format="DD/MM/YYYY"
-                suffixIcon={<CalendarOutlined />}
-                value={dateFilter}
-                onChange={setDateFilter}
-                style={{ width: '150px' }}
+                value={dateFilter ? dateFilter.format('YYYY-MM-DD') : ''}
+                onChange={(e) => {
+                  const value = e.target.value
+                  if (!value) {
+                    setDateFilter(null)
+                    return
+                  }
+                  // Lưu lại dưới dạng dayjs để logic filter bên dưới không phải sửa nhiều
+                  const dayjs = require('dayjs')
+                  setDateFilter(dayjs(value, 'YYYY-MM-DD'))
+                }}
+                style={{
+                  width: 150,
+                  height: 32,
+                  borderRadius: 8,
+                  border: '1px solid #d9d9d9',
+                  padding: '4px 8px',
+                  fontSize: 14
+                }}
               />
             </Col>
             {!isHistoryPage && (
@@ -320,12 +676,7 @@ export default function TicketService() {
                     <Button
                       key={item.key}
                       type={statusFilter === item.key ? 'primary' : 'default'}
-                      style={{
-                        background: statusFilter === item.key ? '#ffd65a' : '#fff',
-                        borderColor: statusFilter === item.key ? '#ffd65a' : '#e6e6e6',
-                        color: statusFilter === item.key ? '#111' : '#666',
-                        fontWeight: 600
-                      }}
+                      className={statusFilter === item.key ? 'status-btn active' : 'status-btn'}
                       onClick={() => setStatusFilter(item.key)}
                     >
                       {item.label}
@@ -337,7 +688,15 @@ export default function TicketService() {
           </Row>
         </div>
 
-        <Card style={{ borderRadius: '12px' }} bodyStyle={{ padding: 0 }}>
+        <Card 
+          style={{ 
+            borderRadius: '16px', 
+            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+            background: '#fff',
+            padding: '24px'
+          }} 
+          bodyStyle={{ padding: 0 }}
+        >
           <Table
             columns={columns}
             dataSource={filtered.map((item, index) => ({ ...item, key: item.id, index }))}
@@ -386,6 +745,228 @@ export default function TicketService() {
         ticketId={updateTicketId}
         onSuccess={handleUpdateSuccess}
       />
+
+      <Modal
+        title={<span style={{ fontSize: '20px', fontWeight: 600 }}>Tạo phiếu dịch vụ</span>}
+        open={createModalOpen}
+        onCancel={handleCreateModalClose}
+        footer={null}
+        width={1000}
+        style={{ top: 20 }}
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          onFinish={handleCreateTicket}
+          className="create-ticket-form"
+        >
+          <Row gutter={24}>
+            <Col span={12}>
+              <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin khách hàng</h3>
+              <Form.Item
+                label="Số điện thoại"
+                name="phone"
+                rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+              >
+                <Input placeholder="VD: 0123456789" />
+              </Form.Item>
+
+              <Form.Item
+                label="Họ và tên"
+                name="name"
+                rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+              >
+                <Input placeholder="VD: Đặng Thị Huyền" />
+              </Form.Item>
+
+              <Form.Item
+                label="Địa chỉ"
+                name="address"
+                rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
+              >
+                <Input placeholder="VD: Hòa Lạc - Hà Nội" />
+              </Form.Item>
+
+              <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin xe</h3>
+              <Form.Item
+                label="Biển số xe"
+                name="plate"
+                rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
+              >
+                <Input placeholder="VD: 30A-12345" />
+              </Form.Item>
+
+              <Form.Item
+                label="Hãng xe"
+                name="brand"
+                rules={[{ required: true, message: 'Vui lòng nhập hãng xe' }]}
+              >
+                <Input placeholder="VD: Mazda" />
+              </Form.Item>
+
+              <Form.Item
+                label="Loại xe"
+                name="model"
+                rules={[{ required: true, message: 'Vui lòng nhập loại xe' }]}
+              >
+                <Input placeholder="VD: Mazda 3" />
+              </Form.Item>
+
+              <Form.Item
+                label="Số khung"
+                name="vin"
+              >
+                <Input placeholder="VD: RL4XW430089206813" />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
+              <Form.Item
+                label="Loại dịch vụ"
+                name="service"
+              >
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      minHeight: '40px',
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '8px',
+                      border: '1px solid #d9d9d9',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {selectedServices.map((service) => (
+                      <div
+                        key={service.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#e8e8e8',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          height: '28px'
+                        }}
+                      >
+                        <span style={{ fontSize: '14px', color: '#333', whiteSpace: 'nowrap' }}>
+                          {service.label}
+                        </span>
+                        <CloseOutlined
+                          style={{
+                            fontSize: '12px',
+                            color: '#666',
+                            cursor: 'pointer',
+                            marginLeft: '2px'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemoveService(service.id)
+                          }}
+                        />
+                      </div>
+                    ))}
+                    <div style={{ flex: 1, minWidth: '150px' }}>
+                      <Select
+                        key={selectKey}
+                        placeholder={selectedServices.length === 0 ? "Chọn loại dịch vụ" : ""}
+                        style={{ 
+                          width: '100%'
+                        }}
+                        className="service-type-select"
+                        value={null}
+                        onChange={handleServiceSelect}
+                        options={SERVICES.filter(s => !selectedServices.some(ss => ss.value === s.value))}
+                        showSearch
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        bordered={false}
+                        dropdownStyle={{ zIndex: 1050 }}
+                        allowClear={false}
+                      />
+                      <style>{`
+                        .service-type-select .ant-select-selector {
+                          border: none !important;
+                          background: transparent !important;
+                          box-shadow: none !important;
+                          padding: 0 !important;
+                          height: auto !important;
+                        }
+                        .service-type-select .ant-select-selection-placeholder {
+                          color: #999;
+                        }
+                        .service-type-select:hover .ant-select-selector {
+                          border: none !important;
+                        }
+                        .service-type-select.ant-select-focused .ant-select-selector {
+                          border: none !important;
+                          box-shadow: none !important;
+                        }
+                      `}</style>
+                    </div>
+                  </div>
+                </div>
+              </Form.Item>
+
+              <Form.Item
+                label="Kỹ thuật viên sửa chữa"
+                name="techs"
+              >
+                <Select
+                  mode="multiple"
+                  options={technicians}
+                  placeholder={techniciansLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                  loading={techniciansLoading}
+                  disabled={techniciansLoading}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Ngày dự đoán nhận xe"
+                name="receiveDate"
+              >
+                <input
+                  type="date"
+                  style={{
+                    width: '100%',
+                    height: 32,
+                    borderRadius: 8,
+                    border: '1px solid #d9d9d9',
+                    padding: '4px 8px',
+                    fontSize: 14
+                  }}
+                  value={createForm.getFieldValue('receiveDate') || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    createForm.setFieldsValue({ receiveDate: value })
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Ghi chú"
+                name="note"
+              >
+                <TextArea rows={6} placeholder="Nhập ghi chú..." />
+              </Form.Item>
+
+              <Row justify="end" style={{ marginTop: '32px' }}>
+                <Space>
+                  <Button onClick={handleCreateModalClose}>Hủy</Button>
+                  <Button type="primary" htmlType="submit" loading={createLoading} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
+                    Tạo phiếu
+                  </Button>
+                </Space>
+              </Row>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
     </AdminLayout>
   )
 }
