@@ -1,5 +1,5 @@
 :root {
-  --gold: #CBB081;
+  --gold: #cbb081;
   --sidebar-width: 240px;
   --sidebar-collapsed-width: 90px;
 }
@@ -220,7 +220,7 @@
 }
 
 .warehouse-nav-item:hover {
-  background: #CBB081;
+  background: #cbb081;
   color: #111;
 }
 
@@ -229,7 +229,7 @@
 }
 
 .warehouse-nav-item.active {
-  background: #CBB081;
+  background: #cbb081;
   color: #111;
 }
 
@@ -259,7 +259,7 @@
   bottom: 0;
   left: 12px;
   width: 2px;
-  background: #CBB081;
+  background: #cbb081;
   border-radius: 2px;
 }
 
@@ -280,7 +280,7 @@
 }
 
 .submenu-item.active {
-  background: #CBB081;
+  background: #cbb081;
   color: #111;
   font-weight: 600;
 }
@@ -293,7 +293,7 @@
   width: 100%;
   padding: 12px;
   border: 1px solid #eee;
-  borderRadius: 10px;
+  border-radius: 10px;
   background: #fafafa;
   cursor: pointer;
   display: flex;
@@ -311,7 +311,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #CBB081;
+  background: #cbb081;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -389,4 +389,3 @@
   width: 100%;
   box-sizing: border-box;
 }
-

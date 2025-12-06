@@ -1183,15 +1183,15 @@ export default function TicketDetailPage() {
       width: 120,
       render: (_, record) => (
         <div>
-          <CustomSelect
-            placeholder="Đơn vị"
-            value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
-            options={unitOptions}
-            isClearable
-            isDisabled={inputsDisabled}
-            onChange={(option) =>
-              updateReplaceItem(record.id, { unit: option?.value || '' })
-            }
+        <CustomSelect
+          placeholder="Đơn vị"
+          value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
+          options={unitOptions}
+          isClearable
+          isDisabled={inputsDisabled}
+          onChange={(option) =>
+            updateReplaceItem(record.id, { unit: option?.value || '' })
+          }
             styles={{
               control: (base, state) => ({
                 ...base,
@@ -1681,7 +1681,7 @@ export default function TicketDetailPage() {
                 <div>
                   <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Tổng cộng</div>
                   <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
-                </div>
+                        </div>
                 <div>
                   <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Giảm giá</div>
                   <div style={{ fontSize: '20px', fontWeight: 700 }}>
@@ -1697,75 +1697,75 @@ export default function TicketDetailPage() {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
-                {!isHistoryPage ? (
-                  <Space size="middle">
-                    <Button 
-                      onClick={handleSendQuote}
-                      disabled={
-                        actionLoading ||
+              {!isHistoryPage ? (
+                <Space size="middle">
+                          <Button 
+                            onClick={handleSendQuote}
+                    disabled={
+                      actionLoading ||
                         isWaitingWarehouse ||
                         (isWarehouseConfirmed && !isEditMode 
                           ? false  // Cho phép bấm "Cập nhật" để bật edit mode
                           : (isWarehouseConfirmed && isEditMode
                               ? (replaceItems.length === 0 && serviceItems.length === 0)  // Validate khi đang edit
                               : inputsDisabled))  // Logic cho các trạng thái khác
-                      }
-                      loading={actionLoading}
-                      style={{
+                    }
+                    loading={actionLoading}
+                    style={{
                         background: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
                         borderColor: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
-                        color: '#fff',
-                        fontWeight: 600,
-                        padding: '0 24px',
+                      color: '#fff',
+                      fontWeight: 600,
+                      padding: '0 24px',
                         height: '40px',
                         cursor: isWaitingWarehouse ? 'not-allowed' : 'pointer'
-                      }}
-                    >
-                      {actionButtonLabel}
-                    </Button>
-                    {canSendToCustomer && (
-                      <>
-                        <Button
-                          onClick={handleExportPDF}
-                          loading={exportPDFLoading}
-                          disabled={exportPDFLoading}
-                          icon={<FilePdfOutlined />}
-                          style={{
-                            background: '#ef4444',
-                            borderColor: '#ef4444',
-                            color: '#fff',
-                            fontWeight: 600,
-                            padding: '0 24px',
-                            height: '40px'
-                          }}
-                        >
-                          Xuất PDF
-                        </Button>
-                        <Button
-                          onClick={handleSendToCustomer}
-                          loading={sendToCustomerLoading}
-                          disabled={sendToCustomerLoading}
-                          style={{
-                            background: '#2563eb',
-                            borderColor: '#2563eb',
-                            color: '#fff',
-                            fontWeight: 600,
-                            padding: '0 24px',
-                            height: '40px'
-                          }}
-                        >
-                          Gửi báo giá
-                        </Button>
-                      </>
+                    }}
+                          >
+                    {actionButtonLabel}
+                          </Button>
+                  {canSendToCustomer && (
+                    <>
+                      <Button
+                        onClick={handleExportPDF}
+                        loading={exportPDFLoading}
+                        disabled={exportPDFLoading}
+                        icon={<FilePdfOutlined />}
+                        style={{
+                          background: '#ef4444',
+                          borderColor: '#ef4444',
+                          color: '#fff',
+                          fontWeight: 600,
+                          padding: '0 24px',
+                          height: '40px'
+                        }}
+                      >
+                        Xuất PDF
+                      </Button>
+                      <Button
+                        onClick={handleSendToCustomer}
+                        loading={sendToCustomerLoading}
+                        disabled={sendToCustomerLoading}
+                        style={{
+                          background: '#2563eb',
+                          borderColor: '#2563eb',
+                          color: '#fff',
+                          fontWeight: 600,
+                          padding: '0 24px',
+                          height: '40px'
+                        }}
+                      >
+                        Gửi báo giá
+                      </Button>
+                    </>
+                  )}
+                        </Space>
+              ) : (
+                <div style={{ color: '#6b7280', fontSize: '12px' }}>
+                  {ticketData?.priceQuotation
+                    ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
+                    : 'Báo giá đang ở chế độ chỉ xem'}
+                      </div>
                     )}
-                  </Space>
-                ) : (
-                  <div style={{ color: '#6b7280', fontSize: '12px' }}>
-                    {ticketData?.priceQuotation
-                      ? 'Trong quá trình chờ kho và khách duyệt không thể cập nhật báo giá'
-                      : 'Báo giá đang ở chế độ chỉ xem'}
-                  </div>
-                )}
               </div>
             </div>
                   </>

@@ -75,6 +75,13 @@ export default function HomePage() {
     });
     document.head.appendChild(script);
 
+    
+    window.scrollTo({
+      top: 0,
+      left: 0,
+      behavior: 'auto',
+    });
+
     return () => {
       document.head.removeChild(script);
     };
@@ -240,7 +247,7 @@ function RegisterButton() {
           e.currentTarget.style.outline='none';
         }}
       >
-        Đăng ký dịch vụ
+        Đặt lịch
       </button>
     </div>
   )

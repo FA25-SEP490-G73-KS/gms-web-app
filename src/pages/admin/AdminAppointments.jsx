@@ -307,18 +307,18 @@ export default function AdminAppointments() {
       const normalizedStatusKey = statusToKeyMap[rawStatus] || statusToKeyMap[normalizedStatus] || 'CONFIRMED'
       
       return {
-        id: item.appointmentId || item.id,
-        customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
-        license: formatLicensePlate(item.licensePlate || item.license || ''),
-        phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
+      id: item.appointmentId || item.id,
+      customer: item.customerName || item.customer?.fullName || item.customer?.name || '',
+      license: formatLicensePlate(item.licensePlate || item.license || ''),
+      phone: displayPhoneFrom84(item.customerPhone || item.customer?.phone || ''),
         status: normalizedStatus,
         statusKey: normalizedStatusKey,
-        time: item.timeSlotLabel || item.time || '',
+      time: item.timeSlotLabel || item.time || '',
         date: dateDisplay,
         dateRaw: dateRawISO,
-        serviceType: serviceLabel || '',
-        note: item.note || '',
-        originalItem: item
+      serviceType: serviceLabel || '',
+      note: item.note || '',
+      originalItem: item
       }
     })
     setData(transformed)
