@@ -1,6 +1,7 @@
 import React from 'react';
 import Header from '../components/common/Header';
 import CustomerNav from '../components/common/customerNav';
+import FloatingContactButtons from '../components/common/FloatingContactButtons';
 import '../styles/layout/customer-layout.css';
 
 export default function CustomerLayout({ children }) {
@@ -12,6 +13,8 @@ export default function CustomerLayout({ children }) {
       <main className="customer-main">
         {children}
       </main>
+
+      <FloatingContactButtons />
 
       <footer className="customer-footer">
         <div className="customer-footer-content">

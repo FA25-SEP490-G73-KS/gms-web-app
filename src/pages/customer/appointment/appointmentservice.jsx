@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { message } from 'antd'
 import CustomerLayout from '../../../layouts/CustomerLayout'
-import { appointmentAPI, otpAPI, serviceTypeAPI } from '../../../services/api'
+import { appointmentAPI, otpAPI, serviceTypeAPI } from '../../../services/api';
+import Lottie from "lottie-react";
+import successAnim from "../../../assets/animations/Success.json";
 
 export default function AppointmentService() {
   const [step, setStep] = useState(1)
@@ -705,7 +707,7 @@ export default function AppointmentService() {
 
           {step === 4 && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#28c76f', margin: '8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 40 }}>✓</div>
+              <Lottie animationData={successAnim} loop={false} />
               <div style={{ margin: '12px 0', fontSize: 18, fontWeight: 600 }}>Chúc mừng bạn đã đặt lịch thành công!</div>
               
               {appointmentResult && (

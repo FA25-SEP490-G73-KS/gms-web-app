@@ -4,22 +4,22 @@ import '../../styles/pages/home/home.css';
 export default function AboutPage() {
   return (
     <CustomerLayout>
-      <section className="home-hero">
-        <div className="hero-full">
-          <img
-            src="/image/gara.png"
-            alt="Garage Hoàng Tuấn - Sơn, bảo dưỡng, phục hồi xe"
-            className="hero-full-img"
-          />
-        </div>
-      </section>
-
       <section className="home-intro">
         <h2><span>VỀ CHÚNG TÔI</span></h2>
         <div className="intro-text">
-          <p><b>TRUNG TÂM SỬA CHỮA GARAGE HOÀNG TUẤN</b></p>
-          <p><b>Địa chỉ</b>: 110 đường Hoàng Nghiêu, phố Đông, phường Đông Tiến, TP. Thanh Hóa</p>
-          <p><b>Điện thoại / Zalo</b>: 0912 603 603</p>
+          <div className="intro-header">
+            <p className="intro-title"><b>TRUNG TÂM SỬA CHỮA GARAGE HOÀNG TUẤN</b></p>
+            <p><b>Địa chỉ</b>: 110 đường Hoàng Nghiêu, phố Đông, phường Đông Tiền, TP. Thanh Hóa</p>
+            <p><b>Điện thoại / Zalo</b>: 0912 603 603</p>
+          </div>
+
+          <div className="intro-image">
+            <img
+              src="/image/gara.png"
+              alt="Garage Hoàng Tuấn - Sơn, bảo dưỡng, phục hồi xe"
+              className="intro-main-img"
+            />
+          </div>
 
           <p>
             Xuất phát từ nhu cầu thực tế hiện nay, việc bảo dưỡng và sửa chữa xe ô tô là mối quan tâm hàng đầu của các chủ xe.
@@ -56,10 +56,18 @@ export default function AboutPage() {
             <li>Tư vấn kỹ thuật, chăm sóc khách hàng tận tâm.</li>
           </ul>
 
-          <p className="intro-quote">“Thời gian – Chất lượng – Giá thành – Tạo nên sự khác biệt.”</p>
+          <p className="intro-quote">"Thời gian – Chất lượng – Giá thành – Tạo nên sức cạnh tranh."</p>
+          <p>
+            Với phương châm trên, Garage Ô tô Hoàng Tuấn cam kết mang đến dịch vụ tốt nhất, đáp ứng mọi nhu cầu sửa chữa, 
+            bảo dưỡng và chăm sóc xe của Quý khách hàng tại Thanh Hóa và các khu vực lân cận.
+          </p>
           <p>
             Đến với Garage Ô tô Hoàng Tuấn, Quý khách sẽ được phục vụ theo phong cách
-            <span className="gold"> chuyên nghiệp – hiện đại – tận tâm</span>. Liên hệ ngay hôm nay để được tư vấn và hỗ trợ nhanh nhất!
+            <span className="gold"> chuyên nghiệp – hiện đại – tận tâm</span>. 
+            Hãy liên hệ ngay hôm nay để được tư vấn và hỗ trợ nhanh nhất!
+          </p>
+          <p style={{ marginTop: '24px', fontStyle: 'italic', textAlign: 'center' }}>
+            <span className="gold">Garage Ô tô Hoàng Tuấn – Nơi chiếc xe của bạn được chăm sóc như người bạn đồng hành.</span>
           </p>
         </div>
       </section>
