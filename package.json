@@ -11,6 +11,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@payos/payos-checkout": "^1.0.8",
+    "@stomp/stompjs": "^7.2.1",
     "antd": "^5.27.6",
     "aos": "^2.3.4",
     "axios": "^1.6.2",
@@ -25,6 +26,7 @@
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.20.0",
     "react-select": "^5.8.0",
+    "sockjs-client": "^1.6.1",
     "zustand": "^4.4.7"
   },
   "devDependencies": {

@@ -51,7 +51,9 @@ export default function ForgotPassword() {
     e.preventDefault()
     setError('')
     
-    const validation = validatePhone(phone)
+    // Trim phone trước khi validate
+    const trimmedPhone = phone?.trim() || ''
+    const validation = validatePhone(trimmedPhone)
     if (!validation.isValid) {
       setError(validation.errorMessage)
       return

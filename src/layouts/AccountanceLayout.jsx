@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 import { getUserNameFromToken } from '../utils/helpers'
+import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/warehouse-layout.css'
 
 export default function AccountanceLayout({ children }) {
@@ -99,9 +100,7 @@ export default function AccountanceLayout({ children }) {
             )}
           </div>
           <div className="warehouse-topbar-right">
-            <button className="notification-btn">
-              <i className="bi bi-bell"></i>
-            </button>
+            <NotificationBell />
           </div>
         </div>
       </header>

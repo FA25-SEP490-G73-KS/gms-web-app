@@ -4,7 +4,8 @@ import { Form, Input, Button, Card, Checkbox, message } from 'antd'
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
 import useAuthStore from '../../store/authStore'
 import '../../styles/pages/auth/login.css'
-import { normalizePhoneTo0 } from '../../utils/helpers'
+import { normalizePhoneTo0, getRoleFromToken } from '../../utils/helpers'
+import { ROLE_ROUTES, USER_ROLES } from '../../utils/constants'
 
 export default function Login() {
   const [form] = Form.useForm()
@@ -24,28 +25,29 @@ export default function Login() {
   )
 
   const redirectAfterLogin = useCallback(() => {
-    const userRole = useAuthStore.getState().user?.role
+    // Lấy role từ token (ưu tiên) hoặc từ user store
+    let userRole = getRoleFromToken()
+    
+    if (!userRole) {
+      userRole = useAuthStore.getState().user?.role
+    }
+    
     const from = location.state?.from?.pathname
 
+    // Nếu có trang được lưu từ trước, redirect về đó
     if (from) {
       navigate(from, { replace: true })
       return
     }
 
-    switch (userRole) {
-      case 'ADMIN':
-        navigate('/admin/dashboard', { replace: true })
-        break
-      case 'MANAGER':
-        navigate('/manager/dashboard', { replace: true })
-        break
-      case 'SERVICE_ADVISOR':
-        navigate('/service-advisor/appointments', { replace: true })
-        break
-      default:
-        navigate('/', { replace: true })
-        break
+    // Redirect theo role
+    if (userRole && ROLE_ROUTES[userRole]) {
+      navigate(ROLE_ROUTES[userRole], { replace: true })
+      return
     }
+
+    // Fallback: redirect về trang chủ
+    navigate('/', { replace: true })
   }, [location.state, navigate])
 
   const onFinish = useCallback(
@@ -53,11 +55,15 @@ export default function Login() {
       const { phone, password, remember } = values
       setLoading(true)
       try {
-        await login(normalizePhoneTo0(phone), password)
+        // Trim tất cả input trước khi xử lý
+        const trimmedPhone = phone?.trim() || ''
+        const trimmedPassword = password?.trim() || ''
+        
+        await login(normalizePhoneTo0(trimmedPhone), trimmedPassword)
         message.success('Đăng nhập thành công!')
 
         if (remember) {
-          localStorage.setItem('rememberedPhone', phone)
+          localStorage.setItem('rememberedPhone', trimmedPhone)
         } else {
           localStorage.removeItem('rememberedPhone')
         }
@@ -129,7 +135,7 @@ export default function Login() {
                 autoComplete="username"
                 maxLength={10}
                 onChange={(e) => {
-                  // Chỉ cho phép nhập số, tự động loại bỏ ký tự không phải số
+                  
                   let value = e.target.value.replace(/\D/g, '')
                   // Giới hạn tối đa 10 chữ số
                   value = value.slice(0, 10)
