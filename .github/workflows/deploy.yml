@@ -46,4 +46,4 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            sudo mv ~/gms-web-app/* /var/www/html/gms
+            sudo cp -r ~/gms-web-app/* /var/www/html/gms
