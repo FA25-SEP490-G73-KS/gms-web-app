@@ -28,6 +28,8 @@ import PayrollDetailPage from './pages/accountance/PayrollDetailPage';
 import AccountanceAttendance from './pages/accountance/Attendance';
 import AccountancePlaceholder from './pages/accountance/Placeholder';
 import AccountanceDebts from './pages/accountance/Debts';
+import AccountanceDebtDetail from './pages/accountance/DebtDetail';
+import AccountanceDebtTicketDetail from './pages/accountance/DebtTicketDetail';
 import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
 import AccountanceMaterials from './pages/accountance/Materials';
@@ -288,6 +290,16 @@ function App() {
         <Route path="/accountance/debts" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
             <AccountanceDebts />
+          </ProtectedRoute>
+        } />
+        <Route path="/accountance/debts/detail" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
+            <AccountanceDebtDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/accountance/debts/ticket/:ticketId" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
+            <AccountanceDebtTicketDetail />
           </ProtectedRoute>
         } />
         <Route path="/accountance/inventory" element={

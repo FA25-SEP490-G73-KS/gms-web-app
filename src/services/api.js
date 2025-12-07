@@ -364,7 +364,27 @@ export const debtsAPI = {
       size,
       sort,
     });
+    return get(`/debts/summary?${qs}`);
+  },
+  getByCustomerId: ({
+    customerId,
+    page = 0,
+    size = 10,
+    sort = "createdAt,desc",
+  }) => {
+    const qs = buildQueryString({
+      customerId,
+      page,
+      size,
+      sort,
+    });
     return get(`/debts?${qs}`);
+  },
+  getDebtDetail: (serviceTicketId) => {
+    return get(`/debts/${serviceTicketId}/debt-detail`);
+  },
+  createPayment: (payload) => {
+    return post('/debts', payload);
   },
 };
 
@@ -419,6 +439,7 @@ export const ledgerVoucherAPI = {
     const suffix = query ? `?${query}` : "";
     return get(`/ledger-vouchers${suffix}`);
   },
+  create: (data) => post("/ledger-vouchers/manual", data),
 };
 
 export const attendanceAPI = {
@@ -458,7 +479,19 @@ export const stockReceiptAPI = {
   },
   getById: (id) => get(`/stock-receipt/${id}`),
   getItemHistory: (itemId) => get(`/stock-receipt/receipt-items/${itemId}/history`),
-  getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`)
+  getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`),
+  getReceiptHistory: (page = 0, size = 10) => {
+    const params = new URLSearchParams({ page, size })
+    return get(`/stock-receipt/receipt-history?${params.toString()}`)
+  },
+  getPaymentDetail: (id) => get(`/stock-receipt/receipt-history/${id}/payment-detail`),
+  createReceiptPayment: (id, formData) => {
+    return axiosClient.post(`/ledger-vouchers/receipt-payment/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  }
 };
 
 export const transactionsAPI = {

@@ -357,10 +357,6 @@ export default function CreateTicketNewCustomer() {
       return
     }
 
-    if (!values.receiveDate) {
-      message.warning('Vui lòng chọn ngày dự đoán nhận xe')
-      return
-    }
 
     const expectedDeliveryAt = values.receiveDate
       ? dayjs(values.receiveDate).format('YYYY-MM-DD')
