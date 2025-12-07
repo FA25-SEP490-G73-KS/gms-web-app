@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Table, Input, Button, Space, Tag, message } from 'antd'
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
+import { Table, Input, Button, Space, Tag, message, Modal, Tabs, Spin } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { usePayOS } from '@payos/payos-checkout'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { debtsAPI } from '../../services/api'
+import { debtsAPI, invoiceAPI } from '../../services/api'
 import '../../styles/pages/accountance/debts.css'
 
 const STATUS_FILTERS = [
@@ -199,6 +200,45 @@ export function AccountanceDebtsContent() {
     total: 0
   })
 
+  // Payment modal states
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [selectedDebt, setSelectedDebt] = useState(null)
+  const [paymentMethod, setPaymentMethod] = useState('QR')
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentData, setPaymentData] = useState(null)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [cashReceived, setCashReceived] = useState('')
+
+  // PayOS config
+  const [payOSConfig, setPayOSConfig] = useState({
+    RETURN_URL: `${window.location.origin}/accountance/debts`,
+    ELEMENT_ID: 'payos-checkout-container-debt',
+    CHECKOUT_URL: null,
+    embedded: true,
+    onSuccess: async (event) => {
+      console.log('Payment successful:', event)
+      message.success('Thanh toán thành công!')
+      setPaymentData(null)
+      setShowPaymentModal(false)
+      fetchDebts(pagination.page, pagination.size)
+    },
+    onExit: (event) => {
+      console.log('User exited payment:', event)
+    },
+    onCancel: (event) => {
+      console.log('Payment canceled:', event)
+      message.info('Đã hủy thanh toán')
+    }
+  })
+
+  const { exit, open } = usePayOS(payOSConfig)
+
+  useEffect(() => {
+    if (payOSConfig.CHECKOUT_URL != null) {
+      open()
+    }
+  }, [payOSConfig])
+
   const normalizedDebts = useMemo(() => {
     return debts.map((item, index) => {
       const customerName =
@@ -358,6 +398,62 @@ export function AccountanceDebtsContent() {
     fetchDebts(0, pagination.size)
   }, [fetchDebts, pagination.size])
 
+  const handlePayment = async (type = 'QR') => {
+    if (!paymentAmount || Number(paymentAmount) <= 0) {
+      message.warning('Vui lòng nhập số tiền thanh toán')
+      return
+    }
+
+    if (Number(paymentAmount) > selectedDebt?.remain) {
+      message.error('Số tiền thanh toán không được vượt quá số tiền còn nợ')
+      return
+    }
+
+    setPaymentLoading(true)
+    try {
+      // Gọi API thanh toán - cần có invoiceId
+      const invoiceId = selectedDebt?.invoiceId || selectedDebt?.id
+      
+      const payload = {
+        method: type === 'QR' ? 'BANK_TRANSFER' : 'CASH',
+        price: Number(paymentAmount),
+        type: 'DEPOSIT'
+      }
+
+      const { data: response, error } = await invoiceAPI.pay(invoiceId, payload)
+
+      if (error) {
+        message.error(error || 'Tạo giao dịch thanh toán thất bại')
+        setPaymentLoading(false)
+        return
+      }
+
+      const result = response?.result || null
+      console.log('Payment response:', result)
+      setPaymentData(result)
+      setPaymentMethod(type)
+
+      if (type === 'QR') {
+        setPayOSConfig((config) => ({
+          ...config,
+          CHECKOUT_URL: result?.paymentUrl
+        }))
+      } else {
+        // Cash payment success
+        message.success('Thanh toán tiền mặt thành công')
+        setShowPaymentModal(false)
+        setPaymentData(null)
+        setPaymentAmount('')
+        fetchDebts(pagination.page, pagination.size)
+      }
+    } catch (err) {
+      console.error('Error creating payment:', err)
+      message.error('Đã xảy ra lỗi khi tạo giao dịch thanh toán')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
   useEffect(() => {
     fetchDebts(pagination.page, pagination.size)
   }, [pagination.page, pagination.size, fetchDebts])
@@ -502,6 +598,11 @@ export function AccountanceDebtsContent() {
                   }}
                   onClick={() => {
                     console.log('Thanh toán:', detailRecord)
+                    setSelectedDebt(detailRecord)
+                    setShowPaymentModal(true)
+                    setPaymentAmount(String(detailRecord.remain))
+                    setPaymentMethod('QR')
+                    setPaymentData(null)
                   }}
                 >
                   Thanh toán
@@ -626,6 +727,273 @@ export function AccountanceDebtsContent() {
             components={goldTableHeader}
           />
         </div>
+
+        {/* Payment Modal */}
+        <Modal
+          open={showPaymentModal}
+          onCancel={() => {
+            setShowPaymentModal(false)
+            setSelectedDebt(null)
+            setPaymentData(null)
+            setPaymentAmount('')
+            setCashReceived('')
+          }}
+          footer={null}
+          width={600}
+          title={null}
+          closable={false}
+        >
+          <div>
+            <style>
+              {`
+                .custom-payment-tabs .ant-tabs-nav {
+                  width: 100%;
+                }
+                .custom-payment-tabs .ant-tabs-nav-list {
+                  width: 100%;
+                  display: flex !important;
+                }
+                .custom-payment-tabs .ant-tabs-tab {
+                  flex: 1;
+                  margin: 0 4px !important;
+                  padding: 0 !important;
+                  justify-content: center;
+                }
+                .custom-payment-tabs .ant-tabs-tab:first-child {
+                  margin-left: 0 !important;
+                }
+                .custom-payment-tabs .ant-tabs-tab:last-child {
+                  margin-right: 0 !important;
+                }
+                .custom-payment-tabs .ant-tabs-tab-btn {
+                  width: 100%;
+                }
+                .custom-payment-tabs .ant-tabs-ink-bar {
+                  display: none !important;
+                }
+              `}
+            </style>
+
+            <div
+              style={{
+                background: '#CBB081',
+                padding: '16px',
+                borderRadius: '8px',
+                marginBottom: '20px',
+                textAlign: 'center'
+              }}
+            >
+              <span style={{ fontWeight: 700, fontSize: '18px', color: '#fff' }}>
+                THANH TOÁN CÔNG NỢ
+              </span>
+            </div>
+
+            <Tabs
+              activeKey={paymentMethod}
+              onChange={(key) => setPaymentMethod(key)}
+              className="custom-payment-tabs"
+              tabBarStyle={{
+                marginBottom: '24px',
+                borderBottom: 'none'
+              }}
+              tabBarGutter={8}
+              items={[
+                {
+                  key: 'QR',
+                  label: (
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '15px',
+                        padding: '10px 0',
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'center',
+                        borderRadius: '8px',
+                        background: paymentMethod === 'QR' ? '#CBB081' : '#f3f4f6',
+                        color: paymentMethod === 'QR' ? '#fff' : '#6b7280',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      QR
+                    </span>
+                  ),
+                  children: paymentData?.paymentUrl ? (
+                    <div
+                      style={{
+                        border: '2px solid #CBB081',
+                        borderRadius: '12px',
+                        padding: '24px',
+                        background: '#fafafa',
+                        minHeight: '400px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 8px rgba(203, 176, 129, 0.15)'
+                      }}
+                    >
+                      <div
+                        id="payos-checkout-container-debt"
+                        style={{
+                          width: '100%',
+                          maxWidth: '350px',
+                          height: '350px'
+                        }}
+                      ></div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        textAlign: 'center',
+                        padding: '60px 0',
+                        background: '#fafafa',
+                        borderRadius: '12px',
+                        border: '2px dashed #CBB081',
+                        minHeight: '400px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      <Spin size="large" />
+                      <p style={{ marginTop: '16px', color: '#666', fontSize: '14px' }}>
+                        Đang tải mã QR...
+                      </p>
+                    </div>
+                  )
+                },
+                {
+                  key: 'CASH',
+                  label: (
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        fontSize: '15px',
+                        padding: '10px 0',
+                        display: 'block',
+                        width: '100%',
+                        textAlign: 'center',
+                        borderRadius: '8px',
+                        background: paymentMethod === 'CASH' ? '#CBB081' : '#f3f4f6',
+                        color: paymentMethod === 'CASH' ? '#fff' : '#6b7280',
+                        transition: 'all 0.3s ease'
+                      }}
+                    >
+                      Tiền mặt
+                    </span>
+                  ),
+                  children: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px', color: '#374151' }}>
+                          Mã phiếu
+                        </label>
+                        <Input value={selectedDebt?.code || '—'} disabled style={{ height: '40px', borderRadius: '8px', backgroundColor: '#f9fafb', borderColor: '#d1d5db' }} />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px', color: '#374151' }}>
+                          Số tiền còn nợ
+                        </label>
+                        <Input value={(selectedDebt?.remain || 0).toLocaleString('vi-VN') + ' đ'} disabled style={{ height: '40px', borderRadius: '8px', backgroundColor: '#f9fafb', borderColor: '#d1d5db' }} />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px', color: '#374151' }}>
+                          Số tiền thanh toán
+                        </label>
+                        <Input
+                          value={paymentAmount ? Number(paymentAmount).toLocaleString('vi-VN') : ''}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^\d]/g, '')
+                            setPaymentAmount(value)
+                          }}
+                          placeholder="Nhập số tiền"
+                          style={{ height: '40px', borderRadius: '8px', fontSize: '14px' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px', color: '#374151' }}>
+                          Số tiền khách trả
+                        </label>
+                        <Input
+                          value={cashReceived ? Number(cashReceived).toLocaleString('vi-VN') : ''}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/[^\d]/g, '')
+                            setCashReceived(value)
+                          }}
+                          placeholder="Nhập số tiền khách trả"
+                          style={{ height: '40px', borderRadius: '8px', fontSize: '14px' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px', color: '#374151' }}>
+                          Số tiền trả khách
+                        </label>
+                        <Input
+                          value={(Math.max(0, Number(cashReceived || 0) - Number(paymentAmount || 0))).toLocaleString('vi-VN') + ' đ'}
+                          disabled
+                          style={{ height: '40px', borderRadius: '8px', backgroundColor: '#f9fafb', borderColor: '#d1d5db' }}
+                        />
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                        <Button
+                          onClick={() => {
+                            setShowPaymentModal(false)
+                            setPaymentData(null)
+                            setPaymentAmount('')
+                            setCashReceived('')
+                          }}
+                          style={{ flex: 1, height: '45px', borderRadius: '8px', fontWeight: 600, fontSize: '14px' }}
+                        >
+                          Hủy
+                        </Button>
+                        <Button
+                          type="primary"
+                          onClick={() => handlePayment('CASH')}
+                          loading={paymentLoading}
+                          disabled={!paymentAmount || Number(paymentAmount) <= 0}
+                          style={{ flex: 1, background: '#22c55e', borderColor: '#22c55e', height: '45px', fontWeight: 600, fontSize: '14px', borderRadius: '8px' }}
+                        >
+                          Hoàn tất
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                }
+              ]}
+            />
+
+            {!paymentData && paymentMethod === 'QR' && (
+              <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
+                <Button
+                  onClick={() => {
+                    setShowPaymentModal(false)
+                    setPaymentData(null)
+                    setPaymentAmount('')
+                  }}
+                  style={{ flex: 1, height: '45px', borderRadius: '8px', fontWeight: 600, fontSize: '14px' }}
+                >
+                  Hủy
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={() => handlePayment('QR')}
+                  loading={paymentLoading}
+                  disabled={!paymentAmount || Number(paymentAmount) <= 0}
+                  style={{ flex: 1, background: '#22c55e', borderColor: '#22c55e', height: '45px', fontWeight: 600, fontSize: '14px', borderRadius: '8px' }}
+                >
+                  Thanh toán
+                </Button>
+              </div>
+            )}
+          </div>
+        </Modal>
       </div>
   )
 }

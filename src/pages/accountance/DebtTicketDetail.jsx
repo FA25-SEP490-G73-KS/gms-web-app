@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
-import { Table, Button, message, Input, Space, Spin } from 'antd'
+import { Table, Button, message, Input, Space, Spin, Tabs } from 'antd'
 import { ArrowLeftOutlined, CloseOutlined } from '@ant-design/icons'
 import { usePayOS } from '@payos/payos-checkout'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
@@ -39,16 +39,18 @@ export function AccountanceDebtTicketDetailContent() {
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [paymentData, setPaymentData] = useState(null)
   const [qrLoading, setQrLoading] = useState(false)
+  const payOSOpenedRef = useRef(false) // Track if PayOS has been opened
 
   // PayOS config
   const [payOSConfig, setPayOSConfig] = useState({
-    RETURN_URL: `${window.location.origin}/accountance/debts`,
-    ELEMENT_ID: 'debt-payment-qr-container',
+    RETURN_URL: `${window.location.origin}/`,
+    ELEMENT_ID: 'payos-checkout-container',
     CHECKOUT_URL: null,
     embedded: true,
     onSuccess: async (event) => {
       console.log('Payment successful:', event)
       message.success('Thanh toán thành công!')
+      setPaymentData(null)
       setPaymentSuccess(true)
       await fetchDebtDetail()
     },
@@ -64,8 +66,9 @@ export function AccountanceDebtTicketDetailContent() {
   const { exit, open } = usePayOS(payOSConfig)
 
   useEffect(() => {
-    if (payOSConfig.CHECKOUT_URL != null && paymentMethod === 'QR') {
+    if (payOSConfig.CHECKOUT_URL != null && !payOSOpenedRef.current) {
       open()
+      payOSOpenedRef.current = true
     }
   }, [payOSConfig])
 
@@ -209,7 +212,7 @@ export function AccountanceDebtTicketDetailContent() {
       const payload = {
         method: 'CASH',
         price: Number(paymentAmount),
-        type: 'PAYMENT'
+        type: 'DEPOSIT'
       }
 
       console.log('=== CASH PAYMENT DEBUG ===')
@@ -259,40 +262,32 @@ export function AccountanceDebtTicketDetailContent() {
       const payload = {
         method: 'BANK_TRANSFER',
         price: Number(paymentAmount),
-        type: 'PAYMENT'
+        type: 'DEPOSIT'
       }
-
-      console.log('=== INITIAL PAYMENT (BANK_TRANSFER) DEBUG ===')
-      console.log('Service Ticket ID:', serviceTicketId)
-      console.log('Payload:', JSON.stringify(payload, null, 2))
 
       const { data: response, error } = await invoiceAPI.pay(serviceTicketId, payload)
 
-      console.log('Payment Response:', response)
-
       if (error) {
-        console.error('Payment Error:', error)
         message.error(error || 'Tạo giao dịch thất bại')
         setSubmitting(false)
         return
       }
 
       const result = response?.result || null
-      console.log('Payment result:', result)
-
-      if (result?.paymentUrl) {
-        setPaymentData(result)
-        setPayOSConfig((config) => ({
-          ...config,
-          CHECKOUT_URL: result.paymentUrl
-        }))
-      }
-
-      // Chuyển sang màn QR
+      console.log('Payment response:', result)
+      console.log('Payment URL:', result?.paymentUrl)
+      
+      setPaymentData(result)
       setPaymentMethod('QR')
+
+      // Set PayOS config - giống InvoiceDetailPage
+      setPayOSConfig((config) => ({
+        ...config,
+        CHECKOUT_URL: result?.paymentUrl
+      }))
     } catch (err) {
-      console.error('Payment failed:', err)
-      message.error(err.message || 'Tạo giao dịch thất bại, vui lòng thử lại')
+      console.error('Error creating payment:', err)
+      message.error('Đã xảy ra lỗi khi tạo giao dịch thanh toán')
     } finally {
       setSubmitting(false)
     }
@@ -559,6 +554,8 @@ export function AccountanceDebtTicketDetailContent() {
                 onClick={() => {
                   setShowPaymentForm(false)
                   setPaymentSuccess(false)
+                  setPaymentData(null)
+                  payOSOpenedRef.current = false // Reset để lần sau có thể tạo QR mới
                 }}
                 style={{ color: '#666' }}
               />
@@ -684,6 +681,8 @@ export function AccountanceDebtTicketDetailContent() {
                         onClick={() => {
                           setShowPaymentForm(false)
                           setPaymentSuccess(false)
+                          setPaymentData(null)
+                          payOSOpenedRef.current = false
                         }}
                         style={{
                           borderRadius: '8px',
@@ -712,250 +711,228 @@ export function AccountanceDebtTicketDetailContent() {
                 ) : (
                   /* Payment Method Selected */
                   <>
-                    {/* Payment Method Tabs */}
-                    <div style={{ marginBottom: '24px' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        <Button
-                          style={{
-                            flex: 1,
-                            height: '40px',
-                            borderRadius: '8px',
-                            background: paymentMethod === 'CASH' ? '#CBB081' : '#ffffff',
-                            color: paymentMethod === 'CASH' ? '#ffffff' : '#374151',
-                            border: paymentMethod === 'CASH' ? 'none' : '1px solid #e5e7eb',
-                            fontWeight: 600
-                          }}
-                          onClick={() => setPaymentMethod('CASH')}
-                        >
-                          Tiền mặt
-                        </Button>
-                        <Button
-                          style={{
-                            flex: 1,
-                            height: '40px',
-                            borderRadius: '8px',
-                            background: paymentMethod === 'QR' ? '#CBB081' : '#ffffff',
-                            color: paymentMethod === 'QR' ? '#ffffff' : '#374151',
-                            border: paymentMethod === 'QR' ? 'none' : '1px solid #e5e7eb',
-                            fontWeight: 600
-                          }}
-                          onClick={() => {
-                            // Chỉ chuyển tab, không call API
-                            setPaymentMethod('QR')
-                          }}
-                        >
-                          QR
-                        </Button>
-                      </div>
-                    </div>
-
-                    {paymentMethod === 'CASH' ? (
-                      <>
-                        {/* Customer Info */}
-                        <div style={{ marginBottom: '24px' }}>
-                          <div style={{ 
-                            fontSize: '12px', 
-                            color: '#666', 
-                            marginBottom: '8px',
-                            fontWeight: 500
-                          }}>
-                            Khách hàng
-                          </div>
-                          <div style={{
-                            padding: '12px',
-                            background: '#f5f5f5',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            color: '#111827'
-                          }}>
-                            {customerInfo.name}
-                          </div>
-                        </div>
-
-                        {/* Service Ticket ID */}
-                        <div style={{ marginBottom: '24px' }}>
-                          <div style={{ 
-                            fontSize: '12px', 
-                            color: '#666', 
-                            marginBottom: '8px',
-                            fontWeight: 500
-                          }}>
-                            Mã phiếu
-                          </div>
-                          <div style={{
-                            padding: '12px',
-                            background: '#f5f5f5',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            color: '#111827'
-                          }}>
-                            {ticketId || customerInfo.licensePlate}
-                          </div>
-                        </div>
-
-                        {/* Total Amount */}
-                        <div style={{ marginBottom: '24px' }}>
-                          <div style={{ 
-                            fontSize: '12px', 
-                            color: '#666', 
-                            marginBottom: '8px',
-                            fontWeight: 500
-                          }}>
-                            Số tiền khách trả
-                          </div>
-                          <div style={{
-                            padding: '12px',
-                            background: '#f5f5f5',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            color: '#111827'
-                          }}>
-                            {(debtDetail?.paymentSummary?.remainingAmount || 0).toLocaleString('vi-VN')}
-                          </div>
-                        </div>
-
-                        {/* Payment Amount Input */}
-                        <div style={{ marginBottom: '24px' }}>
-                          <div style={{ 
-                            fontSize: '12px', 
-                            color: '#666', 
-                            marginBottom: '8px',
-                            fontWeight: 500
-                          }}>
-                            Số tiền nhận của khách
-                          </div>
-                          <Input
-                            value={paymentAmount}
-                            onChange={(e) => {
-                              const value = e.target.value.replace(/[^0-9]/g, '')
-                              setPaymentAmount(value)
-                            }}
-                            placeholder="Nhập số tiền"
-                            style={{
-                              height: '48px',
-                              borderRadius: '8px',
-                              fontSize: '14px'
-                            }}
-                          />
-                        </div>
-
-                        {/* Change Amount */}
-                        <div style={{ marginBottom: '32px' }}>
-                          <div style={{ 
-                            fontSize: '12px', 
-                            color: '#666', 
-                            marginBottom: '8px',
-                            fontWeight: 500
-                          }}>
-                            Số tiền trả khách
-                          </div>
-                          <div style={{
-                            padding: '12px',
-                            background: '#f5f5f5',
-                            borderRadius: '8px',
-                            fontSize: '14px',
-                            color: '#111827'
-                          }}>
-                            {Math.max(0, Number(paymentAmount || 0) - (debtDetail?.paymentSummary?.remainingAmount || 0)).toLocaleString('vi-VN')}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* QR Code Container */}
-                        <div style={{ 
-                          textAlign: 'center', 
-                          padding: '24px',
-                          background: '#f5f5f5',
-                          borderRadius: '8px',
-                          marginBottom: '24px'
-                        }}>
-                          {qrLoading || !paymentData?.paymentUrl ? (
-                            <div style={{ 
-                              height: '350px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              <Spin size="large" tip="Đang tải mã QR..." />
-                            </div>
-                          ) : (
-                            <div
-                              id="debt-payment-qr-container"
-                              style={{ 
+                    <style>
+                      {`
+                        .custom-payment-tabs .ant-tabs-nav {
+                          width: 100%;
+                        }
+                        .custom-payment-tabs .ant-tabs-nav-list {
+                          width: 100%;
+                          display: flex !important;
+                        }
+                        .custom-payment-tabs .ant-tabs-tab {
+                          flex: 1;
+                          margin: 0 4px !important;
+                          padding: 0 !important;
+                          justify-content: center;
+                        }
+                        .custom-payment-tabs .ant-tabs-tab:first-child {
+                          margin-left: 0 !important;
+                        }
+                        .custom-payment-tabs .ant-tabs-tab:last-child {
+                          margin-right: 0 !important;
+                        }
+                        .custom-payment-tabs .ant-tabs-tab-btn {
+                          width: 100%;
+                        }
+                        .custom-payment-tabs .ant-tabs-ink-bar {
+                          display: none !important;
+                        }
+                      `}
+                    </style>
+                    {/* Payment Method Tabs - Using Ant Design Tabs */}
+                    <Tabs
+                      activeKey={paymentMethod}
+                      onChange={(key) => setPaymentMethod(key)}
+                      tabBarStyle={{
+                        marginBottom: '24px',
+                        borderBottom: 'none',
+                        display: 'flex',
+                        justifyContent: 'space-between'
+                      }}
+                      tabBarGutter={8}
+                      className="custom-payment-tabs"
+                      items={[
+                        {
+                          key: 'QR',
+                          label: (
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '15px',
+                                padding: '10px 0',
+                                display: 'block',
                                 width: '100%',
-                                minHeight: '350px'
+                                textAlign: 'center',
+                                borderRadius: '8px',
+                                background: paymentMethod === 'QR' ? '#CBB081' : '#f3f4f6',
+                                color: paymentMethod === 'QR' ? '#fff' : '#6b7280',
+                                transition: 'all 0.3s ease'
                               }}
-                            />
-                          )}
-                        </div>
+                            >
+                              QR
+                            </span>
+                          ),
+                          children: (
+                            <>
+                              {/* QR Code Container */}
+                              {paymentData?.paymentUrl ? (
+                                <div
+                                  style={{
+                                    border: '2px solid #CBB081',
+                                    borderRadius: '12px',
+                                    padding: '24px',
+                                    background: '#fafafa',
+                                    minHeight: '400px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    boxShadow: '0 2px 8px rgba(203, 176, 129, 0.15)',
+                                    marginBottom: '24px'
+                                  }}
+                                >
+                                  <div
+                                    id="payos-checkout-container"
+                                    style={{
+                                      width: '100%',
+                                      maxWidth: '350px',
+                                      height: '350px'
+                                    }}
+                                  ></div>
+                                </div>
+                              ) : (
+                                <div
+                                  style={{
+                                    textAlign: 'center',
+                                    padding: '60px 0',
+                                    background: '#fafafa',
+                                    borderRadius: '12px',
+                                    border: '2px dashed #CBB081',
+                                    minHeight: '400px',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginBottom: '24px'
+                                  }}
+                                >
+                                  <Spin size="large" />
+                                  <p style={{ marginTop: '16px', color: '#666', fontSize: '14px' }}>
+                                    Đang tải mã QR...
+                                  </p>
+                                </div>
+                              )}
 
-                        {/* Bank Info - Only show if we have payment data */}
-                        {paymentData && (
-                          <>
-                            <div style={{ marginBottom: '24px' }}>
-                              <div style={{ 
-                                fontSize: '12px', 
-                                color: '#666', 
-                                marginBottom: '8px',
-                                fontWeight: 500
-                              }}>
-                                Ngân hàng
-                              </div>
-                              <div style={{
-                                padding: '12px',
-                                background: '#f5f5f5',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                color: '#111827'
-                              }}>
-                                {paymentData.bankName || 'VietinBank'}
-                              </div>
-                            </div>
+                              {/* Bank Info */}
+                              {paymentData && (
+                                <>
+                                  <div style={{ marginBottom: '24px' }}>
+                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                      Ngân hàng
+                                    </div>
+                                    <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
+                                      {paymentData.bankName || 'MBBank'}
+                                    </div>
+                                  </div>
 
-                            <div style={{ marginBottom: '24px' }}>
-                              <div style={{ 
-                                fontSize: '12px', 
-                                color: '#666', 
-                                marginBottom: '8px',
-                                fontWeight: 500
-                              }}>
-                                Số tiền
-                              </div>
-                              <div style={{
-                                padding: '12px',
-                                background: '#f5f5f5',
-                                borderRadius: '8px',
-                                fontSize: '14px',
-                                color: '#111827'
-                              }}>
-                                {(debtDetail?.paymentSummary?.remainingAmount || 0).toLocaleString('vi-VN')}
-                              </div>
-                            </div>
+                                  <div style={{ marginBottom: '24px' }}>
+                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                      Số tiền
+                                    </div>
+                                    <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
+                                      {(debtDetail?.paymentSummary?.remainingAmount || 0).toLocaleString('vi-VN')}
+                                    </div>
+                                  </div>
 
-                            <div style={{ marginBottom: '32px' }}>
-                              <div style={{ 
-                                fontSize: '12px', 
-                                color: '#666', 
-                                marginBottom: '8px',
-                                fontWeight: 500
-                              }}>
-                                Nội dung
-                              </div>
-                              <div style={{
-                                padding: '12px',
-                                background: '#f5f5f5',
+
+                                </>
+                              )}
+                            </>
+                          )
+                        },
+                        {
+                          key: 'CASH',
+                          label: (
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: '15px',
+                                padding: '10px 0',
+                                display: 'block',
+                                width: '100%',
+                                textAlign: 'center',
                                 borderRadius: '8px',
-                                fontSize: '14px',
-                                color: '#111827'
-                              }}>
-                                {paymentData.description || `Cong no - ${ticketId || customerInfo.licensePlate}`}
+                                background: paymentMethod === 'CASH' ? '#CBB081' : '#f3f4f6',
+                                color: paymentMethod === 'CASH' ? '#fff' : '#6b7280',
+                                transition: 'all 0.3s ease'
+                              }}
+                            >
+                              Tiền mặt
+                            </span>
+                          ),
+                          children: (
+                            <>
+                              {/* Customer Info */}
+                              <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  Khách hàng
+                                </div>
+                                <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
+                                  {customerInfo.name}
+                                </div>
                               </div>
-                            </div>
-                          </>
-                        )}
-                      </>
-                    )}
+
+                              {/* Service Ticket ID */}
+                              <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  Mã phiếu
+                                </div>
+                                <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
+                                  {ticketId || customerInfo.licensePlate}
+                                </div>
+                              </div>
+
+                              {/* Total Amount */}
+                              <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  Số tiền khách trả
+                                </div>
+                                <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
+                                  {(debtDetail?.paymentSummary?.remainingAmount || 0).toLocaleString('vi-VN')}
+                                </div>
+                              </div>
+
+                              {/* Payment Amount Input */}
+                              <div style={{ marginBottom: '24px' }}>
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  Số tiền nhận của khách
+                                </div>
+                                <Input
+                                  value={paymentAmount}
+                                  onChange={(e) => {
+                                    const value = e.target.value.replace(/[^0-9]/g, '')
+                                    setPaymentAmount(value)
+                                  }}
+                                  placeholder="Nhập số tiền"
+                                  style={{ height: '48px', borderRadius: '8px', fontSize: '14px' }}
+                                />
+                              </div>
+
+                              {/* Change Amount */}
+                              <div style={{ marginBottom: '32px' }}>
+                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  Số tiền trả khách
+                                </div>
+                                <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
+                                  {Math.max(0, Number(paymentAmount || 0) - (debtDetail?.paymentSummary?.remainingAmount || 0)).toLocaleString('vi-VN')}
+                                </div>
+                              </div>
+                            </>
+                          )
+                        }
+                      ]}
+                    />
 
                     {/* Action Buttons */}
                     <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
@@ -964,6 +941,8 @@ export function AccountanceDebtTicketDetailContent() {
                           setShowPaymentForm(false)
                           setPaymentSuccess(false)
                           setPaymentMethod(null)
+                          setPaymentData(null)
+                          payOSOpenedRef.current = false
                         }}
                         style={{
                           borderRadius: '8px',

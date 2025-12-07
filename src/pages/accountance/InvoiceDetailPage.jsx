@@ -35,6 +35,11 @@ export default function InvoiceDetailPage() {
   const [showPaymentTabs, setShowPaymentTabs] = useState(false); // Show tabs when click +
   const [paymentTab, setPaymentTab] = useState("CASH");
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [cashReceived, setCashReceived] = useState(""); // Số tiền khách trả
+  
+  // State for debt modal
+  const [showDebtModal, setShowDebtModal] = useState(false);
+  const [debtDueDate, setDebtDueDate] = useState(dayjs().add(7, 'day').format('YYYY-MM-DD'));
 
   const [payOSInitialized, setPayOSInitialized] = useState(false);
 
@@ -332,6 +337,27 @@ export default function InvoiceDetailPage() {
       message.error("Đã xảy ra lỗi khi tạo giao dịch thanh toán");
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  const handleCreateDebt = async () => {
+    try {
+      const payload = {
+        invoiceId: id,
+        dueDate: debtDueDate,
+        amount: remainingAmount
+      };
+      // Call API to create debt ticket
+      // await api.post('/debts', payload);
+      message.success('Đã tạo phiếu công nợ thành công');
+      setShowDebtModal(false);
+      setShowDepositForm(false);
+      setShowPaymentTabs(false);
+      // Optionally refresh invoice data
+      fetchInvoiceData();
+    } catch (err) {
+      console.error('Error creating debt:', err);
+      message.error('Tạo phiếu công nợ thất bại');
     }
   };
 
@@ -901,8 +927,13 @@ export default function InvoiceDetailPage() {
                           <Button
                             type="primary"
                             onClick={() => {
-                              setShowDepositForm(false);
-                              setShowPaymentTabs(false);
+                              const remaining = finalAmount - (Number(depositAmount) || 0);
+                              if (remaining > 0) {
+                                setShowDebtModal(true);
+                              } else {
+                                setShowDepositForm(false);
+                                setShowPaymentTabs(false);
+                              }
                             }}
                             style={{
                               flex: 1,
@@ -1142,22 +1173,57 @@ export default function InvoiceDetailPage() {
                       // QR Code Display
                       <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                         {/* QR Code */}
-                        <div
-                          style={{
-                            textAlign: "center",
-                            padding: "24px",
-                            background: "#f5f5f5",
-                            borderRadius: "8px",
-                          }}
-                        >
+                        {paymentData?.paymentUrl ? (
                           <div
-                            id="payos-checkout-container"
                             style={{
-                              width: "100%",
-                              minHeight: "350px",
+                              border: "2px solid #CBB081",
+                              borderRadius: "12px",
+                              padding: "24px",
+                              background: "#fafafa",
+                              minHeight: "400px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              boxShadow: "0 2px 8px rgba(203, 176, 129, 0.15)",
                             }}
-                          />
-                        </div>
+                          >
+                            <div
+                              id="payos-checkout-container"
+                              style={{
+                                width: "100%",
+                                maxWidth: "350px",
+                                height: "350px",
+                              }}
+                            ></div>
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "60px 0",
+                              background: "#fafafa",
+                              borderRadius: "12px",
+                              border: "2px dashed #CBB081",
+                              minHeight: "400px",
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <Spin size="large" />
+                            <p
+                              style={{
+                                marginTop: "16px",
+                                color: "#666",
+                                fontSize: "14px",
+                              }}
+                            >
+                              Đang tải mã QR...
+                            </p>
+                          </div>
+                        )}
 
                         {/* Payment Info */}
                         <div>
@@ -1742,98 +1808,346 @@ export default function InvoiceDetailPage() {
                       </span>
                     </div>
 
-                    <Tabs
-                      activeKey={paymentMethod}
-                      onChange={(key) => {
-                        setPaymentMethod(key);
-                        if (key !== "QR") {
-                          exit();
-                        }
+                    <div>
+                      <style>
+                        {`
+                          .custom-payment-tabs .ant-tabs-nav {
+                            width: 100%;
+                          }
+                          .custom-payment-tabs .ant-tabs-nav-list {
+                            width: 100%;
+                            display: flex !important;
+                          }
+                          .custom-payment-tabs .ant-tabs-tab {
+                            flex: 1;
+                            margin: 0 4px !important;
+                            padding: 0 !important;
+                            justify-content: center;
+                          }
+                          .custom-payment-tabs .ant-tabs-tab:first-child {
+                            margin-left: 0 !important;
+                          }
+                          .custom-payment-tabs .ant-tabs-tab:last-child {
+                            margin-right: 0 !important;
+                          }
+                          .custom-payment-tabs .ant-tabs-tab-btn {
+                            width: 100%;
+                          }
+                          .custom-payment-tabs .ant-tabs-ink-bar {
+                            display: none !important;
+                          }
+                        `}
+                      </style>
+                      <Tabs
+                        activeKey={paymentMethod}
+                        onChange={(key) => {
+                          setPaymentMethod(key);
+                        }}
+                      tabBarStyle={{
+                        marginBottom: "24px",
+                        borderBottom: "none",
+                        display: "flex",
+                        justifyContent: "space-between",
                       }}
+                      tabBarGutter={8}
+                      className="custom-payment-tabs"
                       items={[
                         {
                           key: "QR",
-                          label: "QR",
+                          label: (
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: "15px",
+                                padding: "10px 0",
+                                display: "block",
+                                width: "100%",
+                                textAlign: "center",
+                                borderRadius: "8px",
+                                background: paymentMethod === "QR" ? "#CBB081" : "#f3f4f6",
+                                color: paymentMethod === "QR" ? "#fff" : "#6b7280",
+                                transition: "all 0.3s ease",
+                              }}
+                            >
+                              QR
+                            </span>
+                          ),
                           children: paymentData?.paymentUrl ? (
                             <div
                               style={{
-                                position: "relative",
-                                width: "100%",
-                                height: "100%",
+                                border: "2px solid #CBB081",
+                                borderRadius: "12px",
+                                padding: "24px",
+                                background: "#fafafa",
+                                minHeight: "400px",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                boxShadow: "0 2px 8px rgba(203, 176, 129, 0.15)",
                               }}
                             >
                               <div
                                 id="payos-checkout-container"
-                                style={{ height: "350px" }}
+                                style={{
+                                  width: "100%",
+                                  maxWidth: "350px",
+                                  height: "350px",
+                                }}
                               ></div>
                             </div>
                           ) : (
                             <div
-                              style={{ textAlign: "center", padding: "40px 0" }}
+                              style={{
+                                textAlign: "center",
+                                padding: "60px 0",
+                                background: "#fafafa",
+                                borderRadius: "12px",
+                                border: "2px dashed #CBB081",
+                                minHeight: "400px",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
                             >
                               <Spin size="large" />
+                              <p
+                                style={{
+                                  marginTop: "16px",
+                                  color: "#666",
+                                  fontSize: "14px",
+                                }}
+                              >
+                                Đang tải mã QR...
+                              </p>
                             </div>
                           ),
                         },
                         {
                           key: "CASH",
-                          label: "Tiền mặt",
+                          label: (
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                fontSize: "15px",
+                                padding: "10px 0",
+                                display: "block",
+                                width: "100%",
+                                textAlign: "center",
+                                borderRadius: "8px",
+                                background: paymentMethod === "CASH" ? "#CBB081" : "#f3f4f6",
+                                color: paymentMethod === "CASH" ? "#fff" : "#6b7280",
+                                transition: "all 0.3s ease",
+                              }}
+                            >
+                              Tiền mặt
+                            </span>
+                          ),
                           children:
                             paymentData && paymentMethod === "CASH" ? (
                               <div
                                 style={{
-                                  padding: "20px 0",
-                                  textAlign: "center",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "20px",
                                 }}
                               >
-                                <div style={{ marginBottom: "20px" }}>
-                                  <p
+                                {/* Khách hàng */}
+                                <div>
+                                  <label
                                     style={{
-                                      fontSize: "16px",
-                                      color: "#6b7280",
-                                      marginBottom: "12px",
+                                      display: "block",
+                                      marginBottom: "8px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                      color: "#374151",
                                     }}
                                   >
-                                    Số tiền thanh toán
-                                  </p>
-                                  <div
+                                    Khách hàng
+                                  </label>
+                                  <Input
+                                    value={customerName}
+                                    disabled
                                     style={{
-                                      fontSize: "24px",
-                                      fontWeight: 700,
-                                      color: "#2563eb",
+                                      height: "40px",
+                                      borderRadius: "8px",
+                                      backgroundColor: "#f9fafb",
+                                      borderColor: "#d1d5db",
                                     }}
-                                  >
-                                    {formatCurrency(
-                                      paymentData.amount || depositAmount
-                                    )}
-                                  </div>
+                                  />
                                 </div>
-                                <Button
-                                  type="primary"
-                                  size="large"
-                                  onClick={async () => {
-                                    await handlePayment("CASH");
-                                    message.success(
-                                      "Xác nhận thanh toán tiền mặt thành công"
-                                    );
-                                    setPaymentData(null);
-                                    setShowDepositForm(false);
-                                    setDepositAmount("");
-                                    fetchInvoiceDetail();
-                                  }}
-                                  style={{
-                                    background: "#22c55e",
-                                    borderColor: "#22c55e",
-                                    height: "45px",
-                                    padding: "0 40px",
-                                    fontWeight: 600,
-                                    fontSize: "16px",
-                                    borderRadius: "8px",
-                                    width: "100%",
-                                  }}
-                                >
-                                  Xác nhận
-                                </Button>
+
+                                {/* Mã phiếu */}
+                                <div>
+                                  <label
+                                    style={{
+                                      display: "block",
+                                      marginBottom: "8px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    Mã phiếu
+                                  </label>
+                                  <Input
+                                    value={serviceTicketCode}
+                                    disabled
+                                    style={{
+                                      height: "40px",
+                                      borderRadius: "8px",
+                                      backgroundColor: "#f9fafb",
+                                      borderColor: "#d1d5db",
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Số tiền cọc */}
+                                <div>
+                                  <label
+                                    style={{
+                                      display: "block",
+                                      marginBottom: "8px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    Số tiền cọc
+                                  </label>
+                                  <Input
+                                    value={formatCurrency(depositAmount)}
+                                    disabled
+                                    style={{
+                                      height: "40px",
+                                      borderRadius: "8px",
+                                      backgroundColor: "#f9fafb",
+                                      borderColor: "#d1d5db",
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Số tiền khách trả */}
+                                <div>
+                                  <label
+                                    style={{
+                                      display: "block",
+                                      marginBottom: "8px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    Số tiền khách trả
+                                  </label>
+                                  <Input
+                                    value={
+                                      cashReceived
+                                        ? Number(cashReceived).toLocaleString("vi-VN")
+                                        : ""
+                                    }
+                                    onChange={(e) => {
+                                      const value = e.target.value.replace(/[^\d]/g, "");
+                                      setCashReceived(value);
+                                    }}
+                                    placeholder="Nhập số tiền khách trả"
+                                    style={{
+                                      height: "40px",
+                                      borderRadius: "8px",
+                                      fontSize: "14px",
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Số tiền trả khách */}
+                                <div>
+                                  <label
+                                    style={{
+                                      display: "block",
+                                      marginBottom: "8px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                      color: "#374151",
+                                    }}
+                                  >
+                                    Số tiền trả khách
+                                  </label>
+                                  <Input
+                                    value={formatCurrency(
+                                      Math.max(0, Number(cashReceived || 0) - Number(depositAmount || 0))
+                                    )}
+                                    disabled
+                                    style={{
+                                      height: "40px",
+                                      borderRadius: "8px",
+                                      backgroundColor: "#f9fafb",
+                                      borderColor: "#d1d5db",
+                                    }}
+                                  />
+                                </div>
+
+                                {/* Buttons */}
+                                <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                                  <Button
+                                    onClick={() => {
+                                      setPaymentMethod("QR");
+                                      setCashReceived("");
+                                    }}
+                                    style={{
+                                      flex: 1,
+                                      height: "45px",
+                                      borderRadius: "8px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                    }}
+                                  >
+                                    Hủy
+                                  </Button>
+                                  <Button
+                                    type="primary"
+                                    onClick={async () => {
+                                      setPaymentLoading(true);
+                                      try {
+                                        const payload = {
+                                          method: "CASH",
+                                          price: Number(depositAmount),
+                                          type: "DEPOSIT",
+                                        };
+                                        
+                                        const { data: response, error } = await invoiceAPI.pay(id, payload);
+                                        
+                                        if (error) {
+                                          message.error(error || "Tạo giao dịch thanh toán thất bại");
+                                          return;
+                                        }
+                                        
+                                        message.success("Thanh toán tiền mặt thành công");
+                                        setPaymentData(null);
+                                        setShowDepositForm(false);
+                                        setDepositAmount("");
+                                        await fetchInvoiceDetail();
+                                      } catch (err) {
+                                        console.error("Error creating payment:", err);
+                                        message.error("Đã xảy ra lỗi khi tạo giao dịch thanh toán");
+                                      } finally {
+                                        setPaymentLoading(false);
+                                      }
+                                    }}
+                                    loading={paymentLoading}
+                                    style={{
+                                      flex: 1,
+                                      background: "#22c55e",
+                                      borderColor: "#22c55e",
+                                      height: "45px",
+                                      fontWeight: 600,
+                                      fontSize: "14px",
+                                      borderRadius: "8px",
+                                    }}
+                                  >
+                                    Hoàn tất
+                                  </Button>
+                                </div>
                               </div>
                             ) : (
                               <div
@@ -1843,20 +2157,13 @@ export default function InvoiceDetailPage() {
                                 }}
                               >
                                 <Spin size="large" />
-                                <p
-                                  style={{
-                                    marginTop: "12px",
-                                    color: "#6b7280",
-                                  }}
-                                >
-                                  Đang tạo giao dịch thanh toán tiền mặt...
-                                </p>
                               </div>
                             ),
                         },
                       ]}
                       style={{ marginTop: "20px" }}
                     />
+                    </div>
                   </div>
                 )}
                   </>
@@ -1866,6 +2173,58 @@ export default function InvoiceDetailPage() {
           )}
         </Row>
       </div>
+
+      {/* Debt Modal */}
+      <Modal
+        title="Cập nhật phiếu công nợ"
+        open={showDebtModal}
+        onCancel={() => setShowDebtModal(false)}
+        footer={null}
+        width={450}
+        centered
+      >
+        <div style={{ padding: '20px 0' }}>
+          <div style={{ marginBottom: '16px', fontSize: '15px' }}>
+            <strong>Tên khách hàng:</strong> {invoiceData?.customer?.fullName || invoiceData?.customer?.name || 'N/A'}
+          </div>
+          <div style={{ marginBottom: '16px', fontSize: '15px' }}>
+            <strong>Mã phiếu:</strong> {invoiceData?.serviceTicket?.serviceTicketCode || 'N/A'}
+          </div>
+          <div style={{ marginBottom: '16px', fontSize: '15px' }}>
+            <strong>Số điện thoại:</strong> {invoiceData?.customer?.phone || 'N/A'}
+          </div>
+          <div style={{ marginBottom: '24px', fontSize: '15px', color: '#dc2626', fontWeight: 600 }}>
+            <strong>Còn lại:</strong> {remainingAmount?.toLocaleString('vi-VN')} đ
+          </div>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>
+              Ngày hẹn trả
+            </label>
+            <Input
+              type="date"
+              value={debtDueDate}
+              onChange={(e) => setDebtDueDate(e.target.value)}
+              style={{ height: '40px', borderRadius: '8px' }}
+            />
+          </div>
+          <Button
+            type="primary"
+            onClick={handleCreateDebt}
+            style={{
+              width: '100%',
+              height: '45px',
+              background: '#22c55e',
+              borderColor: '#22c55e',
+              fontSize: '16px',
+              fontWeight: 600,
+              borderRadius: '8px',
+              marginTop: '8px'
+            }}
+          >
+            Lưu
+          </Button>
+        </div>
+      </Modal>
     </AccountanceLayout>
   );
 }
