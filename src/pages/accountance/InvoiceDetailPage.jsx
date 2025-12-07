@@ -30,6 +30,11 @@ export default function InvoiceDetailPage() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("QR");
   const payOSElementRef = useRef(null);
+  
+  // States for payment form (WAITING_FOR_DELIVERY)
+  const [showPaymentTabs, setShowPaymentTabs] = useState(false); // Show tabs when click +
+  const [paymentTab, setPaymentTab] = useState("CASH");
+  const [paymentAmount, setPaymentAmount] = useState("");
 
   const [payOSInitialized, setPayOSInitialized] = useState(false);
 
@@ -222,6 +227,66 @@ export default function InvoiceDetailPage() {
     setDepositAmount("");
   };
 
+  // Handle payment for modal (WAITING_FOR_DELIVERY)
+  const handleModalPayment = async () => {
+    if (!paymentAmount || Number(paymentAmount) <= 0) {
+      message.warning("Vui lòng nhập số tiền thanh toán");
+      return;
+    }
+
+    const finalAmount = invoiceData?.finalAmount || 0;
+    if (Number(paymentAmount) > finalAmount) {
+      message.error("Số tiền thanh toán không được vượt quá tổng tiền cần thu");
+      return;
+    }
+
+    setPaymentLoading(true);
+    try {
+      const payload = {
+        method: paymentTab === "CASH" ? "CASH" : "BANK_TRANSFER",
+        price: Number(paymentAmount),
+        type: "DEPOSIT",
+      };
+
+      console.log("=== MODAL PAYMENT DEBUG ===");
+      console.log("Payment Tab:", paymentTab);
+      console.log("Payload:", JSON.stringify(payload, null, 2));
+
+      const { data: response, error } = await invoiceAPI.pay(id, payload);
+
+      if (error) {
+        message.error(error || "Tạo giao dịch thanh toán thất bại");
+        setPaymentLoading(false);
+        return;
+      }
+
+      const result = response?.result || null;
+      console.log("Payment response:", result);
+
+      if (paymentTab === "CASH") {
+        message.success("Thanh toán thành công");
+        setShowDepositForm(false);
+        setShowPaymentTabs(false);
+        setPaymentAmount("");
+        await fetchInvoiceDetail();
+      } else {
+        // QR - show QR code
+        if (result?.paymentUrl) {
+          setPaymentData(result);
+          setPayOSConfig((config) => ({
+            ...config,
+            CHECKOUT_URL: result?.paymentUrl,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error("Error creating payment:", err);
+      message.error("Đã xảy ra lỗi khi tạo giao dịch thanh toán");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   const handlePayment = async (type = "QR") => {
     if (!depositAmount || Number(depositAmount) <= 0) {
       message.warning("Vui lòng nhập số tiền đặt cọc");
@@ -238,10 +303,7 @@ export default function InvoiceDetailPage() {
       const payload = {
         method: type === "QR" ? "BANK_TRANSFER" : "CASH",
         price: Number(depositAmount),
-        type:
-          invoiceData?.serviceTicket.status === "WAITING_FOR_DELIVERY"
-            ? "PAYMENT"
-            : "DEPOSIT",
+        type: "DEPOSIT",
       };
 
       const { data: response, error } = await invoiceAPI.pay(id, payload);
@@ -305,71 +367,112 @@ export default function InvoiceDetailPage() {
               >
                 Thanh toán
               </h2>
+              
+              {/* Payment Summary */}
               <div
                 style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
+                  border: "2px solid #CBB081",
+                  borderRadius: "8px",
+                  padding: "16px",
                 }}
               >
                 <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <span>Tổng tiền hàng:</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {formatCurrency(totalMerchandise)}
-                  </span>
-                </div>
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <span>Tiền công:</span>
-                  <span style={{ fontWeight: 600 }}>
-                    {formatCurrency(totalLabor)}
-                  </span>
-                </div>
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <span>Chiết khấu:</span>
-                  <span style={{ fontWeight: 600, color: "#16a34a" }}>
-                    -{formatCurrency(discount)}
-                  </span>
-                </div>
-                <div
-                  style={{ display: "flex", justifyContent: "space-between" }}
-                >
-                  <span>Tiền cọc đã nhận:</span>
-                  <span style={{ fontWeight: 600, color: "#ef4444" }}>
-                    -{formatCurrency(depositReceived)}
-                  </span>
-                </div>
-                <div
                   style={{
                     display: "flex",
-                    justifyContent: "space-between",
-                    marginTop: "12px",
-                    paddingTop: "12px",
-                    borderTop: "1px solid #e5e7eb",
+                    flexDirection: "column",
+                    gap: "12px",
                   }}
                 >
-                  <span className="h5" style={{ fontWeight: 700 }}>
-                    Thành tiền:
-                  </span>
-                  <span
-                    className="h5"
-                    style={{ fontWeight: 700, color: "#2563eb" }}
+                  {/* Tổng tiền hàng */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "15px",
+                    }}
                   >
-                    {formatCurrency(finalAmount)}
-                  </span>
-                </div>
-                <div style={{ marginTop: "8px" }}>
-                  <span style={{ color: "#6b7280" }}>Bằng chữ: </span>
-                  <span style={{ fontWeight: 600 }}>
-                    {numberToWords(finalAmount)}
-                  </span>
+                    <span style={{ color: "#374151" }}>Tổng tiền hàng</span>
+                    <span style={{ fontWeight: 500 }}>
+                      {formatCurrency(invoiceData?.serviceTicket?.priceQuotation?.estimateAmount || 0)}
+                    </span>
+                  </div>
+
+                  {/* Tiền công */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "15px",
+                    }}
+                  >
+                    <span style={{ color: "#374151" }}>Tiền công</span>
+                    <span style={{ fontWeight: 500 }}>
+                      {formatCurrency(invoiceData?.serviceTicket?.estimatedCost || 0)}
+                    </span>
+                  </div>
+
+                  {/* Chiết khấu */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "15px",
+                    }}
+                  >
+                    <span style={{ color: "#374151" }}>Chiết khấu</span>
+                    <span style={{ fontWeight: 500 }}>
+                      {formatCurrency(invoiceData?.serviceTicket?.priceQuotation?.discount || 0)}
+                    </span>
+                  </div>
+
+                  {/* Tiền cọc */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "15px",
+                      paddingBottom: "12px",
+                      borderBottom: "1px solid #e5e7eb",
+                    }}
+                  >
+                    <span style={{ color: "#374151" }}>Tiền cọc</span>
+                    <span style={{ fontWeight: 500 }}>
+                      {formatCurrency(invoiceData?.depositReceived || 0)}
+                    </span>
+                  </div>
+
+                  {/* Thành tiền */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "16px",
+                    }}
+                  >
+                    <span style={{ color: "#374151", fontWeight: 600 }}>Thành tiền</span>
+                    <span style={{ fontWeight: 700, color: "#CBB081" }}>
+                      {formatCurrency(invoiceData?.finalAmount || 0)}
+                    </span>
+                  </div>
+
+                  {/* Bằng chữ */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "14px",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    <span style={{ color: "#6b7280" }}>Bằng chữ</span>
+                    <span style={{ color: "#6b7280" }}>
+                      {invoiceData?.amountInWords || ""}
+                    </span>
+                  </div>
                 </div>
               </div>
+
+              
             </Card>
 
             <Card
@@ -425,7 +528,10 @@ export default function InvoiceDetailPage() {
                 <Button
                   type="primary"
                   size="large"
-                  onClick={() => setShowDepositForm(true)}
+                  onClick={() => {
+                    setShowDepositForm(true);
+                    setShowPaymentTabs(false); // Reset tabs state
+                  }}
                   style={{
                     background: "#22c55e",
                     borderColor: "#22c55e",
@@ -435,7 +541,7 @@ export default function InvoiceDetailPage() {
                     fontSize: "16px",
                   }}
                 >
-                  Đặt cọc
+                  {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" ? "Thanh toán" : "Đặt cọc"}
                 </Button>
               </div>
             )}
@@ -452,6 +558,755 @@ export default function InvoiceDetailPage() {
                   border: "1px solid #e5e7eb",
                 }}
               >
+                {/* Hiển thị tab Tiền mặt/QR khi WAITING_FOR_DELIVERY */}
+                {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" ? (
+                  <div style={{ padding: "12px 0" }}>
+                    {/* Step 1: Show transaction table first */}
+                    {!showPaymentTabs ? (
+                      <>
+                        {/* Khách hàng */}
+                        <div style={{ marginBottom: "20px" }}>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Khách hàng
+                          </label>
+                          <Input
+                            value={customerName}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Mã phiếu */}
+                        <div style={{ marginBottom: "20px" }}>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Mã phiếu
+                          </label>
+                          <Input
+                            value={serviceTicketCode}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Số tiền thực thu */}
+                        <div style={{ marginBottom: "20px" }}>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Số tiền thực thu
+                          </label>
+                          <Input
+                            value={formatCurrency(invoiceData?.finalAmount || 0)}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Bảng giao dịch */}
+                        <div style={{ marginBottom: "20px" }}>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: "12px",
+                            }}
+                          >
+                            <label
+                              style={{
+                                fontWeight: 600,
+                                fontSize: "14px",
+                                color: "#374151",
+                              }}
+                            >
+                              Bảng giao dịch
+                            </label>
+                            <Button
+                              type="link"
+                              icon={<i className="bi bi-plus-circle" />}
+                              style={{ padding: 0, fontSize: "18px" }}
+                              onClick={() => {
+                                setShowPaymentTabs(true);
+                                setPaymentTab("CASH");
+                                setPaymentAmount("");
+                                setPaymentData(null);
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <thead>
+                                <tr style={{ backgroundColor: "#f9fafb" }}>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      textAlign: "left",
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  >
+                                    Mã giao dịch
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      textAlign: "center",
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  >
+                                    Số tiền
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      textAlign: "center",
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  >
+                                    Phương thức
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      width: "40px",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  ></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {invoiceData?.transactions?.length > 0 ? (
+                                  invoiceData.transactions.map((transaction, index) => (
+                                    <tr
+                                      key={transaction.id || index}
+                                      style={{
+                                        borderBottom:
+                                          index < invoiceData.transactions.length - 1
+                                            ? "1px solid #f3f4f6"
+                                            : "none",
+                                      }}
+                                    >
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          fontSize: "13px",
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        {transaction.transactionCode ||
+                                          transaction.id ||
+                                          "N/A"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          textAlign: "center",
+                                          fontSize: "13px",
+                                          fontWeight: 500,
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        {formatCurrency(transaction.amount || 0)}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          textAlign: "center",
+                                          fontSize: "13px",
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        {transaction.method === "CASH"
+                                          ? "Tiền mặt"
+                                          : transaction.method === "BANK_TRANSFER"
+                                          ? "QR"
+                                          : transaction.method || "N/A"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          textAlign: "center",
+                                        }}
+                                      >
+                                        <Button
+                                          type="text"
+                                          icon={
+                                            <i
+                                              className="bi bi-trash"
+                                              style={{ color: "#ef4444", fontSize: "14px" }}
+                                            />
+                                          }
+                                          size="small"
+                                          style={{ padding: "4px" }}
+                                        />
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td
+                                      colSpan={4}
+                                      style={{
+                                        padding: "20px",
+                                        textAlign: "center",
+                                        color: "#9ca3af",
+                                        fontSize: "13px",
+                                      }}
+                                    >
+                                      Chưa có giao dịch
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Cộng hợp nhất */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            paddingTop: "12px",
+                            borderTop: "1px solid #e5e7eb",
+                            marginBottom: "20px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              color: "#6b7280",
+                            }}
+                          >
+                            Cộng hợp nhất
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              color: "#374151",
+                            }}
+                          >
+                            {formatCurrency(
+                              invoiceData?.transactions?.reduce(
+                                (sum, t) => sum + (t.amount || 0),
+                                0
+                              ) || 0
+                            )}
+                          </span>
+                        </div>
+
+                        {/* Cộng nợ mới */}
+                        <div style={{ marginBottom: "20px" }}>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Cộng nợ mới
+                          </label>
+                          <Input
+                            value={formatCurrency(
+                              Math.max(
+                                0,
+                                (invoiceData?.finalAmount || 0) -
+                                  (invoiceData?.transactions?.reduce(
+                                    (sum, t) => sum + (t.amount || 0),
+                                    0
+                                  ) || 0)
+                              )
+                            )}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Buttons */}
+                        <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                          <Button
+                            onClick={() => {
+                              setShowDepositForm(false);
+                              setShowPaymentTabs(false);
+                            }}
+                            style={{
+                              flex: 1,
+                              height: "45px",
+                              borderRadius: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                            }}
+                          >
+                            Hủy
+                          </Button>
+                          <Button
+                            type="primary"
+                            onClick={() => {
+                              setShowDepositForm(false);
+                              setShowPaymentTabs(false);
+                            }}
+                            style={{
+                              flex: 1,
+                              background: "#22c55e",
+                              borderColor: "#22c55e",
+                              height: "45px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            Lưu
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Step 2: Show Tabs after clicking + */}
+                        <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+                          <Button
+                            style={{
+                              flex: 1,
+                              height: "40px",
+                              borderRadius: "8px",
+                              background: paymentTab === "CASH" ? "#CBB081" : "#ffffff",
+                              color: paymentTab === "CASH" ? "#ffffff" : "#374151",
+                              border: paymentTab === "CASH" ? "none" : "1px solid #e5e7eb",
+                              fontWeight: 600,
+                            }}
+                            onClick={() => {
+                              setPaymentTab("CASH");
+                              setPaymentData(null);
+                            }}
+                          >
+                            Tiền mặt
+                          </Button>
+                          <Button
+                            style={{
+                              flex: 1,
+                              height: "40px",
+                              borderRadius: "8px",
+                              background: paymentTab === "QR" ? "#CBB081" : "#ffffff",
+                              color: paymentTab === "QR" ? "#ffffff" : "#374151",
+                              border: paymentTab === "QR" ? "none" : "1px solid #e5e7eb",
+                              fontWeight: 600,
+                            }}
+                            onClick={() => {
+                              setPaymentTab("QR");
+                              setPaymentData(null);
+                            }}
+                          >
+                            QR
+                          </Button>
+                        </div>
+
+                    {/* Content */}
+                    {!paymentData ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        {/* Khách hàng */}
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Khách hàng
+                          </label>
+                          <Input
+                            value={customerName}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Mã phiếu */}
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Mã phiếu
+                          </label>
+                          <Input
+                            value={serviceTicketCode}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Số tiền thanh toán */}
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Số tiền thanh toán
+                          </label>
+                          <Input
+                            value={
+                              paymentAmount
+                                ? Number(paymentAmount).toLocaleString("vi-VN")
+                                : ""
+                            }
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^\d]/g, "");
+                              setPaymentAmount(value);
+                            }}
+                            placeholder="Nhập số tiền"
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              fontSize: "14px",
+                            }}
+                          />
+                        </div>
+
+                        {paymentTab === "CASH" && (
+                          <>
+                            {/* Số tiền nhận của khách */}
+                            <div>
+                              <label
+                                style={{
+                                  display: "block",
+                                  marginBottom: "8px",
+                                  fontWeight: 600,
+                                  fontSize: "14px",
+                                  color: "#374151",
+                                }}
+                              >
+                                Số tiền nhận của khách
+                              </label>
+                              <Input
+                                value={
+                                  paymentAmount
+                                    ? Number(paymentAmount).toLocaleString("vi-VN")
+                                    : ""
+                                }
+                                disabled
+                                style={{
+                                  height: "40px",
+                                  borderRadius: "8px",
+                                  backgroundColor: "#f9fafb",
+                                  borderColor: "#d1d5db",
+                                }}
+                              />
+                            </div>
+
+                            {/* Số tiền trả khách */}
+                            <div>
+                              <label
+                                style={{
+                                  display: "block",
+                                  marginBottom: "8px",
+                                  fontWeight: 600,
+                                  fontSize: "14px",
+                                  color: "#374151",
+                                }}
+                              >
+                                Số tiền trả khách
+                              </label>
+                              <Input
+                                value="0"
+                                disabled
+                                style={{
+                                  height: "40px",
+                                  borderRadius: "8px",
+                                  backgroundColor: "#f9fafb",
+                                  borderColor: "#d1d5db",
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                        {/* Buttons */}
+                        <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                          <Button
+                            onClick={() => {
+                              setShowDepositForm(false);
+                              setPaymentAmount("");
+                              setPaymentData(null);
+                            }}
+                            style={{
+                              flex: 1,
+                              height: "45px",
+                              borderRadius: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                            }}
+                          >
+                            Hủy
+                          </Button>
+                          <Button
+                            type="primary"
+                            onClick={handleModalPayment}
+                            loading={paymentLoading}
+                            disabled={!paymentAmount || Number(paymentAmount) <= 0}
+                            style={{
+                              flex: 1,
+                              background: "#22c55e",
+                              borderColor: "#22c55e",
+                              height: "45px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            {paymentTab === "CASH" ? "Hoàn tất" : "Tạo QR"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      // QR Code Display
+                      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                        {/* QR Code */}
+                        <div
+                          style={{
+                            textAlign: "center",
+                            padding: "24px",
+                            background: "#f5f5f5",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <div
+                            id="payos-checkout-container"
+                            style={{
+                              width: "100%",
+                              minHeight: "350px",
+                            }}
+                          />
+                        </div>
+
+                        {/* Payment Info */}
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Ngân hàng
+                          </label>
+                          <Input
+                            value="VietinBank"
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Thu hưởng
+                          </label>
+                          <Input
+                            value={paymentData?.bankAccountName || "HOANG ANH TUAN"}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Số tài khoản
+                          </label>
+                          <Input
+                            value={paymentData?.bankAccountNumber || "0010263503"}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Số tiền
+                          </label>
+                          <Input
+                            value={formatCurrency(paymentData?.amount || Number(paymentAmount))}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "8px",
+                              fontWeight: 600,
+                              fontSize: "14px",
+                              color: "#374151",
+                            }}
+                          >
+                            Nội dung
+                          </label>
+                          <Input
+                            value={paymentData?.description || `Thanh toán - ${serviceTicketCode}`}
+                            disabled
+                            style={{
+                              height: "40px",
+                              borderRadius: "8px",
+                              backgroundColor: "#f9fafb",
+                              borderColor: "#d1d5db",
+                            }}
+                          />
+                        </div>
+
+                        {/* Close Button */}
+                        <Button
+                          onClick={() => {
+                            setShowDepositForm(false);
+                            setPaymentAmount("");
+                            setPaymentData(null);
+                            setPaymentTab("CASH");
+                            fetchInvoiceDetail();
+                          }}
+                          style={{
+                            width: "100%",
+                            height: "45px",
+                            borderRadius: "8px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                          }}
+                        >
+                          Gửi
+                        </Button>
+                      </div>
+                    )}
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  // Form đặt cọc cho các status khác
+                  <>
                 {!paymentData ? (
                   <div
                     style={{
@@ -533,6 +1388,220 @@ export default function InvoiceDetailPage() {
                         }}
                       />
                     </div>
+
+                    {/* Chỉ hiển thị bảng giao dịch khi WAITING_FOR_DELIVERY (thanh toán) */}
+                    {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" && (
+                      <>
+                        {/* Bảng giao dịch */}
+                        <div>
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginBottom: "12px",
+                            }}
+                          >
+                            <label
+                              style={{
+                                fontWeight: 600,
+                                fontSize: "14px",
+                                color: "#374151",
+                              }}
+                            >
+                              Bảng giao dịch
+                            </label>
+                            <Button
+                              type="link"
+                              icon={<i className="bi bi-plus-circle" />}
+                              style={{ padding: 0, fontSize: "18px" }}
+                              onClick={() => {
+                                setShowDepositForm(true);
+                                setShowPaymentTabs(true);
+                                setPaymentTab("CASH");
+                                setPaymentAmount("");
+                                setPaymentData(null);
+                              }}
+                            />
+                          </div>
+                          <div
+                            style={{
+                              border: "1px solid #e5e7eb",
+                              borderRadius: "8px",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <thead>
+                                <tr style={{ backgroundColor: "#f9fafb" }}>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      textAlign: "left",
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  >
+                                    Mã giao dịch
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      textAlign: "center",
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  >
+                                    Số tiền
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      textAlign: "center",
+                                      fontSize: "13px",
+                                      fontWeight: 600,
+                                      color: "#6b7280",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  >
+                                    Phương thức
+                                  </th>
+                                  <th
+                                    style={{
+                                      padding: "10px 12px",
+                                      width: "40px",
+                                      borderBottom: "1px solid #e5e7eb",
+                                    }}
+                                  ></th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {invoiceData?.transactions?.length > 0 ? (
+                                  invoiceData.transactions.map((transaction, index) => (
+                                    <tr
+                                      key={transaction.id || index}
+                                      style={{
+                                        borderBottom:
+                                          index < invoiceData.transactions.length - 1
+                                            ? "1px solid #f3f4f6"
+                                            : "none",
+                                      }}
+                                    >
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          fontSize: "13px",
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        {transaction.transactionCode ||
+                                          transaction.id ||
+                                          "N/A"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          textAlign: "center",
+                                          fontSize: "13px",
+                                          fontWeight: 500,
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        {formatCurrency(transaction.amount || 0)}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          textAlign: "center",
+                                          fontSize: "13px",
+                                          color: "#374151",
+                                        }}
+                                      >
+                                        {transaction.method === "CASH"
+                                          ? "Tiền mặt"
+                                          : transaction.method === "BANK_TRANSFER"
+                                          ? "QR"
+                                          : transaction.method || "N/A"}
+                                      </td>
+                                      <td
+                                        style={{
+                                          padding: "10px 12px",
+                                          textAlign: "center",
+                                        }}
+                                      >
+                                        <Button
+                                          type="text"
+                                          icon={
+                                            <i
+                                              className="bi bi-trash"
+                                              style={{ color: "#ef4444", fontSize: "14px" }}
+                                            />
+                                          }
+                                          size="small"
+                                          style={{ padding: "4px" }}
+                                        />
+                                      </td>
+                                    </tr>
+                                  ))
+                                ) : (
+                                  <tr>
+                                    <td
+                                      colSpan={4}
+                                      style={{
+                                        padding: "20px",
+                                        textAlign: "center",
+                                        color: "#9ca3af",
+                                        fontSize: "13px",
+                                      }}
+                                    >
+                                      Chưa có giao dịch
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Cộng hợp nhất */}
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            paddingTop: "12px",
+                            borderTop: "1px solid #e5e7eb",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              color: "#6b7280",
+                            }}
+                          >
+                            Cộng hợp nhất
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              color: "#374151",
+                            }}
+                          >
+                            {formatCurrency(
+                              invoiceData?.transactions?.reduce(
+                                (sum, t) => sum + (t.amount || 0),
+                                0
+                              ) || 0
+                            )}
+                          </span>
+                        </div>
+                      </>
+                    )}
+
                     <div>
                       <label
                         style={{
@@ -543,7 +1612,7 @@ export default function InvoiceDetailPage() {
                           color: "#374151",
                         }}
                       >
-                        Số tiền đặt cọc
+                        {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" ? "Số tiền thanh toán" : "Số tiền đặt cọc"}
                       </label>
                       <Input
                         value={
@@ -789,6 +1858,8 @@ export default function InvoiceDetailPage() {
                       style={{ marginTop: "20px" }}
                     />
                   </div>
+                )}
+                  </>
                 )}
               </Card>
             </Col>

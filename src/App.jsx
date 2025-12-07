@@ -22,6 +22,8 @@ import PayrollDetailPage from './pages/accountance/PayrollDetailPage';
 import AccountanceAttendance from './pages/accountance/Attendance';
 import AccountancePlaceholder from './pages/accountance/Placeholder';
 import AccountanceDebts from './pages/accountance/Debts';
+import AccountanceDebtDetail from './pages/accountance/DebtDetail';
+import AccountanceDebtTicketDetail from './pages/accountance/DebtTicketDetail';
 import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
 import AccountanceMaterials from './pages/accountance/Materials';
@@ -137,6 +139,8 @@ function App() {
         <Route path="/accountance/payments" element={<AccountancePayments />} />
         <Route path="/accountance/payments/:id" element={<InvoiceDetailPage />} />
         <Route path="/accountance/debts" element={<AccountanceDebts />} />
+        <Route path="/accountance/debts/detail" element={<AccountanceDebtDetail />} />
+        <Route path="/accountance/debts/ticket/:ticketId" element={<AccountanceDebtTicketDetail />} />
         <Route path="/accountance/inventory" element={<AccountanceMaterials />} />
         <Route path="/accountance/forms" element={<AccountanceCreateForm />} />
         <Route path="/accountance/services" element={<AccountanceServices />} />
