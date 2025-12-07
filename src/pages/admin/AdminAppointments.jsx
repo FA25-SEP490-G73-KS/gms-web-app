@@ -151,6 +151,7 @@ export default function AdminAppointments() {
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [timeSlots, setTimeSlots] = useState([])
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
+  const [hoveredAppointmentTime, setHoveredAppointmentTime] = useState(null)
 
   // ref to native input so we can focus/showPicker when clicking icon
   const dateInputRef = useRef(null)
@@ -600,6 +601,40 @@ export default function AdminAppointments() {
     await fetchAppointmentDetail(record.id)
   }
 
+  // Helper function to normalize and compare time strings
+  const normalizeTimeForComparison = (timeStr) => {
+    if (!timeStr) return ''
+    // Remove all spaces, convert to lowercase, normalize time format
+    return timeStr.replace(/\s+/g, '').replace(/:/g, '').toLowerCase()
+  }
+
+  const isTimeMatch = (appointmentTime, slotLabel, slotStartTime, slotEndTime) => {
+    if (!appointmentTime) return false
+    
+    const normalizedAppt = normalizeTimeForComparison(appointmentTime)
+    const normalizedSlot = normalizeTimeForComparison(slotLabel)
+    
+    // Priority 1: Direct exact match with slot label
+    if (normalizedAppt === normalizedSlot) return true
+    
+    // Priority 2: Check if both start and end times match (appointment must contain both)
+    const normalizedStart = normalizeTimeForComparison(slotStartTime)
+    const normalizedEnd = normalizeTimeForComparison(slotEndTime)
+    
+    // Only match if appointment contains BOTH start and end time (not just one)
+    if (normalizedStart && normalizedEnd) {
+      const hasStart = normalizedAppt.includes(normalizedStart)
+      const hasEnd = normalizedAppt.includes(normalizedEnd)
+      // Both must be present to match
+      if (hasStart && hasEnd) return true
+    }
+    
+    // Priority 3: Check if slot label contains the full appointment time
+    if (normalizedSlot && normalizedAppt && normalizedSlot.includes(normalizedAppt)) return true
+    
+    return false
+  }
+
   const handleStatusChange = async (appointmentId, newStatus) => {
     if (!appointmentId || !newStatus) return
     
@@ -863,6 +898,14 @@ export default function AdminAppointments() {
                 size="middle"
                 components={goldTableHeader}
                 style={{ padding: 0 }}
+                onRow={(record) => ({
+                  onMouseEnter: () => {
+                    setHoveredAppointmentTime(record.time)
+                  },
+                  onMouseLeave: () => {
+                    setHoveredAppointmentTime(null)
+                  }
+                })}
               />
             </Card>
           </Col>
@@ -925,21 +968,31 @@ export default function AdminAppointments() {
                     const isLast = index === timeSlots.length - 1
                     const progressColor = progressPercent >= 100 ? '#ef4444' : progressPercent >= 80 ? '#f59e0b' : '#16a34a'
                     
+                    const isHovered = hoveredAppointmentTime && isTimeMatch(
+                      hoveredAppointmentTime, 
+                      slotLabel, 
+                      slot.startTime, 
+                      slot.endTime
+                    )
+                    
                     return (
                       <div key={slot.timeSlotId || index} style={{ display: 'flex', gap: '16px', marginBottom: isLast ? 0 : '48px', position: 'relative', zIndex: 1 }}>
                         <div style={{ position: 'relative', width: '20px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start', flexShrink: 0 }}>
                           <div
                             style={{
-                              width: '16px',
-                              height: '16px',
+                              width: isHovered ? '20px' : '16px',
+                              height: isHovered ? '20px' : '16px',
                               borderRadius: '50%',
-                              background: progressColor,
+                              background: isHovered ? '#16a34a' : progressColor,
                               border: '3px solid #fff',
-                              boxShadow: '0 0 0 2px #e5e7eb',
+                              boxShadow: isHovered 
+                                ? '0 0 0 3px #16a34a, 0 0 12px rgba(22, 163, 74, 0.5)' 
+                                : '0 0 0 2px #e5e7eb',
                               position: 'relative',
                               zIndex: 2,
                               marginLeft: '0',
-                              marginTop: '0'
+                              marginTop: '0',
+                              transition: 'all 0.3s ease'
                             }}
                           />
                         </div>

@@ -1,6 +1,6 @@
 import { useMemo, useCallback, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Form, Input, Button, Card, Checkbox, Divider, message } from 'antd'
+import { Form, Input, Button, Card, Checkbox, message } from 'antd'
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
 import useAuthStore from '../../store/authStore'
 import '../../styles/pages/auth/login.css'
@@ -116,8 +116,11 @@ export default function Login() {
               label="Số điện thoại"
               name="phone"
               rules={[
-                { required: true, message: 'Vui lòng nhập số điện thoại!' },
-                { len: 10, message: 'Số điện thoại phải gồm 10 chữ số!' },
+                { required: true, message: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)' },
+                { 
+                  pattern: /^(0[0-9]{9})$/,
+                  message: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+                },
               ]}
             >
               <Input
@@ -125,6 +128,14 @@ export default function Login() {
                 placeholder="Nhập số điện thoại"
                 autoComplete="username"
                 maxLength={10}
+                onChange={(e) => {
+                  // Chỉ cho phép nhập số, tự động loại bỏ ký tự không phải số
+                  let value = e.target.value.replace(/\D/g, '')
+                  // Giới hạn tối đa 10 chữ số
+                  value = value.slice(0, 10)
+                  // Cập nhật giá trị trong form
+                  form.setFieldsValue({ phone: value })
+                }}
               />
             </Form.Item>
 
@@ -171,14 +182,6 @@ export default function Login() {
                 Đăng Nhập
               </Button>
             </Form.Item>
-
-            <Divider plain>Hoặc</Divider>
-
-            <div className="login-footer">
-              <p>
-                Chưa có tài khoản? <a href="#register">Đăng ký ngay</a>
-              </p>
-            </div>
           </Form>
         </Card>
       </div>

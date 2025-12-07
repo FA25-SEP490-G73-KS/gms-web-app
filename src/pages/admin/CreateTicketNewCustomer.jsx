@@ -448,8 +448,8 @@ export default function CreateTicketNewCustomer() {
 
   const cardTitle = (
     <div>
-      <span className="h4" style={{ fontWeight: 600, display: 'block' }}>
-        Tạo phiếu dịch vụ cho khách mới
+      <span className="h4" style={{ fontSize: '24px', fontWeight: 600, display: 'block' }}>
+        Tạo phiếu dịch vụ
       </span>
       <span className="caption" style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>
         Dành cho khách chưa có tài khoản trong hệ thống. Vui lòng nhập đầy đủ thông tin trước khi tạo phiếu.

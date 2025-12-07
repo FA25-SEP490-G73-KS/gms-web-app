@@ -13,27 +13,54 @@ export default function ForgotPassword() {
   const navigate = useNavigate()
 
   const validatePhone = (phoneNumber) => {
-    const normalized = normalizePhoneTo84(phoneNumber)
-    return Boolean(normalized && normalized.startsWith('84') && normalized.length >= 11 && normalized.length <= 12)
+    if (!phoneNumber) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+      }
+    }
+
+    // Loại bỏ khoảng trắng và ký tự đặc biệt, chỉ giữ lại số
+    const cleaned = phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
+    
+    if (cleaned.length === 0) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+      }
+    }
+
+    // Regex: ^(0[0-9]{9})$ - 10 chữ số, bắt đầu bằng 0
+    const regex = /^(0[0-9]{9})$/
+    
+    if (!regex.test(cleaned)) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (10 chữ số)'
+      }
+    }
+
+    return {
+      isValid: true,
+      errorMessage: '',
+      cleanedPhone: cleaned
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     
-    if (!phone) {
-      setError('Vui lòng nhập số điện thoại')
-      return
-    }
-
-    if (!validatePhone(phone)) {
-      setError('Số điện thoại không hợp lệ. Vui lòng nhập 0xxxxxxxxx hoặc 84xxxxxxxxx')
+    const validation = validatePhone(phone)
+    if (!validation.isValid) {
+      setError(validation.errorMessage)
       return
     }
 
     setLoading(true)
     try {
-      const cleanedPhone = normalizePhoneTo84(phone)
+      // Sử dụng số điện thoại đã được validate và cleaned
+      const cleanedPhone = normalizePhoneTo84(validation.cleanedPhone)
       
       const { data, error: apiError } = await otpAPI.send(cleanedPhone, 'RESET_PASSWORD', { skipAuth: true })
       
@@ -84,9 +111,18 @@ export default function ForgotPassword() {
             <input
               type="tel"
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Ví dụ: 0989123456 hoặc 84989123456"
+              onChange={(e) => {
+                // Chỉ cho phép nhập số, tự động loại bỏ ký tự không phải số
+                let value = e.target.value.replace(/\D/g, '')
+                // Giới hạn tối đa 10 chữ số
+                value = value.slice(0, 10)
+                setPhone(value)
+                // Xóa lỗi khi bắt đầu nhập lại
+                if (error) setError('')
+              }}
+              placeholder="Số điện thoại"
               className="forgot-password__input"
+              maxLength={10}
             />
           </div>
 
@@ -102,7 +138,7 @@ export default function ForgotPassword() {
             className="forgot-password__submit-btn"
           >
             <div className="forgot-password__submit-text">
-              {loading ? 'Đang gửi...' : 'GỬI'}
+              {loading ? 'Đang gửi...' : 'Gửi'}
             </div>
           </button>
 

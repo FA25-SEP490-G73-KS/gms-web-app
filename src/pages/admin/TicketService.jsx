@@ -621,7 +621,7 @@ export default function TicketService() {
         <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 className="h4" style={{ fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
+          <h1 className="h4" style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
             {isHistoryPage ? 'Lịch sử sửa chữa' : 'Danh sách phiếu'}
           </h1>
           <p className="subtext" style={{ margin: '0 0 20px 0', color: '#6b7280' }}>
