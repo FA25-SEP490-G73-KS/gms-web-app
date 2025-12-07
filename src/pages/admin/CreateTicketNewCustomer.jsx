@@ -707,7 +707,29 @@ export default function CreateTicketNewCustomer() {
                   </div>
                 </Form.Item>
 
-          
+                <Form.Item 
+                  label="Ngày dự đoán nhận xe" 
+                  name="receiveDate" 
+                  rules={[{ required: true, message: 'Vui lòng chọn ngày dự đoán nhận xe' }]} 
+                  style={formItemStyle}
+                >
+                  <DatePicker
+                    selected={selectedDate}
+                    onChange={(date) => {
+                      setSelectedDate(date)
+                      form.setFieldsValue({ receiveDate: date })
+                    }}
+                    dateFormat="dd/MM/yyyy"
+                    minDate={new Date()}
+                    placeholderText="dd/mm/yyyy"
+                    customInput={<DateInput />}
+                    popperPlacement="bottom-start"
+                    popperModifiers={[{ name: 'offset', options: { offset: [0, 8] } }]}
+                    shouldCloseOnSelect
+                    withPortal
+                    portalId="create-ticket-new-customer-date-portal"
+                  />
+                </Form.Item>
 
                 </div>
               </Col>

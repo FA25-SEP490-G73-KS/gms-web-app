@@ -295,6 +295,18 @@ export const znsNotificationsAPI = {
     post(`/zns-notifications/quotation/${quotationId}/send`),
 };
 
+export const notificationAPI = {
+  getAll: (page = 0, size = 20, status = null) => {
+    const params = new URLSearchParams({ page, size });
+    if (status) params.append('status', status);
+    return get(`/notifications?${params.toString()}`);
+  },
+  getUnreadCount: () => get('/notifications/unread-count'),
+  markAsRead: (notificationId) => patch(`/notifications/${notificationId}/read`),
+  markAllAsRead: () => patch('/notifications/read-all'),
+  getById: (id) => get(`/notifications/${id}`),
+};
+
 export const invoiceAPI = {
   create: (serviceTicketId, quotationId) =>
     post(
@@ -307,8 +319,8 @@ export const invoiceAPI = {
 };
 
 export const authAPI = {
-  login: (phone, password) =>
-    post("/auth/login", { phone, password }, { skipAuth: true }),
+  login: (phone, password, rememberMe = false) =>
+    post("/auth/login", { phone, password, rememberMe }, { skipAuth: true }),
   logout: () => post("/auth/logout", {}, { skipAuth: false }),
   refreshToken: (refreshToken) =>
     post("/auth/refresh", { refreshToken }, { skipAuth: true }),

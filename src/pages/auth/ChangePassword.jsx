@@ -29,8 +29,12 @@ export default function ChangePassword() {
     async (values) => {
       setLoading(true)
       try {
-        const { currentPassword, newPassword } = values
-        const { error } = await authAPI.changePassword(currentPassword, newPassword)
+        // Trim tất cả password input
+        const { currentPassword, newPassword, confirmPassword } = values
+        const trimmedCurrentPassword = currentPassword?.trim() || ''
+        const trimmedNewPassword = newPassword?.trim() || ''
+        
+        const { error } = await authAPI.changePassword(trimmedCurrentPassword, trimmedNewPassword)
         if (error) {
           message.error(error || 'Đổi mật khẩu không thành công.')
           setLoading(false)

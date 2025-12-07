@@ -1,14 +1,35 @@
 import { create } from 'zustand';
 import { authAPI } from '../services/api';
-import { normalizePhoneTo0 } from '../utils/helpers';
+import { normalizePhoneTo0, getRoleFromToken, decodeJWT, normalizeRole } from '../utils/helpers';
 
 
 const initializeUser = () => {
   try {
+    
     const userStr = localStorage.getItem('user');
     if (userStr) {
       return JSON.parse(userStr);
     }
+    
+    
+      const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+      if (token) {
+        const decoded = decodeJWT(token);
+        if (decoded) {
+          const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority;
+          if (rawRole) {
+            
+            const normalizedRole = normalizeRole(rawRole);
+            return {
+              id: decoded?.userId || decoded?.id || decoded?.sub || null,
+              role: normalizedRole,
+              fullName: decoded?.fullName || decoded?.name || decoded?.username || null,
+              email: decoded?.email || null,
+              phone: decoded?.phone || null,
+            };
+          }
+        }
+      }
   } catch (error) {
     console.error('Error parsing user from localStorage:', error);
   }
@@ -19,11 +40,11 @@ const useAuthStore = create((set) => ({
   user: initializeUser(),
   loading: false,
   
-  login: async (phone, password) => {
+  login: async (phone, password, rememberMe = false) => {
     const normalizedPhone = normalizePhoneTo0(phone);
     set({ loading: true });
     try {
-      const { data: response, error } = await authAPI.login(normalizedPhone, password);
+      const { data: response, error } = await authAPI.login(normalizedPhone, password, rememberMe);
       
       if (error) {
         set({ loading: false });
@@ -47,14 +68,33 @@ const useAuthStore = create((set) => ({
         localStorage.setItem('refreshToken', result.refreshToken);
       }
 
+     
+     
+      let userRole = null;
+      if (result?.accessToken) {
+        userRole = getRoleFromToken(); 
+      }
+      
+     
+      if (!userRole) {
+        const rawRole = result?.role || result?.userRole || result?.user?.role;
+        userRole = rawRole ? normalizeRole(rawRole) : null;
+      }
    
       const userData = result?.user || {
         id: result?.userId || result?.id || '1',
         phone: normalizedPhone,
-        role: result?.role || result?.userRole || 'USER',
+        role: userRole,
         fullName: result?.fullName || result?.name || '',
         email: result?.email || ''
       };
+      
+      
+      if (userData.role) {
+        userData.role = normalizeRole(userData.role);
+      } else if (userRole) {
+        userData.role = userRole;
+      }
 
       
       if (userData) {
@@ -79,6 +119,12 @@ const useAuthStore = create((set) => ({
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      try {
+        const wsStore = (await import('./websocketStore')).default;
+        wsStore.getState().disconnect();
+      } catch (wsError) {
+        console.error('Error disconnecting WebSocket:', wsError);
+      }
      
       localStorage.removeItem('token');
       localStorage.removeItem('accessToken');

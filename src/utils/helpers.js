@@ -1,9 +1,58 @@
+import { ROLE_LABEL_TO_KEY } from './constants';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 export function formatDate(date) {
   return new Date(date).toLocaleDateString('vi-VN');
 }
 
 export function formatTime(time) {
   return new Date(time).toLocaleTimeString('vi-VN');
+}
+
+export function parseDateWithVNTimezone(dateString) {
+  if (!dateString) return null;
+  
+  try {
+    if (typeof dateString === 'string') {
+      return dayjs(dateString).utcOffset(7);
+    }
+    
+    return dayjs(dateString).utcOffset(7);
+  } catch (error) {
+    console.error('Error parsing date with VN timezone:', error);
+    return dayjs(dateString);
+  }
+}
+
+export function formatTimeWithVNTimezone(dateString) {
+  if (!dateString) return '';
+  
+  try {
+    const date = parseDateWithVNTimezone(dateString);
+    if (!date || !date.isValid()) return '';
+    
+    const now = dayjs().utcOffset(7);
+    const diff = now.diff(date, 'minute');
+    
+    if (diff < 1) return 'Vừa xong';
+    if (diff < 60) return `${diff} phút trước`;
+    
+    const hours = Math.floor(diff / 60);
+    if (hours < 24) return `${hours} giờ trước`;
+    
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days} ngày trước`;
+    
+    return date.format('DD/MM/YYYY');
+  } catch (error) {
+    console.error('Error formatting time with VN timezone:', error);
+    return '';
+  }
 }
 
 export function formatCurrency(amount) {
@@ -73,13 +122,9 @@ export function decodeJWT(token) {
 export function getUserNameFromToken() {
   try {
     const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
-    console.log('Token found:', token ? 'Yes' : 'No');
     if (!token) return null;
     const decoded = decodeJWT(token);
-    console.log('Decoded JWT:', decoded);
-    console.log('Available fields:', Object.keys(decoded || {}));
     const username = decoded?.fullName || decoded?.name || decoded?.username || decoded?.sub || null;
-    console.log('Username extracted:', username);
     return username;
   } catch (error) {
     console.error('Error getting user name from token:', error);
@@ -97,5 +142,121 @@ export function getUserIdFromToken() {
     console.error('Error getting user ID from token:', error);
     return null;
   }
+}
+
+export function getEmployeeIdFromToken() {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    if (!token) return null;
+    const decoded = decodeJWT(token);
+    
+    return decoded?.employeeId || 
+           decoded?.sub || 
+           decoded?.userId || 
+           decoded?.id || 
+           null;
+  } catch (error) {
+    console.error('Error getting employee ID from token:', error);
+    return null;
+  }
+}
+
+export function debugJWTToken(token) {
+  try {
+    const decoded = decodeJWT(token);
+    console.log('=== JWT Token Debug ===');
+    console.log('All fields:', decoded);
+    console.log('Available fields:', Object.keys(decoded || {}));
+    console.log('sub:', decoded?.sub);
+    console.log('employeeId:', decoded?.employeeId);
+    console.log('userId:', decoded?.userId);
+    console.log('id:', decoded?.id);
+    console.log('role:', decoded?.role);
+    console.log('fullName:', decoded?.fullName);
+    console.log('phone:', decoded?.phone);
+    return decoded;
+  } catch (error) {
+    console.error('Error debugging JWT:', error);
+    return null;
+  }
+}
+
+
+export function normalizeRole(role) {
+  if (!role) return null;
+  
+ 
+  const roleKeys = ['SERVICE_ADVISOR', 'ACCOUNTANT', 'MANAGER', 'WAREHOUSE'];
+  if (roleKeys.includes(role)) {
+    return role;
+  }
+  
+  
+  if (ROLE_LABEL_TO_KEY[role]) {
+    return ROLE_LABEL_TO_KEY[role];
+  }
+  
+ 
+  const normalizedRole = Object.keys(ROLE_LABEL_TO_KEY).find(
+    label => label.toLowerCase() === role.toLowerCase()
+  );
+  
+  if (normalizedRole) {
+    return ROLE_LABEL_TO_KEY[normalizedRole];
+  }
+  
+  return role; 
+}
+
+export function getRoleFromToken() {
+  try {
+    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    if (!token) return null;
+    const decoded = decodeJWT(token);
+    
+    
+    const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority || null;
+    
+    if (!rawRole) return null;
+    
+
+    return normalizeRole(rawRole);
+  } catch (error) {
+    console.error('Error getting role from token:', error);
+    return null;
+  }
+}
+
+export function mapNotificationActionPath(actionPath) {
+  if (!actionPath) return null;
+  
+  const userRole = getRoleFromToken();
+  
+  if (actionPath.startsWith('/service-tickets/')) {
+    const ticketId = actionPath.replace('/service-tickets/', '');
+    
+    if (userRole === 'MANAGER') {
+      return `/manager/service/orders/${ticketId}`;
+    }
+    
+    return `/service-advisor/orders/${ticketId}`;
+  }
+  
+  if (actionPath.startsWith('/appointments/')) {
+    const appointmentId = actionPath.replace('/appointments/', '');
+    return `/service-advisor/appointments`;
+  }
+  
+  if (actionPath.startsWith('/quotations/')) {
+    const quotationId = actionPath.replace('/quotations/', '');
+    
+    if (userRole === 'MANAGER') {
+      return `/manager/service/orders`;
+    }
+    
+    return `/service-advisor/orders`;
+  }
+  
+  return actionPath;
 }
 

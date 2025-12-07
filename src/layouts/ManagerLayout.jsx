@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 import { getUserNameFromToken } from '../utils/helpers'
+import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/manager-layout.css'
 
 /**
@@ -164,10 +165,7 @@ export default function ManagerLayout({ children }) {
             )}
           </div>
           <div className="manager-topbar-right">
-            <button className="manager-header-notification">
-              <i className="bi bi-bell"></i>
-              <span className="notification-badge"></span>
-            </button>
+            <NotificationBell />
           </div>
         </div>
       </header>

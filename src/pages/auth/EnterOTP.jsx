@@ -24,19 +24,22 @@ export default function EnterOTP() {
     e.preventDefault()
     setError('')
     
-    if (!otp) {
+    // Trim OTP trước khi xử lý
+    const trimmedOtp = otp?.trim() || ''
+    
+    if (!trimmedOtp) {
       setError('Vui lòng nhập mã OTP')
       return
     }
 
-    if (otp.length !== 6) {
+    if (trimmedOtp.length !== 6) {
       setError('Mã OTP phải có 6 chữ số')
       return
     }
 
     setLoading(true)
     try {
-      const { data, error: apiError } = await otpAPI.verify(phone, otp, purpose, { skipAuth: true })
+      const { data, error: apiError } = await otpAPI.verify(phone, trimmedOtp, purpose, { skipAuth: true })
       
       if (apiError) {
         setError(apiError || 'Mã OTP không đúng hoặc đã hết hạn.')
