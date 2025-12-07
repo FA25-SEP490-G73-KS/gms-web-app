@@ -227,3 +227,36 @@ export function getRoleFromToken() {
   }
 }
 
+export function mapNotificationActionPath(actionPath) {
+  if (!actionPath) return null;
+  
+  const userRole = getRoleFromToken();
+  
+  if (actionPath.startsWith('/service-tickets/')) {
+    const ticketId = actionPath.replace('/service-tickets/', '');
+    
+    if (userRole === 'MANAGER') {
+      return `/manager/service/orders/${ticketId}`;
+    }
+    
+    return `/service-advisor/orders/${ticketId}`;
+  }
+  
+  if (actionPath.startsWith('/appointments/')) {
+    const appointmentId = actionPath.replace('/appointments/', '');
+    return `/service-advisor/appointments`;
+  }
+  
+  if (actionPath.startsWith('/quotations/')) {
+    const quotationId = actionPath.replace('/quotations/', '');
+    
+    if (userRole === 'MANAGER') {
+      return `/manager/service/orders`;
+    }
+    
+    return `/service-advisor/orders`;
+  }
+  
+  return actionPath;
+}
+

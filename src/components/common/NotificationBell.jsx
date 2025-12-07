@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import useWebSocketStore from '../../store/websocketStore';
 import { notificationAPI } from '../../services/api';
-import { formatTimeWithVNTimezone, parseDateWithVNTimezone } from '../../utils/helpers';
+import { formatTimeWithVNTimezone, parseDateWithVNTimezone, mapNotificationActionPath } from '../../utils/helpers';
 import '../../styles/components/notification-bell.css';
 
 function NotificationBell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const wsNotifications = useWebSocketStore((state) => state.notifications);
   const [apiNotifications, setApiNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -81,9 +82,20 @@ function NotificationBell() {
     const merged = new Map();
     
     [...apiNotifications, ...wsNotifications].forEach(noti => {
-      const id = noti.notificationId || noti.id || `${noti.title}_${noti.createdAt || Date.now()}`;
-      if (!merged.has(id)) {
+      const id = noti.id || noti.notificationId || `${noti.title}_${noti.createdAt || Date.now()}`;
+      const existingNoti = merged.get(id);
+      
+      if (!existingNoti) {
         merged.set(id, noti);
+      } else {
+        const mergedNoti = {
+          ...existingNoti,
+          ...noti,
+          id: id,
+          status: noti.status || existingNoti.status,
+          isRead: noti.isRead !== undefined ? noti.isRead : existingNoti.isRead,
+        };
+        merged.set(id, mergedNoti);
       }
     });
     
@@ -96,11 +108,19 @@ function NotificationBell() {
     });
   }, [apiNotifications, wsNotifications]);
 
+  const isNotificationUnread = useCallback((noti) => {
+    if (noti.status === 'READ') {
+      return false;
+    }
+    if (noti.status === 'UNREAD') {
+      return true;
+    }
+    return !noti.isRead;
+  }, []);
+
   const unreadNotifications = useMemo(() => 
-    allNotifications.filter(
-      (noti) => noti.status === 'UNREAD' || noti.status === undefined || !noti.isRead
-    ),
-    [allNotifications]
+    allNotifications.filter(isNotificationUnread),
+    [allNotifications, isNotificationUnread]
   );
 
   useEffect(() => {
@@ -149,6 +169,11 @@ function NotificationBell() {
   }, [visible]);
 
   useEffect(() => {
+    setVisible(false);
+    visibleRef.current = false;
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (!visible) return;
 
     const handleClickOutside = (event) => {
@@ -180,59 +205,67 @@ function NotificationBell() {
     if (!notificationId) return;
     
     try {
-      await notificationAPI.markAsRead(notificationId);
+      const { data, error, statusCode } = await notificationAPI.markAsRead(notificationId);
+      
+      if (error || statusCode !== 200) {
+        console.error('Error marking notification as read:', error || 'Unknown error');
+        return;
+      }
       
       setApiNotifications((prev) =>
-        prev.map((noti) =>
-          noti.notificationId === notificationId || noti.id === notificationId
-            ? { ...noti, status: 'READ', isRead: true }
-            : noti
-        )
+        prev.map((noti) => {
+          const notiId = noti.id || noti.notificationId;
+          if (notiId && (notiId === notificationId || String(notiId) === String(notificationId))) {
+            return { ...noti, status: 'READ', isRead: true };
+          }
+          return noti;
+        })
       );
+      
+      const { markNotificationAsRead } = useWebSocketStore.getState();
+      if (markNotificationAsRead) {
+        markNotificationAsRead(notificationId);
+      }
     } catch (error) {
       console.error('Error marking notification as read:', error);
     }
   }, []);
 
   const handleNotificationClick = useCallback((notification) => {
-    const notificationId = notification.notificationId || notification.id;
+    const notificationId = notification.id || notification.notificationId;
     
-    if (notificationId) {
-      handleMarkAsRead(notificationId);
-      const { markNotificationAsRead } = useWebSocketStore.getState();
-      if (markNotificationAsRead) {
-        markNotificationAsRead(notificationId);
-      }
-    } else {
-      const { markNotificationAsRead, notifications } = useWebSocketStore.getState();
-      const wsNoti = notifications.find(n => 
-        (n.notificationId || n.id) === (notification.notificationId || notification.id) ||
-        n === notification
-      );
-      if (wsNoti && markNotificationAsRead) {
-        const id = wsNoti.notificationId || wsNoti.id;
-        if (id) {
-          markNotificationAsRead(id);
-        }
+    setVisible(false);
+    visibleRef.current = false;
+    
+    if (notification.actionPath) {
+      const mappedPath = mapNotificationActionPath(notification.actionPath);
+      if (mappedPath) {
+        navigate(mappedPath);
       }
     }
     
-    if (notification.actionPath) {
-      navigate(notification.actionPath);
-      setVisible(false);
+    if (notificationId) {
+      handleMarkAsRead(notificationId);
     }
   }, [navigate, handleMarkAsRead]);
 
   const handleMarkAllAsRead = useCallback(async () => {
     try {
-      await notificationAPI.markAllAsRead();
+      const { data, error, statusCode } = await notificationAPI.markAllAsRead();
+      
+      if (error || statusCode !== 200) {
+        console.error('Error marking all notifications as read:', error || 'Unknown error');
+        return;
+      }
+      
       setApiNotifications((prev) =>
         prev.map((noti) => ({ ...noti, status: 'READ', isRead: true }))
       );
+      
       const { notifications, markNotificationAsRead } = useWebSocketStore.getState();
       if (markNotificationAsRead) {
         notifications.forEach(noti => {
-          const id = noti.notificationId || noti.id;
+          const id = noti.id || noti.notificationId;
           if (id) {
             markNotificationAsRead(id);
           }
@@ -332,8 +365,8 @@ function NotificationBell() {
             ) : (
               <div className="notification-list">
                 {allNotifications.map((item, index) => {
-                  const isUnread = item.status === 'UNREAD' || item.status === undefined || !item.isRead;
-                  const notificationId = item.notificationId || item.id;
+                  const isUnread = isNotificationUnread(item);
+                  const notificationId = item.id || item.notificationId;
                   
                   return (
                     <div

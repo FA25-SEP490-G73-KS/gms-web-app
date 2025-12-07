@@ -40,11 +40,11 @@ const useAuthStore = create((set) => ({
   user: initializeUser(),
   loading: false,
   
-  login: async (phone, password) => {
+  login: async (phone, password, rememberMe = false) => {
     const normalizedPhone = normalizePhoneTo0(phone);
     set({ loading: true });
     try {
-      const { data: response, error } = await authAPI.login(normalizedPhone, password);
+      const { data: response, error } = await authAPI.login(normalizedPhone, password, rememberMe);
       
       if (error) {
         set({ loading: false });

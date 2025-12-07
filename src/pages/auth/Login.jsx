@@ -58,8 +58,9 @@ export default function Login() {
         // Trim tất cả input trước khi xử lý
         const trimmedPhone = phone?.trim() || ''
         const trimmedPassword = password?.trim() || ''
+        const rememberMe = !!remember
         
-        await login(normalizePhoneTo0(trimmedPhone), trimmedPassword)
+        await login(normalizePhoneTo0(trimmedPhone), trimmedPassword, rememberMe)
         message.success('Đăng nhập thành công!')
 
         if (remember) {

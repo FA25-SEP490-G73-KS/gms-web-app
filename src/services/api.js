@@ -319,8 +319,8 @@ export const invoiceAPI = {
 };
 
 export const authAPI = {
-  login: (phone, password) =>
-    post("/auth/login", { phone, password }, { skipAuth: true }),
+  login: (phone, password, rememberMe = false) =>
+    post("/auth/login", { phone, password, rememberMe }, { skipAuth: true }),
   logout: () => post("/auth/logout", {}, { skipAuth: false }),
   refreshToken: (refreshToken) =>
     post("/auth/refresh", { refreshToken }, { skipAuth: true }),
