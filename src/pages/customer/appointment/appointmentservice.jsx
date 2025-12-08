@@ -707,7 +707,7 @@ export default function AppointmentService() {
 
           {step === 4 && (
             <div style={{ textAlign: 'center' }}>
-              <Lottie animationData={successAnim} loop={false} />
+              <Lottie animationData={successAnim} loop={false} style={{ width: 200, height: 200, marginInline: 'auto' }} />
               <div style={{ margin: '12px 0', fontSize: 18, fontWeight: 600 }}>Chúc mừng bạn đã đặt lịch thành công!</div>
               
               {appointmentResult && (
