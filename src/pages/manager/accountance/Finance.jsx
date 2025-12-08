@@ -4,7 +4,7 @@ import { AccountanceFinanceContent } from '../../accountance/Finance'
 export default function FinanceForManager() {
   return (
     <ManagerLayout>
-      <AccountanceFinanceContent />
+      <AccountanceFinanceContent isManager={true} />
     </ManagerLayout>
   )
 }

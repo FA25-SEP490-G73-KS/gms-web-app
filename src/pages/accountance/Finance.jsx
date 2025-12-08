@@ -12,14 +12,19 @@ import {
   Upload,
   message,
   Row,
-  Col
+  Col,
+  Select,
+  Checkbox,
+  DatePicker
 } from 'antd'
 import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined, FilterOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { ledgerVoucherAPI, suppliersAPI, employeeAPI } from '../../services/api'
+import { ledgerVoucherAPI, suppliersAPI, employeeAPI, invoiceAPI } from '../../services/api'
 import { getUserNameFromToken } from '../../utils/helpers'
 import '../../styles/pages/accountance/finance.css'
+
+const { Option } = Select
 
 
 const STATUS_FILTERS = [
@@ -106,7 +111,7 @@ const getStatusConfig = (status) => {
   return configs[status] || { label: status, color: '#666', bg: '#f3f4f6' }
 }
 
-export function AccountanceFinanceContent() {
+export function AccountanceFinanceContent({ isManager = false }) {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [data, setData] = useState([])
@@ -125,6 +130,21 @@ export function AccountanceFinanceContent() {
   const [employees, setEmployees] = useState([])
   const [loadingSuppliers, setLoadingSuppliers] = useState(false)
   const [loadingEmployees, setLoadingEmployees] = useState(false)
+  
+  // Filter modal states
+  const [filterModalVisible, setFilterModalVisible] = useState(false)
+  const [filterForm, setFilterForm] = useState({
+    statuses: [],
+    types: [],
+    dateRange: null,
+    supplierId: null,
+    employeeId: null
+  })
+  
+  // Detail modal states
+  const [detailModalVisible, setDetailModalVisible] = useState(false)
+  const [detailData, setDetailData] = useState(null)
+  const [loadingDetail, setLoadingDetail] = useState(false)
 
   useEffect(() => {
     const userName = getUserNameFromToken()
@@ -205,10 +225,64 @@ export function AccountanceFinanceContent() {
     fetchVouchers()
   }, [page, pageSize])
 
-  const fetchVouchers = async () => {
+  const fetchVouchers = async (filters = {}) => {
     setLoading(true)
     try {
-      const { data: response, error } = await ledgerVoucherAPI.getAll(page - 1, pageSize)
+      // Build query params
+      const params = new URLSearchParams()
+      params.append('page', (page - 1).toString())
+      params.append('size', pageSize.toString())
+      
+      if (query) {
+        params.append('keyword', query)
+      }
+      
+      if (filters.types && filters.types.length > 0) {
+        // Map Vietnamese labels to API enum values
+        const typeMap = {
+          'Phí linh kiện': 'STOCK_RECEIPT_PAYMENT',
+          'Tiền lương': 'SALARY',
+          'Phí dịch vụ': 'SERVICE_FEE',
+          'Khác': 'OTHER'
+        }
+        const apiType = typeMap[filters.types[0]]
+        if (apiType) {
+          params.append('type', apiType)
+        }
+      }
+      
+      if (filters.statuses && filters.statuses.length > 0) {
+        // Map Vietnamese status to API enum values
+        const statusMap = {
+          'Chờ duyệt': 'PENDING',
+          'Đã duyệt': 'APPROVED',
+          'Từ chối': 'REJECTED',
+          'Hoàn tất': 'FINISHED'
+        }
+        const apiStatus = statusMap[filters.statuses[0]]
+        if (apiStatus) {
+          params.append('status', apiStatus)
+        }
+      }
+      
+      if (filters.dateRange && filters.dateRange.length === 2) {
+        const [fromDate, toDate] = filters.dateRange
+        if (fromDate) params.append('fromDate', fromDate.format('DDMMYYYY'))
+        if (toDate) params.append('toDate', toDate.format('DDMMYYYY'))
+      }
+      
+      if (filters.supplierId) {
+        params.append('supplierId', filters.supplierId.toString())
+      }
+      
+      if (filters.employeeId) {
+        params.append('employeeId', filters.employeeId.toString())
+      }
+      
+      const queryString = params.toString()
+      const url = `/ledger-vouchers?${queryString}`
+      
+      const { data: response, error } = await ledgerVoucherAPI.getAll(page - 1, pageSize, queryString)
       
       if (error) {
         message.error('Không thể tải danh sách phiếu thu-chi')
@@ -255,6 +329,171 @@ export function AccountanceFinanceContent() {
       .map((item, index) => ({ ...item, key: item.id, index }))
   }, [data, query, status])
 
+  const handleFilterApply = () => {
+    fetchVouchers(filterForm)
+    setFilterModalVisible(false)
+  }
+
+  const handleFilterReset = () => {
+    setFilterForm({
+      statuses: [],
+      types: [],
+      dateRange: null,
+      supplierId: null,
+      employeeId: null
+    })
+  }
+
+  const handleStatusChange = (statusVal, checked) => {
+    setFilterForm(prev => ({
+      ...prev,
+      statuses: checked 
+        ? [...prev.statuses, statusVal]
+        : prev.statuses.filter(s => s !== statusVal)
+    }))
+  }
+
+  const handleTypeChange = (typeVal, checked) => {
+    setFilterForm(prev => ({
+      ...prev,
+      types: checked 
+        ? [...prev.types, typeVal]
+        : prev.types.filter(t => t !== typeVal)
+    }))
+  }
+
+  const fetchVoucherDetail = async (id) => {
+    setLoadingDetail(true)
+    try {
+      const { data: response, error } = await ledgerVoucherAPI.getById(id)
+      
+      if (error) {
+        message.error('Không thể tải chi tiết phiếu')
+        setLoadingDetail(false)
+        return
+      }
+
+      const result = response?.result
+      if (result) {
+        // Map Vietnamese labels for type and status
+        const typeLabels = {
+          'Thanh toán phiếu nhập kho': 'Chi',
+          'Thanh toán lương': 'Chi',
+          'Thu từ khách hàng': 'Thu',
+          'Ứng lương': 'Chi'
+        }
+        
+        const statusLabels = {
+          'Chờ duyệt': 'Chờ duyệt',
+          'Hoàn tất': 'Hoàn tất',
+          'Từ chối': 'Từ chối',
+          'Đã duyệt': 'Đã duyệt'
+        }
+
+        setDetailData({
+          id: result.id,
+          code: result.code || 'N/A',
+          type: typeLabels[result.type] || result.type || 'N/A',
+          amount: result.amount || 0,
+          target: result.relatedSupplierId ? 'NCC' : (result.relatedEmployeeId ? 'Nhân viên' : 'N/A'),
+          createdAt: result.createdAt ? dayjs(result.createdAt).format('DD/MM/YYYY') : 'N/A',
+          creator: 'DT Huyền', // Default since API doesn't provide
+          approver: result.approvedByEmployeeId ? 'HTK Ly' : 'HTK Ly', // Default
+          status: statusLabels[result.status] || result.status || 'N/A',
+          description: result.description || 'N/A',
+          attachmentUrl: result.attachmentUrl || null
+        })
+        setDetailModalVisible(true)
+      }
+    } catch (err) {
+      console.error('Failed to fetch voucher detail:', err)
+      message.error('Đã xảy ra lỗi khi tải chi tiết')
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  const handleApproveVoucher = async () => {
+    if (!detailData?.id) return
+    
+    try {
+      setLoadingDetail(true)
+      const { data: response, error } = await ledgerVoucherAPI.approve(detailData.id, 0)
+      
+      if (error) {
+        message.error('Không thể duyệt phiếu')
+        return
+      }
+      
+      message.success('Duyệt phiếu thành công')
+      setDetailModalVisible(false)
+      fetchVouchers(filterForm) // Refresh list
+    } catch (err) {
+      console.error('Failed to approve voucher:', err)
+      message.error('Đã xảy ra lỗi khi duyệt phiếu')
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  const handleRejectVoucher = async () => {
+    if (!detailData?.id) return
+    
+    try {
+      setLoadingDetail(true)
+      const { data: response, error } = await ledgerVoucherAPI.reject(detailData.id)
+      
+      if (error) {
+        message.error('Không thể từ chối phiếu')
+        return
+      }
+      
+      message.success('Từ chối phiếu thành công')
+      setDetailModalVisible(false)
+      fetchVouchers(filterForm) // Refresh list
+    } catch (err) {
+      console.error('Failed to reject voucher:', err)
+      message.error('Đã xảy ra lỗi khi từ chối phiếu')
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  const handlePayment = async () => {
+    if (!detailData?.id) return
+    
+    try {
+      setLoadingDetail(true)
+      
+      // Prepare payment payload
+      const payload = {
+        method: "Tiền mặt", // Default payment method
+        price: detailData.amount,
+        type: "Chi tiền" // Payment type
+      }
+      
+      const { data: response, error } = await invoiceAPI.pay(detailData.id, payload)
+      
+      if (error) {
+        message.error('Không thể chi tiền')
+        return
+      }
+      
+      message.success('Chi tiền thành công')
+      setDetailModalVisible(false)
+      fetchVouchers(filterForm) // Refresh list
+    } catch (err) {
+      console.error('Failed to make payment:', err)
+      message.error('Đã xảy ra lỗi khi chi tiền')
+    } finally {
+      setLoadingDetail(false)
+    }
+  }
+
+  const handleRowClick = (record) => {
+    fetchVoucherDetail(record.id)
+  }
+
   const columns = [
     {
       title: <div style={{ textAlign: 'center' }}>Mã phiếu</div>,
@@ -268,7 +507,6 @@ export function AccountanceFinanceContent() {
       dataIndex: 'type',
       key: 'type',
       width: 150,
-      align: 'center',
       render: (type) => {
         const config = getTypeConfig(type)
         return (
@@ -298,7 +536,7 @@ export function AccountanceFinanceContent() {
       dataIndex: 'amount',
       key: 'amount',
       width: 150,
-      align: 'right',
+      align: 'center',
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
@@ -348,6 +586,7 @@ export function AccountanceFinanceContent() {
               allowClear
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onPressEnter={() => fetchVouchers(filterForm)}
               style={{ width: 300 }}
             />
             
@@ -374,35 +613,39 @@ export function AccountanceFinanceContent() {
               
               <Button
                 icon={<FilterOutlined />}
+                onClick={() => setFilterModalVisible(true)}
                 style={{ 
                   borderRadius: 6,
-                  borderColor: '#d9d9d9'
+                  borderColor: '#d9d9d9',
+                  fontWeight: 500
                 }}
               >
-                Sort
+                Bộ lọc
               </Button>
               
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                style={{ 
-                  background: '#22c55e', 
-                  borderColor: '#22c55e', 
-                  fontWeight: 600,
-                  borderRadius: 6
-                }}
-                onClick={() => {
-                  setSelectedTicketType('')
-                  form.setFieldsValue({
-                    type: 'phiếu thu',
-                    createdAt: dayjs().format('DD/MM/YYYY'),
-                    creator: creatorName || ''
-                  })
-                  setCreateModalVisible(true)
-                }}
-              >
-                Tạo phiếu
-              </Button>
+              {!isManager && (
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  style={{ 
+                    background: '#22c55e', 
+                    borderColor: '#22c55e', 
+                    fontWeight: 600,
+                    borderRadius: 6
+                  }}
+                  onClick={() => {
+                    setSelectedTicketType('')
+                    form.setFieldsValue({
+                      type: 'phiếu thu',
+                      createdAt: dayjs().format('DD/MM/YYYY'),
+                      creator: creatorName || ''
+                    })
+                    setCreateModalVisible(true)
+                  }}
+                >
+                  Tạo phiếu
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -418,6 +661,10 @@ export function AccountanceFinanceContent() {
             columns={columns}
             dataSource={filtered}
             loading={loading}
+            onRow={(record) => ({
+              onClick: () => handleRowClick(record),
+              style: { cursor: 'pointer' }
+            })}
             pagination={{
               current: page,
               pageSize: pageSize,
@@ -482,7 +729,7 @@ export function AccountanceFinanceContent() {
                 
                 // Map loại phiếu to API enum (Vietnamese values)
                 const typeMapping = {
-                  'phí linh kiện': 'Thanh toán phiếu nhập kho',
+                  'phí linh kiện': 'Phí linh kiện',
                   'tiền lương': 'Tiền lương',
                   'phí dịch vụ': 'Phí dịch vụ',
                   'khác': 'Khác'
@@ -762,6 +1009,390 @@ export function AccountanceFinanceContent() {
             </Upload>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        title="Bộ lọc sản phẩm"
+        open={filterModalVisible}
+        onCancel={() => setFilterModalVisible(false)}
+        footer={null}
+        width={450}
+        styles={{
+          header: {
+            borderBottom: '1px solid #f0f0f0',
+            marginBottom: '20px'
+          }
+        }}
+      >
+        <div style={{ padding: '20px 0' }}>
+          {/* Status Filter */}
+          <div style={{ marginBottom: '24px' }}>
+            <h4 style={{ marginBottom: '12px', fontWeight: 600 }}>Trạng thái phiếu</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Checkbox
+                checked={filterForm.statuses.includes('Chờ duyệt')}
+                onChange={(e) => handleStatusChange('Chờ duyệt', e.target.checked)}
+              >
+                Chờ duyệt
+              </Checkbox>
+              <Checkbox
+                checked={filterForm.statuses.includes('Hoàn tất')}
+                onChange={(e) => handleStatusChange('Hoàn tất', e.target.checked)}
+              >
+                Đã duyệt
+              </Checkbox>
+              <Checkbox
+                checked={filterForm.statuses.includes('Từ chối')}
+                onChange={(e) => handleStatusChange('Từ chối', e.target.checked)}
+              >
+                Từ chối
+              </Checkbox>
+            </div>
+          </div>
+
+          {/* Type Filter */}
+          <div style={{ marginBottom: '24px' }}>
+            <h4 style={{ marginBottom: '12px', fontWeight: 600 }}>Loại phiếu</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <Checkbox
+                checked={filterForm.types.includes('Phí linh kiện')}
+                onChange={(e) => handleTypeChange('Phí linh kiện', e.target.checked)}
+              >
+                Phí linh kiện
+              </Checkbox>
+              <Checkbox
+                checked={filterForm.types.includes('Tiền lương')}
+                onChange={(e) => handleTypeChange('Tiền lương', e.target.checked)}
+              >
+                Tiền lương
+              </Checkbox>
+              <Checkbox
+                checked={filterForm.types.includes('Phí dịch vụ')}
+                onChange={(e) => handleTypeChange('Phí dịch vụ', e.target.checked)}
+              >
+                Phí dịch vụ
+              </Checkbox>
+              <Checkbox
+                checked={filterForm.types.includes('Khác')}
+                onChange={(e) => handleTypeChange('Khác', e.target.checked)}
+              >
+                Khác
+              </Checkbox>
+            </div>
+          </div>
+
+          {/* Date Range Filter */}
+          <div style={{ marginBottom: '24px' }}>
+            <h4 style={{ marginBottom: '12px', fontWeight: 600 }}>Khoảng ngày tạo</h4>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                  Từ ngày
+                </label>
+                <DatePicker
+                  value={filterForm.dateRange?.[0]}
+                  onChange={(date) => setFilterForm(prev => ({
+                    ...prev,
+                    dateRange: [date, prev.dateRange?.[1] || null]
+                  }))}
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày"
+                  style={{ width: '100%' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                  Đến ngày
+                </label>
+                <DatePicker
+                  value={filterForm.dateRange?.[1]}
+                  onChange={(date) => setFilterForm(prev => ({
+                    ...prev,
+                    dateRange: [prev.dateRange?.[0] || null, date]
+                  }))}
+                  format="DD/MM/YYYY"
+                  placeholder="Chọn ngày"
+                  style={{ width: '100%' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center',
+            gap: '12px',
+            paddingTop: '20px',
+            borderTop: '1px solid #f0f0f0'
+          }}>
+            <Button
+              type="primary"
+              onClick={handleFilterApply}
+              style={{ 
+                minWidth: '100%',
+                background: '#1890ff',
+                height: '40px',
+                borderRadius: '4px'
+              }}
+            >
+              Tìm kiếm
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal
+        title={
+          <div style={{ 
+            background: '#CBB081', 
+            margin: '-20px -24px 0 -24px',
+            padding: '16px 24px',
+            borderRadius: '8px 8px 0 0',
+            color: '#fff',
+            fontSize: '16px',
+            fontWeight: 600
+          }}>
+            Thông tin chi tiết
+          </div>
+        }
+        open={detailModalVisible}
+        onCancel={() => setDetailModalVisible(false)}
+        footer={
+          isManager 
+            ? (detailData?.status === 'Chờ duyệt' ? [
+                <Button
+                  key="reject"
+                  loading={loadingDetail}
+                  onClick={handleRejectVoucher}
+                  style={{
+                    height: '40px',
+                    borderRadius: '6px',
+                    background: '#ef4444',
+                    borderColor: '#ef4444',
+                    color: '#fff',
+                    fontWeight: 500,
+                    minWidth: '120px'
+                  }}
+                >
+                  Hủy
+                </Button>,
+                <Button
+                  key="approve"
+                  type="primary"
+                  loading={loadingDetail}
+                  style={{
+                    height: '40px',
+                    borderRadius: '6px',
+                    background: '#22c55e',
+                    borderColor: '#22c55e',
+                    fontWeight: 500,
+                    minWidth: '120px'
+                  }}
+                  onClick={handleApproveVoucher}
+                >
+                  Duyệt
+                </Button>
+              ] : null)
+            : (detailData?.status === 'Hoàn tất' ? [
+                <Button
+                  key="payment"
+                  type="primary"
+                  loading={loadingDetail}
+                  style={{
+                    height: '40px',
+                    borderRadius: '6px',
+                    background: '#22c55e',
+                    borderColor: '#22c55e',
+                    fontWeight: 500,
+                    minWidth: '120px'
+                  }}
+                  onClick={handlePayment}
+                >
+                  Chi tiền
+                </Button>
+              ] : null)
+        }
+        width={450}
+        closeIcon={
+          <span style={{ color: '#fff', fontSize: '20px' }}>×</span>
+        }
+        styles={{
+          header: {
+            padding: 0,
+            border: 'none',
+            marginBottom: 0
+          },
+          body: {
+            padding: '24px',
+            paddingTop: '20px'
+          },
+          footer: {
+            marginTop: 0,
+            paddingTop: '16px',
+            borderTop: '1px solid #f0f0f0'
+          }
+        }}
+      >
+        {loadingDetail ? (
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <div>Đang tải...</div>
+          </div>
+        ) : detailData ? (
+          <div>
+            {/* Detail Fields */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Mã phiếu:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.code}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Loại phiếu:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.type}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Số tiền:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.amount.toLocaleString('vi-VN')}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Đối tượng:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.target}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Ngày tạo:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.createdAt}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Người tạo:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.creator}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Người duyệt:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.approver}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Trạng thái:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.status}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Nội dung:</span>
+                <div style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '12px 16px', 
+                  borderRadius: '6px',
+                  minHeight: '80px',
+                  fontSize: '14px',
+                  lineHeight: '1.6'
+                }}>
+                  {detailData.description}
+                </div>
+              </div>
+
+              {detailData.attachmentUrl && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>File đính kèm:</span>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    padding: '12px',
+                    background: '#fef2f2',
+                    borderRadius: '6px',
+                    border: '1px solid #fecaca'
+                  }}>
+                    <i className="bi bi-file-earmark-pdf" style={{ fontSize: '24px', color: '#ef4444' }}></i>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '14px', color: '#374151', fontWeight: 500 }}>File Title.pdf</div>
+                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                        51.1 kB · 31 Aug 2022
+                      </div>
+                    </div>
+                    <Button
+                      type="link"
+                      icon={<i className="bi bi-download"></i>}
+                      onClick={() => window.open(detailData.attachmentUrl, '_blank')}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </>
   )

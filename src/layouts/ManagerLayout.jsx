@@ -37,14 +37,14 @@ export default function ManagerLayout({ children }) {
     const v = window.localStorage.getItem('manager_open_hr')
     return v ? v === 'true' : true
   })
-  const [openPromotion, setOpenPromotion] = useState(() => {
-    if (typeof window === 'undefined') return false
-    const v = window.localStorage.getItem('manager_open_promotion')
-    return v ? v === 'true' : false
-  })
   const [openService, setOpenService] = useState(() => {
     if (typeof window === 'undefined') return false
     const v = window.localStorage.getItem('manager_open_service')
+    return v ? v === 'true' : false
+  })
+  const [openWarehouse, setOpenWarehouse] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const v = window.localStorage.getItem('manager_open_warehouse')
     return v ? v === 'true' : false
   })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -69,13 +69,13 @@ export default function ManagerLayout({ children }) {
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    window.localStorage.setItem('manager_open_promotion', String(openPromotion))
-  }, [openPromotion])
+    window.localStorage.setItem('manager_open_service', String(openService))
+  }, [openService])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
-    window.localStorage.setItem('manager_open_service', String(openService))
-  }, [openService])
+    window.localStorage.setItem('manager_open_warehouse', String(openWarehouse))
+  }, [openWarehouse])
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
@@ -125,9 +125,6 @@ export default function ManagerLayout({ children }) {
     if (path.startsWith('/manager/customers')) {
       return { parent: 'Khách hàng', current: 'Danh sách' }
     }
-    if (path.startsWith('/manager/promotions')) {
-      return { parent: 'Khuyến mãi', current: 'Chương trình' }
-    }
     if (path.startsWith('/manager/suppliers')) {
       return { parent: '', current: 'Nhà cung cấp' }
     }
@@ -136,6 +133,9 @@ export default function ManagerLayout({ children }) {
     }
     if (path.startsWith('/manager/service/types')) {
       return { parent: 'Dịch vụ', current: 'Loại dịch vụ' }
+    }
+    if (path.startsWith('/manager/warehouse/import-request')) {
+      return { parent: 'Kho', current: 'Yêu cầu mua hàng' }
     }
     return { parent: '', current: 'Thống kê' }
   }
@@ -287,28 +287,6 @@ export default function ManagerLayout({ children }) {
             )}
           </div>
 
-          <div className={`manager-nav-group ${openPromotion ? 'open' : ''}`}>
-            <button
-              className={`manager-nav-item ${isActiveParent('/manager/promotions') ? 'active' : ''}`}
-              onClick={() => setOpenPromotion((v) => !v)}
-            >
-              <i className="bi bi-tags" />
-              <span>Khuyến mãi</span>
-              <i className={`bi bi-caret-down-fill caret ${openPromotion ? 'rot' : ''}`} />
-            </button>
-            {openPromotion && (
-              <div className="submenu">
-                <div className="submenu-line" />
-                <button
-                  className={`submenu-item ${isActive('/manager/promotions') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/promotions')}
-                >
-                  Chương trình
-                </button>
-              </div>
-            )}
-          </div>
-
           <div className={`manager-nav-group ${openService ? 'open' : ''}`}>
             <button
               className={`manager-nav-item ${isActiveParent('/manager/service') ? 'active' : ''}`}
@@ -344,6 +322,28 @@ export default function ManagerLayout({ children }) {
             <i className="bi bi-truck" />
             <span>Nhà cung cấp</span>
           </button>
+
+          <div className={`manager-nav-group ${openWarehouse ? 'open' : ''}`}>
+            <button
+              className={`manager-nav-item ${isActiveParent('/manager/warehouse') ? 'active' : ''}`}
+              onClick={() => setOpenWarehouse((v) => !v)}
+            >
+              <i className="bi bi-box-seam" />
+              <span>Kho</span>
+              <i className={`bi bi-caret-down-fill caret ${openWarehouse ? 'rot' : ''}`} />
+            </button>
+            {openWarehouse && (
+              <div className="submenu">
+                <div className="submenu-line" />
+                <button
+                  className={`submenu-item ${isActive('/manager/warehouse/import-request') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/warehouse/import-request')}
+                >
+                  Yêu cầu mua hàng
+                </button>
+              </div>
+            )}
+          </div>
         </nav>
         
         <div className="manager-spacer" />
