@@ -434,12 +434,14 @@ export const manualVoucherAPI = {
 };
 
 export const ledgerVoucherAPI = {
-  getAll: (page = 0, size = 20) => {
-    const query = buildQueryString({ page, size });
-    const suffix = query ? `?${query}` : "";
-    return get(`/ledger-vouchers${suffix}`);
+  getAll: (page = 0, size = 20, queryString = '') => {
+    const baseUrl = `/ledger-vouchers?page=${page}&size=${size}`
+    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl)
   },
+  getById: (id) => get(`/ledger-vouchers/${id}`),
   create: (data) => post("/ledger-vouchers/manual", data),
+  approve: (id, approvedByEmployeeId = 0) => post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
+  reject: (id) => post(`/ledger-vouchers/${id}/reject`, {})
 };
 
 export const attendanceAPI = {
@@ -510,4 +512,16 @@ export const dashboardAPI = {
     if (month) params.append('month', month)
     return get(`/dashboard/warehouse/overview?${params.toString()}`)
   }
+};
+
+export const purchaseRequestAPI = {
+  getAll: (page = 0, size = 10, queryString = '') => {
+    const baseUrl = `/purchase-requests?page=${page}&size=${size}`
+    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl)
+  },
+  getById: (id) => get(`/purchase-requests/${id}`),
+  create: (payload) => post('/purchase-requests', payload),
+  update: (id, payload) => put(`/purchase-requests/${id}`, payload),
+  delete: (id) => del(`/purchase-requests/${id}`),
+  approve: (id) => put(`/purchase-requests/${id}/approve`, {})
 };

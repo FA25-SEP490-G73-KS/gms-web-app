@@ -33,69 +33,86 @@ export default function ImportDetail() {
   const fetchDetail = async () => {
     setLoading(true)
     try {
-      // Mock detail data
-      const mockDetail = {
-        code: 'NK-000123',
-        supplierName: 'Hoàng Tuấn Auto',
-        createdAt: '2025-10-12T10:30:00',
-        purchaseRequestCode: 'PR-000456',
-        status: 'Chờ nhập',
-        items: [
-          {
-            id: 1,
-            sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            partName: 'Lọc gió động cơ 30W',
-            requestedQty: 5,
-            receivedQty: 2,
-            status: 'Đang xuất hàng'
-          },
-          {
-            id: 2,
-            sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            partName: 'Lọc gió động cơ 30W',
-            requestedQty: 5,
-            receivedQty: 2,
-            status: 'Đang xuất hàng'
-          },
-          {
-            id: 3,
-            sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            partName: 'Lọc gió động cơ 30W',
-            requestedQty: 5,
-            receivedQty: 2,
-            status: 'Đang xuất hàng'
-          },
-          {
-            id: 4,
-            sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            partName: 'Lọc gió động cơ 30W',
-            requestedQty: 5,
-            receivedQty: 2,
-            status: 'Đang xuất hàng'
-          },
-          {
-            id: 5,
-            sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            partName: 'Lọc gió động cơ 30W',
-            requestedQty: 5,
-            receivedQty: 2,
-            status: 'Hoàn thành'
-          }
-        ]
-      }
-
-      let result = mockDetail
-
-      try {
-        const { data, error } = await stockReceiptAPI.getById(id)
-        if (data?.result) {
-          result = data.result
+      const { data, error } = await stockReceiptAPI.getById(id)
+      
+      if (error) {
+        // Use mock data if API fails
+        const mockData = {
+          code: 'NK-000123',
+          supplierName: 'Hoàng Tuấn Auto',
+          createdAt: '2025-10-12T10:30:00',
+          createdBy: 'Nguyễn Văn A',
+          receivedAt: '2025-10-15T14:20:00',
+          receivedBy: 'Trần Văn B',
+          purchaseRequestCode: 'PR-000456',
+          status: 'Chờ nhập',
+          note: 'Nhập hàng đợt 1 tháng 10',
+          totalAmount: 15000000,
+          items: [
+            {
+              id: 1,
+              sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
+              partName: 'Lọc gió động cơ 30W',
+              requestedQty: 5,
+              receivedQty: 2,
+              unitPrice: 500000,
+              totalPrice: 1000000,
+              status: 'Đang xuất hàng'
+            },
+            {
+              id: 2,
+              sku: 'DAU-NHOT-5W30-TOYOTA',
+              partName: 'Dầu nhớt 5W30 Toyota',
+              requestedQty: 10,
+              receivedQty: 10,
+              unitPrice: 350000,
+              totalPrice: 3500000,
+              status: 'Hoàn thành'
+            },
+            {
+              id: 3,
+              sku: 'LOC-DAN-TOYOTA-CAMRY',
+              partName: 'Lọc dầu Toyota Camry',
+              requestedQty: 8,
+              receivedQty: 5,
+              unitPrice: 280000,
+              totalPrice: 1400000,
+              status: 'Đang xuất hàng'
+            }
+          ]
         }
-      } catch (err) {
-        console.log('Using mock data due to API error:', err)
+        setDetailData(mockData)
+        setLoading(false)
+        return
       }
 
-      setDetailData(result)
+      // Map API response to UI data structure
+      const result = data?.result
+      if (result) {
+        const mappedData = {
+          code: result.code || 'N/A',
+          supplierName: result.supplierName || 'N/A',
+          createdAt: result.createdAt || null,
+          createdBy: result.createdBy || 'N/A',
+          receivedAt: result.receivedAt || null,
+          receivedBy: result.receivedBy || 'N/A',
+          purchaseRequestCode: result.purchaseRequestCode || 'N/A',
+          status: result.status || 'Chờ nhập',
+          note: result.note || '',
+          totalAmount: result.totalAmount || 0,
+          items: (result.items || []).map(item => ({
+            id: item.id,
+            sku: item.partCode || 'N/A',
+            partName: item.partName || 'N/A',
+            requestedQty: item.requestedQty || 0,
+            receivedQty: item.receivedQty || 0,
+            unitPrice: item.unitPrice || 0,
+            totalPrice: item.totalPrice || 0,
+            status: item.status || 'Chờ nhập'
+          }))
+        }
+        setDetailData(mappedData)
+      }
     } catch (err) {
       console.error('Failed to fetch detail:', err)
       message.error('Đã xảy ra lỗi khi tải chi tiết')
@@ -360,6 +377,10 @@ export default function ImportDetail() {
             <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua</span>
             <span>: {detailData.purchaseRequestCode || 'N/A'}</span>
           </div>
+          <div style={{ display: 'flex', marginBottom: 12 }}>
+            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua</span>
+            <span>: {detailData.purchaseRequestCode || 'N/A'}</span>
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ width: 150, fontWeight: 500 }}>Trạng thái</span>
             <span>: </span>
@@ -377,28 +398,28 @@ export default function ImportDetail() {
             >
               {detailData.status || 'CHỜ NHẬP'}
             </Tag>
+          </div>
 
-            {/* Filter buttons for item status */}
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-              {['Tất cả', 'Chờ nhập', 'Hoàn thành'].map((filter) => (
-                <Button
-                  key={filter}
-                  type={statusFilter === filter ? 'primary' : 'default'}
-                  onClick={() => setStatusFilter(filter)}
-                  style={{
-                    borderRadius: '6px',
-                    fontWeight: 500,
-                    ...(statusFilter === filter && {
-                      background: '#CBB081',
-                      borderColor: '#CBB081',
-                      color: '#fff'
-                    })
-                  }}
-                >
-                  {filter}
-                </Button>
-              ))}
-            </div>
+          {/* Filter buttons for item status */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
+            {['Tất cả', 'Chờ nhập', 'Hoàn thành'].map((filter) => (
+              <Button
+                key={filter}
+                type={statusFilter === filter ? 'primary' : 'default'}
+                onClick={() => setStatusFilter(filter)}
+                style={{
+                  borderRadius: '6px',
+                  fontWeight: 500,
+                  ...(statusFilter === filter && {
+                    background: '#CBB081',
+                    borderColor: '#CBB081',
+                    color: '#fff'
+                  })
+                }}
+              >
+                {filter}
+              </Button>
+            ))}
           </div>
         </div>
 

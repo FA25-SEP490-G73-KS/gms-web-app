@@ -53,6 +53,8 @@ import ManagerServiceAdvisorHome from './pages/manager/ManagerServiceAdvisorHome
 import ManagerServiceOrders from './pages/manager/service/ServiceOrders';
 import ManagerServiceTypes from './pages/manager/service/ServiceTypes';
 import ManagerTicketDetailPage from './pages/manager/service/ManagerTicketDetailPage';
+import ManagerImportRequest from './pages/manager/warehouse/ImportRequest';
+import ManagerImportRequestDetail from './pages/manager/warehouse/ImportRequestDetail';
 import Inventory from './pages/admin/Inventory';
 import ManagerHome from './pages/manager/ManagerHome';
 
@@ -421,6 +423,19 @@ function App() {
         <Route path="/manager/suppliers/:id/edit" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
             <SupplierForm />
+          </ProtectedRoute>
+        } />
+
+        {/* Manager - Kho */}
+        <Route path="/manager/warehouse/import-request" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
+            <ManagerImportRequest />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/manager/warehouse/import-request/:id" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
+            <ManagerImportRequestDetail />
           </ProtectedRoute>
         } />
 
