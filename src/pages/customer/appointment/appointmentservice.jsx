@@ -12,6 +12,7 @@ export default function AppointmentService() {
   const [otpLoading, setOtpLoading] = useState(false)
   const [verifyOtpLoading, setVerifyOtpLoading] = useState(false)
   const [otpError, setOtpError] = useState('')
+  const [phoneError, setPhoneError] = useState('')
   const [licenseError, setLicenseError] = useState('')
   const [fullNameError, setFullNameError] = useState('')
   const [serviceTypes, setServiceTypes] = useState([])
@@ -128,12 +129,83 @@ export default function AppointmentService() {
     }
   }
 
-  const validatePhone = (phoneNumber) => {
-    const cleaned = phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
-    if (cleaned.length < 9 || cleaned.length > 10) {
-      return false
+  /**
+   * Validate và normalize số điện thoại theo chuẩn Việt Nam
+   * @param {string} phoneNumber - Số điện thoại cần validate
+   * @returns {Object} { valid: boolean, normalizedPhone: string | null, errorMessage: string | null }
+   */
+  const validateAndNormalizePhone = (phoneNumber) => {
+    if (!phoneNumber || typeof phoneNumber !== 'string') {
+      return {
+        valid: false,
+        normalizedPhone: null,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).'
+      }
     }
-    return true
+    
+    // 1. Lọc bỏ tất cả ký tự không phải số (0-9)
+    // Bao gồm: khoảng trắng, dấu gạch ngang, dấu ngoặc, dấu +
+    let cleaned = phoneNumber.replace(/[\s\-()]/g, '')
+    
+    // Xử lý dấu + ở đầu
+    if (cleaned.startsWith('+')) {
+      cleaned = cleaned.substring(1)
+    }
+    
+    // Chỉ giữ lại số (0-9)
+    cleaned = cleaned.replace(/\D/g, '')
+    
+    // 2. Kiểm tra độ dài sau khi lọc
+    if (cleaned.length === 0) {
+      return {
+        valid: false,
+        normalizedPhone: null,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).'
+      }
+    }
+    
+    // 3. Kiểm tra bắt đầu bằng 0 hoặc 84
+    if (!cleaned.startsWith('0') && !cleaned.startsWith('84')) {
+      return {
+        valid: false,
+        normalizedPhone: null,
+        errorMessage: 'Chỉ chấp nhận 0xxxxxxxxx hoặc 84xxxxxxxxx.'
+      }
+    }
+    
+    // 4. Normalize số điện thoại
+    let normalized = cleaned
+    if (normalized.startsWith('0')) {
+      // 0xxxxxxxxx → 84xxxxxxxxx
+      normalized = '84' + normalized.substring(1)
+    }
+    // 84xxxxxxxxx → giữ nguyên
+    
+    // 5. Kiểm tra số sau 84 phải có đúng 9 chữ số
+    const numberAfter84 = normalized.substring(2)
+    if (numberAfter84.length < 9) {
+      return {
+        valid: false,
+        normalizedPhone: null,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).'
+      }
+    }
+    
+    // 6. Kiểm tra độ dài sau normalize
+    // Sau normalize phải có độ dài 11 (84 + 9 số)
+    if (normalized.length !== 11) {
+      return {
+        valid: false,
+        normalizedPhone: null,
+        errorMessage: 'Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).'
+      }
+    }
+    
+    return {
+      valid: true,
+      normalizedPhone: normalized,
+      errorMessage: null
+    }
   }
 
   const formatLicensePlate = (value) => {
@@ -260,28 +332,27 @@ export default function AppointmentService() {
 
   const handleSendOTP = async () => {
     if (!form.phoneNumber) {
+      setPhoneError('Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).')
       message.warning('Vui lòng nhập số điện thoại')
       return
     }
 
-    let cleanedNumber = form.phoneNumber.replace(/\s+/g, '').replace(/[^\d]/g, '')
+    // Validate và normalize số điện thoại
+    const validation = validateAndNormalizePhone(form.phoneNumber)
     
-    // Cắt số 0 ở đầu nếu có trước khi gửi API
-    if (cleanedNumber.startsWith('0')) {
-      cleanedNumber = cleanedNumber.slice(1)
-    }
-    
-    if (!validatePhone(cleanedNumber)) {
-      message.error('Số điện thoại không hợp lệ. Vui lòng nhập 9-10 chữ số')
+    if (!validation.valid) {
+      setPhoneError(validation.errorMessage || 'Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).')
+      message.error(validation.errorMessage || 'Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).')
       return
     }
 
     setOtpLoading(true)
     setOtpError('')
+    setPhoneError('')
     
-    const fullPhone = '84' + cleanedNumber
+    const normalizedPhone = validation.normalizedPhone
     
-    const { data: response, error } = await otpAPI.send(fullPhone, 'APPOINTMENT')
+    const { data: response, error } = await otpAPI.send(normalizedPhone, 'APPOINTMENT')
     setOtpLoading(false)
 
     if (error) {
@@ -290,7 +361,7 @@ export default function AppointmentService() {
     }
 
     if (response && (response.statusCode === 200 || response.result)) {
-      setForm({ ...form, phone: fullPhone })
+      setForm({ ...form, phone: normalizedPhone })
       message.success('Mã OTP đã được gửi đến số điện thoại của bạn!')
       next()
     } else {
@@ -513,9 +584,27 @@ export default function AppointmentService() {
                 <input 
                   value={form.phoneNumber} 
                   onChange={(e) => {
+                    // Tự động lọc bỏ ký tự không phải số khi nhập
                     let value = e.target.value.replace(/\D/g, '')
+                    // Giới hạn độ dài tối đa 11 số (để cho phép nhập 0xxxxxxxxx hoặc 84xxxxxxxxx)
                     value = value.slice(0, 11)
                     setForm({ ...form, phoneNumber: value })
+                    setPhoneError('')
+                  }}
+                  onPaste={(e) => {
+                    // Xử lý khi paste: tự động lọc và normalize
+                    e.preventDefault()
+                    const pastedText = e.clipboardData.getData('text')
+                    // Lọc bỏ tất cả ký tự không phải số
+                    let cleaned = pastedText.replace(/[\s\-()]/g, '').replace(/[^\d+]/g, '')
+                    if (cleaned.startsWith('+')) {
+                      cleaned = cleaned.substring(1)
+                    }
+                    cleaned = cleaned.replace(/\D/g, '')
+                    // Giới hạn độ dài
+                    cleaned = cleaned.slice(0, 11)
+                    setForm({ ...form, phoneNumber: cleaned })
+                    setPhoneError('')
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') {
@@ -524,7 +613,11 @@ export default function AppointmentService() {
                     }
                   }}
                   placeholder="VD: 0909123456" 
-                  style={{ ...inputStyle, flex: 1 }} 
+                  style={{ 
+                    ...inputStyle, 
+                    flex: 1,
+                    ...(phoneError ? { borderColor: '#ef4444' } : {})
+                  }} 
                 />
               </div>
               <div className="appointment-buttons" style={rowBtns}>
