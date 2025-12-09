@@ -386,10 +386,16 @@ export const debtsAPI = {
   createPayment: (payload) => {
     return post('/debts', payload);
   },
+  pay: (debtId, payload) => {
+    return post(`/debts/${debtId}/pay`, payload);
+  },
 };
 
 export const employeesAPI = {
   getAll: (page = 0, size = 6) => get(`/employees?page=${page}&size=${size}`),
+  getById: (id) => get(`/employees/${id}`),
+  create: (payload) => post("/employees", payload),
+  update: (id, payload) => patch(`/employees/${id}`, payload),
   getTechnicians: () => get("/employees/technicians"),
 };
 
@@ -402,14 +408,17 @@ export const suppliersAPI = {
 };
 
 export const customersAPI = {
-  getAll: (page = 0, size = 10) => get(`/customers?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 10) => get(`/customers/manager?page=${page}&size=${size}`),
   getById: (id) => get(`/customers/${id}`),
   getServiceHistory: (phone) =>
     get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
+  getServiceHistoryById: (customerId) =>
+    get(`/customers/manager/${customerId}/service-history`),
   getByPhone: (phone) =>
     get(`/customers/phone?phone=${encodeURIComponent(phone)}`),
   create: (payload) => post("/customers", payload),
   update: (id, payload) => put(`/customers/${id}`, payload),
+  toggleActive: (id) => patch(`/customers/${id}/toggle-active`, {})
 };
 
 export const manualVoucherAPI = {
@@ -441,7 +450,7 @@ export const ledgerVoucherAPI = {
   getById: (id) => get(`/ledger-vouchers/${id}`),
   create: (data) => post("/ledger-vouchers/manual", data),
   approve: (id, approvedByEmployeeId = 0) => post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
-  reject: (id) => post(`/ledger-vouchers/${id}/reject`, {})
+  reject: (id, rejectedByEmployeeId = 0) => post(`/ledger-vouchers/${id}/reject`, { rejectedByEmployeeId })
 };
 
 export const attendanceAPI = {
@@ -456,6 +465,8 @@ export const payrollAPI = {
     get(`/payroll/preview?month=${month}&year=${year}`),
   getDetail: (employeeId, month, year) =>
     get(`/payroll/detail?employeeId=${employeeId}&month=${month}&year=${year}`),
+  getSummary: (month, year) =>
+    get(`/payroll/summary-by-month?month=${month}&year=${year}`),
   createAllowance: (payload) => post(`/allowance/create`, payload),
   createDeduction: (payload) => post(`/deduction`, payload),
   paySalary: (payrollId, accountantId) =>

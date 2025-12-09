@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Table, Input, Button, Tag, Space, message } from 'antd'
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Table, Input, Button, Tag, Space, message, Dropdown, Modal } from 'antd'
+import { SearchOutlined, ReloadOutlined, MoreOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../layouts/ManagerLayout'
 import { customersAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -38,7 +38,8 @@ const formatCustomer = (customer, index) => ({
   phone: customer.phone || customer.phoneNumber || '—',
   address: customer.address || '—',
   loyaltyLevel: (customer.loyaltyLevel || 'BRONZE').toUpperCase(),
-  customerType: customer.customerType || 'CA_NHAN'
+  customerType: customer.customerType || 'CA_NHAN',
+  isActive: customer.isActive === true
 })
 
 export default function ManagerCustomers() {
@@ -48,6 +49,7 @@ export default function ManagerCustomers() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(fallbackCustomers.length)
+  const [statusFilter, setStatusFilter] = useState('all')
   const didInit = useRef(false)
   const navigate = useNavigate()
 
@@ -95,20 +97,53 @@ export default function ManagerCustomers() {
   const filtered = useMemo(() => {
     return customers
       .filter((customer) => {
-        if (!query) return true
-        const lowerQuery = query.toLowerCase()
-        return (
-          customer.fullName.toLowerCase().includes(lowerQuery) ||
-          customer.phone.includes(lowerQuery) ||
-          customer.address.toLowerCase().includes(lowerQuery)
+        // Filter by search query
+        const matchesQuery = !query || (
+          customer.fullName.toLowerCase().includes(query.toLowerCase()) ||
+          customer.phone.includes(query) ||
+          customer.address.toLowerCase().includes(query.toLowerCase())
         )
+        
+        // Filter by status
+        const matchesStatus = 
+          statusFilter === 'all' ||
+          (statusFilter === 'active' && customer.isActive) ||
+          (statusFilter === 'inactive' && !customer.isActive)
+        
+        return matchesQuery && matchesStatus
       })
       .map((customer, index) => ({
         ...customer,
         key: customer.id ?? `customer-${index}`,
         index: index + 1,
       }))
-  }, [customers, query])
+  }, [customers, query, statusFilter])
+
+  const handleToggleStatus = (record) => {
+    const actionText = record.isActive ? 'ngưng hoạt động' : 'kích hoạt'
+    Modal.confirm({
+      title: `Xác nhận ${actionText} tài khoản`,
+      content: `Bạn có chắc chắn muốn ${actionText} tài khoản của ${record.fullName}?`,
+      okText: 'Xác nhận',
+      cancelText: 'Hủy',
+      onOk: async () => {
+        try {
+          const { data, error } = await customersAPI.toggleActive(record.id)
+          
+          if (error) {
+            message.error(`Không thể ${actionText} tài khoản`)
+            return
+          }
+          
+          message.success(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} tài khoản thành công`)
+          fetchData()
+        } catch (error) {
+          console.error('Toggle customer status error:', error)
+          message.error(`Không thể ${actionText} tài khoản`)
+        }
+      }
+    })
+  }
 
   const columns = [
     {
@@ -169,18 +204,59 @@ export default function ManagerCustomers() {
       key: 'address'
     },
     {
+      title: 'Trạng thái',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 140,
+      align: 'center',
+      render: (isActive) => (
+        <Tag
+          style={{
+            borderRadius: 999,
+            padding: '4px 12px',
+            fontWeight: 600,
+            borderColor: isActive ? '#10b981' : '#ef4444',
+            color: isActive ? '#10b981' : '#ef4444',
+            background: isActive ? '#d1fae5' : '#fee2e2'
+          }}
+        >
+          {isActive ? 'Hoạt động' : 'Ngưng hoạt động'}
+        </Tag>
+      )
+    },
+    {
       title: '',
       key: 'action',
-      width: 90,
-      render: (_, record) => (
-        <Button
-          type="link"
-          disabled={!record.id}
-          onClick={() => record.id && navigate(`/manager/customers/${record.id}`)}
-        >
-          Xem
-        </Button>
-      ),
+      width: 60,
+      align: 'center',
+      render: (_, record) => {
+        const items = [
+          {
+            key: 'view',
+            label: 'Xem chi tiết',
+            onClick: () => record.id && navigate(`/manager/customers/${record.id}`)
+          },
+          {
+            key: 'toggle',
+            label: record.isActive ? 'Ngưng hoạt động' : 'Kích hoạt',
+            onClick: () => handleToggleStatus(record)
+          }
+        ]
+
+        return (
+          <Dropdown
+            menu={{ items }}
+            trigger={['click']}
+            placement="bottomRight"
+          >
+            <Button
+              type="text"
+              icon={<MoreOutlined style={{ fontSize: 20 }} />}
+              style={{ padding: '4px 8px' }}
+            />
+          </Dropdown>
+        )
+      },
     },
   ]
 
@@ -200,30 +276,59 @@ export default function ManagerCustomers() {
               display: 'flex',
               flexWrap: 'wrap',
               justifyContent: 'space-between',
+              alignItems: 'center',
               gap: 12,
               marginBottom: 20
             }}
           >
-            <div>
-              <h2 style={{ margin: 0 }}>Danh sách khách hàng</h2>
-              <p style={{ margin: 0, color: '#667085' }}>
-                Dữ liệu được lấy từ API `/api/customers`
-              </p>
-            </div>
+            <Input
+              allowClear
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              prefix={<SearchOutlined />}
+              placeholder="Tìm kiếm"
+              style={{ width: 280 }}
+            />
+            
             <Space wrap>
-              <Input
-                allowClear
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                prefix={<SearchOutlined />}
-                placeholder="Tìm theo tên, số điện thoại, địa chỉ"
-                style={{ width: 280 }}
-              />
               <Button
-                icon={<ReloadOutlined />}
-                onClick={() => fetchCustomers(page - 1, pageSize)}
+                type={statusFilter === 'all' ? 'primary' : 'default'}
+                onClick={() => setStatusFilter('all')}
+                style={{
+                  background: statusFilter === 'all' ? '#CBB081' : '#fff',
+                  borderColor: statusFilter === 'all' ? '#CBB081' : '#d9d9d9',
+                  color: statusFilter === 'all' ? '#fff' : '#666',
+                  fontWeight: 500,
+                  borderRadius: 6
+                }}
               >
-                Làm mới
+                Tất cả
+              </Button>
+              <Button
+                type={statusFilter === 'active' ? 'primary' : 'default'}
+                onClick={() => setStatusFilter('active')}
+                style={{
+                  background: statusFilter === 'active' ? '#CBB081' : '#fff',
+                  borderColor: statusFilter === 'active' ? '#CBB081' : '#d9d9d9',
+                  color: statusFilter === 'active' ? '#fff' : '#666',
+                  fontWeight: 500,
+                  borderRadius: 6
+                }}
+              >
+                Hoạt động
+              </Button>
+              <Button
+                type={statusFilter === 'inactive' ? 'primary' : 'default'}
+                onClick={() => setStatusFilter('inactive')}
+                style={{
+                  background: statusFilter === 'inactive' ? '#CBB081' : '#fff',
+                  borderColor: statusFilter === 'inactive' ? '#CBB081' : '#d9d9d9',
+                  color: statusFilter === 'inactive' ? '#fff' : '#666',
+                  fontWeight: 500,
+                  borderRadius: 6
+                }}
+              >
+                Ngưng hoạt động
               </Button>
             </Space>
           </div>

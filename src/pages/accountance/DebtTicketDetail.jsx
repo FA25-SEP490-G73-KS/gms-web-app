@@ -39,6 +39,7 @@ export function AccountanceDebtTicketDetailContent() {
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [paymentData, setPaymentData] = useState(null)
   const [qrLoading, setQrLoading] = useState(false)
+  const [debtId, setDebtId] = useState(null) // Store debtId from API response
   const payOSOpenedRef = useRef(false) // Track if PayOS has been opened
 
   // PayOS config
@@ -111,7 +112,11 @@ export function AccountanceDebtTicketDetailContent() {
         const serviceTicket = payload.serviceTicketResponseDto || payload.serviceTicket || {}
         const priceQuotation = serviceTicket.priceQuotation || {}
         const transactions = payload.transactionResponseDto || payload.transactions || []
-
+        const fetchedDebtId = payload.debtId || 1
+        
+        // Store debtId in state
+        setDebtId(fetchedDebtId)
+        
         // Calculate totals from quotation items
         const quotationItems = (priceQuotation.items || []).map((item) => ({
           id: item.priceQuotationItemId || item.id,
@@ -200,10 +205,8 @@ export function AccountanceDebtTicketDetailContent() {
       return
     }
 
-    const serviceTicketId = ticketId || location.state?.ticketId
-
-    if (!serviceTicketId) {
-      message.error('Không tìm thấy thông tin phiếu dịch vụ')
+    if (!debtId) {
+      message.error('Không tìm thấy thông tin công nợ')
       return
     }
 
@@ -211,15 +214,14 @@ export function AccountanceDebtTicketDetailContent() {
     try {
       const payload = {
         method: 'CASH',
-        price: Number(paymentAmount),
-        type: 'DEPOSIT'
+        price: Number(paymentAmount)
       }
 
       console.log('=== CASH PAYMENT DEBUG ===')
-      console.log('Service Ticket ID:', serviceTicketId)
+      console.log('Debt ID:', debtId)
       console.log('Payload:', JSON.stringify(payload, null, 2))
 
-      const { data: response, error } = await invoiceAPI.pay(serviceTicketId, payload)
+      const { data: response, error } = await debtsAPI.pay(debtId, payload)
 
       console.log('Payment Response:', response)
 
@@ -250,10 +252,8 @@ export function AccountanceDebtTicketDetailContent() {
       return
     }
 
-    const serviceTicketId = ticketId || location.state?.ticketId
-
-    if (!serviceTicketId) {
-      message.error('Không tìm thấy thông tin phiếu dịch vụ')
+    if (!debtId) {
+      message.error('Không tìm thấy thông tin công nợ')
       return
     }
 
@@ -261,11 +261,10 @@ export function AccountanceDebtTicketDetailContent() {
     try {
       const payload = {
         method: 'BANK_TRANSFER',
-        price: Number(paymentAmount),
-        type: 'DEPOSIT'
+        price: Number(paymentAmount)
       }
 
-      const { data: response, error } = await invoiceAPI.pay(serviceTicketId, payload)
+      const { data: response, error } = await debtsAPI.pay(debtId, payload)
 
       if (error) {
         message.error(error || 'Tạo giao dịch thất bại')
