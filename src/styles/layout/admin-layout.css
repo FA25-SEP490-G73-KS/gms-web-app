@@ -252,6 +252,22 @@
   height: 100%;
 }
 
+.breadcrumb-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.breadcrumb-button:disabled {
+  cursor: default;
+}
+
 .admin-topbar-right {
   display: flex;
   align-items: center;

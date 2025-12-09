@@ -21,3 +21,15 @@
 
 .td-actions { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
 
+.row-out-of-stock .ant-table-cell {
+  border-color: #ef4444 !important;
+}
+
+.row-out-of-stock .ant-table-cell:first-child {
+  border-left-color: #ef4444 !important;
+}
+
+.row-out-of-stock .ant-table-cell:last-child {
+  border-right-color: #ef4444 !important;
+}
+

@@ -4,7 +4,7 @@ import {
   Row, Col, Card, Button, Table, Space, 
   DatePicker, Modal, message, Tabs, Calendar, Input
 } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined, FileTextOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI, invoiceAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -90,6 +90,8 @@ export default function TicketDetailPage() {
   const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
   const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
   const [sendToCustomerLoading, setSendToCustomerLoading] = useState(false)
+  const [noteModalOpen, setNoteModalOpen] = useState(false)
+  const [noteModalContent, setNoteModalContent] = useState('')
   const [exportPDFLoading, setExportPDFLoading] = useState(false)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
@@ -119,14 +121,22 @@ export default function TicketDetailPage() {
   })()
 
   const isWaitingWarehouse = quotationStatusConfig.label === 'Chờ kho duyệt'
+  const isWaitingCustomerConfirm = quotationStatusConfig.label === 'Chờ khách xác nhận'
   const isWarehouseConfirmed = quotationStatusConfig.label === 'Kho đã duyệt'
+  const isCustomerConfirmed = quotationStatusConfig.label === 'Khách đã xác nhận'
   
   const inputsDisabled = isHistoryPage || actionLoading || 
-    (isWaitingWarehouse ? true : (isWarehouseConfirmed ? !isEditMode : !quotationStatusConfig.canEdit))
+    (isWaitingWarehouse
+      ? true
+      : (isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm)
+        ? !isEditMode
+        : !quotationStatusConfig.canEdit)
   
   const actionButtonLabel = isWaitingWarehouse 
     ? 'Cập nhật' 
-    : (isWarehouseConfirmed ? (isEditMode ? 'Lưu' : 'Cập nhật') : 'Lưu')
+    : ((isWarehouseConfirmed || isCustomerConfirmed)
+        ? (isEditMode ? 'Lưu' : 'Cập nhật')
+        : 'Lưu')
   
   const canSendToCustomer = isWarehouseConfirmed
 
@@ -144,6 +154,12 @@ export default function TicketDetailPage() {
 
   const closeDeliveryPicker = () => {
     setDeliveryPickerVisible(false)
+  }
+
+  const openNoteModal = (note) => {
+    const content = note && String(note).trim() !== '' ? note : 'Chưa có lưu ý'
+    setNoteModalContent(content)
+    setNoteModalOpen(true)
   }
 
   const confirmDeliveryPicker = async () => {
@@ -218,7 +234,30 @@ export default function TicketDetailPage() {
       <selectComponents.DropdownIndicator {...props}>
         <span style={{ fontSize: '12px', color: '#64748b' }}>▾</span>
       </selectComponents.DropdownIndicator>
-    )
+    ),
+    Option: (props) => {
+      // Chỉ render chi tiết xuất xứ/SL cho dropdown linh kiện (isPartSelect = true)
+      const isPartSelect = props?.selectProps?.isPartSelect
+      const part = props.data?.part
+      if (!isPartSelect || !part) {
+        return <selectComponents.Option {...props}>{props.label}</selectComponents.Option>
+      }
+      return (
+        <selectComponents.Option {...props}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ fontWeight: 600, color: '#111' }}>
+              {part.name || props.label || 'Linh kiện'}
+            </div>
+            <div style={{ fontSize: 12, color: '#475569' }}>
+              SL: {part.quantity ?? 0}
+            </div>
+          </div>
+          <div style={{ fontSize: 12, color: '#475569', marginTop: 2 }}>
+            {part.marketName ? `Xuất xứ: ${part.marketName}` : 'Xuất xứ: --'}
+          </div>
+        </selectComponents.Option>
+      )
+    }
   }), [])
 
   const cachePartOption = (value, label) => {
@@ -265,19 +304,23 @@ export default function TicketDetailPage() {
         replacementItems.push({
           id: item.priceQuotationItemId || `part-${index}-${Date.now()}`,
           priceQuotationItemId: item.priceQuotationItemId || null,
-          // Ưu tiên itemName, sau đó tới partName/partCode
+        
           category: item.partId || item.partCode || item.itemName || item.partName || '',
           categoryLabel: item.itemName || item.partName || item.partCode || '',
           quantity: item.quantity ?? 1,
           unit: item.unit || '',
           unitPrice: item.unitPrice || 0,
-          total: item.totalPrice || 0
+          total: item.totalPrice || 0,
+          availableQuantity: item.part?.quantity ?? null,
+          inventoryStatus: item.inventoryStatus || '',
+          warehouseReviewStatus: item.warehouseReviewStatus || '',
+          warehouseNote: item.warehouseNote || null
         })
       } else if (item.itemType === 'SERVICE') {
         serviceItemsResult.push({
           id: item.priceQuotationItemId || `service-${index}-${Date.now()}`,
           priceQuotationItemId: item.priceQuotationItemId || null,
-          // Backend hiện trả partName cho SERVICE, map sang task qua itemName/partName
+         
           task: item.itemName || item.serviceName || item.partName || item.description || '',
           quantity: item.quantity ?? 1,
           unit: item.unit || '',
@@ -510,7 +553,7 @@ export default function TicketDetailPage() {
         .map(part => ({
           value: part.partId || part.id,
           label: part.name || part.partName || '',
-            part
+          part
         }))
       
         aggregatedOptions.push(...options)
@@ -779,7 +822,7 @@ export default function TicketDetailPage() {
     if (actionLoading) return
     
     // Nếu ở trạng thái "Kho đã duyệt" và chưa ở edit mode, bật edit mode
-    if (isWarehouseConfirmed && !isEditMode) {
+    if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
       setIsEditMode(true)
       return
     }
@@ -1022,7 +1065,8 @@ export default function TicketDetailPage() {
       // Backend trả về discount là số tiền, nên khi lưu cũng gửi đúng theo amount
       discount: ticketData?.priceQuotation?.discount ?? 0,
       estimateAmount: grandTotal,
-      items: buildQuotationItemsPayload()
+      items: buildQuotationItemsPayload(),
+      status: 'DRAFT'
     }
 
     const hide = message.loading('Đang gửi báo giá...', 0)
@@ -1056,12 +1100,14 @@ export default function TicketDetailPage() {
       title: 'STT',
       key: 'index',
       width: 60,
+      align: 'center',
       render: (_, __, index) => String(index + 1).padStart(2, '0')
     },
     {
       title: 'Danh mục',
       key: 'category',
       width: 350,
+      align: 'center',
       render: (_, record) => (
         <div>
           <CustomCreatableSelect
@@ -1121,6 +1167,7 @@ export default function TicketDetailPage() {
                   selectedPart?.label ||
                   selectedPart?.part?.name ||
                   '',
+                availableQuantity: selectedPart?.part?.quantity ?? null,
               }
 
               if (selectedPart?.part) {
@@ -1147,6 +1194,7 @@ export default function TicketDetailPage() {
 
               updateReplaceItem(record.id, updates)
             }}
+            isPartSelect
           />
           {errors[`replace_${record.id}_category`] && (
             <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
@@ -1160,6 +1208,7 @@ export default function TicketDetailPage() {
       title: 'Số lượng',
       key: 'quantity',
       width: 120,
+      align: 'center',
       render: (_, record) => (
         <input
           type="number"
@@ -1181,6 +1230,7 @@ export default function TicketDetailPage() {
       title: 'Đơn vị',
       key: 'unit',
       width: 120,
+      align: 'center',
       render: (_, record) => (
         <div>
         <CustomSelect
@@ -1246,6 +1296,7 @@ export default function TicketDetailPage() {
       title: 'Đơn giá (vnd)',
       key: 'unitPrice',
       width: 150,
+      align: 'center',
       render: (_, record) => (
         <div>
           <input
@@ -1279,14 +1330,47 @@ export default function TicketDetailPage() {
       title: 'Thành tiền (vnd)',
       key: 'total',
       width: 150,
+      align: 'center',
       render: (_, record) => (
         <span>{record.total ? record.total.toLocaleString('vi-VN') : '--'}</span>
+      )
+    },
+    {
+      title: 'Ghi chú kho',
+      key: 'warehouseNote',
+      width: 140,
+      align: 'center',
+      render: (_, record) => (
+        <span
+          style={{
+            fontSize: 13,
+            color: '#374151',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            cursor: 'pointer',
+            justifyContent: 'center'
+          }}
+          onClick={() => openNoteModal(record.warehouseNote)}
+          title="Xem ghi chú kho"
+        >
+          {(() => {
+            const noteExists = record.warehouseNote && record.warehouseNote.trim() !== ''
+            const reviewStatus = (record.warehouseReviewStatus || '').toString()
+            const isRejected = reviewStatus.toLocaleUpperCase('vi') === 'TỪ CHỐI'
+            const color = isRejected
+              ? '#ef4444'
+              : (noteExists ? '#111' : '#9ca3af')
+            return <FileTextOutlined style={{ fontSize: 16, color }} />
+          })()}
+        </span>
       )
     },
     {
       title: '',
       key: 'action',
       width: 80,
+      align: 'center',
       render: (_, record) => (
         <Space>
           {!inputsDisabled && (
@@ -1305,11 +1389,13 @@ export default function TicketDetailPage() {
       title: 'STT',
       key: 'index',
       width: 60,
+      align: 'center',
       render: (_, __, index) => String(index + 1).padStart(2, '0')
     },
     {
       title: 'Công việc',
       key: 'task',
+      align: 'center',
       render: (_, record) => (
         <div>
           <input
@@ -1337,6 +1423,7 @@ export default function TicketDetailPage() {
       title: 'Đơn giá (vnd)',
       key: 'unitPrice',
       width: 180,
+      align: 'center',
       render: (_, record) => (
         <div>
           <input
@@ -1368,6 +1455,7 @@ export default function TicketDetailPage() {
       title: 'Thành tiền (vnd)',
       key: 'total',
       width: 150,
+      align: 'center',
       render: (_, record) => (
         <span>{record.total ? record.total.toLocaleString('vi-VN') : '--'}</span>
       )
@@ -1376,6 +1464,7 @@ export default function TicketDetailPage() {
       title: '',
       key: 'action',
       width: 80,
+      align: 'center',
       render: (_, record) => (
         <Space>
           {!inputsDisabled && (
@@ -1419,13 +1508,14 @@ export default function TicketDetailPage() {
   const totalService = serviceItems.reduce((sum, item) => sum + (item.total || 0), 0)
   const grandTotal = totalReplacement + totalService
 
-  // Hiển thị discount đúng theo response: priceQuotation.discount là số tiền giảm
-  const discountAmountFromResponse =
-    ticketData?.priceQuotation?.discount != null
-      ? Number(ticketData.priceQuotation.discount)
-      : 0
-  const safeDiscountAmount = Number.isNaN(discountAmountFromResponse) ? 0 : discountAmountFromResponse
-  const finalAmount = grandTotal - safeDiscountAmount
+  // Giảm giá theo % (ưu tiên discountPercent / discountRate từ backend)
+  const discountPercentRaw =
+    ticketData?.priceQuotation?.discountPercent ??
+    ticketData?.priceQuotation?.discountRate ??
+    0
+  const discountPercent = Number.isFinite(Number(discountPercentRaw)) ? Number(discountPercentRaw) : 0
+  const discountAmount = Math.round((grandTotal * discountPercent) / 100)
+  const finalAmount = Math.max(0, grandTotal - discountAmount)
 
   return (
     <AdminLayout>
@@ -1613,6 +1703,11 @@ export default function TicketDetailPage() {
                 size="small"
                 components={goldTableHeader}
                 locale={{ emptyText: ' ' }}
+                rowClassName={(record) => {
+                  const avail = Number(record.availableQuantity)
+                  const qty = Number(record.quantity) || 0
+                  return Number.isFinite(avail) && qty > avail ? 'row-out-of-stock' : ''
+                }}
                 footer={() =>
                   !isHistoryPage && !inputsDisabled && (
                     <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
@@ -1685,7 +1780,12 @@ export default function TicketDetailPage() {
                 <div>
                   <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Giảm giá</div>
                   <div style={{ fontSize: '20px', fontWeight: 700 }}>
-                    {formatCurrency(safeDiscountAmount)} đ
+                    {discountPercent ? `${discountPercent}%` : '0%'}{' '}
+                    {discountAmount > 0 && (
+                      <span style={{ color: '#4b5563', fontSize: 14 }}>
+                        ({formatCurrency(discountAmount)} đ)
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1704,16 +1804,24 @@ export default function TicketDetailPage() {
                     disabled={
                       actionLoading ||
                         isWaitingWarehouse ||
-                        (isWarehouseConfirmed && !isEditMode 
+                        ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode 
                           ? false  // Cho phép bấm "Cập nhật" để bật edit mode
-                          : (isWarehouseConfirmed && isEditMode
+                          : ((isWarehouseConfirmed || isCustomerConfirmed) && isEditMode
                               ? (replaceItems.length === 0 && serviceItems.length === 0)  // Validate khi đang edit
                               : inputsDisabled))  // Logic cho các trạng thái khác
                     }
                     loading={actionLoading}
                     style={{
-                        background: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
-                        borderColor: isWaitingWarehouse ? '#9ca3af' : '#22c55e',
+                        background: isWaitingWarehouse
+                          ? '#9ca3af'
+                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
+                            ? '#CBB081'
+                            : '#22c55e',
+                        borderColor: isWaitingWarehouse
+                          ? '#9ca3af'
+                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
+                            ? '#CBB081'
+                            : '#22c55e',
                       color: '#fff',
                       fontWeight: 600,
                       padding: '0 24px',
@@ -1904,6 +2012,24 @@ export default function TicketDetailPage() {
               Xác nhận
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Modal ghi chú kho */}
+      <Modal
+        open={noteModalOpen}
+        onCancel={() => setNoteModalOpen(false)}
+        footer={[
+          <Button key="close" type="primary" onClick={() => setNoteModalOpen(false)}>
+            Đóng
+          </Button>
+        ]}
+        title="Ghi chú kho"
+        destroyOnClose
+        width={420}
+      >
+        <div style={{ fontSize: 14, lineHeight: 1.6, color: '#111' }}>
+          {noteModalContent || 'Chưa có lưu ý'}
         </div>
       </Modal>
     </AdminLayout>

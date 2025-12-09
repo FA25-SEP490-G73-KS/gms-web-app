@@ -21,6 +21,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
   const [pendingTechnicianNames, setPendingTechnicianNames] = useState([])
   const [pendingBrandName, setPendingBrandName] = useState('')
   const [pendingModelName, setPendingModelName] = useState('')
+  const [pendingModelId, setPendingModelId] = useState(null)
   const [currentUserName, setCurrentUserName] = useState('')
   const [selectedBrandId, setSelectedBrandId] = useState(null)
   const [selectedModelId, setSelectedModelId] = useState(null)
@@ -88,6 +89,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       setPendingTechnicianNames([])
       setPendingBrandName('')
       setPendingModelName('')
+      setPendingModelId(null)
       setSelectedBrandId(null)
       setSelectedModelId(null)
     }
@@ -154,8 +156,11 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     if (!pendingServiceNames.length || !serviceOptions.length) return
     const mapped = pendingServiceNames
       .map((name) => {
-        const lower = name.toLowerCase()
-        return serviceOptions.find((option) => option.label?.toLowerCase() === lower)?.value
+        const lower = name.toLowerCase().trim()
+        return serviceOptions.find((option) => {
+          const optionLabel = option.label?.toLowerCase().trim()
+          return optionLabel === lower || optionLabel?.includes(lower) || lower.includes(optionLabel)
+        })?.value
       })
       .filter(Boolean)
     if (mapped.length) {
@@ -168,8 +173,12 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     if (!pendingTechnicianNames.length || !technicianOptions.length) return
     const mapped = pendingTechnicianNames
       .map((name) => {
-        const lower = name.toLowerCase()
-        return technicianOptions.find((option) => option.label?.toLowerCase().includes(lower))?.value
+        const lower = name.toLowerCase().trim()
+        return technicianOptions.find((option) => {
+          const optionLabel = option.label?.toLowerCase()
+          
+          return optionLabel?.includes(lower) || optionLabel?.startsWith(lower)
+        })?.value
       })
       .filter(Boolean)
     if (mapped.length) {
@@ -182,30 +191,54 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     if (!pendingBrandName || !brands.length) return
     const modelNameToMatch = pendingModelName
     const matchedBrand = brands.find(
-      (brand) => brand.name?.toLowerCase() === pendingBrandName.toLowerCase()
+      (brand) => brand.name?.toLowerCase().trim() === pendingBrandName.toLowerCase().trim()
     )
     if (matchedBrand) {
       setPendingBrandName('')
       setPendingModelName('')
       ;(async () => {
+        setSelectedBrandId(matchedBrand.id)
         const list = await handleBrandSelect(matchedBrand.id)
         form.setFieldsValue({ brandId: matchedBrand.id })
         if (modelNameToMatch) {
-          const source = list && list.length ? list : models
-          const matchedModel = source.find(
-            (model) => model.name?.toLowerCase() === modelNameToMatch.toLowerCase()
-          )
-          if (matchedModel) {
-            setSelectedModelId(matchedModel.id)
-            form.setFieldsValue({ modelId: matchedModel.id })
-          }
+        
+          setTimeout(() => {
+            const source = list && list.length ? list : models
+            const matchedModel = source.find(
+              (model) => model.name?.toLowerCase().trim() === modelNameToMatch.toLowerCase().trim()
+            )
+            if (matchedModel) {
+              setSelectedModelId(matchedModel.id)
+              form.setFieldsValue({ modelId: matchedModel.id })
+            }
+          }, 200)
         }
       })()
     } else {
       setPendingBrandName('')
       setPendingModelName('')
     }
-  }, [pendingBrandName, pendingModelName, brands, models])
+  }, [pendingBrandName, pendingModelName, brands, models, form])
+  
+
+  useEffect(() => {
+    if ((!pendingModelName && !pendingModelId) || !selectedBrandId || !models.length) return
+    let matchedModel = null
+    if (pendingModelId) {
+      matchedModel = models.find((model) => String(model.id) === String(pendingModelId))
+    }
+    if (!matchedModel && pendingModelName) {
+      matchedModel = models.find(
+        (model) => model.name?.toLowerCase().trim() === pendingModelName.toLowerCase().trim()
+      )
+    }
+    if (matchedModel) {
+      setSelectedModelId(matchedModel.id)
+      form.setFieldsValue({ modelId: matchedModel.id })
+      setPendingModelName('')
+      setPendingModelId(null)
+    }
+  }, [pendingModelName, pendingModelId, selectedBrandId, models, form])
 
   const fetchTicketData = async () => {
     setLoading(true)
@@ -232,30 +265,35 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     const vin = vehicle.vin || ''
     const year = vehicle.year || 0
 
-    const serviceTypeIds = Array.isArray(data.serviceTypeIds)
+  
+    let serviceTypeIds = Array.isArray(data.serviceTypeIds)
       ? data.serviceTypeIds
       : (Array.isArray(data.serviceTypes)
           ? data.serviceTypes.map((item) => Number(item.serviceTypeId || item.id)).filter(Boolean)
           : [])
 
     if (!serviceTypeIds.length && Array.isArray(data.serviceType)) {
-      setPendingServiceNames(
-        data.serviceType
-          .map((item) => (typeof item === 'string' ? item : item?.name || item?.serviceTypeName || ''))
-          .filter(Boolean)
-      )
+      const serviceNames = data.serviceType
+        .map((item) => (typeof item === 'string' ? item : item?.name || item?.serviceTypeName || ''))
+        .filter(Boolean)
+      if (serviceNames.length > 0) {
+        setPendingServiceNames(serviceNames)
+      }
     }
 
-    const assignedTechnicianIds = Array.isArray(data.assignedTechnicianIds)
+
+    let assignedTechnicianIds = Array.isArray(data.assignedTechnicianIds)
       ? data.assignedTechnicianIds
       : []
 
+  
     if (!assignedTechnicianIds.length && Array.isArray(data.technicians)) {
-      setPendingTechnicianNames(
-        data.technicians
-          .map((item) => (typeof item === 'string' ? item : item?.fullName || item?.name || ''))
-          .filter(Boolean)
-      )
+      const technicianNames = data.technicians
+        .map((item) => (typeof item === 'string' ? item : item?.fullName || item?.name || ''))
+        .filter(Boolean)
+      if (technicianNames.length > 0) {
+        setPendingTechnicianNames(technicianNames)
+      }
     }
 
     setVehicleInfo({
@@ -269,36 +307,68 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     if (brandId) {
       setSelectedBrandId(brandId)
       const list = await handleBrandSelect(brandId)
+      
       if (modelId) {
-        setSelectedModelId(modelId)
-        const source = list && list.length ? list : models
-        const matchedModel = source.find((model) => String(model.id) === String(modelId))
+       
+        const matchedModel = list && list.length 
+          ? list.find((model) => String(model.id) === String(modelId))
+          : null
+        
         if (matchedModel) {
+          setSelectedModelId(matchedModel.id)
           form.setFieldsValue({ modelId: matchedModel.id })
         } else {
+          
+          setPendingModelId(modelId)
+          setSelectedModelId(modelId)
           form.setFieldsValue({ modelId })
+        }
+      } else if (modelName) {
+        
+        const matchedModel = list && list.length
+          ? list.find((model) => 
+              model.name?.toLowerCase().trim() === modelName.toLowerCase().trim()
+            )
+          : null
+        
+        if (matchedModel) {
+          setSelectedModelId(matchedModel.id)
+          form.setFieldsValue({ modelId: matchedModel.id })
+        } else {
+          setPendingModelName(modelName)
         }
       }
     } else if (brandName) {
       setPendingBrandName(brandName)
       setPendingModelName(modelName)
+    } else if (modelName && brands.length > 0) {
+   
+      setPendingModelName(modelName)
     }
 
     const quoteStaffName = data.createdBy || currentUserName || ''
+    
+    
+    const receiveDate = data.createdAt 
+      ? dayjs(data.createdAt) 
+      : (data.deliveryAt ? dayjs(data.deliveryAt) : null)
+    
+  
+    const finalModelId = form.getFieldValue('modelId') || (modelId || null)
       
-      form.setFieldsValue({
-        customerName: data.customer?.fullName || '',
+    form.setFieldsValue({
+      customerName: data.customer?.fullName || '',
       phone: displayPhoneFrom84(data.customer?.phone || ''),
       brandId: brandId || null,
-      modelId: modelId || null,
+      modelId: finalModelId,
       licensePlate: (vehicle.licensePlate || '').toUpperCase(),
-      chassisNumber: vin,
+      chassisNumber: vin || '',
       year: year || 2020,
-        quoteStaff: quoteStaffName,
-        receiveDate: data.createdAt ? dayjs(data.createdAt) : (data.deliveryAt ? dayjs(data.deliveryAt) : null),
-      serviceTypes: serviceTypeIds,
-      assignedTechnicianIds: assignedTechnicianIds
-      })
+      quoteStaff: quoteStaffName,
+      receiveDate: receiveDate,
+      serviceTypes: serviceTypeIds.length > 0 ? serviceTypeIds : undefined,
+      assignedTechnicianIds: assignedTechnicianIds.length > 0 ? assignedTechnicianIds : undefined
+    })
   }
 
   const handleSubmit = async () => {

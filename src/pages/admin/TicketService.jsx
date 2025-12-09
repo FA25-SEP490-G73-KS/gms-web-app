@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react'
 import { Table, Input, Card, Badge, Space, message, Button, Row, Col, Form, Select, Modal } from 'antd'
-import { EyeOutlined, SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
+import { SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
@@ -74,8 +74,7 @@ export default function TicketService() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
-  // Không lọc theo trạng thái mặc định để luôn hiển thị mọi phiếu,
-  // tránh trường hợp backend trả về status mới (VD: WAITING_FOR_QUOTATION) mà không map kịp.
+  
   const [statusFilter, setStatusFilter] = useState(null)
   const [dateFilter, setDateFilter] = useState(null)
 
@@ -171,7 +170,7 @@ export default function TicketService() {
     const { data: response, error } = await serviceTicketAPI.getAll()
     setLoading(false)
     
-    // Fallback data for testing
+    
     const fallbackData = [
       {
         id: 1,
@@ -252,7 +251,7 @@ export default function TicketService() {
       }
     }
     
-    // Use fallback if no data
+  
     if (resultArray.length === 0) {
       console.warn('No data from API, using fallback data')
       setData(fallbackData)
@@ -276,11 +275,11 @@ export default function TicketService() {
   const filtered = useMemo(() => {
     let result = data
     
-    // For history page, show completed/cancelled tickets only
+   
     if (isHistoryPage) {
       result = result.filter((r) => {
         const statusKey = r.statusKey || r.status
-        // Show completed (WAITING_HANDOVER) and cancelled tickets
+      
         return statusKey === 'WAITING_HANDOVER' || 
                statusKey === 'Chờ bàn giao xe' ||
                statusKey === 'CANCELLED' ||
@@ -290,7 +289,7 @@ export default function TicketService() {
       })
     }
     
-    // Filter by search query
+    
     if (query) {
       const q = query.toLowerCase()
       result = result.filter(
@@ -298,7 +297,7 @@ export default function TicketService() {
       )
     }
     
-    // Filter by status (only for ticket list page, not history)
+  
     if (!isHistoryPage && statusFilter) {
       result = result.filter((r) => {
         const statusKey = r.statusKey || r.status
@@ -310,7 +309,7 @@ export default function TicketService() {
       })
     }
     
-    // Filter by date
+    
     if (dateFilter) {
       const filterDate = dateFilter.format('DD/MM/YYYY')
       result = result.filter((r) => r.createdAt === filterDate)
@@ -533,6 +532,9 @@ export default function TicketService() {
         const currentStatus = record.statusKey || status
         const config = getStatusConfig(currentStatus)
         const isUpdating = updatingStatusId === record.id
+        const isCancelled = currentStatus === 'CANCELED' || currentStatus === 'CANCELLED' || currentStatus === 'Hủy'
+        const isCompleted = currentStatus === 'COMPLETED' || currentStatus === 'Hoàn thành'
+        const isDisabled = isUpdating || isCancelled || isCompleted
         
         if (isHistoryPage) {
         return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
@@ -546,30 +548,37 @@ export default function TicketService() {
                 handleStatusChange(record.id, e.target.value, currentStatus)
               }}
               onClick={(e) => e.stopPropagation()}
-              disabled={isUpdating}
+              disabled={isDisabled}
               style={{
                 border: '1px solid #d0d7de',
                 borderRadius: '6px',
                 padding: '6px 10px',
                 fontSize: '13px',
                 outline: 'none',
-                cursor: isUpdating ? 'not-allowed' : 'pointer',
-                background: '#fff',
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                background: isDisabled ? '#f5f5f5' : '#fff',
                 minWidth: '160px',
                 color: config.color,
                 fontWeight: 600,
-                opacity: isUpdating ? 0.6 : 1
+                opacity: isDisabled ? 0.6 : 1
               }}
             >
-              {currentStatus === 'WAITING_FOR_QUOTATION' ? (
+              {currentStatus === 'CREATED' || currentStatus === 'Đã tạo' ? (
+                <>
+                  <option value="CREATED" style={{ color: '#3b82f6' }}>Đã tạo</option>
+                  <option value="CANCELED" style={{ color: '#ef4444' }}>Hủy</option>
+                </>
+              ) : currentStatus === 'WAITING_FOR_QUOTATION' || currentStatus === 'WAITING_QUOTE' || currentStatus === 'Chờ báo giá' ? (
                 <>
                   <option value="WAITING_FOR_QUOTATION" style={{ color: '#ffd65a' }}>Chờ báo giá</option>
                   <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
+                  <option value="CANCELED" style={{ color: '#ef4444' }}>Hủy</option>
                 </>
-              ) : currentStatus === 'WAITING_FOR_DELIVERY' ? (
+              ) : currentStatus === 'WAITING_FOR_DELIVERY' || currentStatus === 'WAITING_HANDOVER' || currentStatus === 'Chờ bàn giao xe' ? (
                 <>
                   <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
                   <option value="COMPLETED" style={{ color: '#22c55e' }}>Hoàn thành</option>
+                  <option value="CANCELED" style={{ color: '#ef4444' }}>Hủy</option>
                 </>
               ) : (
                 Object.keys(STATUS_MAP).map((key) => {
@@ -597,21 +606,23 @@ export default function TicketService() {
       width: 120,
       render: (_, record) => {
         const statusKey = record.statusKey || record.status
-        const canUpdate = statusKey === 'CREATED' || statusKey === 'Đã tạo' || 
-                         statusKey === 'WAITING_QUOTE' || statusKey === 'Chờ báo giá'
-        return canUpdate ? (
+        const isCompleted = statusKey === 'COMPLETED' || statusKey === 'Hoàn thành'
+        const isCancelled = statusKey === 'CANCELED' || statusKey === 'CANCELLED' || statusKey === 'Hủy'
+        const isDisabled = isCompleted || isCancelled
+        
+        return (
           <Button 
             type="link" 
             onClick={() => handleUpdate(record)}
-            style={{ padding: 0 }}
+            disabled={isDisabled}
+            style={{ 
+              padding: 0,
+              color: isDisabled ? '#9ca3af' : '#1890ff',
+              cursor: isDisabled ? 'not-allowed' : 'pointer'
+            }}
           >
             Cập nhật
           </Button>
-        ) : (
-          <EyeOutlined
-            style={{ fontSize: '18px', cursor: 'pointer', color: '#111' }}
-            onClick={() => setSelected(record)}
-          />
         )
       }
     }

@@ -281,8 +281,9 @@ function NotificationBell() {
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       setDropdownPosition({
-        top: rect.bottom + window.scrollY + 8,
-        right: window.innerWidth - rect.right
+        // position fixed: use viewport coords, avoid scrollY to keep stable
+        top: rect.bottom + 8,
+        right: Math.max(8, window.innerWidth - rect.right)
       });
     }
   }, []);
@@ -302,7 +303,11 @@ function NotificationBell() {
   useEffect(() => {
     if (visible) {
       updateDropdownPosition();
-      const handleScroll = () => updateDropdownPosition();
+      const handleScroll = () => {
+        // Đóng dropdown khi lăn chuột để tránh lỗi position
+        setVisible(false);
+        visibleRef.current = false;
+      };
       const handleResize = () => updateDropdownPosition();
       
       window.addEventListener('scroll', handleScroll, true);

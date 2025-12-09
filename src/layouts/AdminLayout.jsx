@@ -51,21 +51,38 @@ export default function AdminLayout({ children }) {
   const getBreadcrumb = () => {
     const path = location.pathname
     if (path.startsWith('/service-advisor/orders/history')) {
-      return { parent: 'Phiếu dịch vụ', current: 'Lịch sử sửa chữa' }
+      return { parent: 'Phiếu dịch vụ', current: 'Lịch sử sửa chữa', child: null }
     }
     if (path.startsWith('/service-advisor/orders')) {
-      return { parent: 'Phiếu dịch vụ', current: 'Danh sách phiếu' }
+      const isDetailPage = /^\/service-advisor\/orders\/\d+/.test(path)
+      return {
+        parent: 'Phiếu dịch vụ',
+        current: 'Danh sách phiếu',
+        child: isDetailPage ? 'Chi tiết phiếu' : null
+      }
     }
     if (path.startsWith('/service-advisor/appointments')) {
-      return { parent: '', current: 'Lịch hẹn' }
+      return { parent: '', current: 'Lịch hẹn', child: null }
     }
     if (path.startsWith('/service-advisor/customers')) {
-      return { parent: '', current: 'Khách hàng' }
+      return { parent: '', current: 'Khách hàng', child: null }
     }
-    return { parent: '', current: 'Trang chủ' }
+    return { parent: '', current: 'Trang chủ', child: null }
   }
 
   const breadcrumb = getBreadcrumb()
+
+  const handleBreadcrumbClick = () => {
+    const path = location.pathname
+    if (path.startsWith('/service-advisor/orders/history')) {
+      navigate('/service-advisor/orders/history')
+      return
+    }
+    if (path.startsWith('/service-advisor/orders')) {
+      navigate('/service-advisor/orders')
+      return
+    }
+  }
 
   return (
     <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -84,7 +101,25 @@ export default function AdminLayout({ children }) {
               <div className="breadcrumb">
                 <span className="breadcrumb-item">{breadcrumb.parent}</span>
                 <span className="breadcrumb-separator">&gt;</span>
-                <span className="breadcrumb-current">{breadcrumb.current}</span>
+                <button
+                  type="button"
+                  className="breadcrumb-current breadcrumb-button"
+                  onClick={handleBreadcrumbClick}
+                  disabled={
+                    !(
+                      location.pathname.startsWith('/service-advisor/orders') ||
+                      location.pathname.startsWith('/service-advisor/orders/history')
+                    )
+                  }
+                >
+                  {breadcrumb.current}
+                </button>
+                {breadcrumb.child ? (
+                  <>
+                    <span className="breadcrumb-separator">&gt;</span>
+                    <span className="breadcrumb-current">{breadcrumb.child}</span>
+                  </>
+                ) : null}
               </div>
             ) : (
               <span className="breadcrumb-current">{breadcrumb.current}</span>

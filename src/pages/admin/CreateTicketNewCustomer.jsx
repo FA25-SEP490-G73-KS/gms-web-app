@@ -714,7 +714,6 @@ export default function CreateTicketNewCustomer() {
                 <Form.Item 
                   label="Ngày dự đoán nhận xe" 
                   name="receiveDate" 
-                  rules={[{ required: true, message: 'Vui lòng chọn ngày dự đoán nhận xe' }]} 
                   style={formItemStyle}
                 >
                   <DatePicker
