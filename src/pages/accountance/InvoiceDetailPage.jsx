@@ -247,14 +247,18 @@ export default function InvoiceDetailPage() {
 
     setPaymentLoading(true);
     try {
+      const isPayment = invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY";
+      
       const payload = {
         method: paymentTab === "CASH" ? "CASH" : "BANK_TRANSFER",
         price: Number(paymentAmount),
-        type: "DEPOSIT",
+        type: isPayment ? "PAYMENT" : "DEPOSIT",
       };
 
       console.log("=== MODAL PAYMENT DEBUG ===");
       console.log("Payment Tab:", paymentTab);
+      console.log("Status:", invoiceData?.serviceTicket?.status);
+      console.log("Type:", isPayment ? "PAYMENT" : "DEPOSIT");
       console.log("Payload:", JSON.stringify(payload, null, 2));
 
       const { data: response, error } = await invoiceAPI.pay(id, payload);
@@ -305,11 +309,18 @@ export default function InvoiceDetailPage() {
 
     setPaymentLoading(true);
     try {
+      const isPayment = invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY";
+      
       const payload = {
         method: type === "QR" ? "BANK_TRANSFER" : "CASH",
         price: Number(depositAmount),
-        type: "DEPOSIT",
+        type: isPayment ? "PAYMENT" : "DEPOSIT",
       };
+
+      console.log("=== PAYMENT DEBUG ===");
+      console.log("Status:", invoiceData?.serviceTicket?.status);
+      console.log("Type:", isPayment ? "PAYMENT" : "DEPOSIT");
+      console.log("Payload:", JSON.stringify(payload, null, 2));
 
       const { data: response, error } = await invoiceAPI.pay(id, payload);
 
@@ -2109,11 +2120,18 @@ export default function InvoiceDetailPage() {
                                     onClick={async () => {
                                       setPaymentLoading(true);
                                       try {
+                                        const isPayment = invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY";
+                                        
                                         const payload = {
                                           method: "CASH",
                                           price: Number(depositAmount),
-                                          type: "DEPOSIT",
+                                          type: isPayment ? "PAYMENT" : "DEPOSIT",
                                         };
+                                        
+                                        console.log("=== CASH TAB PAYMENT DEBUG ===");
+                                        console.log("Status:", invoiceData?.serviceTicket?.status);
+                                        console.log("Type:", isPayment ? "PAYMENT" : "DEPOSIT");
+                                        console.log("Payload:", JSON.stringify(payload, null, 2));
                                         
                                         const { data: response, error } = await invoiceAPI.pay(id, payload);
                                         

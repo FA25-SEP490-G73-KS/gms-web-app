@@ -50,6 +50,8 @@ export default function PayrollForManager() {
   const [pageSize, setPageSize] = useState(10)
   const [payrollData, setPayrollData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [summaryData, setSummaryData] = useState(null)
+  const [summaryLoading, setSummaryLoading] = useState(false)
   const prevDateRef = useRef(null)
   
   // Modal detail states
@@ -61,6 +63,7 @@ export default function PayrollForManager() {
   const [rejectReason, setRejectReason] = useState('')
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [processing, setProcessing] = useState(false)
+  const [approvingAll, setApprovingAll] = useState(false)
 
   // Memoize fetchPayrollData to prevent re-creation on every render
   const fetchPayrollData = useCallback(async () => {
@@ -178,6 +181,31 @@ export default function PayrollForManager() {
     }
   }, [selectedDate])
 
+  // Fetch payroll summary
+  const fetchPayrollSummary = useCallback(async () => {
+    try {
+      setSummaryLoading(true)
+      const month = selectedDate.month() + 1
+      const year = selectedDate.year()
+
+      const { data, error } = await payrollAPI.getSummary(month, year)
+
+      if (error) {
+        message.error('Không thể tải tổng quỹ lương')
+        setSummaryData(null)
+        return
+      }
+
+      setSummaryData(data?.result || null)
+    } catch (err) {
+      console.error('Failed to fetch payroll summary:', err)
+      message.error('Đã xảy ra lỗi khi tải tổng quỹ lương')
+      setSummaryData(null)
+    } finally {
+      setSummaryLoading(false)
+    }
+  }, [selectedDate])
+
   // Fetch payroll data on mount and when date actually changes
   useEffect(() => {
     if (!selectedDate) return
@@ -190,8 +218,9 @@ export default function PayrollForManager() {
     if (prevMonthYear === null || currentMonthYear !== prevMonthYear) {
       prevDateRef.current = selectedDate
       fetchPayrollData()
+      fetchPayrollSummary()
     }
-  }, [selectedDate, fetchPayrollData])
+  }, [selectedDate, fetchPayrollData, fetchPayrollSummary])
 
   // Memoize date change handler to prevent DatePicker re-render
   const handleDateChange = useCallback((date) => {
@@ -262,6 +291,7 @@ export default function PayrollForManager() {
       setSelectedEmployee(null)
       setPayrollDetail(null)
       fetchPayrollData() // Refresh list
+      fetchPayrollSummary() // Refresh summary
     } catch (err) {
       console.error('Failed to approve payroll:', err)
       message.error('Đã xảy ra lỗi khi duyệt lương')
@@ -307,12 +337,83 @@ export default function PayrollForManager() {
       setPayrollDetail(null)
       setRejectReason('')
       fetchPayrollData() // Refresh list
+      fetchPayrollSummary() // Refresh summary
     } catch (err) {
       console.error('Failed to reject payroll:', err)
       message.error('Đã xảy ra lỗi khi từ chối lương')
     } finally {
       setProcessing(false)
     }
+  }
+
+  // Handle approve all pending payrolls
+  const handleApproveAll = async () => {
+    const managerId = getUserIdFromToken()
+    if (!managerId) {
+      message.error('Không thể lấy thông tin quản lý')
+      return
+    }
+
+    // Filter only pending payrolls
+    const pendingPayrolls = payrollData.filter(item => item.status === 'pending')
+    
+    if (pendingPayrolls.length === 0) {
+      message.warning('Không có phiếu lương nào cần duyệt')
+      return
+    }
+
+    Modal.confirm({
+      title: 'Xác nhận duyệt tất cả',
+      content: `Bạn có chắc chắn muốn duyệt tất cả ${pendingPayrolls.length} phiếu lương đang chờ?`,
+      okText: 'Duyệt tất cả',
+      cancelText: 'Hủy',
+      okButtonProps: {
+        style: { background: '#22c55e', borderColor: '#22c55e' }
+      },
+      onOk: async () => {
+        setApprovingAll(true)
+        let successCount = 0
+        let failCount = 0
+
+        try {
+          // Approve each pending payroll
+          for (const payroll of pendingPayrolls) {
+            try {
+              const payrollId = payroll.payrollId || payroll.employeeId || payroll.id
+              const { error } = await payrollAPI.approve(payrollId, parseInt(managerId, 10))
+              
+              if (error) {
+                failCount++
+                console.error(`Failed to approve payroll ${payrollId}:`, error)
+              } else {
+                successCount++
+              }
+            } catch (err) {
+              failCount++
+              console.error('Error approving payroll:', err)
+            }
+          }
+
+          // Show result message
+          if (successCount > 0 && failCount === 0) {
+            message.success(`Đã duyệt thành công ${successCount} phiếu lương!`)
+          } else if (successCount > 0 && failCount > 0) {
+            message.warning(`Đã duyệt ${successCount} phiếu lương. ${failCount} phiếu lương thất bại.`)
+          } else {
+            message.error('Không thể duyệt các phiếu lương')
+          }
+
+          // Refresh data
+          fetchPayrollData()
+          fetchPayrollSummary()
+        } catch (err) {
+          console.error('Error in approve all:', err)
+          message.error('Đã xảy ra lỗi khi duyệt lương')
+        } finally {
+          setApprovingAll(false)
+        }
+      }
+    })
   }
 
   const formatCurrency = (amount) => {
@@ -460,7 +561,70 @@ export default function PayrollForManager() {
             </div>
           </div>
 
-          <div className="payroll-table-card" style={{ borderRadius: 16 }}>
+          {/* Payroll Summary Section */}
+          <Spin spinning={summaryLoading}>
+            <div style={{ 
+              marginTop: 24, 
+              padding: 24, 
+              background: '#fff',
+              border: '1px solid #e5e7eb',
+              borderRadius: 12
+            }}>
+              {summaryData ? (
+                <>
+                  <div style={{ 
+                    fontSize: 18, 
+                    fontWeight: 700, 
+                    color: '#3b82f6',
+                    marginBottom: 16 
+                  }}>
+                    Tổng quỹ lương: {formatCurrency(summaryData.totalPayroll)}
+                  </div>
+                  <Row gutter={[24, 16]}>
+                    <Col span={12}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>Đã duyệt:</span>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>
+                          {formatCurrency(summaryData.totalApproved)}
+                        </span>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>Chờ duyệt:</span>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>
+                          {formatCurrency(summaryData.totalPending)}
+                        </span>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>Tổng phụ cấp:</span>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>
+                          {formatCurrency(summaryData.totalAllowance)}
+                        </span>
+                      </div>
+                    </Col>
+                    <Col span={12}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>Tổng khấu trừ:</span>
+                        <span style={{ fontWeight: 600, color: '#111827' }}>
+                          {formatCurrency(summaryData.totalDeduction)}
+                        </span>
+                      </div>
+                    </Col>
+                  </Row>
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>
+                  Không có dữ liệu tổng quỹ lương
+                </div>
+              )}
+            </div>
+          </Spin>
+
+          {/* Employee Table */}
+          <div className="payroll-table-card" style={{ borderRadius: 16, marginTop: 24 }}>
             <Table
               className="payroll-table"
               columns={columns}
@@ -481,6 +645,41 @@ export default function PayrollForManager() {
               components={goldTableHeader}
             />
           </div>
+
+          {/* Approve All Button - Only show if current month and has pending payrolls */}
+          {(() => {
+            const now = dayjs()
+            const isCurrentMonth = selectedDate.month() === now.month() && selectedDate.year() === now.year()
+            const hasPendingPayrolls = payrollData.some(item => item.status === 'pending')
+            
+            if (isCurrentMonth && hasPendingPayrolls) {
+              return (
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  marginTop: 24 
+                }}>
+                  <Button
+                    type="primary"
+                    onClick={handleApproveAll}
+                    loading={approvingAll}
+                    style={{
+                      background: '#22c55e',
+                      borderColor: '#22c55e',
+                      height: '44px',
+                      padding: '0 40px',
+                      fontSize: '16px',
+                      fontWeight: 600,
+                      borderRadius: '8px'
+                    }}
+                  >
+                    Duyệt tất cả
+                  </Button>
+                </div>
+              )
+            }
+            return null
+          })()}
         </div>
       </div>
 

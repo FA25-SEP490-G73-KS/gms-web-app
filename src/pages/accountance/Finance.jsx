@@ -21,7 +21,7 @@ import { SearchOutlined, PlusOutlined, CloseOutlined, UploadOutlined, FilterOutl
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { ledgerVoucherAPI, suppliersAPI, employeeAPI, invoiceAPI } from '../../services/api'
-import { getUserNameFromToken } from '../../utils/helpers'
+import { getUserNameFromToken, getEmployeeIdFromToken } from '../../utils/helpers'
 import '../../styles/pages/accountance/finance.css'
 
 const { Option } = Select
@@ -29,9 +29,9 @@ const { Option } = Select
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
-  { key: 'pending', label: 'Chờ duyệt' },
-  { key: 'completed', label: 'Hoàn tất' },
-  { key: 'rejected', label: 'Từ chối' }
+  { key: 'Chờ duyệt', label: 'Chờ duyệt' },
+  { key: 'Hoàn tất', label: 'Hoàn tất' },
+  { key: 'Từ chối', label: 'Từ chối' }
 ]
 
 
@@ -103,10 +103,10 @@ const getTypeConfig = (type) => {
 
 const getStatusConfig = (status) => {
   const configs = {
-    completed: { label: 'Hoàn tất', color: '#22c55e', bg: '#dcfce7' },
-    pending: { label: 'Chờ duyệt', color: '#3b82f6', bg: '#dbeafe' },
-    rejected: { label: 'Từ chối', color: '#ef4444', bg: '#fee2e2' },
-    approved: { label: 'Đã duyệt', color: '#3b82f6', bg: '#dbeafe' }
+    'Hoàn tất': { label: 'Hoàn tất', color: '#10b981', bg: '#d1fae5' },
+    'Chờ duyệt': { label: 'Chờ duyệt', color: '#3b82f6', bg: '#dbeafe' },
+    'Từ chối': { label: 'Từ chối', color: '#ef4444', bg: '#fee2e2' },
+    'Đã duyệt': { label: 'Đã duyệt', color: '#10b981', bg: '#d1fae5' }
   }
   return configs[status] || { label: status, color: '#666', bg: '#f3f4f6' }
 }
@@ -301,7 +301,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
         subject: item.targetName || 'N/A',
         amount: item.amount || 0,
         createdAt: item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY') : 'N/A',
-        status: (item.status || '').toLowerCase()
+        status: (item.status || '')
       }))
 
       setData(transformedData)
@@ -418,7 +418,14 @@ export function AccountanceFinanceContent({ isManager = false }) {
     
     try {
       setLoadingDetail(true)
-      const { data: response, error } = await ledgerVoucherAPI.approve(detailData.id, 0)
+      const employeeId = getEmployeeIdFromToken()
+      
+      if (!employeeId) {
+        message.error('Không tìm thấy thông tin nhân viên')
+        return
+      }
+      
+      const { data: response, error } = await ledgerVoucherAPI.approve(detailData.id, employeeId)
       
       if (error) {
         message.error('Không thể duyệt phiếu')
@@ -441,7 +448,14 @@ export function AccountanceFinanceContent({ isManager = false }) {
     
     try {
       setLoadingDetail(true)
-      const { data: response, error } = await ledgerVoucherAPI.reject(detailData.id)
+      const employeeId = getEmployeeIdFromToken()
+      
+      if (!employeeId) {
+        message.error('Không tìm thấy thông tin nhân viên')
+        return
+      }
+      
+      const { data: response, error } = await ledgerVoucherAPI.reject(detailData.id, employeeId)
       
       if (error) {
         message.error('Không thể từ chối phiếu')
