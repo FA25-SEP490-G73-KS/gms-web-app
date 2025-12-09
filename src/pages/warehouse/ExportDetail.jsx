@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Table, Button, Tag, message, Dropdown, Spin, Modal, Input } from 'antd'
+import { Table, Button, Tag, message, Dropdown, Spin, Modal, Input, InputNumber } from 'antd'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { stockExportAPI } from '../../services/api'
+import { stockExportAPI, employeeAPI } from '../../services/api'
 
 export default function ExportDetail() {
   const { id } = useParams()
@@ -19,6 +19,8 @@ export default function ExportDetail() {
     quantity: '',
     technician: ''
   })
+  const [employees, setEmployees] = useState([])
+  const [loadingEmployees, setLoadingEmployees] = useState(false)
 
   const breadcrumbItems = [
     { label: 'Xuất kho', path: '/warehouse' },
@@ -28,7 +30,27 @@ export default function ExportDetail() {
 
   useEffect(() => {
     fetchExportDetail()
+    fetchEmployees()
   }, [id])
+
+  const fetchEmployees = async () => {
+    setLoadingEmployees(true)
+    try {
+      const { data: response, error } = await employeeAPI.getAll({ page: 0, size: 100 })
+      
+      if (error) {
+        console.error('Failed to fetch employees:', error)
+        return
+      }
+
+      const content = response?.result?.content || response?.content || []
+      setEmployees(content)
+    } catch (err) {
+      console.error('Failed to fetch employees:', err)
+    } finally {
+      setLoadingEmployees(false)
+    }
+  }
 
   const fetchExportDetail = async () => {
     setLoading(true)
@@ -895,23 +917,44 @@ export default function ExportDetail() {
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px' }}>
                     Số lượng muốn xuất
                   </label>
-                  <Input
-                    placeholder="Đặng Thị Huyền - 01234"
+                  <InputNumber
+                    placeholder="Nhập số lượng muốn xuất"
                     value={exportModal.quantity}
-                    onChange={(e) => setExportModal({ ...exportModal, quantity: e.target.value })}
-                    style={{ height: '40px' }}
+                    onChange={(value) => setExportModal({ ...exportModal, quantity: value })}
+                    min={1}
+                    max={exportModal.data?.requestedQty || 999999}
+                    style={{ width: '100%', height: '40px' }}
                   />
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px' }}>
                     Kỹ thuật viên nhận hàng
                   </label>
-                  <Input
-                    placeholder="Đặng Thị Huyền - 01234"
+                  <select
                     value={exportModal.technician}
                     onChange={(e) => setExportModal({ ...exportModal, technician: e.target.value })}
-                    style={{ height: '40px' }}
-                  />
+                    style={{
+                      width: '100%',
+                      height: '40px',
+                      padding: '0 11px',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: '6px',
+                      fontSize: '14px',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="">Chọn kỹ thuật viên</option>
+                    {loadingEmployees ? (
+                      <option disabled>Đang tải...</option>
+                    ) : (
+                      employees.map((employee) => (
+                        <option key={employee.employeeId} value={employee.employeeId}>
+                          {employee.fullName}
+                        </option>
+                      ))
+                    )}
+                  </select>
                 </div>
               </div>
             </>

@@ -364,7 +364,27 @@ export const debtsAPI = {
       size,
       sort,
     });
+    return get(`/debts/summary?${qs}`);
+  },
+  getByCustomerId: ({
+    customerId,
+    page = 0,
+    size = 10,
+    sort = "createdAt,desc",
+  }) => {
+    const qs = buildQueryString({
+      customerId,
+      page,
+      size,
+      sort,
+    });
     return get(`/debts?${qs}`);
+  },
+  getDebtDetail: (serviceTicketId) => {
+    return get(`/debts/${serviceTicketId}/debt-detail`);
+  },
+  createPayment: (payload) => {
+    return post('/debts', payload);
   },
 };
 
@@ -414,11 +434,14 @@ export const manualVoucherAPI = {
 };
 
 export const ledgerVoucherAPI = {
-  getAll: (page = 0, size = 20) => {
-    const query = buildQueryString({ page, size });
-    const suffix = query ? `?${query}` : "";
-    return get(`/ledger-vouchers${suffix}`);
+  getAll: (page = 0, size = 20, queryString = '') => {
+    const baseUrl = `/ledger-vouchers?page=${page}&size=${size}`
+    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl)
   },
+  getById: (id) => get(`/ledger-vouchers/${id}`),
+  create: (data) => post("/ledger-vouchers/manual", data),
+  approve: (id, approvedByEmployeeId = 0) => post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
+  reject: (id) => post(`/ledger-vouchers/${id}/reject`, {})
 };
 
 export const attendanceAPI = {
@@ -458,7 +481,19 @@ export const stockReceiptAPI = {
   },
   getById: (id) => get(`/stock-receipt/${id}`),
   getItemHistory: (itemId) => get(`/stock-receipt/receipt-items/${itemId}/history`),
-  getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`)
+  getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`),
+  getReceiptHistory: (page = 0, size = 10) => {
+    const params = new URLSearchParams({ page, size })
+    return get(`/stock-receipt/receipt-history?${params.toString()}`)
+  },
+  getPaymentDetail: (id) => get(`/stock-receipt/receipt-history/${id}/payment-detail`),
+  createReceiptPayment: (id, formData) => {
+    return axiosClient.post(`/ledger-vouchers/receipt-payment/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  }
 };
 
 export const transactionsAPI = {
@@ -477,4 +512,16 @@ export const dashboardAPI = {
     if (month) params.append('month', month)
     return get(`/dashboard/warehouse/overview?${params.toString()}`)
   }
+};
+
+export const purchaseRequestAPI = {
+  getAll: (page = 0, size = 10, queryString = '') => {
+    const baseUrl = `/purchase-requests?page=${page}&size=${size}`
+    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl)
+  },
+  getById: (id) => get(`/purchase-requests/${id}`),
+  create: (payload) => post('/purchase-requests', payload),
+  update: (id, payload) => put(`/purchase-requests/${id}`, payload),
+  delete: (id) => del(`/purchase-requests/${id}`),
+  approve: (id) => put(`/purchase-requests/${id}/approve`, {})
 };

@@ -1,52 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import '../../styles/components/hero-slider.css';
 
-/**
- * KÍCH THƯỚC ẢNH SLIDER TỐI ƯU:
- * 
- * Desktop (1920px+):
- * - Tỉ lệ: 21:9 (ultrawide)
- * - Kích thước: 2560 x 1080px (hoặc 1920 x 823px)
- * - Format: WebP hoặc JPG (optimized, quality 80-85%)
- * - File size: < 500KB mỗi ảnh
- * 
- * Tablet (768px - 960px):
- * - Tỉ lệ: 16:9
- * - Kích thước: 1920 x 1080px
- * - Format: WebP hoặc JPG
- * - File size: < 300KB mỗi ảnh
- * 
- * Mobile (< 640px):
- * - Tỉ lệ: 4:3
- * - Kích thước: 1200 x 900px
- * - Format: WebP hoặc JPG
- * - File size: < 200KB mỗi ảnh
- * 
- * Lưu ý:
- * - Ảnh sẽ được crop theo object-fit: cover
- * - Nên đặt nội dung quan trọng ở center để tránh bị crop
- * - Sử dụng srcset cho responsive images nếu có thể
- */
-
 const slides = [
   {
     id: 1,
-    src: '/image/gr1.jpg',
+    src: '/image/slider1.png',
     alt: 'Garage Hoàng Tuấn - Dịch vụ sơn, bảo dưỡng, phục hồi xe ô tô chuyên nghiệp'
   },
   {
     id: 2,
-    src: '/image/gr2.jpg',
+    src: '/image/slider2.png',
     alt: 'Garage Hoàng Tuấn - Xưởng sửa chữa và bảo dưỡng ô tô hiện đại'
   },
   {
     id: 3,
-    src: '/image/gr3.jpg',
+    src: '/image/slider3.png',
     alt: 'Garage Hoàng Tuấn - Chuyên sơn phục hồi và bảo dưỡng xe ô tô'
   },
   {
     id: 4,
-    src: '/image/gara.png',
+    src: '/image/slider4.png',
     alt: 'Garage Hoàng Tuấn - Xưởng sơn, bảo dưỡng và phục hồi xe ô tô chuyên nghiệp tại Thanh Hóa'
   }
 ];
@@ -185,4 +158,3 @@ export default function HeroSlider() {
     </div>
   );
 }
-

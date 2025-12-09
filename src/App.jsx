@@ -28,6 +28,8 @@ import PayrollDetailPage from './pages/accountance/PayrollDetailPage';
 import AccountanceAttendance from './pages/accountance/Attendance';
 import AccountancePlaceholder from './pages/accountance/Placeholder';
 import AccountanceDebts from './pages/accountance/Debts';
+import AccountanceDebtDetail from './pages/accountance/DebtDetail';
+import AccountanceDebtTicketDetail from './pages/accountance/DebtTicketDetail';
 import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
 import AccountanceMaterials from './pages/accountance/Materials';
@@ -51,6 +53,8 @@ import ManagerServiceAdvisorHome from './pages/manager/ManagerServiceAdvisorHome
 import ManagerServiceOrders from './pages/manager/service/ServiceOrders';
 import ManagerServiceTypes from './pages/manager/service/ServiceTypes';
 import ManagerTicketDetailPage from './pages/manager/service/ManagerTicketDetailPage';
+import ManagerImportRequest from './pages/manager/warehouse/ImportRequest';
+import ManagerImportRequestDetail from './pages/manager/warehouse/ImportRequestDetail';
 import Inventory from './pages/admin/Inventory';
 import ManagerHome from './pages/manager/ManagerHome';
 
@@ -290,6 +294,16 @@ function App() {
             <AccountanceDebts />
           </ProtectedRoute>
         } />
+        <Route path="/accountance/debts/detail" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
+            <AccountanceDebtDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/accountance/debts/ticket/:ticketId" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
+            <AccountanceDebtTicketDetail />
+          </ProtectedRoute>
+        } />
         <Route path="/accountance/inventory" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
             <AccountanceMaterials />
@@ -409,6 +423,19 @@ function App() {
         <Route path="/manager/suppliers/:id/edit" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
             <SupplierForm />
+          </ProtectedRoute>
+        } />
+
+        {/* Manager - Kho */}
+        <Route path="/manager/warehouse/import-request" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
+            <ManagerImportRequest />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/manager/warehouse/import-request/:id" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
+            <ManagerImportRequestDetail />
           </ProtectedRoute>
         } />
 
