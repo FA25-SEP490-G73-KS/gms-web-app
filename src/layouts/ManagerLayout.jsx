@@ -98,46 +98,46 @@ export default function ManagerLayout({ children }) {
 
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/manager/accountance/finance')) {
-      return { parent: 'Thu - chi', current: 'Thu - chi' }
-    }
     if (path.startsWith('/manager/accountance/payments')) {
-      return { parent: 'Thu - chi', current: 'Thanh toán' }
+      return { parent: 'Thu - chi', parentPath: null, current: 'Thống kê' }
+    }
+    if (path.startsWith('/manager/accountance/finance')) {
+      return { parent: 'Thu - chi', parentPath: null, current: 'Danh sách phiếu' }
     }
     if (path.startsWith('/manager/accountance/debts')) {
-      return { parent: '', current: 'Công nợ' }
+      return { parent: '', parentPath: null, current: 'Công nợ' }
     }
     if (path.startsWith('/manager/accountance/hr/payroll')) {
-      return { parent: 'Nhân sự', current: 'Lương' }
+      return { parent: 'Nhân sự', parentPath: null, current: 'Lương' }
     }
     if (path.startsWith('/manager/accountance/hr/attendance')) {
-      return { parent: 'Nhân sự', current: 'Chấm công' }
+      return { parent: 'Nhân sự', parentPath: null, current: 'Chấm công' }
     }
     if (path.startsWith('/manager/accountance/hr/list')) {
-      return { parent: 'Nhân sự', current: 'Danh sách nhân sự' }
+      return { parent: 'Nhân sự', parentPath: null, current: 'Danh sách nhân sự' }
     }
     if (path.startsWith('/manager/customers/') && !path.includes('/stats')) {
-      return { parent: 'Khách hàng', current: 'Thông tin khách hàng' }
+      return { grandParent: 'Khách hàng', parent: 'Danh sách khách hàng', parentPath: '/manager/customers', current: 'Thông tin khách hàng' }
     }
     if (path.startsWith('/manager/customers/stats')) {
-      return { parent: 'Khách hàng', current: 'Thống kê' }
+      return { parent: 'Khách hàng', parentPath: null, current: 'Thống kê' }
     }
     if (path.startsWith('/manager/customers')) {
-      return { parent: 'Khách hàng', current: 'Danh sách' }
+      return { parent: 'Khách hàng', parentPath: null, current: 'Danh sách khách hàng' }
     }
     if (path.startsWith('/manager/suppliers')) {
-      return { parent: '', current: 'Nhà cung cấp' }
+      return { parent: '', parentPath: null, current: 'Nhà cung cấp' }
     }
     if (path.startsWith('/manager/service/orders')) {
-      return { parent: 'Dịch vụ', current: 'Phiếu dịch vụ' }
+      return { parent: 'Dịch vụ', parentPath: null, current: 'Phiếu dịch vụ' }
     }
     if (path.startsWith('/manager/service/types')) {
-      return { parent: 'Dịch vụ', current: 'Loại dịch vụ' }
+      return { parent: 'Dịch vụ', parentPath: null, current: 'Loại dịch vụ' }
     }
     if (path.startsWith('/manager/warehouse/import-request')) {
-      return { parent: 'Kho', current: 'Yêu cầu mua hàng' }
+      return { parent: 'Kho', parentPath: null, current: 'Yêu cầu mua hàng' }
     }
-    return { parent: '', current: 'Thống kê' }
+    return { parent: '', parentPath: null, current: 'Thống kê' }
   }
 
   const breadcrumb = getBreadcrumb()
@@ -156,7 +156,23 @@ export default function ManagerLayout({ children }) {
             <div className="manager-breadcrumb-divider"></div>
             {breadcrumb.parent ? (
               <div className="manager-breadcrumb">
-                <span className="manager-breadcrumb-item">{breadcrumb.parent}</span>
+                {breadcrumb.grandParent && (
+                  <>
+                    <span className="manager-breadcrumb-item">{breadcrumb.grandParent}</span>
+                    <span className="manager-breadcrumb-separator">&gt;</span>
+                  </>
+                )}
+                {breadcrumb.parentPath ? (
+                  <span 
+                    className="manager-breadcrumb-item manager-breadcrumb-link"
+                    onClick={() => navigate(breadcrumb.parentPath)}
+                    style={{ cursor: 'pointer', color: '#666' }}
+                  >
+                    {breadcrumb.parent}
+                  </span>
+                ) : (
+                  <span className="manager-breadcrumb-item">{breadcrumb.parent}</span>
+                )}
                 <span className="manager-breadcrumb-separator">&gt;</span>
                 <span className="manager-breadcrumb-current">{breadcrumb.current}</span>
               </div>
@@ -202,16 +218,16 @@ export default function ManagerLayout({ children }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button
-                  className={`submenu-item ${isActive('/manager/accountance/finance') ? 'active' : ''}`}
-                  onClick={() => navigate('/manager/accountance/finance')}
-                >
-                  Thu - Chi
-                </button>
-                <button
                   className={`submenu-item ${isActive('/manager/accountance/payments') ? 'active' : ''}`}
                   onClick={() => navigate('/manager/accountance/payments')}
                 >
-                  Thanh toán
+                  Thống kê
+                </button>
+                <button
+                  className={`submenu-item ${isActive('/manager/accountance/finance') ? 'active' : ''}`}
+                  onClick={() => navigate('/manager/accountance/finance')}
+                >
+                  Danh sách phiếu
                 </button>
               </div>
             )}

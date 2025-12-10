@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { message } from 'antd'
 import CustomerLayout from '../../../layouts/CustomerLayout'
-import { appointmentAPI, otpAPI, serviceTypeAPI } from '../../../services/api';
+import { appointmentAPI, customersAPI, otpAPI, serviceTypeAPI } from '../../../services/api';
 import Lottie from "lottie-react";
 import successAnim from "../../../assets/animations/Success.json";
 
@@ -20,6 +20,10 @@ export default function AppointmentService() {
   const [timeSlots, setTimeSlots] = useState([])
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
   const [appointmentResult, setAppointmentResult] = useState(null)
+  const [customerLookup, setCustomerLookup] = useState(null)
+  const [showCustomerModal, setShowCustomerModal] = useState(false)
+  const [customerLookupLoading, setCustomerLookupLoading] = useState(false)
+  const [showLicenseDropdown, setShowLicenseDropdown] = useState(false)
   const navigate = useNavigate()
   const [form, setForm] = useState({
     phonePrefix: '+84',
@@ -109,7 +113,9 @@ export default function AppointmentService() {
             value: slot.originalIndex,
             label: slot.displayLabel,
             id: slot.timeSlotId,
-            originalIndex: slot.originalIndex
+            originalIndex: slot.originalIndex,
+            startTime: slot.startTime,
+            endTime: slot.endTime
           }))
         
         setTimeSlots(availableSlots)
@@ -280,6 +286,68 @@ export default function AppointmentService() {
     }
   }
 
+  const formatVisitDate = (value) => {
+    if (!value) return 'Chưa rõ'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+    return date.toLocaleDateString('vi-VN')
+  }
+
+  const handleConfirmCustomer = () => {
+    // Tự động điền tên/biển số nếu còn trống
+    setForm((prev) => ({
+      ...prev,
+      fullName: prev.fullName || customerLookup?.fullName || '',
+      license: prev.license || formatLicensePlate(customerLookup?.vehicles?.[0]?.licensePlate || '')
+    }))
+    setShowCustomerModal(false)
+    next()
+  }
+
+  const handleRejectCustomer = async () => {
+    // Thông báo backend tách khách hàng cũ / tạo mới với số điện thoại đang dùng
+    if (form.phone) {
+      try {
+        await customersAPI.notMe(form.phone)
+      } catch (err) {
+        console.error('Gọi API not-me thất bại:', err)
+      }
+    }
+    // Tiếp tục cho khách tự nhập thông tin đặt lịch
+    setShowCustomerModal(false)
+    setCustomerLookup(null)
+    setForm((prev) => ({
+      ...prev,
+      fullName: '',
+      license: ''
+    }))
+    // Đi tới bước đặt lịch
+    setStep(3)
+  }
+
+  const isSlotPast = (dateStr, slot) => {
+    if (!dateStr || !slot) return false
+    const todayStr = new Date().toISOString().split('T')[0]
+    if (dateStr !== todayStr) return false
+
+    const toMinutes = (timeStr) => {
+      const [h, m] = (timeStr || '').split(':').map(Number)
+      if (Number.isNaN(h) || Number.isNaN(m)) return null
+      return h * 60 + m
+    }
+
+    // So sánh với endTime nếu có, fallback startTime
+    const slotMinutes =
+      toMinutes(slot.endTime) ??
+      toMinutes(slot.startTime)
+
+    if (slotMinutes == null) return false
+
+    const now = new Date()
+    const nowMinutes = now.getHours() * 60 + now.getMinutes()
+    return nowMinutes >= slotMinutes
+  }
+
   const formatFullName = (value) => {
     // Trim và convert 2 khoảng trắng liên tiếp thành 1
     let formatted = value.trim()
@@ -394,8 +462,10 @@ export default function AppointmentService() {
 
       if (data && (data.result === true || data.result === 'true' || data.statusCode === 200)) {
         message.success('Xác thực OTP thành công!')
+        // Sau khi xác thực OTP, thử lấy thông tin khách hàng để hiển thị popup xác nhận
+        await fetchCustomerLookupAfterOtp()
+        setShowCustomerModal(true)
         setVerifyOtpLoading(false)
-        next()
       } else {
         setOtpError('Mã OTP không đúng hoặc đã hết hạn.')
         setVerifyOtpLoading(false)
@@ -403,6 +473,41 @@ export default function AppointmentService() {
     } catch (err) {
       setOtpError(err.message || 'Đã xảy ra lỗi. Vui lòng thử lại.')
       setVerifyOtpLoading(false)
+    }
+  }
+
+  const fetchCustomerLookupAfterOtp = async () => {
+    if (!form.phone) {
+      setCustomerLookup(null)
+      return
+    }
+    setCustomerLookupLoading(true)
+    try {
+      const { data, error } = await customersAPI.lookupByOtp(form.phone)
+      if (error) {
+        throw new Error(error)
+      }
+      const payload = data?.result || data?.data || data
+      const vehiclesRaw = payload?.vehicles || []
+      const vehicles = Array.isArray(vehiclesRaw)
+        ? vehiclesRaw.map((item, idx) => ({
+            id: item.vehicleId || item.id || idx,
+            licensePlate: item.licensePlate || item.plate || '',
+            model: item.modelName || item.brandName || item.model || '',
+            lastVisit: payload?.history?.[0]?.deliveryDate || payload?.history?.[0]?.createdDate || ''
+          }))
+        : []
+
+      setCustomerLookup({
+        fullName: payload?.fullName || payload?.customerName || payload?.name || '',
+        phone: payload?.phone || '',
+        vehicles
+      })
+    } catch (err) {
+      console.error('Không thể lấy thông tin khách hàng sau OTP:', err)
+      setCustomerLookup(null)
+    } finally {
+      setCustomerLookupLoading(false)
     }
   }
 
@@ -706,7 +811,7 @@ export default function AppointmentService() {
                     </div>
                   )}
                 </div>
-                <div>
+                <div style={{ position: 'relative' }}>
                   <label style={labelStyle}>Biển số xe <span style={{ color: '#ef4444' }}>*</span></label>
                   <input 
                     value={form.license} 
@@ -715,13 +820,85 @@ export default function AppointmentService() {
                       setForm({ ...form, license: formatted })
                       setLicenseError('')
                     }}
+                    onFocus={() => setShowLicenseDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowLicenseDropdown(false), 100)}
                     placeholder="VD: 29A-123456" 
                     style={{ 
                       ...inputStyle, 
-                      ...(licenseError ? { borderColor: '#ef4444' } : {})
+                      ...(licenseError ? { borderColor: '#ef4444' } : {}),
+                      paddingRight: customerLookup?.vehicles?.length ? 36 : 12,
+                      cursor: 'text'
                     }} 
                     maxLength={12}
                   />
+                  {customerLookup?.vehicles?.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowLicenseDropdown((v) => !v)}
+                      style={{
+                        position: 'absolute',
+                        top: 34,
+                        right: 8,
+                        width: 24,
+                        height: 24,
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: '#6b7280'
+                      }}
+                      aria-label="Chọn biển số có sẵn"
+                    >
+                      ▾
+                    </button>
+                  ) : null}
+                  {customerLookup?.vehicles?.length && showLicenseDropdown ? (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        zIndex: 10,
+                        top: 64,
+                        left: 0,
+                        right: 0,
+                        background: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: 10,
+                        boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
+                        maxHeight: 220,
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {customerLookup.vehicles.map((v) => (
+                        <button
+                          key={v.id || v.licensePlate}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            const formatted = formatLicensePlate(v.licensePlate || '')
+                            setForm({ ...form, license: formatted })
+                            setLicenseError('')
+                            setShowLicenseDropdown(false)
+                          }}
+                          style={{
+                            width: '100%',
+                            textAlign: 'left',
+                            padding: '10px 12px',
+                            border: 'none',
+                            background: '#fff',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #f1f5f9'
+                          }}
+                        >
+                          <div style={{ fontWeight: 700, color: '#111', fontSize: 14 }}>{v.licensePlate || ''}</div>
+                          {v.model ? (
+                            <div style={{ color: '#6b7280', fontSize: 12, marginTop: 2 }}>{v.model}</div>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   {licenseError && (
                     <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
                       {licenseError}
@@ -779,9 +956,14 @@ export default function AppointmentService() {
                     <option value="">
                       {timeSlotsLoading ? 'Đang tải khung giờ...' : '--Chọn khung giờ--'}
                     </option>
-                    {timeSlots.map(slot => (
-                      <option key={slot.value} value={slot.value}>{slot.label}</option>
-                    ))}
+                    {timeSlots.map(slot => {
+                      const past = isSlotPast(form.date, slot)
+                      return (
+                        <option key={slot.value} value={slot.value} disabled={past}>
+                          {slot.label}
+                        </option>
+                      )
+                    })}
                   </select>
                 </div>
                 <div style={{ gridColumn: '1 / span 2' }}>
@@ -878,6 +1060,66 @@ export default function AppointmentService() {
           </div>
         </div>
       </div>
+      {showCustomerModal && (
+        <div style={modalOverlay}>
+          <div style={modalCard}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#CBB081', fontSize: 16 }}>Chúng tôi tìm thấy khách hàng</div>
+              <button
+                onClick={handleRejectCustomer}
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            <div style={{ fontSize: 14, color: '#4b5563', marginBottom: 12 }}>
+              Vui lòng xác nhận thông tin:
+            </div>
+
+            <div style={{ background: '#f8fafc', borderRadius: 10, padding: 12, marginBottom: 12 }}>
+              <div style={{ fontWeight: 600, marginBottom: 6 }}>
+                Họ tên: <span style={{ color: '#111' }}>{customerLookup?.fullName || '—'}</span>
+              </div>
+              <div style={{ fontWeight: 600 }}>
+                Số điện thoại: <span style={{ color: '#111' }}>{customerLookup?.phone || '—'}</span>
+              </div>
+            </div>
+
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Xe đã từng đến xưởng:</div>
+            <div style={{ maxHeight: 180, overflowY: 'auto', paddingRight: 4, marginBottom: 12 }}>
+              {customerLookupLoading ? (
+                <div style={{ textAlign: 'center', color: '#6b7280' }}>Đang tải lịch sử...</div>
+              ) : customerLookup?.vehicles?.length ? (
+                customerLookup.vehicles.map((vehicle) => (
+                  <div
+                    key={vehicle.id}
+                    style={{ padding: '8px 10px', borderRadius: 8, border: '1px solid #f1f5f9', marginBottom: 6 }}
+                  >
+                    <div style={{ fontWeight: 700, color: '#111' }}>{vehicle.licensePlate || '—'}</div>
+                    <div style={{ color: '#4b5563', fontSize: 13, marginBottom: 10 }}>
+                      {vehicle.model ? `${vehicle.model}` : 'Chưa rõ mẫu xe'}
+                      {vehicle.lastVisit ? ` (Lần gần nhất: ${formatVisitDate(vehicle.lastVisit)})` : ''}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: '#6b7280', fontSize: 13 }}>Chưa có lịch sử xe.</div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button style={{ ...btnGhost, minWidth: 120 }} onClick={handleRejectCustomer}>
+                Không phải tôi
+              </button>
+              <button style={{ ...btnPrimary, minWidth: 120 }} onClick={handleConfirmCustomer}>
+                Đúng là tôi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </CustomerLayout>
   )
 }
@@ -929,5 +1171,23 @@ const btnPrimary = { background: '#CBB081', border: 'none', color: '#111', paddi
 const infoRow = { display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #e5e7eb' }
 const infoLabel = { fontWeight: 600, color: '#6b7280', fontSize: 14 }
 const infoValue = { fontWeight: 500, color: '#111', fontSize: 14, textAlign: 'right', flex: 1, marginLeft: 16 }
+const modalOverlay = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(0,0,0,0.35)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '16px',
+  zIndex: 9999
+}
+const modalCard = {
+  width: '100%',
+  maxWidth: 520,
+  background: '#fff',
+  borderRadius: 12,
+  padding: 20,
+  boxShadow: '0 20px 40px rgba(0,0,0,0.12)'
+}
 
 
