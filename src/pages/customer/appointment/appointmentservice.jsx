@@ -462,9 +462,8 @@ export default function AppointmentService() {
 
       if (data && (data.result === true || data.result === 'true' || data.statusCode === 200)) {
         message.success('Xác thực OTP thành công!')
-        // Sau khi xác thực OTP, thử lấy thông tin khách hàng để hiển thị popup xác nhận
+        // Sau khi xác thực OTP, kiểm tra thông tin khách hàng
         await fetchCustomerLookupAfterOtp()
-        setShowCustomerModal(true)
         setVerifyOtpLoading(false)
       } else {
         setOtpError('Mã OTP không đúng hoặc đã hết hạn.')
@@ -483,26 +482,38 @@ export default function AppointmentService() {
     }
     setCustomerLookupLoading(true)
     try {
-      const { data, error } = await customersAPI.lookupByOtp(form.phone)
+      const { data, error } = await customersAPI.checkCustomer(form.phone)
       if (error) {
         throw new Error(error)
       }
       const payload = data?.result || data?.data || data
+      
+      // Nếu customerId là null, không hiển thị popup và di chuyển đến step 3
+      if (!payload?.customerId || payload?.customerId === null || payload?.customerId === 0) {
+        setCustomerLookup(null)
+        setShowCustomerModal(false)
+        setCustomerLookupLoading(false)
+        next() // Di chuyển đến step 3 (thông tin đặt lịch)
+        return
+      }
+      
+      // Nếu có customerId, hiển thị popup
       const vehiclesRaw = payload?.vehicles || []
       const vehicles = Array.isArray(vehiclesRaw)
         ? vehiclesRaw.map((item, idx) => ({
             id: item.vehicleId || item.id || idx,
             licensePlate: item.licensePlate || item.plate || '',
-            model: item.modelName || item.brandName || item.model || '',
-            lastVisit: payload?.history?.[0]?.deliveryDate || payload?.history?.[0]?.createdDate || ''
+            model: item.vehicleModelName || item.modelName || item.brandName || item.model || '',
+            lastVisit: '' // API check không có history
           }))
         : []
 
       setCustomerLookup({
         fullName: payload?.fullName || payload?.customerName || payload?.name || '',
-        phone: payload?.phone || '',
+        phone: payload?.phone || form.phone || '',
         vehicles
       })
+      setShowCustomerModal(true)
     } catch (err) {
       console.error('Không thể lấy thông tin khách hàng sau OTP:', err)
       setCustomerLookup(null)

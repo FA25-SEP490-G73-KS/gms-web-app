@@ -39,6 +39,7 @@ export default function PartsList() {
   const [sortOrder, setSortOrder] = useState('asc')
   const [modalOpen, setModalOpen] = useState(false)
   const [selectedPart, setSelectedPart] = useState(null)
+  const [isEditMode, setIsEditMode] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createForm] = Form.useForm()
   const [editForm] = Form.useForm()
@@ -287,7 +288,9 @@ export default function PartsList() {
       key: 'sku',
       width: 200,
       align: 'left',
-      render: (sku) => sku || '—'
+      render: (sku) => (
+        <span style={{ fontWeight: 600 }}>{sku || '—'}</span>
+      )
     },
     {
       title: 'Danh mục',
@@ -369,6 +372,7 @@ export default function PartsList() {
 
   const handleOpenDetail = async (part) => {
     setSelectedPart(part)
+    setIsEditMode(false) // Mở modal ở chế độ xem
     setModalOpen(true)
 
     // Gọi API để lấy chi tiết linh kiện
@@ -486,6 +490,7 @@ export default function PartsList() {
       }
 
       message.success('Cập nhật thành công')
+      setIsEditMode(false) // Quay về chế độ xem sau khi lưu
       setModalOpen(false)
       fetchParts(page - 1, pageSize)
     } catch (err) {
@@ -625,7 +630,10 @@ export default function PartsList() {
               <span style={{ fontWeight: 700, fontSize: 18, color: '#000' }}>CHI TIẾT LINH KIỆN</span>
               <CloseOutlined 
                 style={{ cursor: 'pointer', fontSize: 16, color: '#000' }} 
-                onClick={() => setModalOpen(false)} 
+                onClick={() => {
+                setModalOpen(false)
+                setIsEditMode(false) // Reset về chế độ xem khi đóng modal
+              }} 
               />
             </div>
 
@@ -658,7 +666,7 @@ export default function PartsList() {
                   rules={[{ required: true, message: 'Vui lòng nhập tên' }]}
                   style={{ marginBottom: 16 }}
                 >
-                  <Input />
+                  <Input disabled={!isEditMode} />
                 </Form.Item>
 
                 <Row gutter={16}>
@@ -673,6 +681,7 @@ export default function PartsList() {
                         placeholder="Chọn xuất xứ"
                         showSearch
                         allowClear
+                        disabled={!isEditMode}
                         filterOption={(input, option) =>
                           (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                         }
@@ -704,6 +713,7 @@ export default function PartsList() {
                     >
                       <InputNumber
                         min={0}
+                        disabled={!isEditMode}
                         style={{ width: '100%' }}
                         formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
@@ -722,6 +732,7 @@ export default function PartsList() {
                         placeholder="Chọn đơn vị"
                         showSearch
                         allowClear
+                        disabled={!isEditMode}
                         filterOption={(input, option) =>
                           (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                         }
@@ -735,7 +746,7 @@ export default function PartsList() {
                 </Row>
 
                 <Form.Item name="useForAllModels" valuePropName="checked" style={{ marginBottom: 16 }}>
-                  <Checkbox>Dùng chung</Checkbox>
+                  <Checkbox disabled={!isEditMode}>Dùng chung</Checkbox>
                 </Form.Item>
 
                 <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.useForAllModels !== currentValues.useForAllModels}>
@@ -746,6 +757,7 @@ export default function PartsList() {
                           <Form.Item label="Hãng xe" name="vehicleBrand" style={{ marginBottom: 16 }}>
                             <Select
                               placeholder="Chọn hãng xe"
+                              disabled={!isEditMode}
                               options={[
                                 { value: 'Castrol', label: 'Castrol' },
                                 { value: 'Toyota', label: 'Toyota' },
@@ -759,6 +771,7 @@ export default function PartsList() {
                           <Form.Item label="Dòng xe" name="vehicleModel" style={{ marginBottom: 16 }}>
                             <Select
                               placeholder="Chọn dòng xe"
+                              disabled={!isEditMode}
                               options={[
                                 { value: 'All', label: 'All' },
                                 { value: 'Camry', label: 'Camry' },
@@ -782,7 +795,8 @@ export default function PartsList() {
                       rules={[{ required: true, message: 'Nhập giá nhập' }]}
                     >
                       <InputNumber 
-                        min={0} 
+                        min={0}
+                        disabled={!isEditMode}
                         style={{ width: '100%' }}
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={value => value.replace(/\$\s?|(,*)/g, '')}
@@ -798,7 +812,8 @@ export default function PartsList() {
                       rules={[{ required: true, message: 'Nhập giá bán' }]}
                     >
                       <InputNumber 
-                        min={0} 
+                        min={0}
+                        disabled={!isEditMode}
                         style={{ width: '100%' }}
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={value => value.replace(/\$\s?|(,*)/g, '')}
@@ -844,20 +859,37 @@ export default function PartsList() {
                       </Button>
                     ) : null
                   })()}
-                  <Button 
-                    type="primary"
-                    htmlType="submit"
-                    style={{
-                      backgroundColor: '#52c41a',
-                      border: 'none',
-                      padding: '8px 40px',
-                      height: 'auto',
-                      fontSize: '14px',
-                      fontWeight: 500
-                    }}
-                  >
-                    Lưu
-                  </Button>
+                  {isEditMode ? (
+                    <Button 
+                      type="primary"
+                      htmlType="submit"
+                      style={{
+                        backgroundColor: '#52c41a',
+                        border: 'none',
+                        padding: '8px 40px',
+                        height: 'auto',
+                        fontSize: '14px',
+                        fontWeight: 500
+                      }}
+                    >
+                      Lưu
+                    </Button>
+                  ) : (
+                    <Button 
+                      type="primary"
+                      onClick={() => setIsEditMode(true)}
+                      style={{
+                        backgroundColor: '#52c41a',
+                        border: 'none',
+                        padding: '8px 40px',
+                        height: 'auto',
+                        fontSize: '14px',
+                        fontWeight: 500
+                      }}
+                    >
+                      Cập nhật
+                    </Button>
+                  )}
                 </div>
               </Form>
             </div>

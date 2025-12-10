@@ -1,15 +1,13 @@
 import axios from "axios";
 
-
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? "/api" : "http://localhost:8080/api");
 
-
 function getToken() {
   try {
-    if (typeof window === 'undefined') return null;
-   
+    if (typeof window === "undefined") return null;
+
     return (
       sessionStorage.getItem("token") ||
       sessionStorage.getItem("accessToken") ||
@@ -23,14 +21,12 @@ function getToken() {
   }
 }
 
-
 const axiosClient = axios.create({
   baseURL: BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
-
 
 const PUBLIC_ENDPOINTS = [
   "/auth/login",
@@ -39,10 +35,8 @@ const PUBLIC_ENDPOINTS = [
   "/auth/update-password",
 ];
 
-
 axiosClient.interceptors.request.use(
   (config) => {
-    
     const skipAuth = config.skipAuth === true || config.skipAuth === "true";
 
     const isPublicEndpoint = PUBLIC_ENDPOINTS.some(
@@ -57,7 +51,6 @@ axiosClient.interceptors.request.use(
       }
     }
 
- 
     delete config.skipAuth;
 
     return config;
@@ -283,7 +276,8 @@ export const vehiclesAPI = {
 export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
   update: (id, payload) => patch(`/price-quotations/${id}`, payload),
-  updateStatus: (id, status) => patch(`/price-quotations/${id}/status`, { status }),
+  updateStatus: (id, status) =>
+    patch(`/price-quotations/${id}/status`, { status }),
   setDraft: (id) => patch(`/price-quotations/${id}/draft`),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
   getPending: (page = 0, size = 6) =>
@@ -437,6 +431,10 @@ export const customersAPI = {
     get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
   lookupByOtp: (phone) =>
     get(`/customers/otp/lookup?phone=${encodeURIComponent(phone || "")}`, {
+      skipAuth: true,
+    }),
+  checkCustomer: (phone) =>
+    get(`/customers/check?phone=${encodeURIComponent(phone || "")}`, {
       skipAuth: true,
     }),
   notMe: (phone) => post("/customers/not-me", { phone }, { skipAuth: true }),
