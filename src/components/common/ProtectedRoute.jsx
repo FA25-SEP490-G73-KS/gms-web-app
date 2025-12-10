@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../../store/authStore';
-import { getRoleFromToken } from '../../utils/helpers';
+import { getRoleFromToken, getToken } from '../../utils/helpers';
 
 /**
  * ProtectedRoute - Component để bảo vệ routes theo role
@@ -17,8 +17,8 @@ export default function ProtectedRoute({
   const location = useLocation();
   const { user } = useAuthStore();
   
-  // Lấy token từ localStorage
-  const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
+  // Lấy token từ sessionStorage hoặc localStorage
+  const token = getToken();
   
   // Kiểm tra xem có token không
   if (requireAuth && !token) {

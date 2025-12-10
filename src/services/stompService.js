@@ -4,7 +4,12 @@ import { WS_URL } from '../utils/constants';
 
 function getToken() {
   try {
+    if (typeof window === 'undefined') return null;
+    // Check sessionStorage first, then localStorage
     return (
+      sessionStorage.getItem('token') ||
+      sessionStorage.getItem('accessToken') ||
+      sessionStorage.getItem('authToken') ||
       localStorage.getItem('token') ||
       localStorage.getItem('accessToken') ||
       localStorage.getItem('authToken')

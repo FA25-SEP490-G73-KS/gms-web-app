@@ -1,10 +1,10 @@
-import React, { useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { Table, Input, Card, Badge, Space, message, Button, Row, Col, Form, Select, Modal } from 'antd'
 import { SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
-import { serviceTicketAPI, employeeAPI } from '../../services/api'
+import { serviceTicketAPI, employeeAPI, customersAPI } from '../../services/api'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
@@ -86,6 +86,107 @@ export default function TicketService() {
   const [currentAppointmentId, setCurrentAppointmentId] = useState(null)
   const [technicians, setTechnicians] = useState([])
   const [techniciansLoading, setTechniciansLoading] = useState(false)
+  const [phoneOptions, setPhoneOptions] = useState([])
+  const [phoneDropdownOpen, setPhoneDropdownOpen] = useState(false)
+  const [phoneLoading, setPhoneLoading] = useState(false)
+  const [customersCache, setCustomersCache] = useState([])
+  const [phoneOptionsSource, setPhoneOptionsSource] = useState([])
+  const latestPhoneSearchRef = useRef('')
+
+  const normalizePhoneTo0 = (phone) => {
+    if (!phone) return ''
+    const str = phone.toString()
+    if (str.startsWith('84') && str.length > 2) {
+      return '0' + str.slice(2)
+    }
+    return str
+  }
+
+  const fetchAllCustomers = async () => {
+    setPhoneLoading(true)
+    try {
+      const { data: response } = await customersAPI.getAll(0, 1000)
+      const result = response?.result || response
+      const list = Array.isArray(result?.content)
+        ? result.content
+        : Array.isArray(result)
+          ? result
+          : []
+      const normalized = list.map((c) => {
+        const phoneRaw = c?.phone || c?.customerPhone
+        const phoneLocal = normalizePhoneTo0(phoneRaw)
+        const fullName = c?.fullName || c?.customerName
+        const label = fullName ? `${phoneLocal || phoneRaw} - ${fullName}` : (phoneLocal || phoneRaw)
+        const value = phoneLocal || phoneRaw
+        return value ? { label, value } : null
+      }).filter(Boolean)
+      setCustomersCache(list)
+      setPhoneOptionsSource(normalized)
+      setPhoneOptions(normalized)
+      return list
+    } catch (error) {
+      console.error('Error fetching all customers:', error)
+      return []
+    } finally {
+      setPhoneLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAllCustomers()
+  }, [])
+
+  const onPhoneSearch = (value) => {
+    const trimmed = (value || '').trim()
+    latestPhoneSearchRef.current = trimmed
+
+    if (!trimmed || trimmed.length < 5) {
+      setPhoneOptions(phoneOptionsSource)
+      setPhoneDropdownOpen(false)
+      return
+    }
+
+    const normalizedSearch = normalizePhoneTo0(trimmed).toLowerCase()
+    const options = phoneOptionsSource.filter((opt) =>
+      (opt.value || '').toLowerCase().includes(normalizedSearch)
+    )
+    setPhoneOptions(options.length ? options : [{ label: trimmed, value: normalizePhoneTo0(trimmed) }])
+    setPhoneDropdownOpen(true)
+  }
+
+  const fillCustomerInfo = (customer) => {
+    if (!customer) return
+    const fullName = customer.fullName || customer.customerName
+    const address = customer.address || ''
+    createForm.setFieldsValue({
+      name: fullName || undefined,
+      address: address || undefined,
+      phone: normalizePhoneTo0(customer.phone || customer.customerPhone) || undefined
+    })
+  }
+
+  const onPhoneSelect = async (value) => {
+    createForm.setFieldsValue({ phone: value })
+    try {
+      setPhoneLoading(true)
+      const { data: response } = await customersAPI.getByPhone(value)
+      const customerData = response?.result || response
+      const customers = Array.isArray(customerData)
+        ? customerData
+        : Array.isArray(customerData?.content)
+          ? customerData.content
+          : customerData
+            ? [customerData]
+            : []
+      if (customers.length > 0) {
+        fillCustomerInfo(customers[0])
+      }
+    } catch (error) {
+      console.error('Error fetching customer by phone:', error)
+    } finally {
+      setPhoneLoading(false)
+    }
+  }
 
   useEffect(() => {
     fetchServiceTickets()
@@ -169,58 +270,9 @@ export default function TicketService() {
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getAll()
     setLoading(false)
-    
-    
-    const fallbackData = [
-      {
-        id: 1,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'CREATED',
-        statusKey: 'CREATED',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-      {
-        id: 2,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'WAITING_QUOTE',
-        statusKey: 'WAITING_QUOTE',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-      {
-        id: 3,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'WAITING_HANDOVER',
-        statusKey: 'WAITING_HANDOVER',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-      {
-        id: 4,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'CANCELLED',
-        statusKey: 'CANCELLED',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-    ]
-    
     if (error || !response) {
-      console.warn('API error, using fallback data:', error)
-      setData(fallbackData)
+      console.warn('API error when fetching service tickets:', error)
+      setData([])
       return
     }
     
@@ -253,14 +305,14 @@ export default function TicketService() {
     
   
     if (resultArray.length === 0) {
-      console.warn('No data from API, using fallback data')
-      setData(fallbackData)
+      console.warn('No data from API')
+      setData([])
       return
     }
     
     const transformed = resultArray.map(item => ({
       id: item.serviceTicketId,
-      code: item.code || `STK-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
+      code: item.serviceTicketCode || item.code || `DV-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
       customer: item.customer?.fullName || 'N/A',
       license: item.vehicle?.licensePlate || 'N/A',
       status: item.status || 'CREATED',
@@ -775,15 +827,32 @@ export default function TicketService() {
             <Col span={12}>
               <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin khách hàng</h3>
               <Form.Item
-                label="Số điện thoại"
+                label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>}
                 name="phone"
                 rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
               >
-                <Input placeholder="VD: 0123456789" />
+                <Select
+                  showSearch
+                  allowClear
+                  open={phoneDropdownOpen && phoneOptions.length > 0}
+                  placeholder="VD: 0123456789"
+                  options={phoneOptions}
+                  loading={phoneLoading}
+                  onSearch={onPhoneSearch}
+                  onSelect={onPhoneSelect}
+                  onChange={(value) => {
+                    createForm.setFieldsValue({ phone: value })
+                    setPhoneDropdownOpen(false)
+                  }}
+                  filterOption={false}
+                  optionFilterProp="label"
+                  notFoundContent={null}
+                  dropdownStyle={{ zIndex: 1200 }}
+                />
               </Form.Item>
 
               <Form.Item
-                label="Họ và tên"
+                label={<span>Họ và tên <span style={{ color: 'red' }}>*</span></span>}
                 name="name"
                 rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
               >
@@ -791,7 +860,7 @@ export default function TicketService() {
               </Form.Item>
 
               <Form.Item
-                label="Địa chỉ"
+                label={<span>Địa chỉ <span style={{ color: 'red' }}>*</span></span>}
                 name="address"
                 rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
               >

@@ -180,6 +180,7 @@ export default function TicketDetailPage() {
     padding: '8px 12px',
     fontSize: '14px',
     outline: 'none',
+    boxShadow: 'none',
     transition: 'border-color 0.2s',
     height: '40px',
     background: inputsDisabled ? '#f5f5f5' : '#fff',
@@ -193,7 +194,7 @@ export default function TicketDetailPage() {
       minHeight: '42px',
       borderRadius: '12px',
       borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
-      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(255, 255, 255, 0.15)' : 'none',
       backgroundColor: inputsDisabled ? '#f5f5f5' : '#fff',
       color: inputsDisabled ? '#9ca3af' : '#262626',
       cursor: inputsDisabled ? 'not-allowed' : 'pointer',
@@ -307,6 +308,7 @@ export default function TicketDetailPage() {
         
           category: item.partId || item.partCode || item.itemName || item.partName || '',
           categoryLabel: item.itemName || item.partName || item.partCode || '',
+          partId: item.partId || item.part?.partId || null,
           quantity: item.quantity ?? 1,
           unit: item.unit || '',
           unitPrice: item.unitPrice || 0,
@@ -314,7 +316,9 @@ export default function TicketDetailPage() {
           availableQuantity: item.part?.quantity ?? null,
           inventoryStatus: item.inventoryStatus || '',
           warehouseReviewStatus: item.warehouseReviewStatus || '',
-          warehouseNote: item.warehouseNote || null
+          warehouseNote: item.warehouseNote || null,
+          unitLocked: false,
+          unitPriceLocked: false
         })
       } else if (item.itemType === 'SERVICE') {
         serviceItemsResult.push({
@@ -399,7 +403,11 @@ export default function TicketDetailPage() {
       return {
         itemName: item.categoryLabel || item.category || '',
       
-        partId: isPartInList ? item.category : null,
+        partId:
+          item.partId ??
+          (isPartInList
+            ? (partOption?.part?.partId ?? parseNumericId(item.category))
+            : parseNumericId(item.category)),
         priceQuotationItemId: item.priceQuotationItemId || (typeof item.id === 'number' ? null : item.id),
         quantity: Number(item.quantity) || 0,
         totalPrice: Number(item.total) || 0,
@@ -553,7 +561,7 @@ export default function TicketDetailPage() {
         .map(part => ({
           value: part.partId || part.id,
           label: part.name || part.partName || '',
-          part
+            part
         }))
       
         aggregatedOptions.push(...options)
@@ -648,16 +656,32 @@ export default function TicketDetailPage() {
   }
 
   const addReplaceItem = () => {
-    setReplaceItems([...replaceItems, { 
+    const newReplace = { 
       id: Date.now(), 
       priceQuotationItemId: null,
       category: '',
       categoryLabel: '',
+      partId: null,
+      quantity: 1, 
+      unit: '',
+      unitPrice: 0,
+      total: 0,
+      unitLocked: false,
+      unitPriceLocked: false
+    }
+    setReplaceItems([...replaceItems, newReplace])
+
+
+    const newService = { 
+      id: Date.now() + 1, 
+      priceQuotationItemId: null,
+      task: 'Tiền công',
       quantity: 1, 
       unit: '',
       unitPrice: 0,
       total: 0
-    }])
+    }
+    setServiceItems([...serviceItems, newService])
   }
 
   const addServiceItem = () => {
@@ -795,22 +819,22 @@ export default function TicketDetailPage() {
     
     replaceItems.forEach((item, index) => {
       if (!item.category) {
-        newErrors[`replace_${item.id}_category`] = 'Trường không được bỏ trống'
+        newErrors[`replace_${item.id}_category`] = 'Trường bắt buộc'
       }
       if (!item.unit) {
-        newErrors[`replace_${item.id}_unit`] = 'Trường không được bỏ trống'
+        newErrors[`replace_${item.id}_unit`] = 'Trường bắt buộc'
       }
       if (!item.unitPrice || item.unitPrice === 0) {
-        newErrors[`replace_${item.id}_unitPrice`] = 'Trường không được bỏ trống'
+        newErrors[`replace_${item.id}_unitPrice`] = 'Trường bắt buộc'
       }
     })
     
     serviceItems.forEach((item) => {
       if (!item.task) {
-        newErrors[`service_${item.id}_task`] = 'Trường không được bỏ trống'
+        newErrors[`service_${item.id}_task`] = 'Trường bắt buộc'
       }
-      if (!item.unitPrice || item.unitPrice === 0) {
-        newErrors[`service_${item.id}_unitPrice`] = 'Trường không được bỏ trống'
+      if (item.unitPrice === null || item.unitPrice === undefined || item.unitPrice === '' || Number.isNaN(item.unitPrice)) {
+        newErrors[`service_${item.id}_unitPrice`] = 'Trường bắt buộc'
       }
     })
     
@@ -818,16 +842,40 @@ export default function TicketDetailPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSendQuote = () => {
+  const setQuotationDraft = async () => {
+    const quotationId = getQuotationId()
+    if (!quotationId) return
+    try {
+      const { data: response, error } = await priceQuotationAPI.setDraft(quotationId)
+      if (error) throw new Error(error)
+
+      setTicketData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          priceQuotation: {
+            ...(prev.priceQuotation || {}),
+            status: 'DRAFT'
+          }
+        }
+      })
+      return response
+    } catch (err) {
+      console.error('Không thể chuyển báo giá về nháp:', err)
+    }
+  }
+
+  const handleSendQuote = async () => {
     if (actionLoading) return
     
-    // Nếu ở trạng thái "Kho đã duyệt" và chưa ở edit mode, bật edit mode
+    
     if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
+      await setQuotationDraft()
       setIsEditMode(true)
       return
     }
     
-    // Nếu ở trạng thái "Chờ kho duyệt", không làm gì (hoặc có thể có logic khác)
+   
     if (isWaitingWarehouse) {
       message.warning('Báo giá đang chờ kho duyệt, không thể chỉnh sửa.')
       return
@@ -1061,8 +1109,11 @@ export default function TicketDetailPage() {
       return
     }
 
+    
+    await setQuotationDraft()
+
     const payload = {
-      // Backend trả về discount là số tiền, nên khi lưu cũng gửi đúng theo amount
+   
       discount: ticketData?.priceQuotation?.discount ?? 0,
       estimateAmount: grandTotal,
       items: buildQuotationItemsPayload(),
@@ -1083,8 +1134,18 @@ export default function TicketDetailPage() {
       }
 
       message.success('Đã lưu báo giá thành công')
-        setShowDateModal(false)
-        setIsEditMode(false) // Reset edit mode sau khi lưu thành công
+      setShowDateModal(false)
+      setIsEditMode(false) 
+      setTicketData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          priceQuotation: {
+            ...prev.priceQuotation,
+            status: 'DRAFT'
+          }
+        }
+      })
         await fetchTicketDetail()
     } catch (err) {
       console.error('Error sending price quotation:', err)
@@ -1137,8 +1198,11 @@ export default function TicketDetailPage() {
               updateReplaceItem(record.id, {
                 category: trimmed,
                 categoryLabel: trimmed,
+                partId: null,
                 unit: '',
-                unitPrice: 0
+                unitPrice: 0,
+                unitLocked: false,
+                unitPriceLocked: false
               })
             }}
             onChange={(option) => {
@@ -1167,7 +1231,10 @@ export default function TicketDetailPage() {
                   selectedPart?.label ||
                   selectedPart?.part?.name ||
                   '',
+                partId: null,
                 availableQuantity: selectedPart?.part?.quantity ?? null,
+                unitLocked: false,
+                unitPriceLocked: false
               }
 
               if (selectedPart?.part) {
@@ -1175,6 +1242,7 @@ export default function TicketDetailPage() {
                   selectedPart.part.unitCode ||
                   selectedPart.part.unit ||
                   selectedPart.part.unitId
+                const partUnitName = selectedPart.part.unitName
                 let matchedUnit = null
                 if (partUnitCode) {
                   matchedUnit = unitOptions.find(unit =>
@@ -1185,22 +1253,33 @@ export default function TicketDetailPage() {
                     unit.code === String(partUnitCode).toLowerCase()
                   )
                 }
-                updates.unit = matchedUnit?.value || selectedPart.part.unit || ''
+                let matchedUnitByName = null
+                if (!matchedUnit && partUnitName) {
+                  matchedUnitByName = unitOptions.find(unit =>
+                    String(unit.label || unit.name || unit.value || '')
+                      .toLowerCase() === String(partUnitName).toLowerCase()
+                  )
+                }
+                updates.unit = matchedUnit?.value || matchedUnitByName?.value || selectedPart.part.unit || ''
                 updates.unitPrice = selectedPart.part.sellingPrice || 0
+                updates.unitLocked = true
+                updates.unitPriceLocked = true
+                updates.partId = selectedPart.part.partId || parseNumericId(value)
               } else {
                 updates.unit = ''
                 updates.unitPrice = 0
+                updates.unitLocked = false
+                updates.unitPriceLocked = false
+                updates.partId = parseNumericId(value)
               }
 
               updateReplaceItem(record.id, updates)
             }}
             isPartSelect
           />
-          {errors[`replace_${record.id}_category`] && (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
-              {errors[`replace_${record.id}_category`]}
-            </div>
-          )}
+          <div className="td-error-placeholder">
+            {errors[`replace_${record.id}_category`] || ''}
+          </div>
         </div>
       )
     },
@@ -1210,20 +1289,23 @@ export default function TicketDetailPage() {
       width: 120,
       align: 'center',
       render: (_, record) => (
-        <input
-          type="number"
-          min={1}
-          value={record.quantity ?? 1}
-          onChange={(e) =>
-            updateReplaceItem(record.id, {
-              quantity: Number(e.target.value) || 1
-            })
-          }
-          style={baseInputStyle}
-          onFocus={handleInputFocus}
-          onBlur={handleInputBlur}
-          disabled={inputsDisabled}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <input
+            type="number"
+            min={1}
+            value={record.quantity ?? 1}
+            onChange={(e) =>
+              updateReplaceItem(record.id, {
+                quantity: Number(e.target.value) || 1
+              })
+            }
+            style={baseInputStyle}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
+          />
+          <div className="td-error-placeholder" />
+        </div>
       )
     },
     {
@@ -1238,7 +1320,7 @@ export default function TicketDetailPage() {
           value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
           options={unitOptions}
           isClearable
-          isDisabled={inputsDisabled}
+          isDisabled={inputsDisabled || record.unitLocked}
           onChange={(option) =>
             updateReplaceItem(record.id, { unit: option?.value || '' })
           }
@@ -1284,11 +1366,9 @@ export default function TicketDetailPage() {
               })
             }}
           />
-          {errors[`replace_${record.id}_unit`] && (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
-              {errors[`replace_${record.id}_unit`]}
-            </div>
-          )}
+          <div className="td-error-placeholder">
+            {errors[`replace_${record.id}_unit`] || ''}
+          </div>
         </div>
       )
     },
@@ -1298,12 +1378,16 @@ export default function TicketDetailPage() {
       width: 150,
       align: 'center',
       render: (_, record) => (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <input
             type="text"
             inputMode="numeric"
             placeholder="Số tiền..."
-            value={record.unitPrice ? record.unitPrice.toLocaleString('vi-VN') : ''}
+            value={
+              record.unitPrice !== null && record.unitPrice !== undefined
+                ? record.unitPrice.toLocaleString('vi-VN')
+                : ''
+            }
             onChange={(e) => {
               const sanitized = e.target.value.replace(/[^\d]/g, '')
               updateReplaceItem(record.id, {
@@ -1316,13 +1400,11 @@ export default function TicketDetailPage() {
             }}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
-            disabled={inputsDisabled}
+            disabled={inputsDisabled || record.unitPriceLocked}
           />
-          {errors[`replace_${record.id}_unitPrice`] && (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
-              {errors[`replace_${record.id}_unitPrice`]}
-            </div>
-          )}
+          <div className="td-error-placeholder">
+            {errors[`replace_${record.id}_unitPrice`] || ''}
+          </div>
         </div>
       )
     },
@@ -1332,54 +1414,55 @@ export default function TicketDetailPage() {
       width: 150,
       align: 'center',
       render: (_, record) => (
-        <span>{record.total ? record.total.toLocaleString('vi-VN') : '--'}</span>
-      )
-    },
-    {
-      title: 'Ghi chú kho',
-      key: 'warehouseNote',
-      width: 140,
-      align: 'center',
-      render: (_, record) => (
-        <span
-          style={{
-            fontSize: 13,
-            color: '#374151',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            cursor: 'pointer',
-            justifyContent: 'center'
-          }}
-          onClick={() => openNoteModal(record.warehouseNote)}
-          title="Xem ghi chú kho"
-        >
-          {(() => {
-            const noteExists = record.warehouseNote && record.warehouseNote.trim() !== ''
-            const reviewStatus = (record.warehouseReviewStatus || '').toString()
-            const isRejected = reviewStatus.toLocaleUpperCase('vi') === 'TỪ CHỐI'
-            const color = isRejected
-              ? '#ef4444'
-              : (noteExists ? '#111' : '#9ca3af')
-            return <FileTextOutlined style={{ fontSize: 16, color }} />
-          })()}
-        </span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
+            {record.total ? record.total.toLocaleString('vi-VN') : '--'}
+          </span>
+          <div className="td-error-placeholder" />
+        </div>
       )
     },
     {
       title: '',
-      key: 'action',
-      width: 80,
+      key: 'warehouseNote',
+      width: 140,
       align: 'center',
       render: (_, record) => (
-        <Space>
-          {!inputsDisabled && (
-            <DeleteOutlined
-              style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
-              onClick={() => deleteReplaceItem(record.id)}
-            />
-          )}
-        </Space>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: 13,
+                color: '#374151',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: 'pointer',
+                justifyContent: 'center'
+              }}
+              onClick={() => openNoteModal(record.warehouseNote)}
+              title="Xem ghi chú kho"
+            >
+              {(() => {
+                const noteExists = record.warehouseNote && record.warehouseNote.trim() !== ''
+                const reviewStatus = (record.warehouseReviewStatus || '').toString()
+                const isRejected = reviewStatus.toLocaleUpperCase('vi') === 'TỪ CHỐI'
+                const color = isRejected
+                  ? '#ef4444'
+                  : (noteExists ? '#111' : '#9ca3af')
+                return <FileTextOutlined style={{ fontSize: 16, color }} />
+              })()}
+            </span>
+            {!isHistoryPage && !inputsDisabled && (
+              <DeleteOutlined
+                style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                onClick={() => deleteReplaceItem(record.id)}
+                title="Xóa dòng"
+              />
+            )}
+          </div>
+          <div className="td-error-placeholder" />
+        </div>
       )
     }
   ]
@@ -1395,6 +1478,7 @@ export default function TicketDetailPage() {
     {
       title: 'Công việc',
       key: 'task',
+      width: 590,
       align: 'center',
       render: (_, record) => (
         <div>
@@ -1411,29 +1495,32 @@ export default function TicketDetailPage() {
             onBlur={handleInputBlur}
             disabled={inputsDisabled}
           />
-          {errors[`service_${record.id}_task`] && (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
-              {errors[`service_${record.id}_task`]}
-            </div>
-          )}
+          <div className="td-error-placeholder">
+            {errors[`service_${record.id}_task`] || ''}
+          </div>
         </div>
       )
     },
     {
       title: 'Đơn giá (vnd)',
       key: 'unitPrice',
-      width: 180,
+      width: 150,
       align: 'center',
       render: (_, record) => (
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <input
             type="text"
             inputMode="numeric"
             placeholder="Số tiền..."
-            value={record.unitPrice ? record.unitPrice.toLocaleString('vi-VN') : ''}
+            value={
+              record.unitPrice !== null && record.unitPrice !== undefined
+                ? record.unitPrice.toLocaleString('vi-VN')
+                : ''
+            }
             onChange={(e) => {
               const sanitized = e.target.value.replace(/[^\d]/g, '')
-              updateServiceItem(record.id, 'unitPrice', sanitized ? parseInt(sanitized, 10) : 0)
+              const value = sanitized === '' ? 0 : parseInt(sanitized, 10)
+              updateServiceItem(record.id, 'unitPrice', Number.isNaN(value) ? 0 : value)
             }}
             style={{
               ...baseInputStyle,
@@ -1443,11 +1530,9 @@ export default function TicketDetailPage() {
             onBlur={handleInputBlur}
             disabled={inputsDisabled}
           />
-          {errors[`service_${record.id}_unitPrice`] && (
-            <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>
-              {errors[`service_${record.id}_unitPrice`]}
-            </div>
-          )}
+          <div className="td-error-placeholder">
+            {errors[`service_${record.id}_unitPrice`] || ''}
+          </div>
         </div>
       )
     },
@@ -1457,13 +1542,18 @@ export default function TicketDetailPage() {
       width: 150,
       align: 'center',
       render: (_, record) => (
-        <span>{record.total ? record.total.toLocaleString('vi-VN') : '--'}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
+            {record.total ? record.total.toLocaleString('vi-VN') : '--'}
+          </span>
+          <div className="td-error-placeholder" />
+        </div>
       )
     },
     {
       title: '',
       key: 'action',
-      width: 80,
+      width: 140,
       align: 'center',
       render: (_, record) => (
         <Space>
@@ -1508,7 +1598,7 @@ export default function TicketDetailPage() {
   const totalService = serviceItems.reduce((sum, item) => sum + (item.total || 0), 0)
   const grandTotal = totalReplacement + totalService
 
-  // Giảm giá theo % (ưu tiên discountPercent / discountRate từ backend)
+
   const discountPercentRaw =
     ticketData?.priceQuotation?.discountPercent ??
     ticketData?.priceQuotation?.discountRate ??
@@ -1559,7 +1649,7 @@ export default function TicketDetailPage() {
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
-            {ticketData?.code || `STK-2025-${String(id || 0).padStart(6, '0')}`}
+            {ticketData?.serviceTicketCode || ticketData?.code || `STK-2025-${String(id || 0).padStart(6, '0')}`}
           </h1>
         </div>
 
@@ -1701,6 +1791,7 @@ export default function TicketDetailPage() {
                 dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
                 pagination={false}
                 size="small"
+                tableLayout="fixed"
                 components={goldTableHeader}
                 locale={{ emptyText: ' ' }}
                 rowClassName={(record) => {
@@ -1739,6 +1830,7 @@ export default function TicketDetailPage() {
                 dataSource={serviceItems.map((item, index) => ({ ...item, key: item.id, index }))}
                 pagination={false}
                 size="small"
+                tableLayout="fixed"
                 components={goldTableHeader}
                 locale={{ emptyText: ' ' }}
                 footer={() =>
@@ -1799,16 +1891,17 @@ export default function TicketDetailPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
               {!isHistoryPage ? (
                 <Space size="middle">
-                          <Button 
+                  {normalizedQuotationStatus !== 'WAITING_CUSTOMER_CONFIRM' && (
+                    <Button 
                             onClick={handleSendQuote}
                     disabled={
                       actionLoading ||
                         isWaitingWarehouse ||
                         ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode 
-                          ? false  // Cho phép bấm "Cập nhật" để bật edit mode
+                          ? false  
                           : ((isWarehouseConfirmed || isCustomerConfirmed) && isEditMode
-                              ? (replaceItems.length === 0 && serviceItems.length === 0)  // Validate khi đang edit
-                              : inputsDisabled))  // Logic cho các trạng thái khác
+                              ? (replaceItems.length === 0 && serviceItems.length === 0)  
+                              : inputsDisabled))  
                     }
                     loading={actionLoading}
                     style={{
@@ -1828,9 +1921,10 @@ export default function TicketDetailPage() {
                         height: '40px',
                         cursor: isWaitingWarehouse ? 'not-allowed' : 'pointer'
                     }}
-                          >
-                    {actionButtonLabel}
-                          </Button>
+                    >
+                      {actionButtonLabel}
+                    </Button>
+                  )}
                   {canSendToCustomer && (
                     <>
                       <Button
@@ -1934,7 +2028,7 @@ export default function TicketDetailPage() {
         </div> */}
       </Modal>
 
-      {/* Modal Từ chối báo giá */}
+   
       <Modal
         open={rejectModalOpen}
         onCancel={handleCloseRejectModal}
@@ -2015,7 +2109,7 @@ export default function TicketDetailPage() {
         </div>
       </Modal>
 
-      {/* Modal ghi chú kho */}
+     
       <Modal
         open={noteModalOpen}
         onCancel={() => setNoteModalOpen(false)}
