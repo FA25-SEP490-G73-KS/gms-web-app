@@ -5,33 +5,38 @@ import { normalizePhoneTo0, getRoleFromToken, decodeJWT, normalizeRole } from '.
 
 const initializeUser = () => {
   try {
+    if (typeof window === 'undefined') return null;
     
-    const userStr = localStorage.getItem('user');
+    // Check localStorage first (remember me), then sessionStorage
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
     if (userStr) {
       return JSON.parse(userStr);
     }
     
-    
-      const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
-      if (token) {
-        const decoded = decodeJWT(token);
-        if (decoded) {
-          const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority;
-          if (rawRole) {
-            
-            const normalizedRole = normalizeRole(rawRole);
-            return {
-              id: decoded?.userId || decoded?.id || decoded?.sub || null,
-              role: normalizedRole,
-              fullName: decoded?.fullName || decoded?.name || decoded?.username || null,
-              email: decoded?.email || null,
-              phone: decoded?.phone || null,
-            };
-          }
+    // Check token from both storage locations
+    const token = sessionStorage.getItem('token') || 
+                  sessionStorage.getItem('accessToken') ||
+                  localStorage.getItem('token') || 
+                  localStorage.getItem('accessToken');
+    if (token) {
+      const decoded = decodeJWT(token);
+      if (decoded) {
+        const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority;
+        if (rawRole) {
+          
+          const normalizedRole = normalizeRole(rawRole);
+          return {
+            id: decoded?.userId || decoded?.id || decoded?.sub || null,
+            role: normalizedRole,
+            fullName: decoded?.fullName || decoded?.name || decoded?.username || null,
+            email: decoded?.email || null,
+            phone: decoded?.phone || null,
+          };
         }
       }
+    }
   } catch (error) {
-    console.error('Error parsing user from localStorage:', error);
+    console.error('Error parsing user from storage:', error);
   }
   return null;
 };
@@ -58,14 +63,30 @@ const useAuthStore = create((set) => ({
 
       const result = response.result || response;
       
- 
+      // Store token based on rememberMe flag
+      const storage = rememberMe ? localStorage : sessionStorage;
+      
       if (result?.accessToken) {
-        localStorage.setItem('token', result.accessToken);
-        localStorage.setItem('accessToken', result.accessToken); 
+        storage.setItem('token', result.accessToken);
+        storage.setItem('accessToken', result.accessToken);
+        // Clear from the other storage to avoid conflicts
+        if (rememberMe) {
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('accessToken');
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('accessToken');
+        }
       }
       
       if (result?.refreshToken) {
-        localStorage.setItem('refreshToken', result.refreshToken);
+        storage.setItem('refreshToken', result.refreshToken);
+        // Clear from the other storage
+        if (rememberMe) {
+          sessionStorage.removeItem('refreshToken');
+        } else {
+          localStorage.removeItem('refreshToken');
+        }
       }
 
      
@@ -97,8 +118,15 @@ const useAuthStore = create((set) => ({
       }
 
       
+      // Store user data in the same storage as token
       if (userData) {
-        localStorage.setItem('user', JSON.stringify(userData));
+        storage.setItem('user', JSON.stringify(userData));
+        // Clear from the other storage
+        if (rememberMe) {
+          sessionStorage.removeItem('user');
+        } else {
+          localStorage.removeItem('user');
+        }
       }
 
       set({ 
@@ -126,11 +154,17 @@ const useAuthStore = create((set) => ({
         console.error('Error disconnecting WebSocket:', wsError);
       }
      
+      // Clear from both localStorage and sessionStorage
       localStorage.removeItem('token');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('authToken');
       localStorage.removeItem('user');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('authToken');
+      sessionStorage.removeItem('user');
       set({ user: null });
     }
   },

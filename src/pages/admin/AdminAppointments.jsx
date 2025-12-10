@@ -27,6 +27,7 @@ const statusMap = {
   'Đã xác nhận': 'Đã xác nhận',
   'Đã đến': 'Đã đến',
   'Hủy': 'Hủy',
+  'Đã hủy': 'Hủy',
   'Chờ': 'Chờ'
 }
 
@@ -35,6 +36,7 @@ const statusToKeyMap = {
   'Đã xác nhận': 'CONFIRMED',
   'Đã đến': 'ARRIVED',
   'Hủy': 'CANCELLED',
+  'Đã hủy': 'CANCELLED',
   'Chờ': 'CONFIRMED',
   'CONFIRMED': 'CONFIRMED',
   'ARRIVED': 'ARRIVED',
@@ -46,7 +48,8 @@ const statusToKeyMap = {
 const getStatusConfig = (status) => {
   switch (status) {
     case 'Hủy':
-      return { color: '#ef4444', text: status }
+    case 'Đã hủy':
+      return { color: '#ef4444', text: 'Hủy' }
     case 'Đã đến':
       return { color: '#16a34a', text: status }
     case 'Đã xác nhận':
@@ -146,14 +149,14 @@ export default function AdminAppointments() {
   const [loading, setLoading] = useState(false)
   const [selectedFull, setSelectedFull] = useState(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'))
+  const [selectedDate, setSelectedDate] = useState(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [timeSlots, setTimeSlots] = useState([])
   const [timeSlotsLoading, setTimeSlotsLoading] = useState(false)
   const [hoveredAppointmentTime, setHoveredAppointmentTime] = useState(null)
 
-  // ref to native input so we can focus/showPicker when clicking icon
+ 
   const dateInputRef = useRef(null)
 
   useEffect(() => {
@@ -185,7 +188,7 @@ export default function AdminAppointments() {
       
       if (error) {
         console.error('Error fetching time slots:', error)
-        // Fallback to default time slots if API fails
+        
         const defaultSlots = [
           { timeSlotId: 1, label: '7:30 - 9:30', startTime: '7:30', endTime: '9:30', maxCapacity: 5, booked: 0 },
           { timeSlotId: 2, label: '9:30 - 11:30', startTime: '9:30', endTime: '11:30', maxCapacity: 5, booked: 0 },
@@ -203,7 +206,7 @@ export default function AdminAppointments() {
       } else if (Array.isArray(response)) {
         setTimeSlots(response)
       } else {
-        // Fallback to default time slots
+     
         const defaultSlots = [
           { timeSlotId: 1, label: '7:30 - 9:30', startTime: '7:30', endTime: '9:30', maxCapacity: 5, booked: 0 },
           { timeSlotId: 2, label: '9:30 - 11:30', startTime: '9:30', endTime: '11:30', maxCapacity: 5, booked: 0 },
@@ -214,7 +217,7 @@ export default function AdminAppointments() {
       }
     } catch (err) {
       console.error('Error fetching time slots:', err)
-      // Fallback to default time slots
+    
       const defaultSlots = [
         { timeSlotId: 1, label: '7:30 - 9:30', startTime: '7:30', endTime: '9:30', maxCapacity: 5, booked: 0 },
         { timeSlotId: 2, label: '9:30 - 11:30', startTime: '9:30', endTime: '11:30', maxCapacity: 5, booked: 0 },
@@ -231,43 +234,16 @@ export default function AdminAppointments() {
     setLoading(true)
     try {
       const { data: response, error } = await appointmentAPI.getAll()
-      
-      // Fallback data for testing/demo if API fails
-      const fallbackData = [
-        {
-          appointmentId: 1,
-          customerName: 'Phạm Văn A',
-          licensePlate: '25A-123456',
-          customerPhone: '0123456789',
-          status: 'CANCELLED',
-          timeSlotLabel: '9:30 - 11:30',
-          appointmentDate: '2025-10-12',
-          serviceType: 'Thay thế phụ tùng',
-          note: 'Bóng đèn sáng yếu.',
-        },
-        {
-          appointmentId: 2,
-          customerName: 'Nguyễn Văn B',
-          licensePlate: '30E-99999',
-          customerPhone: '0987654321',
-          status: 'ARRIVED',
-          timeSlotLabel: '13:30 - 15:30',
-          appointmentDate: '2025-10-12',
-          serviceType: 'Bảo dưỡng',
-          note: '',
-        }
-      ]
 
       if (error) {
-        console.warn('API error, using fallback data:', error)
-        processData(fallbackData) // Use helper function
+        console.error('Error fetching appointments:', error)
+        processData([])
         setLoading(false)
         return
       }
 
       let resultArray = []
 
-      // Xử lý cấu trúc response đa dạng
       if (response) {
         if (response.result && response.result.content && Array.isArray(response.result.content)) {
           resultArray = response.result.content
@@ -282,21 +258,17 @@ export default function AdminAppointments() {
         }
       }
 
-      if (resultArray.length === 0 && !response) {
-         processData(fallbackData)
-      } else {
-         processData(resultArray)
-      }
+      processData(resultArray)
 
     } catch (err) {
       console.error('Error fetching appointments:', err)
-      setLoading(false)
+      processData([])
     } finally {
       setLoading(false)
     }
   }
 
-  // Hàm phụ trợ để map dữ liệu thống nhất
+ 
   const processData = (rawData) => {
     const transformed = rawData.map(item => {
       const serviceLabel = extractServiceLabel(item)
@@ -336,7 +308,9 @@ export default function AdminAppointments() {
              customerName: selected.customer,
              customerPhone: selected.phone,
              licensePlate: formatLicensePlate(selected.license),
-             serviceType: selected.serviceType || extractServiceLabel(selected.originalItem)
+             serviceType: selected.serviceType || extractServiceLabel(selected.originalItem),
+             status: selected.status,
+             statusKey: selected.statusKey
          })
       }
       return
@@ -344,12 +318,15 @@ export default function AdminAppointments() {
 
     if (response && response.result) {
       const result = response.result
+      const rawStatus = result.status || 'CONFIRMED'
+      const normalizedStatusKey = statusToKeyMap[rawStatus] || statusToKeyMap[statusMap[rawStatus]] || 'CONFIRMED'
       setSelectedFull({
         ...result,
         customerName: result.customerName || result.customer?.fullName || '',
         customerPhone: displayPhoneFrom84(result.customerPhone || result.customer?.phone || ''),
         licensePlate: formatLicensePlate(result.licensePlate || result.vehicle?.licensePlate || ''),
-        serviceType: extractServiceLabel(result)
+        serviceType: extractServiceLabel(result),
+        statusKey: normalizedStatusKey
       })
     }
   }
@@ -381,22 +358,67 @@ export default function AdminAppointments() {
       })
     }
 
-  // Group appointments by time slot for timeline
+
+  const normalizeTimeString = (timeStr) => {
+    if (!timeStr) return ''
+ 
+    return timeStr
+      .replace(/\s+/g, '')
+      .replace(/[:\-]/g, '')
+      .toLowerCase()
+  }
+
+  // Helper function to match appointment time with slot
+  const matchesTimeSlot = (apt, slot) => {
+    // First try to match by timeSlotId if available
+    if (apt.originalItem?.timeSlotId && slot.timeSlotId) {
+      return apt.originalItem.timeSlotId === slot.timeSlotId
+    }
+    
+    const aptTime = apt.time || apt.timeSlotLabel || apt.originalItem?.timeSlotLabel || ''
+    if (!aptTime) return false
+    
+    const slotLabel = slot.label || `${slot.startTime} - ${slot.endTime}`
+    const normalizedAptTime = normalizeTimeString(aptTime)
+    const normalizedSlotLabel = normalizeTimeString(slotLabel)
+    
+    // Exact match after normalization
+    if (normalizedAptTime === normalizedSlotLabel) return true
+    
+    // Check if appointment time contains slot start/end times
+    if (slot.startTime && slot.endTime) {
+      const normalizedStart = normalizeTimeString(slot.startTime)
+      const normalizedEnd = normalizeTimeString(slot.endTime)
+      // Check if appointment time contains both start and end times
+      if (normalizedAptTime.includes(normalizedStart) && normalizedAptTime.includes(normalizedEnd)) {
+        return true
+      }
+    }
+    
+    // Fallback: check if either contains the other
+    if (normalizedAptTime.includes(normalizedSlotLabel) || normalizedSlotLabel.includes(normalizedAptTime)) {
+      return true
+    }
+    
+    return false
+  }
+
+  
   const displayDate = selectedDate 
     ? (typeof selectedDate === 'string' ? dayjs(selectedDate).format('DD/MM/YYYY') : dayjs(selectedDate).format('DD/MM/YYYY'))
     : null
   
   let timelineData = []
   if (displayDate && timeSlots.length > 0) {
-    const dayAppointments = data.filter((r) => r.date === displayDate)
+   
+    const dayAppointments = selectedDate ? filtered : filtered.filter((r) => {
+      return r.date === displayDate || r.dateRaw === normalizeToISODate(displayDate)
+    })
 
     const slotsWithAppointments = timeSlots.map((slot) => {
       const slotLabel = slot.label || `${slot.startTime} - ${slot.endTime}`
       const appointments = dayAppointments.filter((apt) => {
-        const aptTime = apt.time || apt.timeSlotLabel || ''
-        return aptTime.includes(slotLabel) || slotLabel.includes(aptTime) ||
-               (slot.startTime && aptTime.includes(slot.startTime)) ||
-               (slot.endTime && aptTime.includes(slot.endTime))
+        return matchesTimeSlot(apt, slot)
       })
       return {
         ...slot,
@@ -595,7 +617,9 @@ export default function AdminAppointments() {
         customerName: record.customer,
         customerPhone: record.phone,
         licensePlate: formatLicensePlate(record.license),
-        serviceType: record.serviceType || extractServiceLabel(record.originalItem)
+        serviceType: record.serviceType || extractServiceLabel(record.originalItem),
+        status: record.status,
+        statusKey: record.statusKey
       })
     }
     await fetchAppointmentDetail(record.id)
@@ -689,6 +713,7 @@ export default function AdminAppointments() {
         const config = getStatusConfig(status)
         const statusKey = record.statusKey || 'CONFIRMED'
         const isUpdating = updatingStatusId === record.id
+        const isCancelled = statusKey === 'CANCELLED'
 
         return (
           <select
@@ -698,14 +723,14 @@ export default function AdminAppointments() {
                 handleStatusChange(record.id, newStatus)
               }
             }}
-            disabled={isUpdating || statusKey === 'CANCELLED'}
+            disabled={isUpdating || isCancelled}
             className="status-select-dropdown modern"
             value={statusKey}
             style={{
               color: config.color,
-              opacity: statusKey === 'CANCELLED' ? 0.6 : isUpdating ? 0.6 : 1,
-              pointerEvents: statusKey === 'CANCELLED' ? 'none' : 'auto',
-              cursor: statusKey === 'CANCELLED' ? 'not-allowed' : 'pointer'
+              opacity: isCancelled ? 0.6 : isUpdating ? 0.6 : 1,
+              pointerEvents: isCancelled ? 'none' : 'auto',
+              cursor: isCancelled ? 'not-allowed' : 'pointer'
             }}
           >
             {/* Hiển thị trạng thái hiện tại nhưng không cho chọn, ẩn khỏi dropdown để giữ chỉ một lựa chọn chuyển đổi */}
@@ -955,9 +980,8 @@ export default function AdminAppointments() {
                   />
                   {timeSlots.map((slot, index) => {
                     const slotLabel = slot.label || `${slot.startTime} - ${slot.endTime}`
-                    const slotAppointments = timelineData.find(t => t.time === slotLabel)?.appointments || []
                     const totalCapacity = slot.maxCapacity || 1
-                    const booked = slot.booked || slotAppointments.length
+                    const booked = slot.booked !== undefined && slot.booked !== null ? slot.booked : 0
                     const progressPercent = totalCapacity > 0 ? (booked / totalCapacity) * 100 : 0
                     const isLast = index === timeSlots.length - 1
                     const progressColor = progressPercent >= 100 ? '#ef4444' : progressPercent >= 80 ? '#f59e0b' : '#16a34a'
@@ -995,7 +1019,7 @@ export default function AdminAppointments() {
                             {slotLabel}
                              </div>
                           <div style={{ fontSize: '14px', color: '#6b7280' }}>
-                            {slotAppointments.length} lịch hẹn
+                            {booked} lịch hẹn
                          </div>
                       </div>
                     </div>
@@ -1088,8 +1112,12 @@ export default function AdminAppointments() {
             
             <div style={{ textAlign: 'center', marginTop: '32px' }}>
               {(() => {
-                const currentStatus = selectedFull?.status || selected?.statusKey || 'CONFIRMED'
-                const isCancelled = currentStatus === 'CANCELLED'
+                const currentStatus = selectedFull?.status || selected?.status || ''
+                const currentStatusKey = selectedFull?.statusKey || selected?.statusKey || ''
+                const isCancelled = currentStatusKey === 'CANCELLED' || 
+                                   currentStatus === 'CANCELLED' || 
+                                   currentStatus === 'Hủy' || 
+                                   currentStatus === 'Đã hủy'
                 return (
               <Button
                 type="primary"
@@ -1098,8 +1126,8 @@ export default function AdminAppointments() {
                 loading={updatingStatus}
                     disabled={updatingStatus || isCancelled}
                 style={{
-                      background: isCancelled ? '#d1d5db' : '#22c55e',
-                      borderColor: isCancelled ? '#d1d5db' : '#22c55e',
+                      background: isCancelled ? '#9ca3af' : '#22c55e',
+                      borderColor: isCancelled ? '#9ca3af' : '#22c55e',
                   height: '45px',
                   padding: '0 40px',
                   fontWeight: 600,

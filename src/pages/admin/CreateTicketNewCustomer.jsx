@@ -9,6 +9,7 @@ import 'react-datepicker/dist/react-datepicker.css'
 import dayjs from 'dayjs'
 import { CalendarOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import ReactSelect from 'react-select'
+import CreatableSelect from 'react-select/creatable'
 
 const { TextArea } = Input
 
@@ -42,22 +43,25 @@ export default function CreateTicketNewCustomer() {
   const [currentPhone, setCurrentPhone] = useState('')
   const [customerId, setCustomerId] = useState(null)
   const [customerDiscountPolicyId, setCustomerDiscountPolicyId] = useState(0)
+  const [phoneOptionsSource, setPhoneOptionsSource] = useState([])
+  const [phoneOptions, setPhoneOptions] = useState([])
+  const [phoneSelectValue, setPhoneSelectValue] = useState(null)
 
   const [showCreateCustomerModal, setShowCreateCustomerModal] = useState(false)
   const [newCustomer, setNewCustomer] = useState({ phone: '', fullName: '', address: '' })
 
-  // Cảnh báo biển số đã thuộc khách khác
+  
   const [plateConflict, setPlateConflict] = useState(null)
 
   const navigate = useNavigate()
 
   const customerTypeSelected = Form.useWatch('customerType', form) || 'CA_NHAN'
 
-  // react-select selected states (objects)
+
   const [selectedServices, setSelectedServices] = useState([])
   const [selectedTechs, setSelectedTechs] = useState([])
 
-  // Options for selects - memoized to prevent re-render
+
   const brandOptions = useMemo(() =>
     brands.map((brand) => ({ label: brand.name, value: brand.id })),
     [brands]
@@ -97,6 +101,13 @@ export default function CreateTicketNewCustomer() {
   const formItemStyle = { marginBottom: 12 }
   const inputStyle = { height: inputHeight }
   const selectStyle = { width: '100%', height: inputHeight, padding: '0 12px', lineHeight: `${inputHeight}px`, color: '#262626', backgroundColor: '#fff', border: '1px solid #d9d9d9', borderRadius: '6px', transition: 'all 0.2s', cursor: 'pointer', outline: 'none' }
+  const singleSelectStyles = {
+    ...multiSelectStyles,
+    valueContainer: (base) => ({ ...base, padding: '4px 8px', gap: 4, alignItems: 'center' }),
+    multiValue: undefined,
+    multiValueLabel: undefined,
+    multiValueRemove: undefined
+  }
 
   const getBrandOptions = () => {
     return brands.map((brand) => ({
@@ -129,9 +140,8 @@ export default function CreateTicketNewCustomer() {
   }
 
   const handleServiceChange = (selected) => {
-    const arr = selected || []
-    setSelectedServices(arr)
-    const ids = arr.map((s) => s.value)
+    setSelectedServices(selected || null)
+    const ids = selected ? [selected.value] : []
     form.setFieldsValue({ service: ids })
   }
 
@@ -147,31 +157,32 @@ export default function CreateTicketNewCustomer() {
     setCustomerExists(false)
     setCustomerDiscountPolicyId(0)
     form.setFieldsValue({ customerType: 'DOANH_NGHIEP' })
+    setPhoneSelectValue(null)
   }
 
-  // Hàm format biển số xe tự động thêm dấu -
+
   const formatLicensePlate = (value) => {
     if (!value) return value
     
     let cleaned = value.replace(/[-\s]/g, '').toUpperCase()
     
-    // Giới hạn độ dài tối đa
+    
     if (cleaned.length > 10) {
       cleaned = cleaned.substring(0, 10)
     }
     
-    // Format theo các pattern phổ biến
+  
     if (cleaned.length >= 3) {
 
       if (/^[0-9]{2}[A-Z]/.test(cleaned)) {
-        const part1 = cleaned.substring(0, 3) // 30A
-        const part2 = cleaned.substring(3)    // 12345
+        const part1 = cleaned.substring(0, 3) 
+        const part2 = cleaned.substring(3)    
         return part2 ? `${part1}-${part2}` : part1
       }
-      // Pattern: QĐ-12345 (2 chữ + số)
+      
       else if (/^[A-Z]{2}/.test(cleaned)) {
-        const part1 = cleaned.substring(0, 2) // QĐ
-        const part2 = cleaned.substring(2)    // 12345
+        const part1 = cleaned.substring(0, 2) 
+        const part2 = cleaned.substring(2)   
         return part2 ? `${part1}-${part2}` : part1
       }
     }
@@ -206,6 +217,7 @@ export default function CreateTicketNewCustomer() {
 
       const phoneValue = displayPhoneFrom84(customer.phone || normalizedPhone)
       setCurrentPhone(phoneValue || phone)
+      setPhoneSelectByValue(phoneValue || phone)
 
       form.setFieldsValue({
         phone: phoneValue || phone,
@@ -223,6 +235,44 @@ export default function CreateTicketNewCustomer() {
       setCustomerLookupLoading(false)
     }
   }
+
+  const fetchAllCustomers = async () => {
+    try {
+      const { data, error } = await customersAPI.getAll(0, 1000)
+      if (error) return
+      const result = data?.result || data || {}
+      const content = Array.isArray(result?.content) ? result.content : Array.isArray(result) ? result : []
+      const mapped = content.map((c) => {
+        const phoneRaw = c.phone || c.customerPhone || ''
+        const phoneLocal = displayPhoneFrom84(phoneRaw) || phoneRaw
+        const label = c.fullName ? `${phoneLocal} - ${c.fullName}` : phoneLocal
+        return { label, value: phoneLocal }
+      }).filter((opt) => opt.value)
+      setPhoneOptionsSource(mapped)
+      setPhoneOptions(mapped)
+    } catch (err) {
+      console.error('Fetch all customers failed:', err)
+    }
+  }
+
+  const setPhoneSelectByValue = (value) => {
+    if (!value) {
+      setPhoneSelectValue(null)
+      return
+    }
+    const normalized = displayPhoneFrom84(value) || value
+    let opt = phoneOptionsSource.find((o) => o.value === normalized)
+    if (!opt) {
+      opt = { label: normalized, value: normalized }
+      setPhoneOptionsSource((prev) => [...prev, opt])
+      setPhoneOptions((prev) => [...prev, opt])
+    }
+    setPhoneSelectValue(opt)
+  }
+
+  useEffect(() => {
+    fetchAllCustomers()
+  }, [])
 
   useEffect(() => {
     const fetchTechnicians = async () => {
@@ -340,7 +390,7 @@ export default function CreateTicketNewCustomer() {
     const ticketId = data?.result?.serviceTicketId
     message.success('Tạo phiếu dịch vụ thành công')
 
-    // Navigate đến trang chi tiết để cập nhật thông tin
+   
     if (ticketId) {
       navigate(`/service-advisor/orders/${ticketId}`)
     } else {
@@ -364,11 +414,11 @@ export default function CreateTicketNewCustomer() {
 
     const normalizedPhone = normalizePhoneTo84(values.phone)
     
-    // Lấy brandId và modelId từ state hoặc form values
+    
     const finalBrandId = selectedBrandId || values.brand || null
     const finalModelId = selectedModelId || values.model || null
     
-    // Tìm brandName và modelName từ danh sách đã fetch
+ 
     const selectedBrand = brands.find(b => b.id === Number(finalBrandId))
     const selectedModel = models.find(m => m.id === Number(finalModelId))
 
@@ -398,7 +448,7 @@ export default function CreateTicketNewCustomer() {
       }
     }
 
-    // 1) Gọi API check biển số TRƯỚC khi tạo phiếu (cho khách mới, customerId chưa chắc có)
+   
     const plate = values.plate || form.getFieldValue('plate')
     if (plate) {
       try {
@@ -412,7 +462,7 @@ export default function CreateTicketNewCustomer() {
           console.log('Check plate (new customer) response:', checkRes)
           const status = checkRes?.result?.status || checkRes?.message
           const owner = checkRes?.result?.owner || checkRes?.result?.customer
-          // Nếu biển số đã thuộc khách khác thì mở modal cảnh báo, KHÔNG tạo phiếu ngay
+      
           if (status === 'OWNED_BY_OTHER' && owner?.customerId) {
             setPlateConflict({
               plate,
@@ -427,15 +477,16 @@ export default function CreateTicketNewCustomer() {
       }
     }
 
-    // 2) Không conflict → tạo phiếu luôn
+    
     await submitCreateTicket(payload)
   }
 
-  // Sync selectedServices/Techs from form values when options arrive or on mount
+  
   useEffect(() => {
     const sv = form.getFieldValue('service') || []
-    if (Array.isArray(sv) && serviceOptionsStable.length > 0) {
-      setSelectedServices(serviceOptionsStable.filter(opt => sv.map(String).includes(String(opt.value))))
+    if (Array.isArray(sv) && sv.length > 0 && serviceOptionsStable.length > 0) {
+      const matched = serviceOptionsStable.find(opt => String(opt.value) === String(sv[0]))
+      setSelectedServices(matched || null)
     }
   }, [serviceOptionsStable])
 
@@ -479,93 +530,130 @@ export default function CreateTicketNewCustomer() {
                 <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Thông tin khách hàng</h3>
 
                 <Form.Item
-                  label="Số điện thoại"
+                  label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>}
                   name="phone"
                   rules={[
                     {
                       validator: (_, value) => {
-                        if (!value || value.trim() === '') {
+                        if (!value || value.toString().trim() === '') {
                           return Promise.reject(new Error('Vui lòng nhập số điện thoại'))
                         }
-                        
-                        const cleanValue = value.replace(/\s/g, '')
-                        
-                        // Kiểm tra chỉ chứa số
+                        const cleanValue = value.toString().replace(/\s/g, '')
                         if (/[^0-9]/.test(cleanValue)) {
                           return Promise.reject(new Error('Số điện thoại chỉ được chứa số'))
                         }
-                        
-                        // Kiểm tra đầu số Việt Nam hợp lệ TRƯỚC
-                        if (cleanValue.length >= 2 && !/^(03|05|07|08|09)/.test(cleanValue)) {
-                          return Promise.reject(new Error('Số điện thoại phải bắt đầu bằng 0'))
+                        if (!/^0\d{9,10}$/.test(cleanValue) && !/^84\d{9,10}$/.test(cleanValue)) {
+                          return Promise.reject(new Error('Số điện thoại không hợp lệ. Vui lòng nhập dạng 0xxxxxxxxx hoặc 84xxxxxxxxx'))
                         }
-                        
-                        // Kiểm tra độ dài SAU
-                        if (cleanValue.length !== 10) {
-                          return Promise.reject(new Error('Số điện thoại phải có đúng 10 chữ số'))
+                        if (cleanValue.length < 10 || cleanValue.length > 11) {
+                          return Promise.reject(new Error('Số điện thoại phải có 10-11 chữ số'))
                         }
-                        
                         return Promise.resolve()
                       }
                     }
                   ]}
-                  normalize={(value) => value?.replace(/\s/g, '')} // Loại bỏ khoảng trắng
                   style={formItemStyle}
                 >
-                  <Input
-                    style={inputStyle}
-                    placeholder={customerLookupLoading ? 'Đang kiểm tra...' : 'VD: 0123456789'}
-                    maxLength={10}
-                    onKeyPress={(e) => {
-                      // Chỉ cho phép nhập số
-                      if (!/[0-9]/.test(e.key)) {
-                        e.preventDefault()
-                      }
-                    }}
-                    onBlur={(e) => {
-                      const raw = e.target.value.trim()
-                      if (!raw) {
-                        resetCustomerSelection()
-                        return
-                      }
-                      setCurrentPhone(raw)
-                      fetchCustomerByPhone(raw)
-                    }}
-                    onChange={(e) => {
-                      const newPhone = e.target.value.trim()
-                      if (newPhone !== currentPhone) {
-                        resetCustomerSelection()
-                      }
-                      if (!newPhone) {
-                        resetCustomerSelection()
-                      }
-                    }}
-                    addonAfter={
-                      <Button
-                        type="link"
-                        style={{ padding: 0 }}
-                        onClick={() => {
-                          const phoneValue = form.getFieldValue('phone') || currentPhone
-                          if (!phoneValue) {
-                            message.warning('Vui lòng nhập số điện thoại trước')
-                            return
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <CreatableSelect
+                        isClearable
+                        isMulti={false}
+                        placeholder="VD: 0123456789"
+                        options={phoneOptions}
+                        value={phoneSelectValue}
+                        styles={singleSelectStyles}
+                        classNamePrefix="react-select"
+                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                        isLoading={customerLookupLoading}
+                        components={{ DropdownIndicator: null }}
+                        onInputChange={(inputValue, action) => {
+                          if (action.action === 'input-change') {
+                            const lower = inputValue.toLowerCase()
+                            const filtered = phoneOptionsSource.filter((opt) =>
+                              (opt.value || '').toLowerCase().includes(lower)
+                            )
+                            setPhoneOptions(filtered.length ? filtered : [{ label: inputValue, value: inputValue }])
+                          
+                            if (inputValue && inputValue.trim()) {
+                              setCurrentPhone(inputValue.trim())
+                            }
                           }
-                          setNewCustomer({
-                            phone: phoneValue,
-                            fullName: form.getFieldValue('name') || '',
-                            address: form.getFieldValue('address') || ''
-                          })
-                          setShowCreateCustomerModal(true)
                         }}
-                      >
-                        Tạo mới
-                      </Button>
-                    }
-                  />
+                        onChange={(option) => {
+                          setPhoneSelectValue(option)
+                          const selectedValue = option ? option.value : ''
+                          form.setFieldsValue({ phone: selectedValue })
+                          setCurrentPhone(selectedValue)
+                          const isKnown = phoneOptionsSource.some((opt) => opt.value === selectedValue)
+                          if (option && isKnown) {
+                            fetchCustomerByPhone(selectedValue)
+                          } else {
+                            resetCustomerSelection()
+                          }
+                        }}
+                        onBlur={() => {
+                          // Khi blur, nếu có giá trị đã nhập nhưng chưa được chọn, tự động tạo option và select
+                          const currentInput = form.getFieldValue('phone') || currentPhone
+                          if (currentInput && currentInput.trim()) {
+                            const trimmed = currentInput.trim()
+                            const exists = phoneOptionsSource.some((opt) => opt.value === trimmed)
+                            if (!exists) {
+                              // Tạo option mới và select nó
+                              const newOption = { label: trimmed, value: trimmed }
+                              setPhoneOptionsSource((prev) => [...prev, newOption])
+                              setPhoneOptions((prev) => {
+                                const existsInOptions = prev.some((opt) => opt.value === trimmed)
+                                return existsInOptions ? prev : [...prev, newOption]
+                              })
+                              setPhoneSelectValue(newOption)
+                              form.setFieldsValue({ phone: trimmed })
+                              setCurrentPhone(trimmed)
+                            } else {
+                              // Nếu đã tồn tại, đảm bảo được select
+                              const existingOption = phoneOptionsSource.find((opt) => opt.value === trimmed)
+                              if (existingOption && phoneSelectValue?.value !== trimmed) {
+                                setPhoneSelectValue(existingOption)
+                              }
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="primary"
+                      style={{ 
+                        whiteSpace: 'nowrap',
+                        height: '40px',
+                        borderRadius: '12px',
+                        fontWeight: 500,
+                        padding: '0 16px',
+                        background: '#2563eb',
+                        borderColor: '#2563eb',
+                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
+                      }}
+                      loading={customerLookupLoading}
+                      onClick={() => {
+                        const phoneValue = form.getFieldValue('phone') || currentPhone
+                        if (!phoneValue) {
+                          message.warning('Vui lòng nhập số điện thoại trước')
+                          return
+                        }
+                        setNewCustomer({
+                          phone: phoneValue,
+                          fullName: form.getFieldValue('name') || '',
+                          address: form.getFieldValue('address') || ''
+                        })
+                        setShowCreateCustomerModal(true)
+                      }}
+                    >
+                      Tạo mới
+                    </Button>
+                  </div>
                 </Form.Item>
 
                 <Form.Item
-                  label="Họ và tên"
+                  label={<span>Họ và tên <span style={{ color: 'red' }}>*</span></span>}
                   name="name"
                   rules={[
                     {
@@ -663,16 +751,16 @@ export default function CreateTicketNewCustomer() {
                 <Form.Item
                   label="Loại dịch vụ"
                   name="service"
-                  rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 loại dịch vụ' }]}
+                  rules={[{ required: true, message: 'Vui lòng chọn loại dịch vụ' }]}
                   style={formItemStyle}
                 >
                   <div>
                     <ReactSelect
-                      isMulti
+                      isMulti={false}
                       options={serviceOptionsStable}
                       value={selectedServices}
                       onChange={handleServiceChange}
-                      styles={multiSelectStyles}
+                      styles={singleSelectStyles}
                       placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
                       isDisabled={serviceLoading || serviceOptionsStable.length === 0}
                       menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
@@ -734,7 +822,7 @@ export default function CreateTicketNewCustomer() {
               </Col>
             </Row>
 
-            {/* Card: Thông tin xe + Ghi chú */}
+         
             <Row gutter={24} style={{ marginTop: 16 }}>
               <Col span={24}>
                 <div
@@ -759,7 +847,7 @@ export default function CreateTicketNewCustomer() {
                             validator: (_, value) => {
                               if (!value) return Promise.resolve()
                               
-                              // Loại bỏ khoảng trắng và dấu gạch ngang để validate
+                              
                               const cleanValue = value.replace(/[\s-]/g, '').toUpperCase()
                               
 
@@ -1028,8 +1116,20 @@ export default function CreateTicketNewCustomer() {
                 const newCustomerId = created.customerId || created.id || null
                 setCustomerId(newCustomerId)
                 setCustomerDiscountPolicyId(created.discountPolicyId ?? 0)
+                const phoneDisplay = displayPhoneFrom84(created.phone || newCustomer.phone)
+                const phoneOption = { label: phoneDisplay, value: phoneDisplay }
+                setPhoneSelectValue(phoneOption)
+                setPhoneOptionsSource((prev) => {
+                  const exists = prev.some((opt) => opt.value === phoneDisplay)
+                  return exists ? prev : [...prev, phoneOption]
+                })
+                setPhoneOptions((prev) => {
+                  const exists = prev.some((opt) => opt.value === phoneDisplay)
+                  return exists ? prev : [...prev, phoneOption]
+                })
+                setCurrentPhone(phoneDisplay)
                 form.setFieldsValue({
-                  phone: displayPhoneFrom84(created.phone || newCustomer.phone),
+                  phone: phoneDisplay,
                   name: created.fullName || newCustomer.fullName,
                   address: created.address || newCustomer.address,
                   customerType: created.customerType || payload.customerType || 'CA_NHAN'
@@ -1071,3 +1171,4 @@ export default function CreateTicketNewCustomer() {
     </AdminLayout>
   )
 }
+

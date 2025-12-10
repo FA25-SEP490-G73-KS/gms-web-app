@@ -119,9 +119,21 @@ export function decodeJWT(token) {
   }
 }
 
+
+export function getToken() {
+  if (typeof window === 'undefined') return null;
+  
+  return sessionStorage.getItem('token') || 
+         sessionStorage.getItem('accessToken') || 
+         sessionStorage.getItem('authToken') ||
+         localStorage.getItem('token') || 
+         localStorage.getItem('accessToken') || 
+         localStorage.getItem('authToken');
+}
+
 export function getUserNameFromToken() {
   try {
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    const token = getToken();
     if (!token) return null;
     const decoded = decodeJWT(token);
     const username = decoded?.fullName || decoded?.name || decoded?.username || decoded?.sub || null;
@@ -134,7 +146,7 @@ export function getUserNameFromToken() {
 
 export function getUserIdFromToken() {
   try {
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    const token = getToken();
     if (!token) return null;
     const decoded = decodeJWT(token);
     return decoded?.userId || decoded?.id || decoded?.employeeId || decoded?.sub || null;
@@ -146,7 +158,7 @@ export function getUserIdFromToken() {
 
 export function getEmployeeIdFromToken() {
   try {
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    const token = getToken();
     if (!token) return null;
     const decoded = decodeJWT(token);
     
@@ -157,6 +169,19 @@ export function getEmployeeIdFromToken() {
            null;
   } catch (error) {
     console.error('Error getting employee ID from token:', error);
+    return null;
+  }
+}
+
+export function getUserPhoneFromToken() {
+  try {
+    const token = getToken();
+    if (!token) return null;
+    const decoded = decodeJWT(token);
+    const phone = decoded?.phone || null;
+    return phone ? displayPhoneFrom84(phone) : null;
+  } catch (error) {
+    console.error('Error getting user phone from token:', error);
     return null;
   }
 }
@@ -210,7 +235,7 @@ export function normalizeRole(role) {
 
 export function getRoleFromToken() {
   try {
-    const token = localStorage.getItem('token') || localStorage.getItem('accessToken') || localStorage.getItem('authToken');
+    const token = getToken();
     if (!token) return null;
     const decoded = decodeJWT(token);
     

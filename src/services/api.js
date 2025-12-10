@@ -1,15 +1,19 @@
 import axios from "axios";
 
-// In development, use relative path to leverage Vite proxy
-// In production, use full URL from env variable
+
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
   (import.meta.env.DEV ? "/api" : "http://localhost:8080/api");
 
-// Get token from localStorage
+
 function getToken() {
   try {
+    if (typeof window === 'undefined') return null;
+   
     return (
+      sessionStorage.getItem("token") ||
+      sessionStorage.getItem("accessToken") ||
+      sessionStorage.getItem("authToken") ||
       localStorage.getItem("token") ||
       localStorage.getItem("accessToken") ||
       localStorage.getItem("authToken")
@@ -19,7 +23,7 @@ function getToken() {
   }
 }
 
-// Create axios instance
+
 const axiosClient = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -27,7 +31,7 @@ const axiosClient = axios.create({
   },
 });
 
-// List of public endpoints that don't require authentication
+
 const PUBLIC_ENDPOINTS = [
   "/auth/login",
   "/auth/refresh",
@@ -35,19 +39,17 @@ const PUBLIC_ENDPOINTS = [
   "/auth/update-password",
 ];
 
-// Request interceptor to add Bearer token automatically
+
 axiosClient.interceptors.request.use(
   (config) => {
-    // Check if skipAuth is set in config (can be boolean true or string 'true')
+    
     const skipAuth = config.skipAuth === true || config.skipAuth === "true";
 
-    // Check if endpoint is in public list
     const isPublicEndpoint = PUBLIC_ENDPOINTS.some(
       (endpoint) =>
         config.url?.includes(endpoint) || config.url?.endsWith(endpoint)
     );
 
-    // Only add token if skipAuth is not set and endpoint is not public
     if (!skipAuth && !isPublicEndpoint) {
       const token = getToken();
       if (token) {
@@ -55,8 +57,7 @@ axiosClient.interceptors.request.use(
       }
     }
 
-    // Remove skipAuth from config as it's not a valid axios option
-    // This must be done after checking it
+ 
     delete config.skipAuth;
 
     return config;
@@ -282,6 +283,8 @@ export const vehiclesAPI = {
 export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
   update: (id, payload) => patch(`/price-quotations/${id}`, payload),
+  updateStatus: (id, status) => patch(`/price-quotations/${id}/status`, { status }),
+  setDraft: (id) => patch(`/price-quotations/${id}/draft`),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
   getPending: (page = 0, size = 6) =>
     get(`/price-quotations/pending?page=${page}&size=${size}`),

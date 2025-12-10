@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
-import { getUserNameFromToken } from '../utils/helpers'
+import { getUserNameFromToken, getUserPhoneFromToken } from '../utils/helpers'
 import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/warehouse-layout.css'
 
@@ -195,7 +195,7 @@ export default function AccountanceLayout({ children }) {
                 {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
               </div>
               <div className="warehouse-user-role">
-              {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+                {getUserPhoneFromToken() || user?.phone || ''}
               </div>
             </div>
           </button>
