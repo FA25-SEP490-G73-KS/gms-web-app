@@ -2,6 +2,7 @@
 import { Table, Input, Button, Tag, message, Modal, Select, Checkbox, DatePicker } from 'antd'
 import { SearchOutlined, CloseOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { priceQuotationAPI } from '../../services/api'
@@ -19,6 +20,7 @@ export default function ExportRequest() {
   const [loading, setLoading] = useState(false)
   const [total, setTotal] = useState(0)
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
+  const [dateRange, setDateRange] = useState([null, null])
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -530,7 +532,7 @@ export default function ExportRequest() {
       render: (_, __, index) => (page - 1) * pageSize + index + 1
     },
     {
-      title: 'Code',
+      title: 'Mã phiếu',
       dataIndex: 'code',
       key: 'code',
       width: 150
@@ -732,18 +734,8 @@ export default function ExportRequest() {
             }}
           />
 
-          {/* Date picker ở giữa */}
-          <DatePicker
-            placeholder="Ngày tạo"
-            suffixIcon={<CalendarOutlined />}
-            style={{ 
-              width: '250px',
-              borderRadius: '8px'
-            }}
-          />
-
-          {/* Filter buttons bên phải */}
-          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto' }}>
+          {/* Filter buttons và DatePicker */}
+          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', alignItems: 'center' }}>
             <Button
               type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
               onClick={() => setStatusFilter('Đang xuất hàng')}
@@ -789,6 +781,21 @@ export default function ExportRequest() {
             >
               Tất cả
             </Button>
+
+            {/* Date picker bên phải filter */}
+            <DatePicker
+              placeholder="Ngày tạo"
+              suffixIcon={<CalendarOutlined />}
+              value={dateRange[0]}
+              onChange={(date) => {
+                setDateRange([date, dateRange[1]])
+              }}
+              style={{ 
+                width: '150px',
+                borderRadius: '8px'
+              }}
+              format="DD/MM/YYYY"
+            />
           </div>
         </div>
 
@@ -801,7 +808,8 @@ export default function ExportRequest() {
             expandedRowRender,
             expandedRowKeys,
             onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
-            expandRowByClick: true
+            expandRowByClick: true,
+            expandIconColumnIndex: -1 // Di chuyển expand icon về cuối
           }}
           pagination={{ 
             current: page, 

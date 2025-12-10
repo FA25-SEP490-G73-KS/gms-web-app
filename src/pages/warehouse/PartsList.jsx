@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Table,
   Input,
@@ -24,7 +25,7 @@ import {
 } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { partsAPI, partCategoriesAPI, unitsAPI } from '../../services/api'
+import { partsAPI, partCategoriesAPI, unitsAPI, marketsAPI, suppliersAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 import '../../styles/pages/warehouse/import-list.css'
 import '../../styles/pages/warehouse/parts-list.css'
@@ -33,6 +34,7 @@ const { Search } = Input
 const { Option } = Select
 
 export default function PartsList() {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
   const [sortOrder, setSortOrder] = useState('asc')
   const [modalOpen, setModalOpen] = useState(false)
@@ -49,6 +51,10 @@ export default function PartsList() {
   const [filterModalOpen, setFilterModalOpen] = useState(false)
   const [categories, setCategories] = useState([])
   const [units, setUnits] = useState([])
+  const [markets, setMarkets] = useState([])
+  const [suppliers, setSuppliers] = useState([])
+  const [newPartModalOpen, setNewPartModalOpen] = useState(false)
+  const [newPartForm] = Form.useForm()
   const [tempFilters, setTempFilters] = useState({
     status: [],
     categoryIds: [],
@@ -62,6 +68,14 @@ export default function PartsList() {
     vehicleModel: []
   })
 
+  const handleNumberKeyDown = (e) => {
+    const allowedKeys = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Home', 'End']
+    if (allowedKeys.includes(e.key)) return
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault()
+    }
+  }
+
   useEffect(() => {
     fetchParts(page - 1, pageSize)
   }, [page, pageSize, appliedFilters])
@@ -69,6 +83,8 @@ export default function PartsList() {
   useEffect(() => {
     fetchCategories()
     fetchUnits()
+    fetchMarkets()
+    fetchSuppliers()
   }, [])
 
   const fetchCategories = async () => {
@@ -102,6 +118,38 @@ export default function PartsList() {
     } catch (err) {
       console.error('Failed to fetch units:', err)
       setUnits([])
+    }
+  }
+
+  const fetchMarkets = async () => {
+    try {
+      const { data, error } = await marketsAPI.getAll()
+      if (error) {
+        console.error('Error fetching markets:', error)
+        return
+      }
+      
+      const result = data?.result || data || []
+      setMarkets(Array.isArray(result) ? result : [])
+    } catch (err) {
+      console.error('Failed to fetch markets:', err)
+      setMarkets([])
+    }
+  }
+
+  const fetchSuppliers = async () => {
+    try {
+      const { data, error } = await suppliersAPI.getAll(0, 100)
+      if (error) {
+        console.error('Error fetching suppliers:', error)
+        return
+      }
+      
+      const result = data?.result?.content || data?.result || data?.content || data || []
+      setSuppliers(Array.isArray(result) ? result : [])
+    } catch (err) {
+      console.error('Failed to fetch suppliers:', err)
+      setSuppliers([])
     }
   }
 
@@ -335,11 +383,12 @@ export default function PartsList() {
         setSelectedPart((prev) => ({ ...prev, originalItem: detail }))
         editForm.setFieldsValue({
           name: detail.name,
-          origin: detail.marketName || detail.market,
+          origin: detail.marketId || detail.market?.id || detail.marketName,
           vehicleBrand: detail.categoryName,
           vehicleModel: detail.universal ? 'All' : (detail.modelName || ''),
           sellingPrice: detail.sellingPrice,
           importPrice: detail.purchasePrice,
+          alertThreshold: detail.reorderLevel ?? detail.alertThreshold ?? 0,
           useForAllModels: detail.universal,
           unit: detail.unitId || detail.unitName
         })
@@ -371,12 +420,13 @@ export default function PartsList() {
     try {
       const payload = {
         name: values.name,
-        market: values.origin || 'VN',
-        categoryId: 0,
+        marketId: values.origin,
+        categoryId: values.categoryId || 0,
         purchasePrice: values.importPrice || 0,
         sellingPrice: values.sellingPrice || 0,
         reorderLevel: values.alertThreshold || 0,
-        unit: values.unit || '',
+        unitId: values.unit,
+        supplierId: values.supplier,
         universal: values.useForAllModels || false,
         specialPart: false,
         compatibleVehicleModelIds: values.useForAllModels ? [] : (values.vehicleModelIds || []),
@@ -389,8 +439,8 @@ export default function PartsList() {
       }
 
       message.success('Thêm linh kiện thành công')
-      createForm.resetFields()
-      setCreateModalOpen(false)
+      newPartForm.resetFields()
+      setNewPartModalOpen(false)
       fetchParts(page - 1, pageSize)
     } catch (err) {
       console.error(err)
@@ -414,11 +464,11 @@ export default function PartsList() {
       
       const payload = {
         name: values.name,
-        marketId: detail.marketId || detail.market?.id || 1,
+        marketId: values.origin || detail.marketId || detail.market?.id || 1,
         categoryId: detail.categoryId || detail.category?.id || 1,
         purchasePrice: values.importPrice || 0,
         sellingPrice: values.sellingPrice || 0,
-        reorderLevel: detail.reorderLevel || 0,
+        reorderLevel: values.alertThreshold || detail.reorderLevel || 0,
         unitId: values.unit || detail.unitId || detail.unit?.id || 1,
         universal: values.useForAllModels || false,
         specialPart: detail.specialPart || false,
@@ -500,18 +550,31 @@ export default function PartsList() {
               prefix={<SearchOutlined />}
             />
             
-            <Button
-              icon={<FilterOutlined />}
-              onClick={() => setFilterModalOpen(true)}
-              style={{
-                borderRadius: '6px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              Bộ lọc
-            </Button>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <Button
+                type="primary"
+                onClick={() => setNewPartModalOpen(true)}
+                style={{
+                  borderRadius: '6px',
+                  backgroundColor: '#52c41a',
+                  borderColor: '#52c41a'
+                }}
+              >
+                Thêm linh kiện
+              </Button>
+              <Button
+                icon={<FilterOutlined />}
+                onClick={() => setFilterModalOpen(true)}
+                style={{
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                Bộ lọc
+              </Button>
+            </div>
           </div>
 
           <Table
@@ -600,16 +663,23 @@ export default function PartsList() {
 
                 <Row gutter={16}>
                   <Col span={12}>
-                    <Form.Item label="Xuất xứ" name="origin" style={{ marginBottom: 16 }}>
+                    <Form.Item
+                      label="Xuất xứ"
+                      name="origin"
+                      style={{ marginBottom: 16 }}
+                      rules={[{ required: true, message: 'Chọn xuất xứ' }]}
+                    >
                       <Select
                         placeholder="Chọn xuất xứ"
-                        options={[
-                          { value: 'VN', label: 'VN' },
-                          { value: 'USA', label: 'USA' },
-                          { value: 'China', label: 'China' },
-                          { value: 'Japan', label: 'Japan' },
-                          { value: 'Korea', label: 'Korea' }
-                        ]}
+                        showSearch
+                        allowClear
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        options={markets.map(market => ({
+                          value: market.id || market.marketId,
+                          label: market.name || market.marketName || ''
+                        }))}
                       />
                     </Form.Item>
                   </Col>
@@ -626,16 +696,28 @@ export default function PartsList() {
 
                 <Row gutter={16}>
                   <Col span={12}>
-                    <Form.Item label="Lượng tối thiếu" style={{ marginBottom: 16 }}>
-                      <Input 
-                        value={selectedPart.originalItem?.reorderLevel || 0}
-                        disabled
-                        style={{ backgroundColor: '#f5f5f5' }}
+                    <Form.Item
+                      label="Lượng tối thiểu"
+                      name="alertThreshold"
+                      style={{ marginBottom: 16 }}
+                      rules={[{ required: true, message: 'Nhập lượng tối thiểu' }]}
+                    >
+                      <InputNumber
+                        min={0}
+                        style={{ width: '100%' }}
+                        formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                        onKeyDown={handleNumberKeyDown}
                       />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item label="Đơn vị" name="unit" style={{ marginBottom: 16 }}>
+                    <Form.Item
+                      label="Đơn vị"
+                      name="unit"
+                      style={{ marginBottom: 16 }}
+                      rules={[{ required: true, message: 'Chọn đơn vị' }]}
+                    >
                       <Select
                         placeholder="Chọn đơn vị"
                         showSearch
@@ -693,42 +775,75 @@ export default function PartsList() {
 
                 <Row gutter={16}>
                   <Col span={12}>
-                    <Form.Item label="Giá nhập" name="importPrice" style={{ marginBottom: 16 }}>
+                    <Form.Item
+                      label="Giá nhập"
+                      name="importPrice"
+                      style={{ marginBottom: 16 }}
+                      rules={[{ required: true, message: 'Nhập giá nhập' }]}
+                    >
                       <InputNumber 
                         min={0} 
                         style={{ width: '100%' }}
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                        onKeyDown={handleNumberKeyDown}
                       />
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item label="Giá bán" name="sellingPrice" style={{ marginBottom: 16 }}>
+                    <Form.Item
+                      label="Giá bán"
+                      name="sellingPrice"
+                      style={{ marginBottom: 16 }}
+                      rules={[{ required: true, message: 'Nhập giá bán' }]}
+                    >
                       <InputNumber 
                         min={0} 
                         style={{ width: '100%' }}
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                        onKeyDown={handleNumberKeyDown}
                       />
                     </Form.Item>
                   </Col>
                 </Row>
 
                 <div style={{ display: 'flex', gap: 16, marginTop: 24, justifyContent: 'flex-end' }}>
-                  <Button 
-                    style={{
-                      backgroundColor: '#C9A961',
-                      color: '#fff',
-                      border: 'none',
-                      padding: '8px 40px',
-                      height: 'auto',
-                      fontSize: '14px',
-                      fontWeight: 500
-                    }}
-                    onClick={() => setModalOpen(false)}
-                  >
-                    Nhập hàng
-                  </Button>
+                  {(() => {
+                    const status =
+                      selectedPart?.originalItem?.status ||
+                      selectedPart?.status ||
+                      ''
+                    const isInStock =
+                      status === 'Đủ hàng' ||
+                      status === 'IN_STOCK'
+
+                    return !isInStock ? (
+                      <Button 
+                        style={{
+                          backgroundColor: '#C9A961',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '8px 40px',
+                          height: 'auto',
+                          fontSize: '14px',
+                          fontWeight: 500
+                        }}
+                        onClick={() => {
+                          setModalOpen(false)
+                          // Navigate to create ticket with part data
+                          navigate('/warehouse/create-ticket', {
+                            state: {
+                              part: selectedPart,
+                              ticketType: 'import'
+                            }
+                          })
+                        }}
+                      >
+                        Nhập hàng
+                      </Button>
+                    ) : null
+                  })()}
                   <Button 
                     type="primary"
                     htmlType="submit"
@@ -813,12 +928,16 @@ export default function PartsList() {
               rules={[{ required: true, message: 'Vui lòng chọn xuất xứ' }]}
             >
               <Select
-                options={[
-                  { value: 'VN', label: 'Việt Nam' },
-                  { value: 'USA', label: 'USA' },
-                  { value: 'China', label: 'Trung Quốc' },
-                  { value: 'UK', label: 'UK' }
-                ]}
+                placeholder="Chọn xuất xứ"
+                showSearch
+                allowClear
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={markets.map(market => ({
+                  value: market.id || market.marketId,
+                  label: market.name || market.marketName || ''
+                }))}
               />
             </Form.Item>
 
@@ -833,7 +952,14 @@ export default function PartsList() {
                 style={{ flex: 1 }}
                 rules={[{ required: true, message: 'Nhập giá bán' }]}
               >
-                <InputNumber min={0} style={{ width: '100%' }} addonAfter="/ đ" />
+                <InputNumber
+                  min={0}
+                  style={{ width: '100%' }}
+                  addonAfter="/ đ"
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => (value || '').replace(/[^\d]/g, '')}
+                  onKeyDown={handleNumberKeyDown}
+                />
               </Form.Item>
               <Form.Item
                 label="Giá nhập"
@@ -841,13 +967,24 @@ export default function PartsList() {
                 style={{ flex: 1 }}
                 rules={[{ required: true, message: 'Nhập giá nhập' }]}
               >
-                <InputNumber min={0} style={{ width: '100%' }} addonAfter="/ đ" />
+                <InputNumber
+                  min={0}
+                  style={{ width: '100%' }}
+                  addonAfter="/ đ"
+                  formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={(value) => (value || '').replace(/[^\d]/g, '')}
+                  onKeyDown={handleNumberKeyDown}
+                />
               </Form.Item>
             </div>
 
-            <Form.Item label="Đơn vị" name="unit">
-              <Input placeholder="lít, bộ, cái..." />
-            </Form.Item>
+              <Form.Item
+                label="Đơn vị"
+                name="unit"
+                rules={[{ required: true, message: 'Vui lòng chọn đơn vị' }]}
+              >
+                <Input placeholder="lít, bộ, cái..." />
+              </Form.Item>
 
             <Form.Item label="Ghi chú" name="note">
               <Input.TextArea rows={3} />
@@ -984,6 +1121,260 @@ export default function PartsList() {
               Tìm kiếm
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* New Part Modal */}
+      <Modal
+        title={null}
+        open={newPartModalOpen}
+        onCancel={() => {
+          setNewPartModalOpen(false)
+          newPartForm.resetFields()
+        }}
+        closable={false}
+        footer={null}
+        width={580}
+        styles={{ body: { background: '#fff', padding: 0 } }}
+      >
+        <div
+          style={{
+            background: '#CBB081',
+            padding: '16px 20px',
+            margin: '-24px -24px 24px -24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}
+        >
+          <span style={{ fontWeight: 700, fontSize: 20 }}>THÊM LINH KIỆN</span>
+          <CloseOutlined style={{ cursor: 'pointer' }} onClick={() => {
+            setNewPartModalOpen(false)
+            newPartForm.resetFields()
+          }} />
+        </div>
+
+        <div style={{ padding: 24 }}>
+          <Form layout="vertical" form={newPartForm} onFinish={handleCreatePart}>
+            <Form.Item 
+              label={<span><span style={{ color: '#ef4444' }}>*</span> Tên linh kiện</span>}
+              name="name" 
+              required={false}
+              rules={[{ required: true, message: 'Vui lòng nhập tên linh kiện' }]}
+              style={{ marginBottom: 16 }}
+            >
+              <Input placeholder="Nhập tên linh kiện" />
+            </Form.Item>
+
+            <Form.Item
+              label={<span><span style={{ color: '#ef4444' }}>*</span> Loại linh kiện</span>}
+              name="categoryId"
+              required={false}
+              style={{ marginBottom: 16 }}
+              rules={[{ required: true, message: 'Chọn loại linh kiện' }]}
+            >
+              <Select
+                placeholder="Chọn loại linh kiện"
+                showSearch
+                allowClear
+                filterOption={(input, option) =>
+                  (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                }
+                options={categories.map(cat => ({
+                  value: cat.id || cat.partCategoryId,
+                  label: cat.name
+                }))}
+              />
+            </Form.Item>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label={<span><span style={{ color: '#ef4444' }}>*</span> Xuất xứ</span>}
+                  name="origin"
+                  required={false}
+                  style={{ marginBottom: 16 }}
+                  rules={[{ required: true, message: 'Chọn xuất xứ' }]}
+                >
+                  <Select
+                    placeholder="Chọn xuất xứ"
+                    showSearch
+                    allowClear
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    options={markets.map(market => ({
+                      value: market.id || market.marketId,
+                      label: market.name || market.marketName || ''
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label={<span><span style={{ color: '#ef4444' }}>*</span> Đơn vị</span>}
+                  name="unit"
+                  required={false}
+                  style={{ marginBottom: 16 }}
+                  rules={[{ required: true, message: 'Chọn đơn vị' }]}
+                >
+                  <Select
+                    placeholder="Chọn đơn vị"
+                    showSearch
+                    allowClear
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    options={units.map(unit => ({
+                      value: unit.id,
+                      label: unit.name
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label={<span><span style={{ color: '#ef4444' }}>*</span> Lượng tối thiểu</span>}
+                  name="alertThreshold"
+                  required={false}
+                  style={{ marginBottom: 16 }}
+                  rules={[{ required: true, message: 'Nhập lượng tối thiểu' }]}
+                >
+                  <InputNumber
+                    min={0}
+                    style={{ width: '100%' }}
+                    placeholder="Nhập lượng tối thiểu"
+                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                    onKeyDown={handleNumberKeyDown}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label={<span><span style={{ color: '#ef4444' }}>*</span> Nhà cung cấp</span>}
+                  name="supplier"
+                  required={false}
+                  style={{ marginBottom: 16 }}
+                  rules={[{ required: true, message: 'Chọn nhà cung cấp' }]}
+                >
+                  <Select
+                    placeholder="Chọn nhà cung cấp"
+                    showSearch
+                    allowClear
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    options={suppliers.map(supplier => ({
+                      value: supplier.id || supplier.supplierId,
+                      label: supplier.name || supplier.supplierName || supplier.companyName || ''
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item name="useForAllModels" valuePropName="checked" style={{ marginBottom: 16 }}>
+              <Checkbox>Dùng chung</Checkbox>
+            </Form.Item>
+
+            <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.useForAllModels !== currentValues.useForAllModels}>
+              {({ getFieldValue }) =>
+                !getFieldValue('useForAllModels') ? (
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item label="Hãng xe" name="vehicleBrand" style={{ marginBottom: 16 }}>
+                        <Select
+                          placeholder="Chọn hãng xe"
+                          showSearch
+                          allowClear
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          options={categories.map(cat => ({
+                            value: cat.id || cat.partCategoryId,
+                            label: cat.name
+                          }))}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="Dòng xe" name="vehicleModel" style={{ marginBottom: 16 }}>
+                        <Select
+                          placeholder="Chọn dòng xe"
+                          options={[
+                            { value: 'All', label: 'All' },
+                            { value: 'Camry', label: 'Camry' },
+                            { value: 'Vios', label: 'Vios' },
+                            { value: 'Civic', label: 'Civic' }
+                          ]}
+                        />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                ) : null
+              }
+            </Form.Item>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label={<span><span style={{ color: '#ef4444' }}>*</span> Giá nhập</span>}
+                  name="importPrice"
+                  required={false}
+                  style={{ marginBottom: 16 }}
+                  rules={[{ required: true, message: 'Nhập giá nhập' }]}
+                >
+                  <InputNumber 
+                    min={0} 
+                    style={{ width: '100%' }}
+                    placeholder="Nhập giá nhập"
+                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    onKeyDown={handleNumberKeyDown}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  label={<span><span style={{ color: '#ef4444' }}>*</span> Giá bán</span>}
+                  name="sellingPrice"
+                  required={false}
+                  style={{ marginBottom: 16 }}
+                  rules={[{ required: true, message: 'Nhập giá bán' }]}
+                >
+                  <InputNumber 
+                    min={0} 
+                    style={{ width: '100%' }}
+                    placeholder="Nhập giá bán"
+                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    onKeyDown={handleNumberKeyDown}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <div style={{ display: 'flex', gap: 16, marginTop: 24, justifyContent: 'flex-end' }}>
+              <Button 
+                type="primary"
+                htmlType="submit"
+                style={{
+                  backgroundColor: '#52c41a',
+                  border: 'none',
+                  padding: '8px 40px',
+                  height: 'auto',
+                  fontSize: '14px',
+                  fontWeight: 500
+                }}
+              >
+                Lưu
+              </Button>
+            </div>
+          </Form>
         </div>
       </Modal>
     </WarehouseLayout>

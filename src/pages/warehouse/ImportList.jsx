@@ -40,83 +40,21 @@ export default function ImportList() {
       const fromDate = dateRange[0] ? dateRange[0].format('YYYY-MM-DD') : null
       const toDate = dateRange[1] ? dateRange[1].format('YYYY-MM-DD') : null
 
-      // Mock data để test
-      const mockData = {
-        content: [
-          {
-            id: 1,
-            code: 'NK-000123',
-            supplierName: 'Hoàng Tuấn Auto',
-            purchaseRequestCode: 'PR-000456',
-            receivedQty: 2,
-            totalQty: 5,
-            lineCount: 5,
-            createdAt: '2025-10-12T10:30:00',
-            status: 'PENDING'
-          },
-          {
-            id: 2,
-            code: 'NK-000124',
-            supplierName: 'Công ty Phụ Tùng ABC',
-            purchaseRequestCode: 'PR-000457',
-            receivedQty: 5,
-            totalQty: 10,
-            lineCount: 8,
-            createdAt: '2025-11-15T14:20:00',
-            status: 'PARTIALLY_RECEIVED'
-          },
-          {
-            id: 3,
-            code: 'NK-000125',
-            supplierName: 'Nhà cung cấp XYZ',
-            purchaseRequestCode: 'PR-000458',
-            receivedQty: 15,
-            totalQty: 15,
-            lineCount: 10,
-            createdAt: '2025-12-01T09:15:00',
-            status: 'RECEIVED'
-          },
-          {
-            id: 4,
-            code: 'NK-000126',
-            supplierName: 'Auto Parts Vietnam',
-            purchaseRequestCode: 'PR-000459',
-            receivedQty: 0,
-            totalQty: 8,
-            lineCount: 6,
-            createdAt: '2025-12-05T11:45:00',
-            status: 'PENDING'
-          }
-        ],
-        totalElements: 4
-      }
-
-      let result = mockData
+      const { data, error } = await stockReceiptAPI.getAll(
+        page - 1, 
+        pageSize, 
+        searchTerm || null, 
+        status, 
+        fromDate, 
+        toDate
+      )
       
-      try {
-        const { data, error } = await stockReceiptAPI.getAll(
-          page - 1, 
-          pageSize, 
-          searchTerm || null, 
-          status, 
-          fromDate, 
-          toDate
-        )
-        console.log('API response:', data)
-        console.log('API error:', error)
-        // Only use API data if it has content, otherwise keep mock data
-        if (data?.result?.content && data.result.content.length > 0) {
-          result = data.result
-        } else {
-          console.log('API returned empty, using mock data')
-        }
-      } catch (err) {
-        console.log('Using mock data due to API error:', err)
+      if (error) {
+        throw new Error(error)
       }
 
-      console.log('Final result:', result)
+      const result = data?.result || {}
       const content = result.content || []
-      console.log('Content:', content)
       
       // Transform API data to match UI structure
       const transformedData = content.map((item) => ({
@@ -132,12 +70,13 @@ export default function ImportList() {
         status: mapStatus(item.status)
       }))
 
-      console.log('transformedData:', transformedData)
       setImportList(transformedData)
       setTotal(result.totalElements || 0)
     } catch (err) {
       console.error('Failed to fetch import list:', err)
       message.error('Đã xảy ra lỗi khi tải dữ liệu')
+      setImportList([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
@@ -194,29 +133,6 @@ export default function ImportList() {
     return statusMap[status] || { color: '#666', bgColor: '#fafafa', borderColor: '#d9d9d9', text: status || 'Không rõ' }
   }
 
-  const getFilteredData = () => {
-    let filtered = importList
-
-    // Filter by status (for mock data when API not working)
-    if (statusFilter !== 'Tất cả') {
-      filtered = filtered.filter(item => item.status === statusFilter)
-    }
-
-    // Search (for mock data when API not working)
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      filtered = filtered.filter(item =>
-        item.code?.toLowerCase().includes(term) ||
-        item.supplierName?.toLowerCase().includes(term) ||
-        item.purchaseRequestCode?.toLowerCase().includes(term)
-      )
-    }
-
-    return filtered.map((item, index) => ({
-      ...item,
-      index: (page - 1) * pageSize + index + 1
-    }))
-  }
 
   const columns = [
     {
@@ -352,7 +268,7 @@ export default function ImportList() {
 
         <Table
           columns={columns}
-          dataSource={getFilteredData()}
+          dataSource={importList}
           loading={loading}
           pagination={{
             current: page,

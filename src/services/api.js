@@ -528,6 +528,8 @@ export const stockReceiptAPI = {
   getItemHistory: (itemId) =>
     get(`/stock-receipt/receipt-items/${itemId}/history`),
   getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`),
+  receiveItem: (itemId, payload) =>
+    post(`/stock-receipt/receipt-items/${itemId}/receive`, payload),
   getReceiptHistory: (page = 0, size = 10) => {
     const params = new URLSearchParams({ page, size });
     return get(`/stock-receipt/receipt-history?${params.toString()}`);

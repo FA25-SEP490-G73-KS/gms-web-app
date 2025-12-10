@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Input, Button, Table, Select, message, InputNumber } from 'antd'
 import { CloseOutlined, PlusOutlined } from '@ant-design/icons'
+import { useLocation } from 'react-router-dom'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { partsAPI, employeesAPI, warehouseAPI } from '../../services/api'
@@ -9,6 +10,7 @@ import { getUserNameFromToken } from '../../utils/helpers'
 const { Option } = Select
 
 export default function CreateTicket() {
+  const location = useLocation()
   const [formData, setFormData] = useState({
     ticketType: undefined,
     reason: '',
@@ -37,6 +39,52 @@ export default function CreateTicket() {
       }))
     }
   }, [])
+
+  useEffect(() => {
+    // Check if navigating from PartsList with part data
+    if (location.state?.part && location.state?.ticketType === 'import') {
+      const part = location.state.part
+      
+      // Set default ticket type to import
+      setFormData(prev => ({
+        ...prev,
+        ticketType: 'import'
+      }))
+
+      // Add part to items table
+      const partItem = {
+        key: Date.now(),
+        partId: part.id || part.partId,
+        partName: part.name || '',
+        ton: part.quantityOnHand || part.quantity || 0,
+        reserved: part.reservedQuantity || 0,
+        price: part.importPrice || part.purchasePrice || 0,
+        quantity: 1,
+        totalPrice: (part.importPrice || part.purchasePrice || 0) * 1,
+        note: ''
+      }
+      setItems([partItem])
+      
+      // Ensure part is in allParts for dropdown
+      if (part.id || part.partId) {
+        const partExists = allParts.find(p => p.id === (part.id || part.partId))
+        if (!partExists) {
+          setAllParts(prev => [...prev, {
+            id: part.id || part.partId,
+            sku: part.sku || '',
+            name: part.name || '',
+            quantity: part.quantityOnHand || part.quantity || 0,
+            reservedQuantity: part.reservedQuantity || 0,
+            price: part.sellingPrice || 0,
+            purchasePrice: part.importPrice || part.purchasePrice || 0,
+            categoryName: part.categoryName || '',
+            unitName: part.unit || part.unitName || 'cái',
+            supplierName: part.supplierName || ''
+          }])
+        }
+      }
+    }
+  }, [location.state])
 
   const loadInitialParts = async () => {
     const parts = await fetchParts('')
@@ -87,7 +135,8 @@ export default function CreateTicket() {
         purchasePrice: item.purchasePrice || 0,
         categoryName: item.categoryName,
         unitName: item.unitName,
-        supplierName: item.supplierName
+        supplierName: item.supplierName,
+        marketName: item.marketName || 'VN'
       }))
     } catch (err) {
       console.error('Failed to fetch parts:', err)
@@ -267,14 +316,7 @@ export default function CreateTicket() {
       
       message.success('Tạo phiếu thành công!')
       
-      // Reset form
-      setFormData({
-        ticketType: '',
-        reason: '',
-        receiver: '',
-        creator: '',
-        creatorName: ''
-      })
+      // Chỉ reset danh sách items, giữ nguyên thông tin chung
       setItems([])
       
     } catch (err) {
@@ -311,10 +353,43 @@ export default function CreateTicket() {
           filterOption={false}
           style={{ width: '100%' }}
           notFoundContent={searchingPart[record.key] ? 'Đang tải...' : 'Không tìm thấy linh kiện'}
+          optionLabelProp="label"
         >
           {allParts.map(part => (
-            <Option key={part.id} value={part.id}>
-              {part.name}
+            <Option key={part.id} value={part.id} label={part.name}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                width: '100%'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontWeight: 600, 
+                    fontSize: '14px', 
+                    color: '#111',
+                    marginBottom: '4px'
+                  }}>
+                    {part.name}
+                  </div>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: '#888',
+                    marginTop: '2px'
+                  }}>
+                    Xuất xứ: {part.marketName || 'VN'}
+                  </div>
+                </div>
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#111',
+                  fontWeight: 500,
+                  marginLeft: '16px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  SL: {part.quantity || 0}
+                </div>
+              </div>
             </Option>
           ))}
         </Select>
@@ -403,10 +478,43 @@ export default function CreateTicket() {
           filterOption={false}
           style={{ width: '100%' }}
           notFoundContent={searchingPart[record.key] ? 'Đang tải...' : 'Không tìm thấy linh kiện'}
+          optionLabelProp="label"
         >
           {allParts.map(part => (
-            <Option key={part.id} value={part.id}>
-              {part.name}
+            <Option key={part.id} value={part.id} label={part.name}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between', 
+                alignItems: 'flex-start',
+                width: '100%'
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontWeight: 600, 
+                    fontSize: '14px', 
+                    color: '#111',
+                    marginBottom: '4px'
+                  }}>
+                    {part.name}
+                  </div>
+                  <div style={{ 
+                    fontSize: '12px', 
+                    color: '#888',
+                    marginTop: '2px'
+                  }}>
+                    Xuất xứ: {part.marketName || 'VN'}
+                  </div>
+                </div>
+                <div style={{ 
+                  fontSize: '14px', 
+                  color: '#111',
+                  fontWeight: 500,
+                  marginLeft: '16px',
+                  whiteSpace: 'nowrap'
+                }}>
+                  SL: {part.quantity || 0}
+                </div>
+              </div>
             </Option>
           ))}
         </Select>

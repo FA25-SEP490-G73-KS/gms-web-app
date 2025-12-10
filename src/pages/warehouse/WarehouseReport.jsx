@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Statistic, Row, Col, Typography, Table, Select, Spin, message, Dropdown, Modal, Form, Input, InputNumber, Checkbox, Button } from 'antd'
 import { UserOutlined, AlertOutlined, DollarOutlined, FileTextOutlined, MoreOutlined, CloseOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { Bar } from 'react-chartjs-2'
 import {
@@ -29,6 +30,7 @@ const { Title } = Typography
 const { Option } = Select
 
 export default function WarehouseReport() {
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [yearFilter, setYearFilter] = useState(new Date().getFullYear())
   const [monthFilter, setMonthFilter] = useState(new Date().getMonth() + 1)
@@ -37,69 +39,13 @@ export default function WarehouseReport() {
   const [detailForm] = Form.useForm()
   const [units, setUnits] = useState([])
   const [dashboardData, setDashboardData] = useState({
-    totalPartsInStock: 40,
-    lowStockCount: 20,
-    totalStockValue: 100000000,
-    pendingQuotationsForWarehouse: 10,
-    lowStockParts: [
-      {
-        partId: 1,
-        sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-        categoryName: 'Truyền động – Hộp số',
-        unitName: 'cái',
-        quantity: 50,
-        reservedQuantity: 5,
-        status: 'Sắp hết'
-      },
-      {
-        partId: 2,
-        sku: 'LOC-DAU-HONDA-CIVIC-2020',
-        categoryName: 'Động cơ',
-        unitName: 'cái',
-        quantity: 30,
-        reservedQuantity: 8,
-        status: 'Sắp hết'
-      },
-      {
-        partId: 3,
-        sku: 'MA-PHANH-MAZDA-CX5-2021',
-        categoryName: 'Hệ thống phanh',
-        unitName: 'bộ',
-        quantity: 15,
-        reservedQuantity: 15,
-        status: 'Hết hàng'
-      },
-      {
-        partId: 4,
-        sku: 'BUGI-TOYOTA-VIOS-2019',
-        categoryName: 'Hệ thống điện',
-        unitName: 'cái',
-        quantity: 25,
-        reservedQuantity: 5,
-        status: 'Sắp hết'
-      }
-    ],
-    monthCosts: [
-      { month: 1, year: 2025, importCost: 75000000, exportCost: 65000000 },
-      { month: 2, year: 2025, importCost: 110000000, exportCost: 90000000 },
-      { month: 3, year: 2025, importCost: 145000000, exportCost: 120000000 },
-      { month: 4, year: 2025, importCost: 220000000, exportCost: 190000000 },
-      { month: 5, year: 2025, importCost: 310000000, exportCost: 280000000 },
-      { month: 6, year: 2025, importCost: 340000000, exportCost: 310000000 },
-      { month: 7, year: 2025, importCost: 420000000, exportCost: 390000000 },
-      { month: 8, year: 2025, importCost: 360000000, exportCost: 330000000 },
-      { month: 9, year: 2025, importCost: 450000000, exportCost: 410000000 },
-      { month: 10, year: 2025, importCost: 380000000, exportCost: 350000000 },
-      { month: 11, year: 2025, importCost: 540000000, exportCost: 490000000 },
-      { month: 12, year: 2025, importCost: 575000000, exportCost: 520000000 }
-    ],
-    topImportedParts: [
-      { partId: 1, partName: 'Má phanh', totalImportedQuantity: 80, unitName: 'bộ' },
-      { partId: 2, partName: 'Dầu động cơ', totalImportedQuantity: 75, unitName: 'lít' },
-      { partId: 3, partName: 'Lọc dầu', totalImportedQuantity: 70, unitName: 'cái' },
-      { partId: 4, partName: 'Bugi', totalImportedQuantity: 85, unitName: 'cái' },
-      { partId: 5, partName: 'Ắc quy', totalImportedQuantity: 65, unitName: 'cái' }
-    ]
+    totalPartsInStock: 0,
+    lowStockCount: 0,
+    totalStockValue: 0,
+    pendingQuotationsForWarehouse: 0,
+    lowStockParts: [],
+    monthCosts: [],
+    topImportedParts: []
   })
 
   useEffect(() => {
@@ -132,29 +78,32 @@ export default function WarehouseReport() {
       const { data, error } = await dashboardAPI.getWarehouseOverview(yearFilter, monthFilter)
       
       if (error) {
-        console.error('Error fetching dashboard:', error)
-        // Giữ dữ liệu fake nếu API lỗi
-        setLoading(false)
-        return
+        throw new Error(error)
       }
 
       const result = data?.result || {}
       
-      // Chỉ cập nhật nếu có dữ liệu từ API
-      if (result && Object.keys(result).length > 0) {
-        setDashboardData({
-          totalPartsInStock: result.totalPartsInStock || dashboardData.totalPartsInStock,
-          lowStockCount: result.lowStockCount || dashboardData.lowStockCount,
-          totalStockValue: result.totalStockValue || dashboardData.totalStockValue,
-          pendingQuotationsForWarehouse: result.pendingQuotationsForWarehouse || dashboardData.pendingQuotationsForWarehouse,
-          lowStockParts: result.lowStockParts && result.lowStockParts.length > 0 ? result.lowStockParts : dashboardData.lowStockParts,
-          monthCosts: result.monthCosts && result.monthCosts.length > 0 ? result.monthCosts : dashboardData.monthCosts,
-          topImportedParts: result.topImportedParts && result.topImportedParts.length > 0 ? result.topImportedParts : dashboardData.topImportedParts
-        })
-      }
+      setDashboardData({
+        totalPartsInStock: result.totalPartsInStock || 0,
+        lowStockCount: result.lowStockCount || 0,
+        totalStockValue: result.totalStockValue || 0,
+        pendingQuotationsForWarehouse: result.pendingQuotationsForWarehouse || 0,
+        lowStockParts: result.lowStockParts || [],
+        monthCosts: result.monthCosts || [],
+        topImportedParts: result.topImportedParts || []
+      })
     } catch (err) {
       console.error('Failed to fetch dashboard:', err)
-      // Giữ dữ liệu fake nếu có exception
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+      setDashboardData({
+        totalPartsInStock: 0,
+        lowStockCount: 0,
+        totalStockValue: 0,
+        pendingQuotationsForWarehouse: 0,
+        lowStockParts: [],
+        monthCosts: [],
+        topImportedParts: []
+      })
     } finally {
       setLoading(false)
     }
@@ -792,7 +741,16 @@ export default function WarehouseReport() {
                       fontSize: '14px',
                       fontWeight: 500
                     }}
-                    onClick={() => setModalOpen(false)}
+                    onClick={() => {
+                      setModalOpen(false)
+                      // Navigate to create ticket with part data
+                      navigate('/warehouse/create-ticket', {
+                        state: {
+                          part: selectedPart,
+                          ticketType: 'import'
+                        }
+                      })
+                    }}
                   >
                     Nhập hàng
                   </Button>

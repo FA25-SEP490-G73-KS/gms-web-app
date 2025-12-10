@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Tag, Modal, Dropdown, Input, Upload, message } from 'antd'
+import { Table, Button, Tag, Modal, Dropdown, Input, InputNumber, Upload, message } from 'antd'
 import { useParams, useNavigate } from 'react-router-dom'
 import { MoreOutlined, UploadOutlined, InboxOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { stockReceiptAPI } from '../../services/api'
+import { getUserNameFromToken } from '../../utils/helpers'
 import dayjs from 'dayjs'
 
 const { Dragger } = Upload
@@ -22,7 +23,11 @@ export default function ImportDetail() {
   const [importFormLoading, setImportFormLoading] = useState(false)
   const [selectedItem, setSelectedItem] = useState(null)
   const [importFormData, setImportFormData] = useState({
-    receiver: '',
+    quantity: 0,
+    receivedBy: '',
+    note: '',
+    unitPrice: 0,
+    attachmentUrl: '',
     fileList: []
   })
 
@@ -89,6 +94,16 @@ export default function ImportDetail() {
       // Map API response to UI data structure
       const result = data?.result
       if (result) {
+        const mapStatus = (status) => {
+          const statusMap = {
+            'PENDING': 'Chờ nhập kho',
+            'PARTIALLY_RECEIVED': 'Nhập một phần',
+            'RECEIVED': 'Đã nhập kho',
+            'CANCELLED': 'Đã hủy'
+          }
+          return statusMap[status] || status || 'Chờ nhập kho'
+        }
+
         const mappedData = {
           code: result.code || 'N/A',
           supplierName: result.supplierName || 'N/A',
@@ -97,7 +112,7 @@ export default function ImportDetail() {
           receivedAt: result.receivedAt || null,
           receivedBy: result.receivedBy || 'N/A',
           purchaseRequestCode: result.purchaseRequestCode || 'N/A',
-          status: result.status || 'Chờ nhập',
+          status: mapStatus(result.status),
           note: result.note || '',
           totalAmount: result.totalAmount || 0,
           items: (result.items || []).map(item => ({
@@ -108,7 +123,7 @@ export default function ImportDetail() {
             receivedQty: item.receivedQty || 0,
             unitPrice: item.unitPrice || 0,
             totalPrice: item.totalPrice || 0,
-            status: item.status || 'Chờ nhập'
+            status: mapStatus(item.status)
           }))
         }
         setDetailData(mappedData)
@@ -124,80 +139,93 @@ export default function ImportDetail() {
   const fetchItemHistory = async (itemId) => {
     setHistoryLoading(true)
     try {
-      // Mock history data
-      const mockHistory = {
-        partInfo: {
-          sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-          partName: 'Lọc gió động cơ Camry 2019'
-        },
-        importInfo: {
-          requestedQty: 5,
-          receivedQty: 1
-        },
-        history: [
-          {
-            id: 1,
-            quantity: 1,
-            importDate: '2025-10-20T14:30:00',
-            importedBy: 'Nguyễn Văn A',
-            document: 'File.pdf'
+      const { data, error } = await stockReceiptAPI.getItemHistory(itemId)
+      
+      if (error) {
+        throw new Error(error)
+      }
+
+      const result = data?.result
+      if (result) {
+        const mappedData = {
+          partInfo: {
+            sku: result.partCode || 'N/A',
+            partName: result.partName || 'N/A'
           },
-          {
-            id: 2,
-            quantity: 1,
-            importDate: '2025-10-20T14:30:00',
-            importedBy: 'Nguyễn Văn A',
-            document: 'File.pdf'
-          }
-        ]
-      }
-
-      let result = mockHistory
-
-      try {
-        const { data, error } = await stockReceiptAPI.getItemHistory(itemId)
-        if (data?.result) {
-          result = data.result
+          importInfo: {
+            requestedQty: result.requestedQty || 0,
+            receivedQty: result.receivedQty || 0
+          },
+          history: (result.history || []).map(item => ({
+            id: item.id,
+            quantity: item.quantity || 0,
+            receivedAt: item.receivedAt,
+            receivedBy: item.receivedBy || 'N/A',
+            attachmentUrl: item.attachmentUrl || ''
+          }))
         }
-      } catch (err) {
-        console.log('Using mock history data due to API error:', err)
+        setHistoryData(mappedData)
       }
-
-      setHistoryData(result)
     } catch (err) {
       console.error('Failed to fetch history:', err)
       message.error('Đã xảy ra lỗi khi tải lịch sử')
+      setHistoryData(null)
     } finally {
       setHistoryLoading(false)
+    }
+  }
+
+  const extractFileName = (url) => {
+    if (!url) return ''
+    try {
+      // Extract filename from URL
+      const urlParts = url.split('/')
+      const fileName = urlParts[urlParts.length - 1]
+      // Remove extension and any numbers in parentheses, keep only the base name
+      // Example: "quotation-1 (28).pdf" -> "quotation-1"
+      const baseName = fileName.replace(/\s*\([^)]*\)\s*/, '').replace(/\.[^.]*$/, '')
+      return baseName
+    } catch (err) {
+      return url
+    }
+  }
+
+  const handleNumberKeyDown = (e) => {
+    const allowedKeys = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Home', 'End', 'Enter']
+    if (allowedKeys.includes(e.key)) {
+      return
+    }
+    // Allow numbers only
+    if (!/^[0-9]$/.test(e.key)) {
+      e.preventDefault()
     }
   }
 
   const fetchItemForImport = async (itemId) => {
     setImportFormLoading(true)
     try {
-      // Mock item data
-      const mockItemData = {
-        sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-        partName: 'Lọc gió động cơ Camry 2019',
-        requestedQty: 5,
-        receivedQty: 1
+      const { data, error } = await stockReceiptAPI.getItemById(itemId)
+      
+      if (error) {
+        throw new Error(error)
       }
 
-      let result = mockItemData
-
-      try {
-        const { data, error } = await stockReceiptAPI.getItemById(itemId)
-        if (data?.result) {
-          result = data.result
+      const result = data?.result
+      if (result) {
+        const mappedItem = {
+          id: result.id,
+          sku: result.partCode || result.sku || 'N/A',
+          partName: result.partName || 'N/A',
+          requestedQty: result.requestedQty || 0,
+          receivedQty: result.receivedQty || 0,
+          unitPrice: result.unitPrice || 0
         }
-      } catch (err) {
-        console.log('Using mock item data due to API error:', err)
+        setSelectedItem(mappedItem)
       }
-
-      setSelectedItem(result)
     } catch (err) {
       console.error('Failed to fetch item:', err)
       message.error('Đã xảy ra lỗi khi tải thông tin linh kiện')
+      setSelectedItem(null)
     } finally {
       setImportFormLoading(false)
     }
@@ -206,23 +234,86 @@ export default function ImportDetail() {
   const handleOpenImportModal = (item) => {
     setIsImportModalOpen(true)
     fetchItemForImport(item.id)
+    // Reset form data
+    const username = getUserNameFromToken() || ''
+    setImportFormData({
+      quantity: 0,
+      receivedBy: username,
+      note: '',
+      unitPrice: item.unitPrice || 0,
+      attachmentUrl: '',
+      fileList: []
+    })
   }
 
-  const handleImportGoods = () => {
-    if (!importFormData.receiver) {
+  const uploadFile = async (file) => {
+    try {
+      // TODO: Implement file upload API if needed
+      // For now, return a placeholder URL
+      return 'https://example.com/uploads/' + file.name
+    } catch (err) {
+      console.error('File upload error:', err)
+      throw err
+    }
+  }
+
+  const handleImportGoods = async () => {
+    if (!importFormData.quantity || importFormData.quantity <= 0) {
       message.error('Vui lòng nhập số lượng thực nhận')
       return
     }
     
-    if (importFormData.fileList.length === 0) {
-      message.error('Vui lòng đính kèm file')
+    if (!importFormData.receivedBy) {
+      message.error('Vui lòng nhập người nhận')
       return
     }
 
-    // TODO: Call API to submit import
-    message.success('Nhập hàng thành công')
-    setIsImportModalOpen(false)
-    setImportFormData({ receiver: '', fileList: [] })
+    if (!selectedItem?.id) {
+      message.error('Không tìm thấy thông tin linh kiện')
+      return
+    }
+
+    try {
+      setImportFormLoading(true)
+      
+      // Upload file if exists
+      let attachmentUrl = ''
+      if (importFormData.fileList.length > 0) {
+        attachmentUrl = await uploadFile(importFormData.fileList[0].originFileObj || importFormData.fileList[0])
+      }
+
+      const payload = {
+        quantity: importFormData.quantity,
+        receivedBy: importFormData.receivedBy,
+        note: importFormData.note || '',
+        unitPrice: importFormData.unitPrice || 0,
+        attachmentUrl: attachmentUrl
+      }
+
+      const { data, error } = await stockReceiptAPI.receiveItem(selectedItem.id, payload)
+      
+      if (error) {
+        throw new Error(error)
+      }
+
+      message.success('Nhập hàng thành công')
+      setIsImportModalOpen(false)
+      setImportFormData({
+        quantity: 0,
+        receivedBy: '',
+        note: '',
+        unitPrice: 0,
+        attachmentUrl: '',
+        fileList: []
+      })
+      // Refresh detail data
+      fetchDetail()
+    } catch (err) {
+      console.error('Import goods error:', err)
+      message.error(err.message || 'Đã xảy ra lỗi khi nhập hàng')
+    } finally {
+      setImportFormLoading(false)
+    }
   }
 
   const handleViewItemDetail = (item) => {
@@ -244,10 +335,15 @@ export default function ImportDetail() {
 
   const getStatusTagConfig = (status) => {
     const configs = {
-      'Đang xuất hàng': { color: '#1677ff', text: 'Đang xuất hàng' },
-      'Hoàn thành': { color: '#22c55e', text: 'Hoàn thành' }
+      'Đã nhập kho': { color: '#22c55e', bgColor: '#f6ffed', borderColor: '#b7eb8f', text: 'Đã nhập kho' },
+      'Chờ nhập kho': { color: '#faad14', bgColor: '#fffbe6', borderColor: '#ffe58f', text: 'Chờ nhập kho' },
+      'Nhập một phần': { color: '#1677ff', bgColor: '#e6f4ff', borderColor: '#91caff', text: 'Nhập một phần' },
+      'Đang xuất hàng': { color: '#1677ff', bgColor: '#e6f4ff', borderColor: '#91caff', text: 'Đang xuất hàng' },
+      'Hoàn thành': { color: '#22c55e', bgColor: '#f6ffed', borderColor: '#b7eb8f', text: 'Hoàn thành' },
+      'Đã hủy': { color: '#ff4d4f', bgColor: '#fff1f0', borderColor: '#ffccc7', text: 'Đã hủy' }
     }
-    return configs[status] || { color: '#666', text: status }
+    const config = configs[status] || { color: '#666', bgColor: '#fafafa', borderColor: '#d9d9d9', text: status }
+    return config
   }
 
   const getFilteredItems = () => {
@@ -304,8 +400,8 @@ export default function ImportDetail() {
           <Tag
             style={{
               color: config.color,
-              backgroundColor: config.color + '15',
-              borderColor: config.color,
+              backgroundColor: config.bgColor,
+              borderColor: config.borderColor,
               border: '1px solid',
               borderRadius: '6px',
               padding: '4px 12px',
@@ -384,25 +480,31 @@ export default function ImportDetail() {
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ width: 150, fontWeight: 500 }}>Trạng thái</span>
             <span>: </span>
-            <Tag
-              style={{
-                marginLeft: 8,
-                color: '#faad14',
-                backgroundColor: '#fffbe6',
-                borderColor: '#ffe58f',
-                border: '1px solid',
-                borderRadius: '6px',
-                padding: '4px 12px',
-                fontWeight: 500
-              }}
-            >
-              {detailData.status || 'CHỜ NHẬP'}
-            </Tag>
+            {(() => {
+              const status = detailData.status || 'Chờ nhập kho'
+              const config = getStatusTagConfig(status)
+              return (
+                <Tag
+                  style={{
+                    marginLeft: 8,
+                    color: config.color,
+                    backgroundColor: config.bgColor,
+                    borderColor: config.borderColor,
+                    border: '1px solid',
+                    borderRadius: '6px',
+                    padding: '4px 12px',
+                    fontWeight: 500
+                  }}
+                >
+                  {config.text}
+                </Tag>
+              )
+            })()}
           </div>
 
           {/* Filter buttons for item status */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginBottom: 16 }}>
-            {['Tất cả', 'Chờ nhập', 'Hoàn thành'].map((filter) => (
+            {['Tất cả', 'Chờ nhập kho', 'Đã nhập kho'].map((filter) => (
               <Button
                 key={filter}
                 type={statusFilter === filter ? 'primary' : 'default'}
@@ -499,23 +601,36 @@ export default function ImportDetail() {
                 },
                 {
                   title: 'Ngày',
-                  dataIndex: 'importDate',
-                  key: 'importDate',
+                  dataIndex: 'receivedAt',
+                  key: 'receivedAt',
                   width: 150,
                   render: (date) => date ? dayjs(date).format('DD/MM/YYYY') : 'N/A'
                 },
                 {
                   title: 'Người nhập',
-                  dataIndex: 'importedBy',
-                  key: 'importedBy',
+                  dataIndex: 'receivedBy',
+                  key: 'receivedBy',
                   width: 150
                 },
                 {
                   title: 'Hóa đơn',
-                  dataIndex: 'document',
-                  key: 'document',
+                  dataIndex: 'attachmentUrl',
+                  key: 'attachmentUrl',
                   width: 120,
-                  render: (doc) => doc ? <a>{doc}</a> : 'N/A'
+                  render: (url) => {
+                    if (!url) return 'N/A'
+                    const fileName = extractFileName(url)
+                    return (
+                      <a 
+                        href={url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        style={{ color: '#1677ff', textDecoration: 'underline' }}
+                      >
+                        {fileName}
+                      </a>
+                    )
+                  }
                 }
               ]}
               dataSource={historyData.history || []}
@@ -525,27 +640,30 @@ export default function ImportDetail() {
               rowKey={(record) => record.id}
             />
 
-            {/* Button Nhập hàng */}
-            <div style={{ marginTop: 24, textAlign: 'right' }}>
-              <Button
-                type="primary"
-                style={{
-                  background: '#22c55e',
-                  borderColor: '#22c55e',
-                  borderRadius: '6px',
-                  padding: '8px 32px',
-                  height: 'auto',
-                  fontSize: '16px',
-                  fontWeight: 500
-                }}
-                onClick={() => {
-                  setIsHistoryModalOpen(false)
-                  handleOpenImportModal(selectedItem)
-                }}
-              >
-                Nhập hàng
-              </Button>
-            </div>
+            {/* Button Nhập hàng - chỉ hiển thị khi chưa nhập đủ */}
+            {selectedItem?.status !== 'Đã nhập kho' && selectedItem?.status !== 'RECEIVED' && 
+             (!historyData?.importInfo || historyData.importInfo.receivedQty < historyData.importInfo.requestedQty) && (
+              <div style={{ marginTop: 24, textAlign: 'right' }}>
+                <Button
+                  type="primary"
+                  style={{
+                    background: '#22c55e',
+                    borderColor: '#22c55e',
+                    borderRadius: '6px',
+                    padding: '8px 32px',
+                    height: 'auto',
+                    fontSize: '16px',
+                    fontWeight: 500
+                  }}
+                  onClick={() => {
+                    setIsHistoryModalOpen(false)
+                    handleOpenImportModal(selectedItem)
+                  }}
+                >
+                  Nhập hàng
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '40px' }}>Không có dữ liệu</div>
@@ -602,12 +720,63 @@ export default function ImportDetail() {
               {/* Số lượng thực nhận */}
               <div style={{ marginBottom: 16 }}>
                 <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>
-                  Số lượng thực nhận
+                  Số lượng thực nhận <span style={{ color: 'red' }}>*</span>
+                </label>
+                <InputNumber
+                  min={0}
+                  placeholder="Nhập số lượng"
+                  value={importFormData.quantity}
+                  onChange={(value) => setImportFormData({ ...importFormData, quantity: value || 0 })}
+                  onKeyDown={handleNumberKeyDown}
+                  style={{ width: '100%', borderRadius: '6px' }}
+                />
+              </div>
+
+              {/* Người nhận */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>
+                  Người nhận <span style={{ color: 'red' }}>*</span>
                 </label>
                 <Input
-                  placeholder="Đặng Thị Huyền - 01234"
-                  value={importFormData.receiver}
-                  onChange={(e) => setImportFormData({ ...importFormData, receiver: e.target.value })}
+                  placeholder="Nhập tên người nhận"
+                  value={importFormData.receivedBy}
+                  onChange={(e) => setImportFormData({ ...importFormData, receivedBy: e.target.value })}
+                  disabled
+                  style={{ 
+                    borderRadius: '6px',
+                    backgroundColor: '#f5f5f5',
+                    cursor: 'not-allowed'
+                  }}
+                />
+              </div>
+
+              {/* Đơn giá */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>
+                  Đơn giá
+                </label>
+                <InputNumber
+                  min={0}
+                  placeholder="Nhập đơn giá"
+                  value={importFormData.unitPrice}
+                  onChange={(value) => setImportFormData({ ...importFormData, unitPrice: value || 0 })}
+                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                  onKeyDown={handleNumberKeyDown}
+                  style={{ width: '100%', borderRadius: '6px' }}
+                />
+              </div>
+
+              {/* Ghi chú */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>
+                  Ghi chú
+                </label>
+                <Input.TextArea
+                  placeholder="Nhập ghi chú"
+                  value={importFormData.note}
+                  onChange={(e) => setImportFormData({ ...importFormData, note: e.target.value })}
+                  rows={3}
                   style={{ borderRadius: '6px' }}
                 />
               </div>

@@ -177,6 +177,17 @@ export default function ExportList() {
   // Main table columns
   const columns = [
     {
+      title: 'STT',
+      key: 'index',
+      width: 80,
+      align: 'center',
+      render: (_, __, index) => (
+        <span style={{ fontWeight: 600, color: '#111' }}>
+          {String(index + 1).padStart(2, '0')}
+        </span>
+      )
+    },
+    {
       title: 'Mã phiếu',
       dataIndex: 'exportCode',
       key: 'exportCode',
@@ -310,7 +321,7 @@ export default function ExportList() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
 
-            {/* Filter buttons bên phải */}
+            {/* Filter buttons và DatePicker */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
               <Button
                 type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
@@ -324,19 +335,6 @@ export default function ExportList() {
                 }}
               >
                 Đang xuất hàng
-              </Button>
-              <Button
-                type={statusFilter === 'Chờ mua hàng' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Chờ mua hàng')}
-                style={{
-                  borderRadius: '8px',
-                  fontWeight: 600,
-                  background: statusFilter === 'Chờ mua hàng' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Chờ mua hàng' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Chờ mua hàng' ? '#111' : '#666'
-                }}
-              >
-                Chờ mua hàng
               </Button>
               <Button
                 type={statusFilter === 'Hoàn thành' ? 'primary' : 'default'}
@@ -364,6 +362,20 @@ export default function ExportList() {
               >
                 Tất cả
               </Button>
+
+              {/* DatePicker Ngày tạo */}
+              <DatePicker
+                placeholder="Ngày tạo"
+                value={dateRange[0]}
+                onChange={(date) => {
+                  setDateRange([date, dateRange[1]])
+                }}
+                style={{ 
+                  width: 150, 
+                  borderRadius: '8px'
+                }}
+                format="DD/MM/YYYY"
+              />
 
               {/* Filter icon button */}
               <Button
