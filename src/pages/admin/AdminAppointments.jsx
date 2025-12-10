@@ -140,7 +140,7 @@ export default function AdminAppointments() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState(10)
+  const [pageSize, setPageSize] = useState(6)
   const [selected, setSelected] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
@@ -689,34 +689,32 @@ export default function AdminAppointments() {
         const config = getStatusConfig(status)
         const statusKey = record.statusKey || 'CONFIRMED'
         const isUpdating = updatingStatusId === record.id
-        
-        const statusOptions = [
-          { value: 'CONFIRMED', label: 'Chờ', color: '#e89400' },
-          { value: 'ARRIVED', label: 'Đã đến', color: '#16a34a' },
-          { value: 'CANCELLED', label: 'Hủy', color: '#ef4444' }
-        ]
-        
+
         return (
           <select
             onChange={(e) => {
-              const newStatus = e.target.value
-              if (newStatus && newStatus !== statusKey) {
+              const newStatus = 'CANCELLED'
+              if (statusKey !== 'CANCELLED') {
                 handleStatusChange(record.id, newStatus)
               }
             }}
-            disabled={isUpdating}
-            className="status-select-dropdown"
+            disabled={isUpdating || statusKey === 'CANCELLED'}
+            className="status-select-dropdown modern"
             value={statusKey}
             style={{
               color: config.color,
-              opacity: isUpdating ? 0.6 : 1
+              opacity: statusKey === 'CANCELLED' ? 0.6 : isUpdating ? 0.6 : 1,
+              pointerEvents: statusKey === 'CANCELLED' ? 'none' : 'auto',
+              cursor: statusKey === 'CANCELLED' ? 'not-allowed' : 'pointer'
             }}
           >
-            {statusOptions.map((opt) => (
-              <option key={opt.value} value={opt.value} style={{ color: opt.color }}>
-                {opt.label}
-              </option>
-            ))}
+            {/* Hiển thị trạng thái hiện tại nhưng không cho chọn, ẩn khỏi dropdown để giữ chỉ một lựa chọn chuyển đổi */}
+            <option value={statusKey} disabled hidden={statusKey !== 'CANCELLED'}>
+              {config.text}
+            </option>
+            <option value="CANCELLED" style={{ color: '#ef4444' }}>
+              Hủy
+            </option>
           </select>
         )
       }
@@ -887,13 +885,9 @@ export default function AdminAppointments() {
                   current: page,
                   pageSize: pageSize,
                   total: filtered.length,
-                  showSizeChanger: true,
+                  showSizeChanger: false,
                   showTotal: (total) => `Tổng ${total} lịch hẹn`,
-                  pageSizeOptions: ['10', '20', '50'],
-                  onChange: (p, ps) => {
-                    setPage(p)
-                    setPageSize(ps)
-                  }
+                  onChange: (p) => setPage(p)
                 }}
                 size="middle"
                 components={goldTableHeader}

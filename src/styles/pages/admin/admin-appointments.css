@@ -13,6 +13,54 @@
 .status-warning { background: #ffffff; color: #e49a00; border-color: #ffe6b3; }
 .status-secondary { background: #ffffff; color: #b0b5bd; border-color: #e7eaf0; }
 
+.status-cancelled-pill {
+  min-width: 140px;
+  height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #ffd5d8;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff5f5 0%, #fff 100%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.04);
+  font-weight: 700;
+  letter-spacing: 0.1px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: not-allowed;
+}
+
+/* modern status dropdown */
+.status-select-dropdown.modern {
+  min-width: 140px;
+  height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  transition: all 0.2s ease;
+  color: #111;
+}
+
+.status-select-dropdown.modern:focus {
+  outline: none;
+  border-color: #cbb081;
+  box-shadow: 0 10px 24px rgba(203, 176, 129, 0.25);
+}
+
+.status-select-dropdown.modern option {
+  font-weight: 600;
+  color: #111;
+  background: #fff;
+}
+
+.status-select-dropdown.modern:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
 /* status filter buttons */
 .status-btn {
   border-radius: 24px !important;

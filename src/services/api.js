@@ -186,22 +186,32 @@ export const inventoryAPI = {
 };
 
 export const stockExportAPI = {
-  getAll: (page = 0, size = 6, keyword = null, status = null, fromDate = null, toDate = null) => {
-    const params = new URLSearchParams({ page, size })
-    if (keyword) params.append('keyword', keyword)
-    if (status) params.append('status', status)
-    if (fromDate) params.append('fromDate', fromDate)
-    if (toDate) params.append('toDate', toDate)
-    return get(`/stock-exports?${params.toString()}`)
+  getAll: (
+    page = 0,
+    size = 6,
+    keyword = null,
+    status = null,
+    fromDate = null,
+    toDate = null
+  ) => {
+    const params = new URLSearchParams({ page, size });
+    if (keyword) params.append("keyword", keyword);
+    if (status) params.append("status", status);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+    return get(`/stock-exports?${params.toString()}`);
   },
   getById: (id) => get(`/stock-exports/${id}`),
-  getItemHistory: (itemId) => get(`/stock-exports/export-items/${itemId}/history`),
+  getItemHistory: (itemId) =>
+    get(`/stock-exports/export-items/${itemId}/history`),
   getQuotationDetail: (id) => get(`/stock-exports/quotation/${id}`),
- 
-  exportItem: (itemId, payload) => post(`/stock-exports/export-items/${itemId}/export`, payload),
-  
-  getExportItemDetail: (exportItemId) => get(`/stock-exports/export-items/${exportItemId}`),
-  create: (data) => post('/stock-exports', data),
+
+  exportItem: (itemId, payload) =>
+    post(`/stock-exports/export-items/${itemId}/export`, payload),
+
+  getExportItemDetail: (exportItemId) =>
+    get(`/stock-exports/export-items/${exportItemId}`),
+  create: (data) => post("/stock-exports", data),
   update: (id, data) => put(`/stock-exports/${id}`, data),
 };
 
@@ -222,7 +232,14 @@ export const employeeAPI = {
 };
 
 export const partsAPI = {
-  getAll: ({ page = 0, size = 6, keyword, categoryId, status, signal } = {}) => {
+  getAll: ({
+    page = 0,
+    size = 6,
+    keyword,
+    categoryId,
+    status,
+    signal,
+  } = {}) => {
     const query = buildQueryString({ page, size, keyword, categoryId, status });
     const suffix = query ? `?${query}` : "";
     return get(`/parts${suffix}`, { signal });
@@ -266,7 +283,8 @@ export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
   update: (id, payload) => patch(`/price-quotations/${id}`, payload),
   sendToCustomer: (id) => post(`/price-quotations/${id}/send-to-customer`),
-  getPending: (page = 0, size = 6) => get(`/price-quotations/pending?page=${page}&size=${size}`),
+  getPending: (page = 0, size = 6) =>
+    get(`/price-quotations/pending?page=${page}&size=${size}`),
   getById: (id) => get(`/price-quotations/${id}`),
   getItemById: (id) => get(`/quotation-items/${id}`),
 
@@ -298,12 +316,13 @@ export const znsNotificationsAPI = {
 export const notificationAPI = {
   getAll: (page = 0, size = 20, status = null) => {
     const params = new URLSearchParams({ page, size });
-    if (status) params.append('status', status);
+    if (status) params.append("status", status);
     return get(`/notifications?${params.toString()}`);
   },
-  getUnreadCount: () => get('/notifications/unread-count'),
-  markAsRead: (notificationId) => patch(`/notifications/${notificationId}/read`),
-  markAllAsRead: () => patch('/notifications/read-all'),
+  getUnreadCount: () => get("/notifications/unread-count"),
+  markAsRead: (notificationId) =>
+    patch(`/notifications/${notificationId}/read`),
+  markAllAsRead: () => patch("/notifications/read-all"),
   getById: (id) => get(`/notifications/${id}`),
 };
 
@@ -384,7 +403,7 @@ export const debtsAPI = {
     return get(`/debts/${serviceTicketId}/debt-detail`);
   },
   createPayment: (payload) => {
-    return post('/debts', payload);
+    return post("/debts", payload);
   },
   pay: (debtId, payload) => {
     return post(`/debts/${debtId}/pay`, payload);
@@ -408,17 +427,23 @@ export const suppliersAPI = {
 };
 
 export const customersAPI = {
-  getAll: (page = 0, size = 10) => get(`/customers/manager?page=${page}&size=${size}`),
+  getAll: (page = 0, size = 10) =>
+    get(`/customers/manager?page=${page}&size=${size}`),
   getById: (id) => get(`/customers/${id}`),
   getServiceHistory: (phone) =>
     get(`/customers/service-history?phone=${encodeURIComponent(phone)}`),
+  lookupByOtp: (phone) =>
+    get(`/customers/otp/lookup?phone=${encodeURIComponent(phone || "")}`, {
+      skipAuth: true,
+    }),
+  notMe: (phone) => post("/customers/not-me", { phone }, { skipAuth: true }),
   getServiceHistoryById: (customerId) =>
     get(`/customers/manager/${customerId}/service-history`),
   getByPhone: (phone) =>
     get(`/customers/phone?phone=${encodeURIComponent(phone)}`),
   create: (payload) => post("/customers", payload),
   update: (id, payload) => put(`/customers/${id}`, payload),
-  toggleActive: (id) => patch(`/customers/${id}/toggle-active`, {})
+  toggleActive: (id) => patch(`/customers/${id}/toggle-active`, {}),
 };
 
 export const manualVoucherAPI = {
@@ -443,14 +468,16 @@ export const manualVoucherAPI = {
 };
 
 export const ledgerVoucherAPI = {
-  getAll: (page = 0, size = 20, queryString = '') => {
-    const baseUrl = `/ledger-vouchers?page=${page}&size=${size}`
-    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl)
+  getAll: (page = 0, size = 20, queryString = "") => {
+    const baseUrl = `/ledger-vouchers?page=${page}&size=${size}`;
+    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl);
   },
   getById: (id) => get(`/ledger-vouchers/${id}`),
   create: (data) => post("/ledger-vouchers/manual", data),
-  approve: (id, approvedByEmployeeId = 0) => post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
-  reject: (id, rejectedByEmployeeId = 0) => post(`/ledger-vouchers/${id}/reject`, { rejectedByEmployeeId })
+  approve: (id, approvedByEmployeeId = 0) =>
+    post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
+  reject: (id, rejectedByEmployeeId = 0) =>
+    post(`/ledger-vouchers/${id}/reject`, { rejectedByEmployeeId }),
 };
 
 export const attendanceAPI = {
@@ -482,29 +509,42 @@ export const payrollAPI = {
 };
 
 export const stockReceiptAPI = {
-  getAll: (page = 0, size = 10, keyword = null, status = null, fromDate = null, toDate = null) => {
-    const params = new URLSearchParams({ page, size })
-    if (keyword) params.append('keyword', keyword)
-    if (status) params.append('status', status)
-    if (fromDate) params.append('fromDate', fromDate)
-    if (toDate) params.append('toDate', toDate)
-    return get(`/stock-receipt?${params.toString()}`)
+  getAll: (
+    page = 0,
+    size = 10,
+    keyword = null,
+    status = null,
+    fromDate = null,
+    toDate = null
+  ) => {
+    const params = new URLSearchParams({ page, size });
+    if (keyword) params.append("keyword", keyword);
+    if (status) params.append("status", status);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+    return get(`/stock-receipt?${params.toString()}`);
   },
   getById: (id) => get(`/stock-receipt/${id}`),
-  getItemHistory: (itemId) => get(`/stock-receipt/receipt-items/${itemId}/history`),
+  getItemHistory: (itemId) =>
+    get(`/stock-receipt/receipt-items/${itemId}/history`),
   getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`),
   getReceiptHistory: (page = 0, size = 10) => {
-    const params = new URLSearchParams({ page, size })
-    return get(`/stock-receipt/receipt-history?${params.toString()}`)
+    const params = new URLSearchParams({ page, size });
+    return get(`/stock-receipt/receipt-history?${params.toString()}`);
   },
-  getPaymentDetail: (id) => get(`/stock-receipt/receipt-history/${id}/payment-detail`),
+  getPaymentDetail: (id) =>
+    get(`/stock-receipt/receipt-history/${id}/payment-detail`),
   createReceiptPayment: (id, formData) => {
-    return axiosClient.post(`/ledger-vouchers/receipt-payment/${id}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+    return axiosClient.post(
+      `/ledger-vouchers/receipt-payment/${id}`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       }
-    })
-  }
+    );
+  },
 };
 
 export const transactionsAPI = {
@@ -513,26 +553,27 @@ export const transactionsAPI = {
 };
 
 export const warehouseAPI = {
-  createManualTransaction: (payload) => post('/warehouse/manual-transaction', payload)
+  createManualTransaction: (payload) =>
+    post("/warehouse/manual-transaction", payload),
 };
 
 export const dashboardAPI = {
   getWarehouseOverview: (year, month) => {
-    const params = new URLSearchParams()
-    if (year) params.append('year', year)
-    if (month) params.append('month', month)
-    return get(`/dashboard/warehouse/overview?${params.toString()}`)
-  }
+    const params = new URLSearchParams();
+    if (year) params.append("year", year);
+    if (month) params.append("month", month);
+    return get(`/dashboard/warehouse/overview?${params.toString()}`);
+  },
 };
 
 export const purchaseRequestAPI = {
-  getAll: (page = 0, size = 10, queryString = '') => {
-    const baseUrl = `/purchase-requests?page=${page}&size=${size}`
-    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl)
+  getAll: (page = 0, size = 10, queryString = "") => {
+    const baseUrl = `/purchase-requests?page=${page}&size=${size}`;
+    return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl);
   },
   getById: (id) => get(`/purchase-requests/${id}`),
-  create: (payload) => post('/purchase-requests', payload),
+  create: (payload) => post("/purchase-requests", payload),
   update: (id, payload) => put(`/purchase-requests/${id}`, payload),
   delete: (id) => del(`/purchase-requests/${id}`),
-  approve: (id) => put(`/purchase-requests/${id}/approve`, {})
+  approve: (id) => put(`/purchase-requests/${id}/approve`, {}),
 };
