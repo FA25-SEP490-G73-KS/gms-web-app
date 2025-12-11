@@ -109,7 +109,9 @@ export function AccountanceDebtTicketDetailContent() {
         console.log('API returned empty data, using mock data')
         setDebtDetail(MOCK_DEBT_DETAIL)
       } else {
-        const serviceTicket = payload.serviceTicketResponseDto || payload.serviceTicket || {}
+        // Cấu trúc mới: payload.invoice.serviceTicket
+        const invoice = payload.invoice || {}
+        const serviceTicket = invoice.serviceTicket || {}
         const priceQuotation = serviceTicket.priceQuotation || {}
         const transactions = payload.transactionResponseDto || payload.transactions || []
         const fetchedDebtId = payload.debtId || 1
@@ -128,13 +130,25 @@ export function AccountanceDebtTicketDetailContent() {
           itemType: item.itemType || '—'
         }))
 
-        const estimateAmount = safeNumber(priceQuotation.estimateAmount)
+        // Tổng tiền hàng = tổng totalPrice trong items
+        const totalMerchandise = quotationItems.reduce((sum, item) => sum + safeNumber(item.totalPrice), 0)
+        
+        // Giảm giá = discount trong priceQuotation
         const discount = safeNumber(priceQuotation.discount)
-        const totalAmount = estimateAmount - discount
-
-        // Calculate paid amount from transactions
-        const totalPaid = transactions.reduce((sum, tx) => sum + safeNumber(tx.amount || tx.paidAmount), 0)
-        const remainingAmount = Math.max(totalAmount - totalPaid, 0)
+        
+        // Tổng cộng = estimateAmount
+        const estimateAmount = safeNumber(priceQuotation.estimateAmount)
+        
+        // Lấy thông tin từ customerDebt
+        const customerDebt = payload.customerDebt || {}
+        const totalAmount = safeNumber(customerDebt.totalAmount || 0)
+        const paidAmount = safeNumber(customerDebt.paidAmount || 0)
+        
+        // Đã thanh toán = paidAmount từ customerDebt
+        const totalPaid = paidAmount
+        
+        // Còn lại = totalAmount - paidAmount từ customerDebt
+        const remainingAmount = totalAmount - paidAmount
 
         // Normalize API response
         const normalized = {
@@ -164,15 +178,15 @@ export function AccountanceDebtTicketDetailContent() {
             code: priceQuotation.code,
             estimateAmount,
             discount,
-            totalAmount
+            totalAmount: estimateAmount
           },
           quotationItems,
           paymentSummary: {
-            totalAmount,
-            estimateAmount,
-            discount,
-            totalPaid,
-            remainingAmount
+            totalMerchandise, // Tổng tiền hàng
+            discount, // Giảm giá
+            estimateAmount, // Tổng cộng
+            totalPaid, // Đã thanh toán = estimateAmount - finalAmount
+            remainingAmount // Còn lại = finalAmount
           },
           paymentHistory: transactions.map((tx) => ({
             id: tx.transactionId || tx.id,
@@ -437,7 +451,7 @@ export function AccountanceDebtTicketDetailContent() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ color: '#374151' }}>Tổng tiền hàng</span>
                   <span style={{ fontWeight: 600 }}>
-                    {debtDetail.paymentSummary.estimateAmount.toLocaleString('vi-VN')}
+                    {debtDetail.paymentSummary.totalMerchandise.toLocaleString('vi-VN')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
@@ -449,7 +463,7 @@ export function AccountanceDebtTicketDetailContent() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ color: '#374151' }}>Tổng cộng</span>
                   <span style={{ fontWeight: 600 }}>
-                    {debtDetail.paymentSummary.totalAmount.toLocaleString('vi-VN')}
+                    {debtDetail.paymentSummary.estimateAmount.toLocaleString('vi-VN')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>

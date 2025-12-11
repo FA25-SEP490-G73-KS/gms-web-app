@@ -27,14 +27,6 @@ import '../../styles/pages/accountance/finance.css'
 const { Option } = Select
 
 
-const STATUS_FILTERS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'Chờ duyệt', label: 'Chờ duyệt' },
-  { key: 'Hoàn tất', label: 'Hoàn tất' },
-  { key: 'Từ chối', label: 'Từ chối' }
-]
-
-
 const initialFinanceData = [
   {
     id: 1,
@@ -113,7 +105,6 @@ const getStatusConfig = (status) => {
 
 export function AccountanceFinanceContent({ isManager = false }) {
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('all')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -321,13 +312,10 @@ export function AccountanceFinanceContent({ isManager = false }) {
           !query ||
           item.code.toLowerCase().includes(query.toLowerCase()) ||
           item.subject.toLowerCase().includes(query.toLowerCase())
-        const matchesStatus =
-          status === 'all' ||
-          item.status === status
-        return matchesQuery && matchesStatus
+        return matchesQuery
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [data, query, status])
+  }, [data, query])
 
   const handleFilterApply = () => {
     fetchVouchers(filterForm)
@@ -606,25 +594,6 @@ export function AccountanceFinanceContent({ isManager = false }) {
             
             {/* Right side - Filter buttons, Sort, and Create */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <Space>
-                {STATUS_FILTERS.map((filter) => (
-                  <Button
-                    key={filter.key}
-                    type={status === filter.key ? 'primary' : 'default'}
-                    onClick={() => setStatus(filter.key)}
-                    style={{
-                      background: status === filter.key ? '#CBB081' : '#fff',
-                      borderColor: status === filter.key ? '#CBB081' : '#d9d9d9',
-                      color: status === filter.key ? '#fff' : '#666',
-                      fontWeight: 500,
-                      borderRadius: 6
-                    }}
-                  >
-                    {filter.label}
-                  </Button>
-                ))}
-              </Space>
-              
               <Button
                 icon={<FilterOutlined />}
                 onClick={() => setFilterModalVisible(true)}
@@ -806,7 +775,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
         >
           <Form.Item
             name="type"
-            label={<span style={{ fontWeight: 500 }}>Loại Phiếu <span style={{ color: 'red' }}>*</span></span>}
+            label={<span style={{ fontWeight: 500 }}>Loại Phiếu</span>}
             rules={[{ required: true, message: 'Vui lòng chọn loại phiếu' }]}
           >
             <select
@@ -838,7 +807,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
 
           <Form.Item
             name="category"
-            label={<span style={{ fontWeight: 500 }}>Đối tượng <span style={{ color: 'red' }}>*</span></span>}
+            label={<span style={{ fontWeight: 500 }}>Đối tượng</span>}
             rules={[{ required: true, message: 'Vui lòng nhập đối tượng' }]}
           >
             {selectedTicketType === 'phí linh kiện' ? (
@@ -918,7 +887,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
             <Col span={12}>
               <Form.Item
                 name="creator"
-                label={<span style={{ fontWeight: 500 }}>Người tạo <span style={{ color: 'red' }}>*</span></span>}
+                label={<span style={{ fontWeight: 500 }}>Người tạo</span>}
               >
                 <Input 
                   disabled
@@ -934,7 +903,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
             <Col span={12}>
               <Form.Item
                 name="amount"
-                label={<span style={{ fontWeight: 500 }}>Số tiền <span style={{ color: 'red' }}>*</span></span>}
+                label={<span style={{ fontWeight: 500 }}>Số tiền</span>}
                 rules={[
                   { required: true, message: 'Vui lòng nhập số tiền' },
                   { type: 'number', min: 1, message: 'Số tiền phải lớn hơn 0' }
@@ -954,7 +923,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
 
           <Form.Item
             name="description"
-            label={<span style={{ fontWeight: 500 }}>Nội dung <span style={{ color: 'red' }}>*</span></span>}
+            label={<span style={{ fontWeight: 500 }}>Nội dung</span>}
             rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
           >
             <Input.TextArea 
@@ -1027,7 +996,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
 
       {/* Filter Modal */}
       <Modal
-        title="Bộ lọc sản phẩm"
+        title="Bộ lọc"
         open={filterModalVisible}
         onCancel={() => setFilterModalVisible(false)}
         footer={null}
@@ -1136,19 +1105,31 @@ export function AccountanceFinanceContent({ isManager = false }) {
           {/* Action Buttons */}
           <div style={{ 
             display: 'flex', 
-            justifyContent: 'center',
+            justifyContent: 'flex-end',
             gap: '12px',
             paddingTop: '20px',
             borderTop: '1px solid #f0f0f0'
           }}>
             <Button
+              onClick={handleFilterReset}
+              style={{
+                minWidth: 100,
+                height: 40,
+                borderRadius: 6,
+                fontWeight: 600
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
               type="primary"
               onClick={handleFilterApply}
               style={{ 
-                minWidth: '100%',
+                minWidth: 120,
                 background: '#1890ff',
-                height: '40px',
-                borderRadius: '4px'
+                height: 40,
+                borderRadius: 6,
+                fontWeight: 600
               }}
             >
               Tìm kiếm

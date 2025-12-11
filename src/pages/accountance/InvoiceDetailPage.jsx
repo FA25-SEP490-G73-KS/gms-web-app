@@ -52,9 +52,10 @@ export default function InvoiceDetailPage() {
       console.log("Payment successful:", event);
       message.success("Thanh toán thành công!");
       setPaymentData(null);
-      setShowDepositForm(false);
       setDepositAmount("");
       setPayOSInitialized(false);
+      setShowDepositForm(true); // Giữ sidebar hiển thị
+      setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
       await transactionsAPI.callback(event.id);
       await fetchInvoiceDetail();
 
@@ -102,7 +103,24 @@ export default function InvoiceDetailPage() {
         return;
       }
 
-      setInvoiceData(response?.result || null);
+      const invoiceResult = response?.result || null;
+      
+      // Fetch transactions for this invoice
+      try {
+        const { data: transactionsResponse, error: transactionsError } = 
+          await transactionsAPI.getByInvoiceId(id);
+        
+        if (!transactionsError && transactionsResponse?.result) {
+          // Merge transactions into invoice data
+          invoiceResult.transactions = transactionsResponse.result;
+        }
+      } catch (transactionsErr) {
+        console.error("Failed to fetch transactions:", transactionsErr);
+        // Don't show error, just continue without transactions
+        invoiceResult.transactions = [];
+      }
+
+      setInvoiceData(invoiceResult);
     } catch (err) {
       console.error("Failed to fetch invoice detail:", err);
       message.error("Đã xảy ra lỗi khi tải dữ liệu");
@@ -141,6 +159,7 @@ export default function InvoiceDetailPage() {
 
   const discount = invoiceData?.serviceTicket?.priceQuotation?.discount || 0;
   const depositReceived = invoiceData?.depositReceived || 0;
+  const paidAmount = invoiceData?.paidAmount || 0;
   const finalAmount = invoiceData?.finalAmount || 0;
 
   const quotationColumns = [
@@ -213,7 +232,9 @@ export default function InvoiceDetailPage() {
   const customerName = customer?.fullName || customer?.name || "N/A";
   const serviceTicketCode =
     invoiceData?.serviceTicket?.serviceTicketCode || "N/A";
-  const remainingAmount = finalAmount - (Number(depositAmount) || 0);
+  
+  // Công nợ mới = Thành tiền (finalAmount)
+  const remainingAmount = finalAmount || 0;
 
   const handleDepositChange = (value) => {
     const numValue = value.replace(/[^\d]/g, "");
@@ -274,9 +295,9 @@ export default function InvoiceDetailPage() {
 
       if (paymentTab === "CASH") {
         message.success("Thanh toán thành công");
-        setShowDepositForm(false);
-        setShowPaymentTabs(false);
         setPaymentAmount("");
+        setShowDepositForm(true); // Giữ sidebar hiển thị
+        setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
         await fetchInvoiceDetail();
       } else {
         // QR - show QR code
@@ -352,23 +373,31 @@ export default function InvoiceDetailPage() {
   };
 
   const handleCreateDebt = async () => {
+    if (!debtDueDate) {
+      message.warning('Vui lòng chọn ngày hẹn trả');
+      return;
+    }
+
     try {
       const payload = {
-        invoiceId: id,
-        dueDate: debtDueDate,
-        amount: remainingAmount
+        dueDate: debtDueDate
       };
-      // Call API to create debt ticket
-      // await api.post('/debts', payload);
+      
+      const { data, error } = await invoiceAPI.createDebt(id, payload);
+      
+      if (error) {
+        throw new Error(error);
+      }
+
       message.success('Đã tạo phiếu công nợ thành công');
       setShowDebtModal(false);
       setShowDepositForm(false);
       setShowPaymentTabs(false);
-      // Optionally refresh invoice data
-      fetchInvoiceData();
+      // Refresh invoice data to get updated information
+      await fetchInvoiceDetail();
     } catch (err) {
       console.error('Error creating debt:', err);
-      message.error('Tạo phiếu công nợ thất bại');
+      message.error(err?.message || 'Tạo phiếu công nợ thất bại');
     }
   };
 
@@ -434,20 +463,6 @@ export default function InvoiceDetailPage() {
                     </span>
                   </div>
 
-                  {/* Tiền công */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      fontSize: "15px",
-                    }}
-                  >
-                    <span style={{ color: "#374151" }}>Tiền công</span>
-                    <span style={{ fontWeight: 500 }}>
-                      {formatCurrency(invoiceData?.serviceTicket?.estimatedCost || 0)}
-                    </span>
-                  </div>
-
                   {/* Chiết khấu */}
                   <div
                     style={{
@@ -475,6 +490,20 @@ export default function InvoiceDetailPage() {
                     <span style={{ color: "#374151" }}>Tiền cọc</span>
                     <span style={{ fontWeight: 500 }}>
                       {formatCurrency(invoiceData?.depositReceived || 0)}
+                    </span>
+                  </div>
+
+                  {/* Đã thanh toán */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      fontSize: "15px",
+                    }}
+                  >
+                    <span style={{ color: "#374151" }}>Đã thanh toán</span>
+                    <span style={{ fontWeight: 500 }}>
+                      {formatCurrency(paidAmount)}
                     </span>
                   </div>
 
@@ -781,9 +810,8 @@ export default function InvoiceDetailPage() {
                                           color: "#374151",
                                         }}
                                       >
-                                        {transaction.transactionCode ||
-                                          transaction.id ||
-                                          "N/A"}
+                                        {transaction.paymentLinkId ||
+                                          (transaction.id ? `GD-${transaction.id}` : "N/A")}
                                       </td>
                                       <td
                                         style={{
@@ -806,7 +834,7 @@ export default function InvoiceDetailPage() {
                                       >
                                         {transaction.method === "CASH"
                                           ? "Tiền mặt"
-                                          : transaction.method === "BANK_TRANSFER"
+                                          : transaction.method === "BANK_TRANSFER" || transaction.method === "QR"
                                           ? "QR"
                                           : transaction.method || "N/A"}
                                       </td>
@@ -877,7 +905,13 @@ export default function InvoiceDetailPage() {
                           >
                             {formatCurrency(
                               invoiceData?.transactions?.reduce(
-                                (sum, t) => sum + (t.amount || 0),
+                                (sum, t) => {
+                                  // Chỉ tính các transaction SUCCESS
+                                  if (!t.status || t.status === 'SUCCESS' || t.status === 'SUCCEEDED') {
+                                    return sum + (t.amount || 0);
+                                  }
+                                  return sum;
+                                },
                                 0
                               ) || 0
                             )}
@@ -898,16 +932,7 @@ export default function InvoiceDetailPage() {
                             Cộng nợ mới
                           </label>
                           <Input
-                            value={formatCurrency(
-                              Math.max(
-                                0,
-                                (invoiceData?.finalAmount || 0) -
-                                  (invoiceData?.transactions?.reduce(
-                                    (sum, t) => sum + (t.amount || 0),
-                                    0
-                                  ) || 0)
-                              )
-                            )}
+                            value={formatCurrency(remainingAmount)}
                             disabled
                             style={{
                               height: "40px",
@@ -937,23 +962,28 @@ export default function InvoiceDetailPage() {
                           </Button>
                           <Button
                             type="primary"
+                            disabled={remainingAmount === 0}
                             onClick={() => {
-                              const remaining = finalAmount - (Number(depositAmount) || 0);
-                              if (remaining > 0) {
+                              if (remainingAmount === 0) {
+                                message.info("Khách hàng không còn công nợ");
+                                return;
+                              }
+                              if (remainingAmount > 0) {
                                 setShowDebtModal(true);
                               } else {
-                                setShowDepositForm(false);
-                                setShowPaymentTabs(false);
+                                setShowDepositForm(true); // Giữ sidebar hiển thị
+                                setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
                               }
                             }}
                             style={{
                               flex: 1,
-                              background: "#22c55e",
-                              borderColor: "#22c55e",
+                              background: remainingAmount === 0 ? "#d1d5db" : "#22c55e",
+                              borderColor: remainingAmount === 0 ? "#d1d5db" : "#22c55e",
                               height: "45px",
                               fontWeight: 600,
                               fontSize: "14px",
                               borderRadius: "8px",
+                              cursor: remainingAmount === 0 ? "not-allowed" : "pointer",
                             }}
                           >
                             Lưu
@@ -1575,9 +1605,8 @@ export default function InvoiceDetailPage() {
                                           color: "#374151",
                                         }}
                                       >
-                                        {transaction.transactionCode ||
-                                          transaction.id ||
-                                          "N/A"}
+                                        {transaction.paymentLinkId ||
+                                          (transaction.id ? `GD-${transaction.id}` : "N/A")}
                                       </td>
                                       <td
                                         style={{
@@ -1600,7 +1629,7 @@ export default function InvoiceDetailPage() {
                                       >
                                         {transaction.method === "CASH"
                                           ? "Tiền mặt"
-                                          : transaction.method === "BANK_TRANSFER"
+                                          : transaction.method === "BANK_TRANSFER" || transaction.method === "QR"
                                           ? "QR"
                                           : transaction.method || "N/A"}
                                       </td>
@@ -1670,7 +1699,13 @@ export default function InvoiceDetailPage() {
                           >
                             {formatCurrency(
                               invoiceData?.transactions?.reduce(
-                                (sum, t) => sum + (t.amount || 0),
+                                (sum, t) => {
+                                  // Chỉ tính các transaction SUCCESS
+                                  if (!t.status || t.status === 'SUCCESS' || t.status === 'SUCCEEDED') {
+                                    return sum + (t.amount || 0);
+                                  }
+                                  return sum;
+                                },
                                 0
                               ) || 0
                             )}
@@ -2142,8 +2177,9 @@ export default function InvoiceDetailPage() {
                                         
                                         message.success("Thanh toán tiền mặt thành công");
                                         setPaymentData(null);
-                                        setShowDepositForm(false);
                                         setDepositAmount("");
+                                        setShowDepositForm(true); // Giữ sidebar hiển thị
+                                        setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
                                         await fetchInvoiceDetail();
                                       } catch (err) {
                                         console.error("Error creating payment:", err);

@@ -50,9 +50,6 @@ export default function AdminLayout({ children }) {
 
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/service-advisor/orders/history')) {
-      return { parent: 'Phiếu dịch vụ', current: 'Lịch sử sửa chữa', child: null }
-    }
     if (path.startsWith('/service-advisor/orders')) {
       const isDetailPage = /^\/service-advisor\/orders\/\d+/.test(path)
       return {
@@ -74,10 +71,6 @@ export default function AdminLayout({ children }) {
 
   const handleBreadcrumbClick = () => {
     const path = location.pathname
-    if (path.startsWith('/service-advisor/orders/history')) {
-      navigate('/service-advisor/orders/history')
-      return
-    }
     if (path.startsWith('/service-advisor/orders')) {
       navigate('/service-advisor/orders')
       return
@@ -106,10 +99,7 @@ export default function AdminLayout({ children }) {
                   className="breadcrumb-current breadcrumb-button"
                   onClick={handleBreadcrumbClick}
                   disabled={
-                    !(
-                      location.pathname.startsWith('/service-advisor/orders') ||
-                      location.pathname.startsWith('/service-advisor/orders/history')
-                    )
+                    !location.pathname.startsWith('/service-advisor/orders')
                   }
                 >
                   {breadcrumb.current}
@@ -178,12 +168,6 @@ export default function AdminLayout({ children }) {
                   onClick={() => navigate('/service-advisor/orders/new-customer')}
                 >
                   Tạo phiếu dịch vụ
-                </button>
-                <button 
-                  className={`submenu-item ${location.pathname === '/service-advisor/orders/history' ? 'active' : ''}`}
-                  onClick={() => navigate('/service-advisor/orders/history')}
-                >
-                  Lịch sử sửa chữa
                 </button>
               </div>
             )}

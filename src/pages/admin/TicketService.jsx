@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { Table, Input, Card, Badge, Space, message, Button, Row, Col, Form, Select, Modal } from 'antd'
-import { SearchOutlined, CalendarOutlined, CloseOutlined } from '@ant-design/icons'
+import { SearchOutlined, CalendarOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons'
+import { DatePicker } from 'antd'
+import dayjs from 'dayjs'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
@@ -77,6 +79,11 @@ export default function TicketService() {
   
   const [statusFilter, setStatusFilter] = useState(null)
   const [dateFilter, setDateFilter] = useState(null)
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
+  const [selectedStatuses, setSelectedStatuses] = useState([])
+  const [dateRange, setDateRange] = useState([null, null])
+  const [appliedStatuses, setAppliedStatuses] = useState([])
+  const [appliedDateRange, setAppliedDateRange] = useState([null, null])
 
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createForm] = Form.useForm()
@@ -190,7 +197,7 @@ export default function TicketService() {
 
   useEffect(() => {
     fetchServiceTickets()
-  }, [page, pageSize, statusFilter, dateFilter])
+  }, [page, pageSize, statusFilter, dateFilter, appliedStatuses, appliedDateRange])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -350,7 +357,21 @@ export default function TicketService() {
     }
     
   
-    if (!isHistoryPage && statusFilter) {
+    // Filter by multiple statuses if applied
+    if (!isHistoryPage && appliedStatuses.length > 0) {
+      result = result.filter((r) => {
+        const statusKey = r.statusKey || r.status
+        return appliedStatuses.some(selectedStatus => {
+          return statusKey === selectedStatus || 
+                 (selectedStatus === 'CREATED' && (statusKey === 'CREATED' || statusKey === 'Đã tạo')) ||
+                 (selectedStatus === 'WAITING_FOR_QUOTATION' && (statusKey === 'WAITING_FOR_QUOTATION' || statusKey === 'WAITING_QUOTE' || statusKey === 'Chờ báo giá')) ||
+                 (selectedStatus === 'WAITING_FOR_DELIVERY' && (statusKey === 'WAITING_FOR_DELIVERY' || statusKey === 'WAITING_HANDOVER' || statusKey === 'Chờ bàn giao xe')) ||
+                 (selectedStatus === 'COMPLETED' && (statusKey === 'COMPLETED' || statusKey === 'Hoàn thành')) ||
+                 (selectedStatus === 'CANCELED' && (statusKey === 'CANCELED' || statusKey === 'CANCELLED' || statusKey === 'Hủy'))
+        })
+      })
+    } else if (!isHistoryPage && statusFilter) {
+      // Fallback to single status filter for backward compatibility
       result = result.filter((r) => {
         const statusKey = r.statusKey || r.status
         return statusKey === statusFilter || 
@@ -362,7 +383,25 @@ export default function TicketService() {
     }
     
     
-    if (dateFilter) {
+    // Filter by date range if applied
+    if (appliedDateRange[0] || appliedDateRange[1]) {
+      result = result.filter((r) => {
+        if (!r.createdAt) return false
+        const recordDate = dayjs(r.createdAt, 'DD/MM/YYYY')
+        if (!recordDate.isValid()) return false
+        
+        if (appliedDateRange[0] && appliedDateRange[1]) {
+          return recordDate.isAfter(appliedDateRange[0].subtract(1, 'day')) && 
+                 recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+        } else if (appliedDateRange[0]) {
+          return recordDate.isAfter(appliedDateRange[0].subtract(1, 'day'))
+        } else if (appliedDateRange[1]) {
+          return recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+        }
+        return true
+      })
+    } else if (dateFilter) {
+      // Fallback to single date filter for backward compatibility
       const filterDate = dateFilter.format('DD/MM/YYYY')
       result = result.filter((r) => r.createdAt === filterDate)
     }
@@ -504,7 +543,7 @@ export default function TicketService() {
       )
     },
     {
-      title: 'Code',
+      title: 'Mã phiếu',
       dataIndex: 'code',
       key: 'code',
       width: 180,
@@ -558,7 +597,7 @@ export default function TicketService() {
 
   const columns = [
     {
-      title: 'Code',
+      title: 'Mã phiếu',
       dataIndex: 'code',
       key: 'code',
       width: 180
@@ -708,46 +747,20 @@ export default function TicketService() {
               />
             </Col>
             <Col>
-              <input
-                type="date"
-                placeholder="Ngày tạo"
-                value={dateFilter ? dateFilter.format('YYYY-MM-DD') : ''}
-                onChange={(e) => {
-                  const value = e.target.value
-                  if (!value) {
-                    setDateFilter(null)
-                    return
-                  }
-                  // Lưu lại dưới dạng dayjs để logic filter bên dưới không phải sửa nhiều
-                  const dayjs = require('dayjs')
-                  setDateFilter(dayjs(value, 'YYYY-MM-DD'))
-                }}
+              <Button
+                icon={<FilterOutlined />}
+                onClick={() => setFilterModalOpen(true)}
                 style={{
-                  width: 150,
                   height: 32,
                   borderRadius: 8,
-                  border: '1px solid #d9d9d9',
-                  padding: '4px 8px',
-                  fontSize: 14
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
                 }}
-              />
+              >
+                Sort
+              </Button>
             </Col>
-            {!isHistoryPage && (
-              <Col>
-                <Space>
-                  {STATUS_FILTERS.map((item) => (
-                    <Button
-                      key={item.key}
-                      type={statusFilter === item.key ? 'primary' : 'default'}
-                      className={statusFilter === item.key ? 'status-btn active' : 'status-btn'}
-                      onClick={() => setStatusFilter(item.key)}
-                    >
-                      {item.label}
-                    </Button>
-                  ))}
-                </Space>
-              </Col>
-            )}
           </Row>
         </div>
 
@@ -1046,6 +1059,146 @@ export default function TicketService() {
             </Col>
           </Row>
         </Form>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        title="Bộ lọc"
+        open={filterModalOpen}
+        onCancel={() => setFilterModalOpen(false)}
+        footer={null}
+        width={400}
+      >
+        <div style={{ padding: '8px 0' }}>
+          {/* Status Filter Section */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Trạng thái
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {STATUS_FILTERS.map((item) => (
+                <label
+                  key={item.key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#374151'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStatuses.includes(item.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedStatuses([...selectedStatuses, item.key])
+                      } else {
+                        setSelectedStatuses(selectedStatuses.filter(s => s !== item.key))
+                      }
+                    }}
+                    style={{
+                      marginRight: '8px',
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Date Range Section */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Khoảng ngày tạo
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                  Từ ngày
+                </div>
+                <DatePicker
+                  value={dateRange[0]}
+                  onChange={(date) => setDateRange([date, dateRange[1]])}
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                  Đến ngày
+                </div>
+                <DatePicker
+                  value={dateRange[1]}
+                  onChange={(date) => setDateRange([dateRange[0], date])}
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: '12px',
+            paddingTop: '16px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button
+              onClick={() => {
+                setSelectedStatuses([])
+                setDateRange([null, null])
+                setAppliedStatuses([])
+                setAppliedDateRange([null, null])
+                setStatusFilter(null)
+                setDateFilter(null)
+              }}
+              style={{
+                borderRadius: '6px'
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                // Apply filters
+                setAppliedStatuses([...selectedStatuses])
+                setAppliedDateRange([dateRange[0], dateRange[1]])
+                
+                // Clear old single filters
+                setStatusFilter(null)
+                setDateFilter(null)
+                
+                setFilterModalOpen(false)
+              }}
+              style={{
+                background: '#1677ff',
+                borderColor: '#1677ff',
+                borderRadius: '6px'
+              }}
+            >
+              Áp dụng
+            </Button>
+          </div>
+        </div>
       </Modal>
     </AdminLayout>
   )

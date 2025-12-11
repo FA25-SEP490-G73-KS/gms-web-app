@@ -462,9 +462,10 @@ export default function AppointmentService() {
 
       if (data && (data.result === true || data.result === 'true' || data.statusCode === 200)) {
         message.success('Xác thực OTP thành công!')
-        // Sau khi xác thực OTP, kiểm tra thông tin khách hàng
-        await fetchCustomerLookupAfterOtp()
         setVerifyOtpLoading(false)
+        // Sau khi xác thực OTP, kiểm tra thông tin khách hàng
+        // fetchCustomerLookupAfterOtp sẽ tự động chuyển sang step 3 nếu không có customerId
+        await fetchCustomerLookupAfterOtp()
       } else {
         setOtpError('Mã OTP không đúng hoặc đã hết hạn.')
         setVerifyOtpLoading(false)
@@ -478,6 +479,9 @@ export default function AppointmentService() {
   const fetchCustomerLookupAfterOtp = async () => {
     if (!form.phone) {
       setCustomerLookup(null)
+      setShowCustomerModal(false)
+      // Nếu không có số điện thoại, vẫn chuyển sang step 3
+      next()
       return
     }
     setCustomerLookupLoading(true)
@@ -490,10 +494,12 @@ export default function AppointmentService() {
       
       // Nếu customerId là null, không hiển thị popup và di chuyển đến step 3
       if (!payload?.customerId || payload?.customerId === null || payload?.customerId === 0) {
+        message.info('Không tìm thấy thông tin khách hàng, vui lòng nhập thủ công.')
         setCustomerLookup(null)
         setShowCustomerModal(false)
         setCustomerLookupLoading(false)
-        next() // Di chuyển đến step 3 (thông tin đặt lịch)
+        // Đảm bảo chuyển sang step 3
+        setStep(3)
         return
       }
       
@@ -516,7 +522,11 @@ export default function AppointmentService() {
       setShowCustomerModal(true)
     } catch (err) {
       console.error('Không thể lấy thông tin khách hàng sau OTP:', err)
+      message.warning('Không thể tải thông tin khách hàng, vui lòng nhập thủ công.')
       setCustomerLookup(null)
+      setShowCustomerModal(false)
+      // Khi có lỗi, vẫn chuyển sang step 3 để người dùng có thể nhập thông tin
+      setStep(3)
     } finally {
       setCustomerLookupLoading(false)
     }

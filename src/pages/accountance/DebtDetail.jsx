@@ -423,16 +423,8 @@ export function AccountanceDebtDetailContent() {
 
   return (
     <div className="debts-page">
-      {/* Breadcrumb */}
+      {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate('/accountance/debts')}
-          style={{ padding: 0, marginBottom: '16px' }}
-        >
-          Công nợ
-        </Button>
         <h1 style={{ margin: 0 }}>Khách hàng</h1>
       </div>
 
@@ -509,21 +501,17 @@ export function AccountanceDebtDetailContent() {
           border: '1px solid #e5e7eb',
           borderRadius: '8px',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          justifyContent: 'flex-end',
+          alignItems: 'center',
+          gap: '12px'
         }}
       >
-        <span style={{ fontSize: '14px', color: '#6b7280' }}>
-          0 of {filteredDetails.length} row(s) selected.
+        <span style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
+          Tổng công còn nợ:
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-            Tổng công còn nợ:
-          </span>
-          <span style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-            {totalRemaining.toLocaleString('vi-VN')}
-          </span>
-        </div>
+        <span style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
+          {totalRemaining.toLocaleString('vi-VN')}
+        </span>
       </div>
 
       {/* Update Due Date Modal */}

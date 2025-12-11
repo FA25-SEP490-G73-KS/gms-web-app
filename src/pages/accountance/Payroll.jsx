@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
-import { Table, Input, Button, Tag, message } from 'antd'
+import { Table, Input, Button, Tag, message, Modal, Checkbox } from 'antd'
 import { SearchOutlined, FilterOutlined, EyeOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
@@ -9,14 +9,8 @@ import { getUserIdFromToken } from '../../utils/helpers'
 import dayjs from 'dayjs'
 import '../../styles/pages/accountance/payroll.css'
 
-const statusFilters = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'pending_manager_approval', label: 'Chờ quản lý duyệt' },
-  { key: 'approved', label: 'Duyệt' },
-  { key: 'paid', label: 'Đã thanh toán' }
-]
-
 const STATUS_CONFIG = {
+  pending: { color: '#0ea5e9', bg: '#e0f2fe', text: 'Đang làm lương' },
   pending_manager_approval: { color: '#b45309', bg: '#fff4e6', text: 'Chờ quản lý duyệt' },
   approved: { color: '#5b8def', bg: '#eef4ff', text: 'Duyệt' },
   paid: { color: '#22c55e', bg: '#f0fdf4', text: 'Đã thanh toán' }
@@ -68,7 +62,6 @@ const payrollData = [
 export function AccountancePayrollContent() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('all')
   const [selectedMonth, setSelectedMonth] = useState(dayjs().format('YYYY-MM'))
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -77,6 +70,12 @@ export function AccountancePayrollContent() {
   const [total, setTotal] = useState(0)
   const [submitting, setSubmitting] = useState(false)
   const monthInputRef = useRef(null)
+  const [filterModalVisible, setFilterModalVisible] = useState(false)
+  const [filterStatuses, setFilterStatuses] = useState([])
+  const [filterForm, setFilterForm] = useState({
+    statuses: [],
+    month: dayjs().format('YYYY-MM')
+  })
 
   useEffect(() => {
     fetchPayrollData()
@@ -109,6 +108,8 @@ export function AccountancePayrollContent() {
         
         // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
         const statusMap = {
+          'Đang làm lương': 'pending',
+          'PENDING': 'pending',
           'Chờ quản lý duyệt': 'pending_manager_approval',
           'PENDING_MANAGER_APPROVAL': 'pending_manager_approval',
           'Đã duyệt': 'approved',
@@ -208,12 +209,31 @@ export function AccountancePayrollContent() {
         const matchesQuery =
           !query ||
           item.name.toLowerCase().includes(query.toLowerCase()) ||
-          item.phone.includes(query)
-        const matchesStatus = status === 'all' || item.status === status
+          item.phone?.includes(query)
+        const matchesStatus =
+          filterStatuses.length === 0 || filterStatuses.includes(item.status)
         return matchesQuery && matchesStatus
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [payrollData, query, status])
+  }, [payrollData, query, filterStatuses])
+
+  const handleFilterApply = () => {
+    setFilterStatuses(filterForm.statuses || [])
+    if (filterForm.month) {
+      setSelectedMonth(filterForm.month)
+    }
+    setFilterModalVisible(false)
+  }
+
+  const handleFilterReset = () => {
+    const defaultMonth = dayjs().format('YYYY-MM')
+    setFilterForm({
+      statuses: [],
+      month: defaultMonth
+    })
+    setFilterStatuses([])
+    setSelectedMonth(defaultMonth)
+  }
 
   const columns = [
     {
@@ -232,7 +252,7 @@ export function AccountancePayrollContent() {
       )
     },
     {
-      title: 'Lương cơ bản',
+      title: 'Tiền công',
       dataIndex: 'baseSalary',
       key: 'baseSalary',
       width: 150,
@@ -313,53 +333,17 @@ export function AccountancePayrollContent() {
           <h1>Lương nhân viên</h1>
         </div>
 
-        <div className="payroll-filters">
-          <div className="payroll-month-picker-wrapper">
-            <select
-              ref={monthInputRef}
-              value={selectedMonth}
-              onChange={(e) => {
-                e.stopPropagation()
-                setSelectedMonth(e.target.value)
-              }}
-              className="payroll-month-select"
-            >
-              {(() => {
-                const options = []
-                const currentYear = dayjs().year()
-                const years = [currentYear - 1, currentYear, currentYear + 1]
-                
-                years.forEach(year => {
-                  for (let month = 1; month <= 12; month++) {
-                    const monthStr = String(month).padStart(2, '0')
-                    const value = `${year}-${monthStr}`
-                    const monthName = dayjs(`${year}-${monthStr}-01`).format('MM/YYYY')
-                    options.push(
-                      <option key={value} value={value}>
-                        {monthName}
-                      </option>
-                    )
-                  }
-                })
-                
-                return options
-              })()}
-            </select>
-            <CalendarOutlined className="payroll-month-icon" />
-          </div>
-          <div className="status-filters">
-            {statusFilters.map((item) => (
-              <Button
-                key={item.key}
-                type={status === item.key ? 'primary' : 'default'}
-                onClick={() => setStatus(item.key)}
-                className={status === item.key ? 'status-btn active' : 'status-btn'}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </div>
-          <div className="payroll-actions">
+        <div
+          className="payroll-filters"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap'
+          }}
+        >
+          <div style={{ minWidth: 260, flex: 1 }}>
             <Input
               prefix={<SearchOutlined />}
               placeholder="Tìm kiếm"
@@ -368,8 +352,28 @@ export function AccountancePayrollContent() {
               onChange={(e) => setQuery(e.target.value)}
               className="payroll-search"
             />
-            <Button icon={<FilterOutlined />} className="sort-btn">
-              Sort
+          </div>
+
+          <div
+            className="payroll-actions"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12
+            }}
+          >
+            <Button
+              icon={<FilterOutlined />}
+              className="sort-btn"
+              onClick={() => {
+                setFilterForm((prev) => ({
+                  ...prev,
+                  month: selectedMonth
+                }))
+                setFilterModalVisible(true)
+              }}
+            >
+              Bộ lọc
             </Button>
           </div>
         </div>
@@ -413,6 +417,95 @@ export function AccountancePayrollContent() {
             Nộp
           </Button>
         </div>
+
+        <Modal
+          title="Bộ lọc"
+          open={filterModalVisible}
+          onCancel={() => setFilterModalVisible(false)}
+          footer={null}
+          width={480}
+        >
+          <div style={{ padding: '8px 0' }}>
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Trạng thái</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[
+                  { key: 'pending', label: 'Đang làm lương' },
+                  { key: 'pending_manager_approval', label: 'Chờ quản lý duyệt' },
+                  { key: 'approved', label: 'Duyệt' },
+                  { key: 'paid', label: 'Đã thanh toán' }
+                ].map((opt) => (
+                  <Checkbox
+                    key={opt.key}
+                    checked={filterForm.statuses.includes(opt.key)}
+                    onChange={(e) => {
+                      setFilterForm((prev) => ({
+                        ...prev,
+                        statuses: e.target.checked
+                          ? [...prev.statuses, opt.key]
+                          : prev.statuses.filter((s) => s !== opt.key)
+                      }))
+                    }}
+                  >
+                    {opt.label}
+                  </Checkbox>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Tháng</div>
+              <div className="payroll-month-picker-wrapper" style={{ width: '100%' }}>
+                <select
+                  ref={monthInputRef}
+                  value={filterForm.month}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    const val = e.target.value
+                    setFilterForm((prev) => ({ ...prev, month: val }))
+                  }}
+                  className="payroll-month-select"
+                  style={{ width: '100%' }}
+                >
+                  {(() => {
+                    const options = []
+                    const currentYear = dayjs().year()
+                    const years = [currentYear - 1, currentYear, currentYear + 1]
+                    
+                    years.forEach(year => {
+                      for (let month = 1; month <= 12; month++) {
+                        const monthStr = String(month).padStart(2, '0')
+                        const value = `${year}-${monthStr}`
+                        const monthName = dayjs(`${year}-${monthStr}-01`).format('MM/YYYY')
+                        options.push(
+                          <option key={value} value={value}>
+                            {monthName}
+                          </option>
+                        )
+                      }
+                    })
+                    
+                    return options
+                  })()}
+                </select>
+                <CalendarOutlined className="payroll-month-icon" />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, paddingTop: 12 }}>
+              <Button onClick={handleFilterReset} style={{ height: 40, borderRadius: 6, minWidth: 90 }}>
+                Đặt lại
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleFilterApply}
+                style={{ height: 40, borderRadius: 6, minWidth: 110 }}
+              >
+                Áp dụng
+              </Button>
+            </div>
+          </div>
+        </Modal>
       </div>
   )
 }

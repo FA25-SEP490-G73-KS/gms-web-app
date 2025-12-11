@@ -13,25 +13,6 @@ const loyaltyConfig = {
   PLATINUM: { color: '#4f8cff', text: 'Platinum' }
 }
 
-const fallbackCustomers = [
-  {
-    id: 'KH-001',
-    fullName: 'Doanh Nghiệp A',
-    phone: '0909123456',
-    address: '12 Nguyễn Huệ, Quận 1, TP.HCM',
-    loyaltyLevel: 'GOLD',
-    customerType: 'DOANH_NGHIEP'
-  },
-  {
-    id: 'KH-002',
-    fullName: 'Nguyễn Văn Minh',
-    phone: '0987123456',
-    address: '25 Lý Thường Kiệt, Hà Nội',
-    loyaltyLevel: 'SILVER',
-    customerType: 'CA_NHAN'
-  }
-]
-
 const formatCustomer = (customer, index) => ({
   id: customer.customerId ?? customer.id ?? null,
   fullName: customer.fullName || customer.name || 'Không rõ',
@@ -44,11 +25,11 @@ const formatCustomer = (customer, index) => ({
 
 export default function ManagerCustomers() {
   const [query, setQuery] = useState('')
-  const [customers, setCustomers] = useState(fallbackCustomers)
+  const [customers, setCustomers] = useState([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  const [total, setTotal] = useState(fallbackCustomers.length)
+  const [total, setTotal] = useState(0)
   const [statusFilter, setStatusFilter] = useState('all')
   const didInit = useRef(false)
   const navigate = useNavigate()
@@ -76,10 +57,8 @@ export default function ManagerCustomers() {
         setPageSize(size)
       } catch (err) {
         message.error(err.message || 'Không thể tải danh sách khách hàng')
-        setCustomers(fallbackCustomers)
-        setTotal(fallbackCustomers.length)
-        setPage(1)
-        setPageSize(10)
+        setCustomers([])
+        setTotal(0)
       } finally {
         setLoading(false)
       }
@@ -136,7 +115,7 @@ export default function ManagerCustomers() {
           }
           
           message.success(`${actionText.charAt(0).toUpperCase() + actionText.slice(1)} tài khoản thành công`)
-          fetchData()
+          await fetchCustomers(page - 1, pageSize)
         } catch (error) {
           console.error('Toggle customer status error:', error)
           message.error(`Không thể ${actionText} tài khoản`)

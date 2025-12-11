@@ -1,20 +1,13 @@
 import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Input, Button, Tag, Space, message, Modal, Upload } from 'antd'
-import { SearchOutlined, CloseOutlined } from '@ant-design/icons'
+import { Table, Input, Button, Tag, Space, message, Modal, Upload, Checkbox, DatePicker } from 'antd'
+import { SearchOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/accountance/materials.css'
 import { stockReceiptAPI } from '../../services/api'
 
-const statusButtons = [
-  { key: 'processing', label: 'Chờ xử lý' },
-  { key: 'paid', label: 'Đã thanh toán' },
-  { key: 'all', label: 'Tất cả' }
-]
-
 export default function Materials() {
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('processing')
   const [loading, setLoading] = useState(false)
   const [materialsData, setMaterialsData] = useState([])
   const [pagination, setPagination] = useState({
@@ -27,6 +20,9 @@ export default function Materials() {
   const [paymentLoading, setPaymentLoading] = useState(false)
   const [fileList, setFileList] = useState([])
   const [selectedRecord, setSelectedRecord] = useState(null)
+  const [filterVisible, setFilterVisible] = useState(false)
+  const [selectedPaymentStatuses, setSelectedPaymentStatuses] = useState([])
+  const [createdDateRange, setCreatedDateRange] = useState([null, null])
 
   const fetchPaymentDetail = async (id) => {
     setPaymentLoading(true)
@@ -34,39 +30,16 @@ export default function Materials() {
       const { data, error } = await stockReceiptAPI.getPaymentDetail(id)
       
       if (error) {
-        // Nếu lỗi, dùng mock data
-        const mockDetail = {
-          type: 'Chi',
-          supplier: 'Toyota',
-          amount: 600000,
-          attachments: []
-        }
-        setPaymentDetail(mockDetail)
+        message.error(error || 'Không thể tải chi tiết thanh toán')
         return
       }
 
       if (data?.result) {
         setPaymentDetail(data.result)
-      } else {
-        // Nếu không có data, dùng mock
-        const mockDetail = {
-          type: 'Chi',
-          supplier: 'Toyota',
-          amount: 600000,
-          attachments: []
-        }
-        setPaymentDetail(mockDetail)
       }
     } catch (error) {
       console.error('Error fetching payment detail:', error)
-      // Dùng mock data khi lỗi
-      const mockDetail = {
-        type: 'Chi',
-        supplier: 'Toyota',
-        amount: 600000,
-        attachments: []
-      }
-      setPaymentDetail(mockDetail)
+      message.error('Không thể tải chi tiết thanh toán')
     } finally {
       setPaymentLoading(false)
     }
@@ -139,108 +112,18 @@ export default function Materials() {
       }
 
       if (data?.result) {
-        const { content, totalElements } = data.result
-        
-        // Nếu không có dữ liệu, dùng mock data
-        const mockData = [
-          {
-            id: 1,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 10,
-            unitPrice: 3,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'PENDING'
-          },
-          {
-            id: 2,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 1,
-            unitPrice: 4,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'PENDING'
-          },
-          {
-            id: 3,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 2,
-            unitPrice: 6,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'PENDING'
-          },
-          {
-            id: 4,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 2,
-            unitPrice: 1,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'PENDING'
-          },
-          {
-            id: 5,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 1,
-            unitPrice: 5,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'COMPLETED'
-          },
-          {
-            id: 6,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 1,
-            unitPrice: 8,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'COMPLETED'
-          },
-          {
-            id: 7,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 1,
-            unitPrice: 2,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'COMPLETED'
-          },
-          {
-            id: 8,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 1,
-            unitPrice: 1,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'COMPLETED'
-          },
-          {
-            id: 9,
-            receiptCode: 'NK-2025-000001',
-            partSKU: 'LOC-GIO-TOYOTA-CAMRY-2019',
-            receivedQuantity: 1,
-            unitPrice: 1,
-            totalPrice: 10000000,
-            createdAt: '2025-11-11T00:00:00',
-            status: 'COMPLETED'
-          }
-        ]
-        
-        const finalData = content && content.length > 0 ? content : mockData
-        
-        setMaterialsData(finalData)
+        const { content = [], totalElements } = data.result
+        setMaterialsData(content)
         setPagination(prev => ({
           ...prev,
-          total: totalElements || finalData.length,
+          total: totalElements ?? content.length ?? 0,
+          current: page + 1
+        }))
+      } else {
+        setMaterialsData([])
+        setPagination(prev => ({
+          ...prev,
+          total: 0,
           current: page + 1
         }))
       }
@@ -257,20 +140,29 @@ export default function Materials() {
   }, [])
 
   const filtered = useMemo(() => {
+    const [fromDate, toDate] = createdDateRange
     return materialsData
       .filter((item) => {
         const matchesQuery =
           !query ||
           item.receiptCode?.toLowerCase().includes(query.toLowerCase()) ||
           item.partSKU?.toLowerCase().includes(query.toLowerCase())
-        const matchesStatus =
-          status === 'all' ||
-          (status === 'processing' && item.status !== 'COMPLETED') ||
-          (status === 'paid' && item.status === 'COMPLETED')
-        return matchesQuery && matchesStatus
+        const matchesPaymentStatus =
+          selectedPaymentStatuses.length === 0 ||
+          selectedPaymentStatuses.includes((item.paymentStatus || '').toUpperCase())
+        const createdAt = item.createdAt ? new Date(item.createdAt) : null
+        const matchesDate =
+          !fromDate ||
+          !toDate ||
+          (createdAt &&
+            createdAt >= new Date(fromDate.startOf('day').toISOString()) &&
+            createdAt <= new Date(toDate.endOf('day').toISOString()))
+        return matchesQuery
+          && matchesPaymentStatus
+          && matchesDate
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
-  }, [query, status, materialsData])
+  }, [query, materialsData, selectedPaymentStatuses, createdDateRange])
 
   const mainColumns = [
     {
@@ -357,7 +249,7 @@ export default function Materials() {
         <div style={{ marginBottom: '24px' }}>
           <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>Tiền vật tư</h1>
 
-          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
             <Input
               prefix={<SearchOutlined />}
               placeholder="Tìm kiếm"
@@ -366,23 +258,23 @@ export default function Materials() {
               onChange={(e) => setQuery(e.target.value)}
               style={{ width: 260 }}
             />
-            <Space>
-              {statusButtons.map((btn) => (
-                <Button
-                  key={btn.key}
-                  type={status === btn.key ? 'primary' : 'default'}
-                  onClick={() => setStatus(btn.key)}
-                  style={{
-                    background: status === btn.key ? '#CBB081' : '#fff',
-                    borderColor: status === btn.key ? '#CBB081' : '#e6e6e6',
-                    color: status === btn.key ? '#111' : '#666',
-                    fontWeight: 600
-                  }}
-                >
-                  {btn.label}
-                </Button>
-              ))}
-            </Space>
+            <Button
+              onClick={() => setFilterVisible(true)}
+              icon={<FilterOutlined />}
+              style={{
+                borderColor: '#d9d9d9',
+                fontWeight: 700,
+                borderRadius: 10,
+                height: 40,
+                padding: '0 16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+              }}
+            >
+              Bộ lọc
+            </Button>
           </div>
         </div>
 
@@ -537,6 +429,85 @@ export default function Materials() {
               </Button>
             </div>
           ) : null}
+        </Modal>
+
+        <Modal
+          open={filterVisible}
+          onCancel={() => setFilterVisible(false)}
+          footer={null}
+          title="Bộ lọc"
+          width={420}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Trạng thái</div>
+            <Space direction="vertical">
+              {[
+                { key: 'UNPAID', label: 'Chưa thanh toán' },
+                { key: 'PARTIAL_PAID', label: 'Thanh toán 1 phần' },
+                { key: 'PAID', label: 'Đã thanh toán đủ' }
+              ].map((opt) => (
+                <Checkbox
+                  key={opt.key}
+                  checked={selectedPaymentStatuses.includes(opt.key)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedPaymentStatuses((prev) => [...prev, opt.key])
+                    } else {
+                      setSelectedPaymentStatuses((prev) => prev.filter((v) => v !== opt.key))
+                    }
+                  }}
+                >
+                  {opt.label}
+                </Checkbox>
+              ))}
+            </Space>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Khoảng ngày tạo</div>
+            <Space direction="vertical" style={{ width: '100%', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, color: '#444', marginBottom: 6 }}>Từ ngày</div>
+                <DatePicker
+                  style={{ width: '100%', height: 40, borderRadius: 8 }}
+                  placeholder="dd/mm/yyyy"
+                  value={createdDateRange[0]}
+                  format="DD/MM/YYYY"
+                  allowClear
+                  onChange={(val) => setCreatedDateRange([val, createdDateRange[1]])}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, color: '#444', marginBottom: 6 }}>Đến ngày</div>
+                <DatePicker
+                  style={{ width: '100%', height: 40, borderRadius: 8 }}
+                  placeholder="dd/mm/yyyy"
+                  value={createdDateRange[1]}
+                  format="DD/MM/YYYY"
+                  allowClear
+                  onChange={(val) => setCreatedDateRange([createdDateRange[0], val])}
+                />
+              </div>
+            </Space>
+          </div>
+
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button
+              onClick={() => {
+                setSelectedPaymentStatuses([])
+                setCreatedDateRange([null, null])
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => setFilterVisible(false)}
+              style={{ background: '#CBB081', borderColor: '#CBB081' }}
+            >
+              Áp dụng
+            </Button>
+          </Space>
         </Modal>
       </div>
     </AccountanceLayout>

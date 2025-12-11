@@ -485,216 +485,80 @@ export default function EmployeeListForManager() {
       </div>
 
       {/* Edit Employee Modal */}
-      <Modal
+            {/* Edit Employee Modal */}
+            <Modal
         open={editModalVisible}
         onCancel={handleCloseModal}
-        width={900}
+        width={960}
         footer={null}
-        closeIcon={<span style={{ fontSize: 24 }}>×</span>}
-        styles={{
-          header: {
+        closable={false}
+        styles={{ header: { display: 'none' }, body: { padding: 0, background: '#fff', borderRadius: 12 } }}
+      >
+        <div
+          style={{
             background: '#CBB081',
             padding: '20px 24px',
-            marginBottom: 0
-          },
-          body: {
-            padding: '32px 24px'
-          }
-        }}
-      >
-        <div style={{ 
-          background: '#CBB081', 
-          padding: '20px 24px', 
-          margin: '-20px -24px 24px -24px',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#000' }}>
-            Thông tin nhân viên
-          </h2>
+            borderRadius: '12px 12px 0 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#000' }}>Thông tin nhân viên</h2>
+          <Button type="text" onClick={handleCloseModal} style={{ fontSize: 20, color: '#000' }} aria-label="Đóng">
+            ×
+          </Button>
         </div>
 
-        <Form
-          form={form}
-          layout="vertical"
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span>Tên nhân viên <span style={{ color: 'red' }}>*</span></span>}
-              name="fullName"
-              rules={[{ required: true, message: 'Vui lòng nhập tên nhân viên' }]}
-            >
-              <Input 
-                placeholder="Nguyễn Văn A" 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
+        <div style={{ padding: 32 }}>
+          <Form form={form} layout="vertical">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 24 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <Form.Item label={<span>Tên nhân viên <span style={{ color: 'red' }}>*</span></span>} name="fullName" rules={[{ required: true, message: 'Vui lòng nhập tên nhân viên' }]}>
+                  <Input placeholder="Nguyễn Văn A" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+                <Form.Item label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>} name="phone" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}>
+                  <Input placeholder="0987654321" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+                <Form.Item label={<span>Chức vụ <span style={{ color: 'red' }}>*</span></span>} name="position" rules={[{ required: true, message: 'Vui lòng nhập chức vụ' }]}>
+                  <Input placeholder="Kỹ thuật viên" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+                <Form.Item label={<span>Lương cơ bản <span style={{ color: 'red' }}>*</span></span>} name="dailySalary" rules={[{ required: true, message: 'Vui lòng nhập lương' }]}>
+                  <Input placeholder="10.000.000" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+              </div>
 
-            <Form.Item
-              label={<span>Tỉnh thành <span style={{ color: 'red' }}>*</span></span>}
-              name="province"
-              rules={[{ required: true, message: 'Vui lòng nhập tỉnh thành' }]}
-            >
-              <Input 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <Form.Item label={<span>Tỉnh thành <span style={{ color: 'red' }}>*</span></span>} name="province" rules={[{ required: true, message: 'Vui lòng nhập tỉnh thành' }]}>
+                  <Input disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+                <Form.Item label="Phường xã" name="ward">
+                  <Input disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+                <Form.Item label="Địa chỉ chi tiết" name="addressDetail">
+                  <Input placeholder="Trung tâm thạch thất" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                </Form.Item>
+                <Form.Item label={<span>Trạng thái <span style={{ color: 'red' }}>*</span></span>} name="status" rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}>
+                  <Select placeholder="Đang làm việc" disabled={!isEditing} style={{ borderRadius: 8 }}>
+                    <Select.Option value="Đang hoạt động">Đang làm việc</Select.Option>
+                    <Select.Option value="Nghỉ phép">Nghỉ phép</Select.Option>
+                    <Select.Option value="Nghỉ làm">Nghỉ làm</Select.Option>
+                  </Select>
+                </Form.Item>
+              </div>
+            </div>
 
-            <Form.Item
-              label="Phường xã"
-              name="ward"
-            >
-              <Input 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
-          </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginTop: 16 }}>
+              <Form.Item label="Ngày bắt đầu" name="hireDate">
+                <DatePicker style={{ width: '100%', background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} format="DD/MM/YYYY" placeholder="11/10/2025" disabled={!isEditing} />
+              </Form.Item>
+              <Form.Item label="Ngày kết thúc" name="terminationDate">
+                <DatePicker style={{ width: '100%', background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} format="DD/MM/YYYY" placeholder="11/10/2025" disabled={!isEditing} />
+              </Form.Item>
+            </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
-            <Form.Item
-              label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>}
-              name="phone"
-              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
-            >
-              <Input 
-                placeholder="0987654321" 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Địa chỉ chi tiết"
-              name="addressDetail"
-            >
-              <Input 
-                placeholder="Trung tâm thạch thất" 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span>Chức vụ <span style={{ color: 'red' }}>*</span></span>}
-              name="position"
-              rules={[{ required: true, message: 'Vui lòng nhập chức vụ' }]}
-            >
-              <Input 
-                placeholder="Kỹ thuật viên" 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Ngày bắt đầu"
-              name="hireDate"
-            >
-              <DatePicker 
-                style={{ 
-                  width: '100%',
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }} 
-                format="DD/MM/YYYY"
-                placeholder="11/10/2025"
-                disabled={!isEditing}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Ngày kết thúc"
-              name="terminationDate"
-            >
-              <DatePicker 
-                style={{ 
-                  width: '100%',
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }} 
-                format="DD/MM/YYYY"
-                placeholder="11/10/2025"
-                disabled={!isEditing}
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span>Lương cơ bản <span style={{ color: 'red' }}>*</span></span>}
-              name="dailySalary"
-              rules={[{ required: true, message: 'Vui lòng nhập lương' }]}
-            >
-              <Input 
-                placeholder="10.000.000" 
-                disabled={!isEditing}
-                style={{ 
-                  background: isEditing ? '#fff' : '#f5f5f5',
-                  borderRadius: 8
-                }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label={<span>Trạng thái <span style={{ color: 'red' }}>*</span></span>}
-              name="status"
-              rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}
-            >
-              <Select 
-                placeholder="Đang làm việc" 
-                disabled={!isEditing}
-                style={{ 
-                  borderRadius: 8
-                }}
-              >
-                <Select.Option value="Đang hoạt động">Đang làm việc</Select.Option>
-                <Select.Option value="Nghỉ phép">Nghỉ phép</Select.Option>
-                <Select.Option value="Nghỉ làm">Nghỉ làm</Select.Option>
-              </Select>
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 24 }}>
-            {!isEditing ? (
-              <Button 
-                type="primary"
-                onClick={() => setIsEditing(true)}
-                style={{
-                  background: '#CBB081',
-                  borderColor: '#CBB081',
-                  borderRadius: 8,
-                  padding: '8px 32px',
-                  height: 'auto',
-                  fontSize: 16,
-                  fontWeight: 500
-                }}
-              >
-                Chỉnh sửa
-              </Button>
-            ) : (
-              <Button 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+              <Button
                 type="primary"
                 onClick={handleSave}
                 style={{
@@ -704,14 +568,14 @@ export default function EmployeeListForManager() {
                   padding: '8px 32px',
                   height: 'auto',
                   fontSize: 16,
-                  fontWeight: 500
+                  fontWeight: 500,
                 }}
               >
-                Lưu
+                Chỉnh sửa
               </Button>
-            )}
-          </div>
-        </Form>
+            </div>
+          </Form>
+        </div>
       </Modal>
 
       {/* Add Employee Modal */}

@@ -332,6 +332,8 @@ export const invoiceAPI = {
     get(`/invoices?page=${page}&size=${size}&sort=${sort}`),
   getById: (id) => get(`/invoices/${id}`),
   pay: (id, payload) => post(`/invoices/${id}/pay`, payload),
+  createDebt: (paymentId, payload) =>
+    post(`/invoices/${paymentId}/debt`, payload),
 };
 
 export const authAPI = {
@@ -370,7 +372,9 @@ export const debtsAPI = {
     keyword,
     page = 0,
     size = 10,
-    sort = "createdAt,desc",
+    sort,
+    fromDate,
+    toDate,
   }) => {
     const qs = buildQueryString({
       customerId,
@@ -379,6 +383,8 @@ export const debtsAPI = {
       page,
       size,
       sort,
+      fromDate,
+      toDate,
     });
     return get(`/debts/summary?${qs}`);
   },
@@ -496,7 +502,9 @@ export const payrollAPI = {
   getSummary: (month, year) =>
     get(`/payroll/summary-by-month?month=${month}&year=${year}`),
   createAllowance: (payload) => post(`/allowance/create`, payload),
+  deleteAllowance: (id) => del(`/allowance/${id}`),
   createDeduction: (payload) => post(`/deduction`, payload),
+  deleteDeduction: (id) => del(`/deduction/${id}`),
   paySalary: (payrollId, accountantId) =>
     post(`/payroll/${payrollId}/pay?accountant=${accountantId}`),
   submit: (month, year, accountantId) =>
@@ -553,6 +561,7 @@ export const stockReceiptAPI = {
 export const transactionsAPI = {
   callback: (paymentLinkId) =>
     post("/transactions/manual-callback", { paymentLinkId }),
+  getByInvoiceId: (invoiceId) => get(`/transactions/invoice/${invoiceId}`),
 };
 
 export const warehouseAPI = {

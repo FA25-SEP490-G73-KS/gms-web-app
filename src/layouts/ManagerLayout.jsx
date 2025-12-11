@@ -23,19 +23,19 @@ export default function ManagerLayout({ children }) {
   
   // State for collapsible menu groups (persisted, không auto đóng/mở theo route)
   const [openFinance, setOpenFinance] = useState(() => {
-    if (typeof window === 'undefined') return true
+    if (typeof window === 'undefined') return false
     const v = window.localStorage.getItem('manager_open_finance')
-    return v ? v === 'true' : true
+    return v ? v === 'true' : false
   })
   const [openCustomers, setOpenCustomers] = useState(() => {
-    if (typeof window === 'undefined') return true
+    if (typeof window === 'undefined') return false
     const v = window.localStorage.getItem('manager_open_customers')
-    return v ? v === 'true' : true
+    return v ? v === 'true' : false
   })
   const [openHR, setOpenHR] = useState(() => {
-    if (typeof window === 'undefined') return true
+    if (typeof window === 'undefined') return false
     const v = window.localStorage.getItem('manager_open_hr')
-    return v ? v === 'true' : true
+    return v ? v === 'true' : false
   })
   const [openService, setOpenService] = useState(() => {
     if (typeof window === 'undefined') return false
@@ -76,6 +76,23 @@ export default function ManagerLayout({ children }) {
     if (typeof window === 'undefined') return
     window.localStorage.setItem('manager_open_warehouse', String(openWarehouse))
   }, [openWarehouse])
+
+  // Tự mở đúng nhóm menu theo route hiện tại, đóng các nhóm không liên quan
+  useEffect(() => {
+    const path = location.pathname || ''
+    const next = {
+      finance: path.startsWith('/manager/accountance'),
+      hr: path.startsWith('/manager/accountance/hr'),
+      customers: path.startsWith('/manager/customers'),
+      service: path.startsWith('/manager/service'),
+      warehouse: path.startsWith('/manager/warehouse')
+    }
+    setOpenFinance(next.finance)
+    setOpenHR(next.hr)
+    setOpenCustomers(next.customers)
+    setOpenService(next.service)
+    setOpenWarehouse(next.warehouse)
+  }, [location.pathname])
 
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)

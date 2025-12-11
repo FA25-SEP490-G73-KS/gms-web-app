@@ -68,12 +68,6 @@ const fallbackServices = [
   },
 ]
 
-const fallbackSpending = [
-  { month: '01/2025', amount: 3500000 },
-  { month: '02/2025', amount: 1500000 },
-  { month: '03/2025', amount: 4200000 },
-]
-
 export default function CustomerDetailForManager() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -81,7 +75,6 @@ export default function CustomerDetailForManager() {
   const [customer, setCustomer] = useState(fallbackCustomer)
   const [vehicles, setVehicles] = useState(fallbackVehicles)
   const [serviceHistory, setServiceHistory] = useState(fallbackServices)
-  const [spending, setSpending] = useState(fallbackSpending)
   const [editVisible, setEditVisible] = useState(false)
   const [serviceDetailVisible, setServiceDetailVisible] = useState(false)
   const [selectedService, setSelectedService] = useState(null)
@@ -373,17 +366,6 @@ export default function CustomerDetailForManager() {
     }
   }
 
-  const spendingColumns = [
-    { title: 'Tháng', dataIndex: 'month', key: 'month' },
-    {
-      title: 'Chi tiêu',
-      dataIndex: 'amount',
-      key: 'amount',
-      align: 'right',
-      render: (value) => value.toLocaleString('vi-VN'),
-    },
-  ]
-
   return (
     <ManagerLayout>
       <Spin spinning={loading}>
@@ -478,19 +460,6 @@ export default function CustomerDetailForManager() {
                     <Table
                       columns={serviceColumns}
                       dataSource={serviceHistory.map((item) => ({ ...item, key: item.licensePlate }))}
-                      pagination={false}
-                      components={goldTableHeader}
-                      style={{ marginTop: 16 }}
-                    />
-                  )
-                },
-                { 
-                  key: 'spending', 
-                  label: <span style={{ fontWeight: 500 }}>Chi tiêu</span>,
-                  children: (
-                    <Table
-                      columns={spendingColumns}
-                      dataSource={spending.map((item) => ({ ...item, key: item.month }))}
                       pagination={false}
                       components={goldTableHeader}
                       style={{ marginTop: 16 }}

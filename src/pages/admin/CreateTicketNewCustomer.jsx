@@ -770,7 +770,7 @@ export default function CreateTicketNewCustomer() {
                 </Form.Item>
 
                 <Form.Item 
-                  label="Kỹ thuật viên sửa chữa" 
+                  label="Thợ sửa chữa" 
                   name="techs" 
                   rules={[
                     { 

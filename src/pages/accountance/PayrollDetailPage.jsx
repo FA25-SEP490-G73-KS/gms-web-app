@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Card, Button, Tabs, message, Spin, Row, Col, Modal, Form, Input, InputNumber, Table, Tag } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { payrollAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { getUserIdFromToken } from '../../utils/helpers'
+import { ROLE_KEY_TO_LABEL } from '../../utils/constants'
 import dayjs from 'dayjs'
 import '../../styles/pages/accountance/payroll-detail.css'
 
@@ -23,6 +24,8 @@ export default function PayrollDetailPage() {
   const [deductionForm] = Form.useForm()
   const [submitting, setSubmitting] = useState(false)
   const [payingSalary, setPayingSalary] = useState(false)
+  const [deletingAllowanceId, setDeletingAllowanceId] = useState(null)
+  const [deletingDeductionId, setDeletingDeductionId] = useState(null)
 
   useEffect(() => {
     fetchPayrollDetail()
@@ -150,6 +153,33 @@ export default function PayrollDetailPage() {
       render: () => (
         <Tag color="success">Hoàn tất</Tag>
       )
+    },
+    {
+      title: '',
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => {
+        const statusText = (payrollDetail?.status || '').toLowerCase()
+        const isPaid =
+          statusText === 'paid' ||
+          statusText.includes('đã thanh toán') ||
+          statusText.includes('đã chi trả')
+        const canDelete =
+          payrollDetail?.canPaySalary === false && !isPaid
+        const allowanceId = record?.id || record?.allowanceId || record?._id
+
+        if (!canDelete) return null
+
+        return (
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            loading={deletingAllowanceId === record.id}
+            onClick={() => handleDeleteAllowance(allowanceId)}
+          />
+        )
+      }
     }
   ]
 
@@ -207,6 +237,52 @@ export default function PayrollDetailPage() {
     }
   }
 
+  const handleDeleteAllowance = async (id) => {
+    if (!id) {
+      message.error('Không tìm thấy ID phụ cấp để xóa')
+      return
+    }
+    setDeletingAllowanceId(id)
+    try {
+      const { error } = await payrollAPI.deleteAllowance(id)
+      if (error) {
+        message.error(error || 'Không thể xóa phụ cấp')
+        setDeletingAllowanceId(null)
+        return
+      }
+      message.success('Xóa phụ cấp thành công')
+      await fetchPayrollDetail()
+    } catch (err) {
+      console.error('Failed to delete allowance:', err)
+      message.error('Đã xảy ra lỗi khi xóa phụ cấp')
+    } finally {
+      setDeletingAllowanceId(null)
+    }
+  }
+
+  const handleDeleteDeduction = async (id) => {
+    if (!id) {
+      message.error('Không tìm thấy ID khấu trừ để xóa')
+      return
+    }
+    setDeletingDeductionId(id)
+    try {
+      const { error } = await payrollAPI.deleteDeduction(id)
+      if (error) {
+        message.error(error || 'Không thể xóa khấu trừ')
+        setDeletingDeductionId(null)
+        return
+      }
+      message.success('Xóa khấu trừ thành công')
+      await fetchPayrollDetail()
+    } catch (err) {
+      console.error('Failed to delete deduction:', err)
+      message.error('Đã xảy ra lỗi khi xóa khấu trừ')
+    } finally {
+      setDeletingDeductionId(null)
+    }
+  }
+
   const deductionColumns = [
     {
       title: 'Loại khấu trừ',
@@ -236,6 +312,33 @@ export default function PayrollDetailPage() {
       render: () => (
         <Tag color="success">Hoàn tất</Tag>
       )
+    },
+    {
+      title: '',
+      key: 'actions',
+      align: 'center',
+      render: (_, record) => {
+        const statusText = (payrollDetail?.status || '').toLowerCase()
+        const isPaid =
+          statusText === 'paid' ||
+          statusText.includes('đã thanh toán') ||
+          statusText.includes('đã chi trả')
+        const canDelete =
+          payrollDetail?.canPaySalary === false && !isPaid
+        const deductionId = record?.id || record?.deductionId || record?._id
+
+        if (!canDelete) return null
+
+        return (
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            loading={deletingDeductionId === deductionId}
+            onClick={() => handleDeleteDeduction(deductionId)}
+          />
+        )
+      }
     }
   ]
 
@@ -276,7 +379,9 @@ export default function PayrollDetailPage() {
                 <Col span={12}>
                   <div className="info-item">
                     <span className="info-label">Chức vụ:</span>
-                    <span className="info-value">{payrollDetail.employee?.role || 'N/A'}</span>
+                    <span className="info-value">
+                      {ROLE_KEY_TO_LABEL[payrollDetail.employee?.role] || payrollDetail.employee?.role || 'N/A'}
+                    </span>
                   </div>
                 </Col>
               </Row>
@@ -318,7 +423,7 @@ export default function PayrollDetailPage() {
                 <Col span={12}>
                   <Card className="overview-card">
                     <div className="overview-item">
-                      <span className="overview-label">Lương cơ bản:</span>
+                      <span className="overview-label">Tiền công:</span>
                       <span className="overview-value">{formatCurrency(payrollDetail.overview?.baseSalary || 0)}</span>
                     </div>
                     <div className="overview-item">
@@ -448,7 +553,7 @@ export default function PayrollDetailPage() {
                 onFinish={handleCreateAllowance}
               >
                 <Form.Item
-                  label={<span>Danh mục <span style={{ color: 'red' }}>*</span></span>}
+                  label="Danh mục"
                   name="category"
                   rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
                 >
@@ -480,7 +585,7 @@ export default function PayrollDetailPage() {
                   </select>
                 </Form.Item>
                 <Form.Item
-                  label={<span>Nội dung <span style={{ color: 'red' }}>*</span></span>}
+                  label="Nội dung"
                   name="type"
                   rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
                 >
@@ -491,7 +596,7 @@ export default function PayrollDetailPage() {
                   />
                 </Form.Item>
                 <Form.Item
-                  label={<span>Số tiền <span style={{ color: 'red' }}>*</span></span>}
+                  label="Số tiền"
                   name="amount"
                   rules={[{ required: true, message: 'Vui lòng nhập số tiền' }]}
                 >
@@ -499,12 +604,31 @@ export default function PayrollDetailPage() {
                     style={{ width: '100%' }}
                     placeholder="VD: 1000000"
                     min={0}
-                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                    step={1}
+                    controls={false}
+                    inputMode="numeric"
+                    formatter={(value) =>
+                      `${value || ''}`.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                    }
+                    parser={(value) => (value ? value.replace(/\D/g, '') : '')}
+                    onKeyDown={(e) => {
+                      const allowedKeys = [
+                        'Backspace',
+                        'Delete',
+                        'ArrowLeft',
+                        'ArrowRight',
+                        'Tab',
+                        'Home',
+                        'End'
+                      ]
+                      if (!allowedKeys.includes(e.key) && !/^\d$/.test(e.key)) {
+                        e.preventDefault()
+                      }
+                    }}
                   />
                 </Form.Item>
                 <Form.Item style={{ marginBottom: 0, marginTop: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       type="primary"
                       htmlType="submit"
@@ -544,7 +668,7 @@ export default function PayrollDetailPage() {
                 onFinish={handleCreateDeduction}
               >
                 <Form.Item
-                  label={<span>Danh mục <span style={{ color: 'red' }}>*</span></span>}
+                  label="Danh mục"
                   name="category"
                   rules={[{ required: true, message: 'Vui lòng chọn danh mục' }]}
                 >
@@ -575,7 +699,7 @@ export default function PayrollDetailPage() {
                   </select>
                 </Form.Item>
                 <Form.Item
-                  label={<span>Nội dung <span style={{ color: 'red' }}>*</span></span>}
+                  label="Nội dung"
                   name="type"
                   rules={[{ required: true, message: 'Vui lòng nhập nội dung' }]}
                 >
@@ -586,7 +710,7 @@ export default function PayrollDetailPage() {
                   />
                 </Form.Item>
                 <Form.Item
-                  label={<span>Số tiền <span style={{ color: 'red' }}>*</span></span>}
+                  label="Số tiền"
                   name="amount"
                   rules={[{ required: true, message: 'Vui lòng nhập số tiền' }]}
                 >
@@ -594,12 +718,31 @@ export default function PayrollDetailPage() {
                     style={{ width: '100%' }}
                     placeholder="VD: 500000"
                     min={0}
-                    formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                    step={1}
+                    controls={false}
+                    inputMode="numeric"
+                    formatter={(value) =>
+                      `${value || ''}`.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+                    }
+                    parser={(value) => (value ? value.replace(/\D/g, '') : '')}
+                    onKeyDown={(e) => {
+                      const allowedKeys = [
+                        'Backspace',
+                        'Delete',
+                        'ArrowLeft',
+                        'ArrowRight',
+                        'Tab',
+                        'Home',
+                        'End'
+                      ]
+                      if (!allowedKeys.includes(e.key) && !/^\d$/.test(e.key)) {
+                        e.preventDefault()
+                      }
+                    }}
                   />
                 </Form.Item>
                 <Form.Item style={{ marginBottom: 0, marginTop: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                     <Button
                       type="primary"
                       htmlType="submit"

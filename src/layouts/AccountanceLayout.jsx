@@ -54,7 +54,28 @@ export default function AccountanceLayout({ children }) {
       return { parent: 'Nhân sự', current: 'Ngày công' }
     }
     if (path.startsWith('/accountance/hr/payroll')) {
+      if (path !== '/accountance/hr/payroll') {
+        return {
+          parent: 'Lương',
+          parentPath: '/accountance/hr/payroll',
+          current: 'Chi tiết'
+        }
+      }
       return { parent: 'Nhân sự', current: 'Lương' }
+    }
+    if (path.startsWith('/accountance/debts/') && path !== '/accountance/debts') {
+      return {
+        parent: 'Công nợ',
+        parentPath: '/accountance/debts',
+        current: 'Chi tiết công nợ'
+      }
+    }
+    if (path.startsWith('/accountance/payments/') && path !== '/accountance/payments') {
+      return {
+        parent: 'Thanh toán',
+        parentPath: '/accountance/payments',
+        current: 'Chi tiết hóa đơn',
+      }
     }
     if (path.startsWith('/accountance/payments')) {
       return { parent: '', current: 'Thanh toán' }
@@ -85,7 +106,14 @@ export default function AccountanceLayout({ children }) {
             <div className="breadcrumb-divider"></div>
             {breadcrumb.parent ? (
               <div className="breadcrumb">
-                <span className="breadcrumb-item">{breadcrumb.parent}</span>
+                <button
+                  className="breadcrumb-item"
+                  type="button"
+                  onClick={() => navigate(breadcrumb.parentPath || '/accountance')}
+                  style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                >
+                  {breadcrumb.parent}
+                </button>
                 <span className="breadcrumb-separator">&gt;</span>
                 <span className="breadcrumb-current">{breadcrumb.current}</span>
               </div>
@@ -146,7 +174,7 @@ export default function AccountanceLayout({ children }) {
                   Ngày công
                 </button>
                 <button
-                  className={`submenu-item ${isActive('/accountance/hr/payroll') ? 'active' : ''}`}
+                  className={`submenu-item ${isActiveParent('/accountance/hr/payroll') ? 'active' : ''}`}
                   onClick={() => navigate('/accountance/hr/payroll')}
                 >
                   Lương
@@ -156,7 +184,7 @@ export default function AccountanceLayout({ children }) {
           </div>
 
           <button
-            className={`warehouse-nav-item ${isActive('/accountance/payments') ? 'active' : ''}`}
+            className={`warehouse-nav-item ${isActiveParent('/accountance/payments') ? 'active' : ''}`}
             onClick={() => navigate('/accountance/payments')}
           >
             <i className="bi bi-credit-card" />
@@ -164,7 +192,7 @@ export default function AccountanceLayout({ children }) {
           </button>
 
           <button
-            className={`warehouse-nav-item ${isActive('/accountance/debts') ? 'active' : ''}`}
+            className={`warehouse-nav-item ${isActiveParent('/accountance/debts') ? 'active' : ''}`}
             onClick={() => navigate('/accountance/debts')}
           >
             <i className="bi bi-receipt" />

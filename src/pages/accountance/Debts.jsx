@@ -19,150 +19,6 @@ const STATUS_COLORS = {
   paid: { color: '#15803d', bg: '#dcfce7', text: 'Đã thanh toán' }
 }
 
-// Mock data for testing when API fails or returns no data
-const MOCK_DEBTS = [
-  {
-    id: 1,
-    customerName: 'Nguyễn Văn An',
-    customerPhone: '0901234567',
-    totalDebt: 15000000,
-    status: 'CON_NO',
-    debtCount: 2,
-    details: [
-      {
-        id: 101,
-        code: 'TK001',
-        createdAt: '2024-11-15T10:00:00',
-        total: 8000000,
-        remain: 5000000,
-        dueDate: '2024-12-15T00:00:00',
-        status: 'warning',
-        licensePlate: '30A-12345'
-      },
-      {
-        id: 102,
-        code: 'TK002',
-        createdAt: '2024-11-20T14:30:00',
-        total: 7000000,
-        remain: 7000000,
-        dueDate: '2024-12-20T00:00:00',
-        status: 'warning',
-        licensePlate: '30A-12345'
-      }
-    ]
-  },
-  {
-    id: 2,
-    customerName: 'Trần Thị Bình',
-    customerPhone: '0912345678',
-    totalDebt: 20000000,
-    status: 'CON_NO',
-    debtCount: 1,
-    details: [
-      {
-        id: 201,
-        code: 'TK003',
-        createdAt: '2024-11-25T09:15:00',
-        total: 20000000,
-        remain: 18000000,
-        dueDate: '2024-12-25T00:00:00',
-        status: 'warning',
-        licensePlate: '29B-67890'
-      }
-    ]
-  },
-  {
-    id: 3,
-    customerName: 'Lê Hoàng Cường',
-    customerPhone: '0923456789',
-    totalDebt: 12500000,
-    status: 'DA_TAT_TOAN',
-    debtCount: 1,
-    details: [
-      {
-        id: 301,
-        code: 'TK004',
-        createdAt: '2024-10-10T11:20:00',
-        total: 12500000,
-        remain: 0,
-        dueDate: '2024-11-10T00:00:00',
-        status: 'done',
-        licensePlate: '51C-11111'
-      }
-    ]
-  },
-  {
-    id: 4,
-    customerName: 'Phạm Minh Đức',
-    customerPhone: '0934567890',
-    totalDebt: 9800000,
-    status: 'CON_NO',
-    debtCount: 3,
-    details: [
-      {
-        id: 401,
-        code: 'TK005',
-        createdAt: '2024-11-05T08:00:00',
-        total: 3500000,
-        remain: 1500000,
-        dueDate: '2024-12-05T00:00:00',
-        status: 'warning',
-        licensePlate: '43D-22222'
-      },
-      {
-        id: 402,
-        code: 'TK006',
-        createdAt: '2024-11-10T15:45:00',
-        total: 4000000,
-        remain: 4000000,
-        dueDate: '2024-12-10T00:00:00',
-        status: 'warning',
-        licensePlate: '43D-22222'
-      },
-      {
-        id: 403,
-        code: 'TK007',
-        createdAt: '2024-11-18T13:30:00',
-        total: 2300000,
-        remain: 2300000,
-        dueDate: '2024-12-18T00:00:00',
-        status: 'warning',
-        licensePlate: '43D-22222'
-      }
-    ]
-  },
-  {
-    id: 5,
-    customerName: 'Võ Thị Hà',
-    customerPhone: '0945678901',
-    totalDebt: 18000000,
-    status: 'DA_TAT_TOAN',
-    debtCount: 2,
-    details: [
-      {
-        id: 501,
-        code: 'TK008',
-        createdAt: '2024-10-20T10:10:00',
-        total: 10000000,
-        remain: 0,
-        dueDate: '2024-11-20T00:00:00',
-        status: 'done',
-        licensePlate: '92E-33333'
-      },
-      {
-        id: 502,
-        code: 'TK009',
-        createdAt: '2024-10-25T16:20:00',
-        total: 8000000,
-        remain: 0,
-        dueDate: '2024-11-25T00:00:00',
-        status: 'done',
-        licensePlate: '92E-33333'
-      }
-    ]
-  }
-]
-
 const detailStatusConfig = {
   done: { label: 'Thanh toán', color: '#22c55e', bg: '#dcfce7' },
   warning: { label: 'Sắp', color: '#f97316', bg: '#ffedd5' }
@@ -196,7 +52,7 @@ export function AccountanceDebtsContent() {
   const [debts, setDebts] = useState([])
   const [pagination, setPagination] = useState({
     page: 0,
-    size: 50,
+    size: 10,
     total: 0
   })
 
@@ -294,12 +150,21 @@ export function AccountanceDebtsContent() {
     async (page = 0, size = 10) => {
       setLoading(true)
       try {
+        // Map status: CON_NO -> OUTSTANDING, DA_TAT_TOAN -> PAID_IN_FULL
+        let apiStatus = undefined
+        if (status === 'CON_NO') {
+          apiStatus = 'OUTSTANDING'
+        } else if (status === 'DA_TAT_TOAN') {
+          apiStatus = 'PAID_IN_FULL'
+        }
+        // status === 'ALL' thì không truyền status
+        
         const { data, error } = await debtsAPI.list({
-          status: status === 'ALL' ? undefined : status,
+          status: apiStatus,
           keyword: query || undefined,
           page,
           size,
-          sort: 'createdAt,desc'
+          sort: undefined // Bỏ sort vì API /debts/summary không hỗ trợ
         })
 
         if (error) {
@@ -315,31 +180,13 @@ export function AccountanceDebtsContent() {
               payload?.records ||
               []
 
-        // If API returns empty data, use mock data
         if (!list || list.length === 0) {
-
-          // Filter mock data based on status
-          let filteredMockData = MOCK_DEBTS
-          if (status !== 'ALL') {
-            filteredMockData = MOCK_DEBTS.filter(debt => debt.status === status)
-          }
-          
-          // Filter by search query
-          if (query && query.trim()) {
-            const searchLower = query.toLowerCase()
-            filteredMockData = filteredMockData.filter(debt => 
-              debt.customerName.toLowerCase().includes(searchLower) ||
-              debt.customerPhone.includes(searchLower) ||
-              debt.details.some(d => d.licensePlate.toLowerCase().includes(searchLower))
-            )
-          }
-          
-          setDebts(filteredMockData)
+          setDebts([])
           setPagination((prev) => ({
             ...prev,
             page: 0,
             size,
-            total: filteredMockData.length
+            total: 0
           }))
         } else {
           setDebts(list)
@@ -356,31 +203,14 @@ export function AccountanceDebtsContent() {
         }
         setExpandedRowKeys([])
       } catch (err) {
-        console.warn('API failed, using mock data:', err.message)
-
-        
-        // Filter mock data based on status
-        let filteredMockData = MOCK_DEBTS
-        if (status !== 'ALL') {
-          filteredMockData = MOCK_DEBTS.filter(debt => debt.status === status)
-        }
-        
-        // Filter by search query
-        if (query && query.trim()) {
-          const searchLower = query.toLowerCase()
-          filteredMockData = filteredMockData.filter(debt => 
-            debt.customerName.toLowerCase().includes(searchLower) ||
-            debt.customerPhone.includes(searchLower) ||
-            debt.details.some(d => d.licensePlate.toLowerCase().includes(searchLower))
-          )
-        }
-        
-        setDebts(filteredMockData)
+        console.error('Failed to fetch debts:', err)
+        message.error('Không thể tải danh sách công nợ')
+        setDebts([])
         setPagination((prev) => ({
           ...prev,
           page: 0,
           size,
-          total: filteredMockData.length
+          total: 0
         }))
         setExpandedRowKeys([])
       } finally {
@@ -662,7 +492,7 @@ export function AccountanceDebtsContent() {
   return (
       <div className="debts-page">
         <div className="debts-header">
-          <h1>Công nợ • Khách hàng</h1>
+          <h1>Công nợ</h1>
         </div>
 
         <div className="debts-filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>

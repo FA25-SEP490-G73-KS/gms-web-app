@@ -1697,7 +1697,7 @@ export default function TicketDetailPage() {
                 <span>{getDisplayValue(createdDate)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <strong>Kỹ thuật viên sửa chữa:</strong>{' '}
+                <strong>Thợ sửa chữa:</strong>{' '}
                 <span>{technicianDisplay}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
@@ -1864,13 +1864,13 @@ export default function TicketDetailPage() {
                 paddingTop: '24px'
               }}
             >
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '48px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '48px', marginBottom: '24px' }}>
                 <div>
-                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Tổng cộng</div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>TỔNG CỘNG</div>
                   <div style={{ fontSize: '20px', fontWeight: 700 }}>{formatCurrency(grandTotal)} đ</div>
-                        </div>
+                </div>
                 <div>
-                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Giảm giá</div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>GIẢM GIÁ</div>
                   <div style={{ fontSize: '20px', fontWeight: 700 }}>
                     {discountPercent ? `${discountPercent}%` : '0%'}{' '}
                     {discountAmount > 0 && (
@@ -1881,7 +1881,7 @@ export default function TicketDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>Thanh toán cuối cùng</div>
+                  <div style={{ color: '#6b7280', fontSize: '12px', textTransform: 'uppercase', marginBottom: '4px' }}>THANH TOÁN CUỐI CÙNG</div>
                   <div style={{ fontSize: '20px', fontWeight: 700, color: '#ef4444' }}>
                     {formatCurrency(finalAmount)} đ
                   </div>
