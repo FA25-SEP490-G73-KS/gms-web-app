@@ -6,12 +6,13 @@ import {
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined, FileTextOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI, invoiceAPI } from '../../services/api'
+import { serviceTicketAPI, priceQuotationAPI, znsNotificationsAPI, partsAPI, unitsAPI, invoiceAPI, employeesAPI, serviceTypeAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/admin/modals/ticketdetail.css'
 import dayjs from 'dayjs'
 import Select, { components as selectComponents } from 'react-select'
 import CreatableSelect from 'react-select/creatable'
+import ReactSelect from 'react-select'
 
 const DEFAULT_UNITS = [
   { value: 'Cái', label: 'Cái' },
@@ -96,6 +97,48 @@ export default function TicketDetailPage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [isEditMode, setIsEditMode] = useState(false)
+  const [techOptions, setTechOptions] = useState([])
+  const [techLoading, setTechLoading] = useState(false)
+  const [serviceOptions, setServiceOptions] = useState([])
+  const [serviceLoading, setServiceLoading] = useState(false)
+  const [selectedTechs, setSelectedTechs] = useState([])
+  const [selectedServices, setSelectedServices] = useState([])
+
+  const inputHeight = 40
+  
+  const multiSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: inputHeight,
+      borderRadius: 6,
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      transition: 'all 0.15s ease',
+      '&:hover': { borderColor: '#3b82f6' }
+    }),
+    indicatorsContainer: (base) => ({ ...base, paddingRight: 8, gap: 0 }),
+    valueContainer: (base) => ({ ...base, padding: '4px 8px', gap: 4, flexWrap: 'wrap', alignItems: 'center' }),
+    placeholder: (base) => ({ ...base, color: '#9ca3af', fontWeight: 500 }),
+    multiValue: (base) => ({ ...base, borderRadius: 12, backgroundColor: '#e0f2ff', border: '1px solid #bae6fd' }),
+    multiValueLabel: (base) => ({ ...base, color: '#0f172a', fontWeight: 600, padding: '2px 8px', fontSize: 13 }),
+    multiValueRemove: (base) => ({ ...base, color: '#0ea5e9', borderLeft: '1px solid #bae6fd', padding: '2px 6px', ':hover': { backgroundColor: '#bae6fd', color: '#0284c7' } }),
+    menu: (base) => ({ ...base, zIndex: 9999, borderRadius: 12, overflow: 'hidden' }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    option: (base, state) => ({ ...base, backgroundColor: state.isSelected ? '#dbeafe' : state.isFocused ? '#f8fafc' : 'white', color: '#0f172a', fontWeight: state.isSelected ? 600 : 500 })
+  }
+
+  const techOptionsStable = useMemo(() => techOptions, [techOptions])
+  const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
+
+  const handleServiceChange = (selected) => {
+    const arr = selected || []
+    setSelectedServices(arr)
+  }
+
+  const handleTechChange = (selected) => {
+    const arr = selected || []
+    setSelectedTechs(arr)
+  }
 
   const quotationStatusRaw = ticketData?.priceQuotation?.status
   const normalizedQuotationStatus = quotationStatusRaw
@@ -537,6 +580,37 @@ export default function TicketDetailPage() {
     return DEFAULT_UNITS
   }
 
+  // Sync selected techs và services khi options được load và ticket data có
+  useEffect(() => {
+    if (!ticketData || techOptions.length === 0 || serviceOptions.length === 0) return
+    
+    // Sync selected technicians
+    if (Array.isArray(ticketData.assignedTechnicianIds) && ticketData.assignedTechnicianIds.length > 0) {
+      const matched = techOptions.filter(opt => ticketData.assignedTechnicianIds.map(String).includes(String(opt.value)))
+      if (matched.length > 0 && JSON.stringify(matched.map(m => m.value).sort()) !== JSON.stringify(selectedTechs.map(s => s.value).sort())) {
+        setSelectedTechs(matched)
+      }
+    }
+    
+    // Sync selected services
+    if (Array.isArray(ticketData.serviceTypeIds) && ticketData.serviceTypeIds.length > 0) {
+      const matched = serviceOptions.filter(opt => ticketData.serviceTypeIds.map(String).includes(String(opt.value)))
+      if (matched.length > 0 && JSON.stringify(matched.map(m => m.value).sort()) !== JSON.stringify(selectedServices.map(s => s.value).sort())) {
+        setSelectedServices(matched)
+      }
+    } else if (Array.isArray(ticketData.serviceType) && ticketData.serviceType.length > 0) {
+      // Nếu có serviceType (array of names), match theo tên
+      const serviceTypeNames = ticketData.serviceType.map(name => String(name).trim().toLowerCase())
+      const matched = serviceOptions.filter(opt => {
+        const optLabel = String(opt.label || '').trim().toLowerCase()
+        return serviceTypeNames.includes(optLabel)
+      })
+      if (matched.length > 0 && JSON.stringify(matched.map(m => m.value).sort()) !== JSON.stringify(selectedServices.map(s => s.value).sort())) {
+        setSelectedServices(matched)
+      }
+    }
+  }, [ticketData, techOptions, serviceOptions, selectedTechs, selectedServices])
+
   useEffect(() => {
     if (id) {
       fetchTicketDetail()
@@ -615,6 +689,48 @@ export default function TicketDetailPage() {
     }
   }
 
+  // Fetch technicians
+  const fetchTechnicians = async () => {
+    setTechLoading(true)
+    try {
+      const { data, error } = await employeesAPI.getTechnicians()
+      if (error) {
+        message.error('Không thể tải danh sách kỹ thuật viên')
+        setTechLoading(false)
+        return
+      }
+      const technicians = data?.result || data || []
+      setTechOptions(technicians.map(t => ({ value: t.employeeId, label: `${t.fullName} - ${t.phone || ''}` })))
+    } catch (err) {
+      console.error('Error fetching technicians:', err)
+    } finally {
+      setTechLoading(false)
+    }
+  }
+
+  // Fetch service types
+  const fetchServiceTypes = async () => {
+    setServiceLoading(true)
+    try {
+      const { data, error } = await serviceTypeAPI.getAll()
+      if (error) {
+        message.error('Không thể tải danh sách loại dịch vụ')
+        setServiceLoading(false)
+        return
+      }
+      const list = data?.result || data || []
+      const allServiceOptions = list.map(item => ({ 
+        value: item.serviceTypeId || item.id || item.value, 
+        label: item.serviceTypeName || item.name || item.label 
+      }))
+      setServiceOptions(allServiceOptions)
+    } catch (err) {
+      console.error('Error fetching service types:', err)
+    } finally {
+      setServiceLoading(false)
+    }
+  }
+
   const fetchTicketDetail = async () => {
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getById(id)
@@ -650,6 +766,40 @@ export default function TicketDetailPage() {
       }))
       setTechnicians(techniciansOptions)
       setSelectedTechnician(techniciansList[0] || null)
+      
+      // Fetch technicians và service types để hiển thị trong dropdown
+      await fetchTechnicians()
+      await fetchServiceTypes()
+      
+      // Set selected values từ ticket data sau khi fetch xong
+      // Sử dụng setTimeout để đảm bảo state đã được cập nhật
+      setTimeout(() => {
+        // Set selected technicians
+        if (Array.isArray(data.assignedTechnicianIds) && data.assignedTechnicianIds.length > 0) {
+          const matched = techOptions.filter(opt => data.assignedTechnicianIds.map(String).includes(String(opt.value)))
+          if (matched.length > 0) {
+            setSelectedTechs(matched)
+          }
+        }
+        
+        // Set selected services
+        if (Array.isArray(data.serviceTypeIds) && data.serviceTypeIds.length > 0) {
+          const matched = serviceOptions.filter(opt => data.serviceTypeIds.map(String).includes(String(opt.value)))
+          if (matched.length > 0) {
+            setSelectedServices(matched)
+          }
+        } else if (Array.isArray(normalizedData.serviceType) && normalizedData.serviceType.length > 0) {
+          // Nếu có serviceType (array of names), match theo tên
+          const serviceTypeNames = normalizedData.serviceType.map(name => String(name).trim().toLowerCase())
+          const matched = serviceOptions.filter(opt => {
+            const optLabel = String(opt.label || '').trim().toLowerCase()
+            return serviceTypeNames.includes(optLabel)
+          })
+          if (matched.length > 0) {
+            setSelectedServices(matched)
+          }
+        }
+      }, 300)
       
       const serviceTypes = Array.isArray(normalizedData.serviceType) ? normalizedData.serviceType.join(', ') : (normalizedData.serviceType || '')
       
@@ -1813,12 +1963,42 @@ export default function TicketDetailPage() {
                 <span>{getDisplayValue(createdDate)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <strong>Thợ sửa chữa:</strong>{' '}
-                <span>{technicianDisplay}</span>
+                <strong>Thợ sửa chữa:</strong>
+                <div style={{ marginTop: 4 }}>
+                  <ReactSelect
+                    isMulti
+                    options={techOptionsStable}
+                    value={selectedTechs}
+                    onChange={handleTechChange}
+                    styles={multiSelectStyles}
+                    placeholder={techLoading ? 'Đang tải...' : 'Chọn thợ sửa chữa'}
+                    isDisabled={techLoading || techOptionsStable.length === 0 || inputsDisabled}
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    classNamePrefix="react-select"
+                  />
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                    {selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn thợ sửa chữa'}
+                  </div>
+                </div>
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <strong>Loại dịch vụ:</strong>{' '}
-                <span>{getDisplayValue(serviceTypeValue)}</span>
+                <strong>Loại dịch vụ:</strong>
+                <div style={{ marginTop: 4 }}>
+                  <ReactSelect
+                    isMulti
+                    options={serviceOptionsStable}
+                    value={selectedServices}
+                    onChange={handleServiceChange}
+                    styles={multiSelectStyles}
+                    placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
+                    isDisabled={serviceLoading || serviceOptionsStable.length === 0 || inputsDisabled}
+                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                    classNamePrefix="react-select"
+                  />
+                  <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                    {selectedServices.length ? `Đã chọn ${selectedServices.length}` : 'Chưa chọn dịch vụ'}
+                  </div>
+                </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <strong>Ngày dự đoán giao xe:</strong>

@@ -15,6 +15,7 @@ import AppointmentService from './pages/customer/appointment/appointmentservice'
 import Login from './pages/auth/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ChangePassword from './pages/auth/ChangePassword';
+import Profile from './pages/auth/Profile';
 import AdminHome from './pages/admin/AdminHome';
 import AdminAppointments from './pages/admin/AdminAppointments';
 import TicketService from './pages/admin/TicketService';
@@ -56,6 +57,7 @@ import ManagerTicketDetailPage from './pages/manager/service/ManagerTicketDetail
 import ManagerImportRequest from './pages/manager/warehouse/ImportRequest';
 import ManagerImportRequestDetail from './pages/manager/warehouse/ImportRequestDetail';
 import Inventory from './pages/admin/Inventory';
+import AdminCustomers from './pages/admin/Customers';
 import ManagerHome from './pages/manager/ManagerHome';
 
 import WarehouseHome from './pages/warehouse/WarehouseHome';
@@ -125,6 +127,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/change-password" element={<ChangePassword />} />
+        <Route path="/auth/profile" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.SERVICE_ADVISOR, USER_ROLES.MANAGER, USER_ROLES.ACCOUNTANT, USER_ROLES.WAREHOUSE]}>
+            <Profile />
+          </ProtectedRoute>
+        } />
         
         
         <Route path="/404" element={<NotFound />} />
@@ -184,6 +191,11 @@ function App() {
         <Route path="/service-advisor/inventory" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.SERVICE_ADVISOR]}>
             <Inventory />
+          </ProtectedRoute>
+        } />
+        <Route path="/service-advisor/customers" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.SERVICE_ADVISOR]}>
+            <AdminCustomers />
           </ProtectedRoute>
         } />
         {/* Warehouse Routes - Protected */}

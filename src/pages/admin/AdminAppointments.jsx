@@ -149,7 +149,7 @@ export default function AdminAppointments() {
   const [loading, setLoading] = useState(false)
   const [selectedFull, setSelectedFull] = useState(null)
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [selectedDate, setSelectedDate] = useState(null)
+  const [selectedDate, setSelectedDate] = useState(dayjs().format('YYYY-MM-DD'))
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [timeSlots, setTimeSlots] = useState([])
@@ -520,66 +520,36 @@ export default function AdminAppointments() {
       
       console.log('✓ No existing ticket found, proceeding to create')
 
+      // Gọi API để lấy thông tin appointment đầy đủ
+      console.log('Fetching appointment details from API...')
+      const { data: appointmentResponse, error: appointmentError } = await appointmentAPI.getById(appointmentId)
+      
+      if (appointmentError || !appointmentResponse || !appointmentResponse.result) {
+        console.error('Error fetching appointment:', appointmentError)
+        message.error('Không thể lấy thông tin lịch hẹn')
+        setUpdatingStatus(false)
+        return
+      }
+      
+      const fullAppointmentData = appointmentResponse.result
+      console.log('✓ Appointment data fetched:', fullAppointmentData)
+
       // Update trạng thái lịch hẹn thành ARRIVED
       console.log('Updating appointment status to ARRIVED...')
       const { error: statusError } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
       if (statusError) {
         console.error('Update status error:', statusError)
         message.error('Cập nhật trạng thái lịch hẹn thất bại')
-      setUpdatingStatus(false)
-      return
+        setUpdatingStatus(false)
+        return
       }
       console.log('✓ Appointment status updated to ARRIVED')
 
-      // Parse expectedDeliveryAt
-      let expectedDeliveryAt = null
-      if (appointmentData.appointmentDate) {
-        const dateStr = appointmentData.appointmentDate
-        console.log('Parsing appointmentDate:', dateStr)
-        
-        let parsedDate = dayjs(dateStr, 'DD/MM/YYYY', true)
-        if (!parsedDate.isValid()) {
-          parsedDate = dayjs(dateStr, 'YYYY-MM-DD', true)
-        }
-        if (!parsedDate.isValid()) {
-          parsedDate = dayjs(dateStr)
-        }
-        
-        if (parsedDate.isValid()) {
-          expectedDeliveryAt = parsedDate.format('YYYY-MM-DD')
-          console.log('Parsed expectedDeliveryAt:', expectedDeliveryAt)
-        } else {
-          console.warn('Could not parse date:', dateStr)
-          expectedDeliveryAt = null
-        }
-      }
-
-      // Chuẩn bị data để pass sang CreateTicket (sẽ dùng để build payload ở đó)
+      // Chuẩn bị data để pass sang CreateTicket
       const navigationState = {
         fromAppointment: true,
         appointmentId: appointmentId,
-        assignedTechnicianIds: appointmentData.assignedTechnicianIds || [],
-        customer: {
-          customerId: appointmentData.customerId || null,
-          fullName: appointmentData.customerName || '',
-          phone: appointmentData.customerPhone || '',
-          address: appointmentData.address || '',
-          customerType: appointmentData.customerType || 'DOANH_NGHIEP',
-          discountPolicyId: appointmentData.discountPolicyId || 0
-        },
-        expectedDeliveryAt: expectedDeliveryAt,
-        receiveCondition: appointmentData.note || '',
-        serviceTypeIds: appointmentData.serviceTypeIds || [],
-        vehicle: {
-          brandId: appointmentData.brandId || null,
-          brandName: appointmentData.brandName || '',
-          licensePlate: (appointmentData.licensePlate || '').toUpperCase(),
-          modelId: appointmentData.modelId || null,
-          modelName: appointmentData.modelName || '',
-          vehicleId: appointmentData.vehicleId || null,
-          vin: appointmentData.vin || null,
-          year: appointmentData.year || 2020
-        }
+        appointmentData: fullAppointmentData // Truyền toàn bộ dữ liệu từ API
       }
 
       console.log('=== [AdminAppointments] Navigation State ===')
@@ -589,11 +559,11 @@ export default function AdminAppointments() {
       message.success('Đang chuyển sang trang tạo phiếu dịch vụ...')
       
       // Clean up first
-    setSelected(null)
-    setSelectedFull(null)
+      setSelected(null)
+      setSelectedFull(null)
       setUpdatingStatus(false)
       
-      // Navigate to CreateTicket page - API POST sẽ gọi ở đó
+      // Navigate to CreateTicket page - sẽ gọi API để fill dữ liệu
       setTimeout(() => {
         console.log('Navigating to /service-advisor/orders/create')
         navigate('/service-advisor/orders/create', { state: navigationState })
@@ -892,7 +862,7 @@ export default function AdminAppointments() {
         </div>
 
         <Row gutter={24}>
-          <Col span={16}>
+          <Col span={19}>
             <Card 
               style={{ 
                 borderRadius: '16px', 
@@ -929,7 +899,7 @@ export default function AdminAppointments() {
             </Card>
           </Col>
           
-          <Col span={8}>
+          <Col span={5}>
             <Card 
               style={{ borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)', height: '100%' }}
               bodyStyle={{ padding: '24px' }}
@@ -942,20 +912,6 @@ export default function AdminAppointments() {
                   <div style={{ fontSize: '18px', fontWeight: 700, color: '#04091e' }}>
                     {displayDate || 'Tất cả lịch hẹn'}
                   </div>
-                </div>
-                <div
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '10px',
-                    border: '1px solid #e5e7eb',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#04091e'
-                  }}
-            >
-                  <CalendarOutlined />
                 </div>
               </div>
 

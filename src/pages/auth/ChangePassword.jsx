@@ -34,7 +34,8 @@ export default function ChangePassword() {
         const trimmedCurrentPassword = currentPassword?.trim() || ''
         const trimmedNewPassword = newPassword?.trim() || ''
         
-        const { error } = await authAPI.changePassword(trimmedCurrentPassword, trimmedNewPassword)
+        const trimmedConfirmPassword = confirmPassword?.trim() || ''
+        const { error } = await authAPI.changePassword(trimmedCurrentPassword, trimmedNewPassword, trimmedConfirmPassword)
         if (error) {
           message.error(error || 'Đổi mật khẩu không thành công.')
           setLoading(false)
