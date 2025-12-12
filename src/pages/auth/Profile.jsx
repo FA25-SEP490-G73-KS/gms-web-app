@@ -4,7 +4,7 @@ import { Form, Input, Button, Card, message, Row, Col, Spin } from 'antd'
 import { ArrowLeftOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
 import useAuthStore from '../../store/authStore'
 import { employeesAPI, authAPI } from '../../services/api'
-import { displayPhoneFrom84 } from '../../utils/helpers'
+import { displayPhoneFrom84, getEmployeeIdFromToken, getUserIdFromToken } from '../../utils/helpers'
 import { USER_ROLES } from '../../utils/constants'
 import AdminLayout from '../../layouts/AdminLayout'
 import ManagerLayout from '../../layouts/ManagerLayout'
@@ -23,22 +23,30 @@ export default function Profile() {
   const user = useAuthStore((state) => state.user)
 
   useEffect(() => {
-    if (!user?.id) {
+    // Lấy employee ID từ token thay vì từ user store
+    const employeeId = getEmployeeIdFromToken() || getUserIdFromToken()
+    
+    if (!employeeId) {
       message.warning('Vui lòng đăng nhập để xem thông tin')
       navigate('/login', { replace: true })
       return
     }
 
-    fetchEmployeeData()
-  }, [user, navigate])
+    fetchEmployeeData(employeeId)
+  }, [navigate])
 
-  const fetchEmployeeData = async () => {
-    if (!user?.id) return
+  const fetchEmployeeData = async (employeeId) => {
+    if (!employeeId) {
+      console.warn('No employee ID available')
+      return
+    }
 
     setLoadingEmployee(true)
     try {
-      const { data, error } = await employeesAPI.getById(user.id)
+      console.log('Fetching employee data for ID:', employeeId)
+      const { data, error } = await employeesAPI.getById(employeeId)
       if (error) {
+        console.error('Error from API:', error)
         message.error('Không thể tải thông tin nhân viên')
         return
       }

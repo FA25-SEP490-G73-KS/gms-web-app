@@ -214,10 +214,10 @@ export default function CreateTicketNewCustomer() {
     // Xóa TẤT CẢ các trường thông tin khách hàng và xe
     form.setFieldsValue({ 
       customerType: 'DOANH_NGHIEP',
-      phone: undefined,
-      name: undefined,
-      address: undefined,
-      plate: undefined,
+      phone: '',
+      name: '',
+      address: '',
+      plate: '',
       brand: undefined,
       model: undefined,
       vin: '',
@@ -347,11 +347,22 @@ export default function CreateTicketNewCustomer() {
         vehicle.brand?.id ||
         vehicle.brand?.brandId ||
         (vehicle.brand && typeof vehicle.brand === 'number' ? vehicle.brand : undefined)
-      
+      const brandNameRaw =
+        vehicle.brandName ||
+        vehicle.brand?.name ||
+        vehicle.brand?.brandName ||
+        vehicle?.brand_name
+
       const modelIdRaw = vehicle.modelId ||
         vehicle.model?.id ||
         vehicle.model?.vehicleModelId ||
         (vehicle.model && typeof vehicle.model === 'number' ? vehicle.model : undefined)
+      const modelNameRaw =
+        vehicle.modelName ||
+        vehicle.vehicleModelName ||
+        vehicle.model?.name ||
+        vehicle.model?.vehicleModelName ||
+        vehicle?.model_name
 
       const brandId = brandIdRaw ? Number(brandIdRaw) : undefined
       const modelId = modelIdRaw ? Number(modelIdRaw) : undefined
@@ -417,6 +428,48 @@ export default function CreateTicketNewCustomer() {
         setSelectedModelId(modelId)
         form.setFieldsValue({ model: modelId })
         console.log('Set modelId without brandId:', modelId)
+      } else if (brandNameRaw) {
+        // Fallback: match brand theo tên nếu không có brandId
+        const matchedBrand = brands.find((b) => {
+          const bName = (b.name || '').toLowerCase().trim()
+          return bName === (brandNameRaw || '').toLowerCase().trim()
+        })
+        if (matchedBrand) {
+          const bId = matchedBrand.id || matchedBrand.brandId
+          setSelectedBrandId(bId)
+          form.setFieldsValue({ brand: bId })
+          await handleBrandChange(bId)
+          // Nếu có modelName và chưa có modelId, thử match theo tên
+          if (modelNameRaw && models.length > 0) {
+            const matchedModel = models.find((m) => {
+              const mName = (m.name || m.vehicleModelName || '').toLowerCase().trim()
+              return mName === modelNameRaw.toLowerCase().trim()
+            })
+            if (matchedModel) {
+              setSelectedModelId(matchedModel.id || matchedModel.vehicleModelId)
+              form.setFieldsValue({ model: matchedModel.id || matchedModel.vehicleModelId })
+            }
+          }
+        } else if (modelNameRaw && models.length > 0) {
+          // Nếu không match được brand nhưng có modelName, thử match model theo tên
+          const matchedModel = models.find((m) => {
+            const mName = (m.name || m.vehicleModelName || '').toLowerCase().trim()
+            return mName === modelNameRaw.toLowerCase().trim()
+          })
+          if (matchedModel) {
+            setSelectedModelId(matchedModel.id || matchedModel.vehicleModelId)
+            form.setFieldsValue({ model: matchedModel.id || matchedModel.vehicleModelId })
+          }
+        }
+      } else if (modelNameRaw && models.length > 0) {
+        const matchedModel = models.find((m) => {
+          const mName = (m.name || m.vehicleModelName || '').toLowerCase().trim()
+          return mName === modelNameRaw.toLowerCase().trim()
+        })
+        if (matchedModel) {
+          setSelectedModelId(matchedModel.id || matchedModel.vehicleModelId)
+          form.setFieldsValue({ model: matchedModel.id || matchedModel.vehicleModelId })
+        }
       }
 
       return
@@ -1014,21 +1067,39 @@ export default function CreateTicketNewCustomer() {
                           return option.label || option.value || ''
                         }}
                         onInputChange={(inputValue, action) => {
+                          // Cập nhật form value khi người dùng đang nhập để giữ giá trị
                           if (action.action === 'input-change') {
                             const lower = inputValue.toLowerCase()
                             const filtered = phoneOptionsSource.filter((opt) =>
-                              (opt.value || '').toLowerCase().includes(lower)
+                              (opt.value || '').toLowerCase().includes(lower) ||
+                              (opt.fullName || '').toLowerCase().includes(lower)
                             )
                             setPhoneOptions(filtered.length ? filtered : [{ label: inputValue, value: inputValue }])
                           
                             if (inputValue && inputValue.trim()) {
-                              setCurrentPhone(inputValue.trim())
+                              // Cập nhật form value khi đang nhập
+                              const trimmed = inputValue.trim()
+                              form.setFieldsValue({ phone: trimmed })
+                              setCurrentPhone(trimmed)
+                            } else if (!inputValue) {
+                              // Nếu xóa hết số điện thoại, xóa TẤT CẢ thông tin khách hàng và xe
+                              form.setFieldsValue({ phone: '' })
+                              setPhoneSelectValue(null)
+                              resetCustomerSelection()
                             }
                           }
                         }}
                         onChange={(option) => {
                           if (!option) {
-                            // Nếu xóa số điện thoại, xóa TẤT CẢ thông tin khách hàng và xe
+                            // Nếu xóa số điện thoại (click nút x), xóa TẤT CẢ thông tin khách hàng và xe
+                            setPhoneSelectValue(null)
+                            setCurrentPhone('')
+                            // Xóa ngay lập tức các trường thông tin khách hàng
+                            form.setFieldsValue({ 
+                              phone: '',
+                              name: '',
+                              address: ''
+                            })
                             resetCustomerSelection()
                             return
                           }
@@ -1053,37 +1124,69 @@ export default function CreateTicketNewCustomer() {
                             setCurrentPhone(selectedValue)
                           }
                         }}
-                        onBlur={() => {
-                          // Khi blur, nếu có giá trị đã nhập nhưng chưa được chọn, tự động tạo option và select
-                          const currentInput = form.getFieldValue('phone') || currentPhone
-                          if (currentInput && currentInput.trim()) {
-                            const trimmed = currentInput.trim()
-                            const exists = phoneOptionsSource.some((opt) => opt.value === trimmed)
-                            if (!exists) {
-                              // Tạo option mới và select nó
-                              const newOption = { 
-                                label: trimmed, 
-                                value: trimmed,
-                                fullName: '',
-                                phone: trimmed
-                              }
-                              setPhoneOptionsSource((prev) => [...prev, newOption])
-                              setPhoneOptions((prev) => {
-                                const existsInOptions = prev.some((opt) => opt.value === trimmed)
-                                return existsInOptions ? prev : [...prev, newOption]
-                              })
-                              // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
-                              setPhoneSelectValue({
-                                label: trimmed,
-                                value: trimmed
-                              })
-                              form.setFieldsValue({ phone: trimmed })
-                              setCurrentPhone(trimmed)
-                            } else {
-                              // Nếu đã tồn tại, đảm bảo được select
-                              const existingOption = phoneOptionsSource.find((opt) => opt.value === trimmed)
-                              if (existingOption && phoneSelectValue?.value !== trimmed) {
-                                setPhoneSelectValue(existingOption)
+                        onCreateOption={(inputValue) => {
+                          const trimmed = inputValue.trim()
+                          const newOption = { 
+                            label: trimmed, 
+                            value: trimmed,
+                            fullName: '',
+                            phone: trimmed
+                          }
+                          
+                          setPhoneOptionsSource((prev) => [...prev, newOption])
+                          setPhoneOptions((prev) => {
+                            const existsInOptions = prev.some((opt) => opt.value === trimmed)
+                            return existsInOptions ? prev : [...prev, newOption]
+                          })
+                          
+                          // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
+                          setPhoneSelectValue({
+                            label: trimmed,
+                            value: trimmed
+                          })
+                          form.setFieldsValue({ phone: trimmed })
+                          setCurrentPhone(trimmed)
+                          
+                          // Số điện thoại mới, reset tất cả nhưng giữ số điện thoại
+                          resetCustomerSelection()
+                          form.setFieldsValue({ phone: trimmed })
+                        }}
+                        onKeyDown={(e) => {
+                          // Khi nhấn Enter, ngăn form submit và giữ giá trị
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            // Lấy giá trị hiện tại từ form
+                            const currentPhone = form.getFieldValue('phone')
+                            if (currentPhone && currentPhone.trim()) {
+                              const trimmed = currentPhone.trim()
+                              const exists = phoneOptionsSource.some((opt) => opt.value === trimmed)
+                              if (!exists) {
+                                // Tạo option mới nếu chưa tồn tại
+                                const newOption = { 
+                                  label: trimmed, 
+                                  value: trimmed,
+                                  fullName: '',
+                                  phone: trimmed
+                                }
+                                setPhoneOptionsSource((prev) => [...prev, newOption])
+                                setPhoneOptions((prev) => {
+                                  const existsInOptions = prev.some((opt) => opt.value === trimmed)
+                                  return existsInOptions ? prev : [...prev, newOption]
+                                })
+                                // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
+                                setPhoneSelectValue({
+                                  label: trimmed,
+                                  value: trimmed
+                                })
+                                form.setFieldsValue({ phone: trimmed })
+                                setCurrentPhone(trimmed)
+                                
+                                // Số điện thoại mới, reset tất cả nhưng giữ số điện thoại
+                                resetCustomerSelection()
+                                form.setFieldsValue({ phone: trimmed })
+                              } else {
+                                // Nếu đã tồn tại, fetch customer data
+                                fetchCustomerByPhone(trimmed)
                               }
                             }
                           }
@@ -1354,38 +1457,49 @@ export default function CreateTicketNewCustomer() {
          resetCustomerSelection()
        }
      } else {
-       // Nếu chọn biển số xe, fill thông tin xe
-       const vehicleFromOption = option?.vehicle
-       if (vehicleFromOption) {
-         // Tìm vehicle trong customerVehicles hoặc sử dụng vehicle từ option
-         const vehicleToPass = Array.isArray(customerVehicles) && customerVehicles.length > 0
-           ? customerVehicles.find(v => {
-               const vPlate = v.licensePlate || v.plate || ''
-               return formatLicensePlate(vPlate) === formatLicensePlate(plateValue)
-             }) || vehicleFromOption
-           : vehicleFromOption
-         handlePlateSelect(plateValue, [vehicleToPass])
-       } else {
-         // Kiểm tra xem biển số có trong danh sách không
-         const isKnown = plateOptionsSource.some((opt) => opt.value === plateValue)
-         if (isKnown) {
-           // Biển số có trong danh sách, fill thông tin xe
-           handlePlateSelect(plateValue, customerVehicles)
-         } else {
-           // Biển số mới, không có trong hệ thống, cho phép chọn hãng xe và loại xe
-           setIsNewVehicle(true)
-           setSelectedVehicle(null)
-           form.setFieldsValue({
-             brand: undefined,
-             model: undefined,
-             vin: '',
-             year: 2020
-           })
-           setSelectedBrandId(null)
-           setSelectedModelId(null)
-           setModels([])
-         }
-       }
+      // Nếu chọn biển số xe, fill thông tin xe
+      const vehicleFromOption = option?.vehicle
+      const vehiclesPool =
+        (Array.isArray(customerVehicles) && customerVehicles.length > 0
+          ? customerVehicles
+          : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
+
+      if (vehicleFromOption) {
+        const vehicleToPass =
+          vehiclesPool.find((v) => {
+            const vPlate = v.licensePlate || v.plate || ''
+            return formatLicensePlate(vPlate) === formatLicensePlate(plateValue)
+          }) || vehicleFromOption
+        handlePlateSelect(plateValue, [vehicleToPass])
+      } else {
+        // Kiểm tra xem biển số có trong danh sách không
+        const isKnown = plateOptionsSource.some((opt) => opt.value === plateValue)
+        if (isKnown) {
+          // Biển số có trong danh sách, fill thông tin xe (ưu tiên pool đã có vehicle)
+          const vehicleFromPool = vehiclesPool.find((v) => {
+            const vPlate = v?.licensePlate || v?.plate || ''
+            return formatLicensePlate(vPlate) === formatLicensePlate(plateValue)
+          })
+          if (vehicleFromPool) {
+            handlePlateSelect(plateValue, [vehicleFromPool])
+          } else {
+            handlePlateSelect(plateValue, customerVehicles)
+          }
+        } else {
+          // Biển số mới, không có trong hệ thống, cho phép chọn hãng xe và loại xe
+          setIsNewVehicle(true)
+          setSelectedVehicle(null)
+          form.setFieldsValue({
+            brand: undefined,
+            model: undefined,
+            vin: '',
+            year: 2020
+          })
+          setSelectedBrandId(null)
+          setSelectedModelId(null)
+          setModels([])
+        }
+      }
      }
    }}
 
@@ -1438,8 +1552,20 @@ export default function CreateTicketNewCustomer() {
         // Kiểm tra xem biển số có trong danh sách không
         const isKnown = plateOptionsSource.some((opt) => opt.value === formatted)
         if (isKnown) {
-          // Biển số có trong danh sách, fill thông tin xe
-          handlePlateSelect(formatted, customerVehicles)
+          // Biển số có trong danh sách, fill thông tin xe (ưu tiên pool đã có vehicle)
+          const vehiclesPool =
+            (Array.isArray(customerVehicles) && customerVehicles.length > 0
+              ? customerVehicles
+              : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
+          const vehicleFromPool = vehiclesPool.find((v) => {
+            const vPlate = v?.licensePlate || v?.plate || ''
+            return formatLicensePlate(vPlate) === formatLicensePlate(formatted)
+          })
+          if (vehicleFromPool) {
+            handlePlateSelect(formatted, [vehicleFromPool])
+          } else {
+            handlePlateSelect(formatted, customerVehicles)
+          }
         } else {
           // Biển số mới, không có trong hệ thống, cho phép chọn hãng xe và loại xe
           resetVehicleInfo()
