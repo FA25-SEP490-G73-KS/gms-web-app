@@ -233,18 +233,50 @@ export default function AccountanceLayout({ children }) {
               position: 'absolute',
               bottom: '100%',
               left: 0,
-              right: 0,
               marginBottom: '8px',
               background: '#fff',
               border: '1px solid #e6e8eb',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               zIndex: 1000,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              minWidth: '200px',
+              textAlign: 'left'
             }}>
               <button
+                className="warehouse-menu-item"
+                onClick={() => {
+                  setShowUserMenu(false)
+                  navigate('/auth/profile')
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontWeight: 500,
+                  color: '#333',
+                  fontSize: '14px',
+                  borderBottom: '1px solid #e6e8eb',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                <i className="bi bi-person" />
+                <span>Thông tin cá nhân</span>
+              </button>
+              <button
                 className="warehouse-logout"
-                onClick={handleLogout}
+                onClick={() => {
+                  setShowUserMenu(false)
+                  handleLogout()
+                }}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -256,8 +288,12 @@ export default function AccountanceLayout({ children }) {
                   gap: '10px',
                   fontWeight: 600,
                   color: '#d1293d',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
                 }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
               >
                 <i className="bi bi-box-arrow-right" />
                 <span>Đăng xuất</span>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, forwardRef, useMemo } from 'react'
 import { Form, Input, Button, Card, Row, Col, Space, message, Modal } from 'antd'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AdminLayout from '../../layouts/AdminLayout'
-import { serviceTicketAPI, employeesAPI, vehiclesAPI, customersAPI, serviceTypeAPI } from '../../services/api'
+import { serviceTicketAPI, employeesAPI, vehiclesAPI, customersAPI, serviceTypeAPI, appointmentAPI } from '../../services/api'
 import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 import DatePicker from 'react-datepicker'
 import 'react-datepicker/dist/react-datepicker.css'
@@ -111,54 +111,283 @@ export default function CreateTicket() {
     form.setFieldsValue({ customerType: 'DOANH_NGHIEP' })
   }
 
+  const handleBrandChange = async (brandId) => {
+    setSelectedBrandId(brandId)
+    setSelectedModelId(null)
+    form.setFieldsValue({ model: undefined })
+    if (!brandId) { setModels([]); return }
+    setModelsLoading(true)
+    const { data, error } = await vehiclesAPI.getModelsByBrand(brandId)
+    if (error) {
+      message.error('Không thể tải danh sách mẫu xe')
+      setModels([])
+      setModelsLoading(false)
+      return
+    }
+    const modelList = data?.result || data || []
+    setModels(modelList.map(m => ({ id: m.vehicleModelId || m.id, name: m.vehicleModelName || m.name })))
+    setModelsLoading(false)
+  }
+
+  // Fetch appointment data từ API và fill form
   useEffect(() => {
-    if (appointmentPrefill?.fromAppointment) {
-      const phoneValue = displayPhoneFrom84(appointmentPrefill.customer?.phone || '')
-      const appointmentVehicle = appointmentPrefill.vehicle || {}
-
-      form.setFieldsValue({
-        phone: phoneValue,
-        name: appointmentPrefill.customer?.fullName || '',
-        address: appointmentPrefill.customer?.address || '',
-        customerType: appointmentPrefill.customer?.customerType || 'DOANH_NGHIEP',
-        plate: appointmentVehicle.licensePlate || '',
-        brand: appointmentVehicle.brandId || undefined,
-        model: appointmentVehicle.modelId || undefined,
-        vin: appointmentVehicle.vin || '',
-        year: appointmentVehicle.year || 2020,
-        note: appointmentPrefill.receiveCondition || '',
-        service: appointmentPrefill.serviceTypeIds || [],
-        techs: appointmentPrefill.assignedTechnicianIds || [],
+    const fetchAndFillAppointmentData = async () => {
+      console.log('fetchAndFillAppointmentData - checking conditions:', {
+        fromAppointment: appointmentPrefill?.fromAppointment,
+        appointmentId: appointmentPrefill?.appointmentId,
+        hasAppointmentData: !!appointmentPrefill?.appointmentData,
+        appointmentPrefill: appointmentPrefill
       })
-
-      if (appointmentPrefill.customer?.customerId) {
-        setCustomerId(appointmentPrefill.customer.customerId)
-        setCustomerExists(true)
-        setCustomerDiscountPolicyId(appointmentPrefill.customer?.discountPolicyId || 0)
-      }
-
-      if (appointmentVehicle.brandId) {
-        setSelectedBrandId(appointmentVehicle.brandId)
-        handleBrandChange(appointmentVehicle.brandId)
-      }
-
-      if (appointmentVehicle.modelId) setSelectedModelId(appointmentVehicle.modelId)
-
-      if (appointmentPrefill.expectedDeliveryAt) {
-        const parsedDate = dayjs(appointmentPrefill.expectedDeliveryAt, 'YYYY-MM-DD')
-        if (parsedDate.isValid()) {
-          setSelectedDate(parsedDate.toDate())
-          form.setFieldsValue({ receiveDate: parsedDate.toDate() })
+      
+      // Nếu có appointmentData sẵn từ navigation state, dùng luôn
+      if (appointmentPrefill?.fromAppointment && appointmentPrefill?.appointmentData) {
+        console.log('Using appointmentData from navigation state:', appointmentPrefill.appointmentData)
+        const appointmentData = appointmentPrefill.appointmentData
+        
+        // Extract và fill form tương tự như khi fetch từ API
+        const customer = appointmentData.customer || {}
+        const phoneValue = displayPhoneFrom84(customer.phone || appointmentData.customerPhone || '')
+        
+        const vehicle = appointmentData.vehicle || {}
+        const appointmentVehicle = {
+          brandId: vehicle.brandId || appointmentData.brandId || null,
+          brandName: vehicle.brandName || appointmentData.brandName || '',
+          licensePlate: vehicle.licensePlate || appointmentData.licensePlate || '',
+          modelId: vehicle.modelId || appointmentData.modelId || null,
+          modelName: vehicle.modelName || appointmentData.modelName || '',
+          vehicleId: vehicle.vehicleId || appointmentData.vehicleId || null,
+          vin: vehicle.vin || appointmentData.vin || '',
+          year: vehicle.year || appointmentData.year || 2020
         }
-      }
 
-      if (phoneValue) {
-        setCurrentPhone(phoneValue)
-        setPhoneLocked(true)
-        fetchCustomerByPhone(phoneValue)
+        let serviceTypeIds = appointmentData.serviceTypeIds || []
+        let serviceTypes = appointmentData.serviceTypes || appointmentData.serviceTypeList || []
+        
+        // Nếu không có serviceTypeIds nhưng có serviceType (array of names), cần fetch để lấy IDs
+        // Tạm thời để serviceTypeIds rỗng, sẽ được fetch trong useEffect fetchServiceTypes
+        console.log('Service types info:', { 
+          serviceTypeIds, 
+          serviceTypes, 
+          serviceType: appointmentData.serviceType,
+          serviceTypeNames: appointmentData.serviceType 
+        })
+
+        form.setFieldsValue({
+          phone: phoneValue,
+          name: customer.fullName || customer.name || appointmentData.customerName || '',
+          address: customer.address || appointmentData.address || '',
+          customerType: customer.customerType || appointmentData.customerType || 'DOANH_NGHIEP',
+          plate: appointmentVehicle.licensePlate || '',
+          brand: appointmentVehicle.brandId || undefined,
+          model: appointmentVehicle.modelId || undefined,
+          vin: appointmentVehicle.vin || '',
+          year: appointmentVehicle.year || 2020,
+          note: appointmentData.note || appointmentData.receiveCondition || '',
+          service: serviceTypeIds,
+          techs: appointmentData.assignedTechnicianIds || [],
+        })
+
+        if (customer.customerId || appointmentData.customerId) {
+          setCustomerId(customer.customerId || appointmentData.customerId)
+          setCustomerExists(true)
+          setCustomerDiscountPolicyId(customer.discountPolicyId || appointmentData.discountPolicyId || 0)
+        }
+
+        if (appointmentVehicle.brandId) {
+          setSelectedBrandId(appointmentVehicle.brandId)
+          await handleBrandChange(appointmentVehicle.brandId)
+          setTimeout(() => {
+            if (appointmentVehicle.modelId) {
+              setSelectedModelId(appointmentVehicle.modelId)
+            }
+          }, 500)
+        }
+
+        if (appointmentData.appointmentDate || appointmentData.expectedDeliveryAt) {
+          const dateStr = appointmentData.appointmentDate || appointmentData.expectedDeliveryAt
+          const parsedDate = dayjs(dateStr, 'YYYY-MM-DD', true)
+          if (!parsedDate.isValid()) {
+            const parsedDate2 = dayjs(dateStr, 'DD/MM/YYYY', true)
+            if (parsedDate2.isValid()) {
+              setSelectedDate(parsedDate2.toDate())
+              form.setFieldsValue({ receiveDate: parsedDate2.toDate() })
+            }
+          } else {
+            setSelectedDate(parsedDate.toDate())
+            form.setFieldsValue({ receiveDate: parsedDate.toDate() })
+          }
+        }
+
+        if (phoneValue) {
+          setCurrentPhone(phoneValue)
+          setPhoneLocked(true)
+          fetchCustomerByPhone(phoneValue)
+        }
+
+        console.log('Setting appointmentDataFromAPI from navigation state')
+        // Đảm bảo set state và sau đó trigger các useEffect khác
+        setAppointmentDataFromAPI(appointmentData)
+        
+        // Nếu có serviceTypes array đầy đủ với IDs, set ngay
+        if (serviceTypes && Array.isArray(serviceTypes) && serviceTypes.length > 0 && serviceTypes[0].serviceTypeId) {
+          const serviceOptions = serviceTypes.map(item => ({ 
+            value: item.serviceTypeId || item.id || item.value, 
+            label: item.serviceTypeName || item.name || item.label 
+          }))
+          setServiceOptions(serviceOptions)
+          setTimeout(() => {
+            if (serviceTypeIds.length > 0) {
+              const matched = serviceOptions.filter(opt => serviceTypeIds.map(String).includes(String(opt.value)))
+              console.log('Setting selectedServices from serviceTypes array:', matched)
+              if (matched.length > 0) {
+                setSelectedServices(matched)
+              }
+            }
+          }, 100)
+        }
+        // Nếu không có serviceTypes array đầy đủ, useEffect fetchServiceTypes sẽ xử lý
+        return
+      }
+      
+      if (appointmentPrefill?.fromAppointment && appointmentPrefill?.appointmentId) {
+        try {
+          console.log('Fetching appointment data for ID:', appointmentPrefill.appointmentId)
+          // Gọi API để lấy thông tin appointment đầy đủ
+          const { data: appointmentResponse, error: appointmentError } = await appointmentAPI.getById(appointmentPrefill.appointmentId)
+          
+          console.log('Appointment API response:', { appointmentResponse, appointmentError })
+          
+          if (appointmentError || !appointmentResponse || !appointmentResponse.result) {
+            console.error('Error fetching appointment:', appointmentError)
+            message.error('Không thể lấy thông tin lịch hẹn')
+            return
+          }
+
+          const appointmentData = appointmentResponse.result || appointmentPrefill.appointmentData
+          console.log('Appointment data extracted:', appointmentData)
+          
+          // Extract customer info
+          const customer = appointmentData.customer || {}
+          const phoneValue = displayPhoneFrom84(customer.phone || appointmentData.customerPhone || '')
+          
+          // Extract vehicle info
+          const vehicle = appointmentData.vehicle || {}
+          const appointmentVehicle = {
+            brandId: vehicle.brandId || appointmentData.brandId || null,
+            brandName: vehicle.brandName || appointmentData.brandName || '',
+            licensePlate: vehicle.licensePlate || appointmentData.licensePlate || '',
+            modelId: vehicle.modelId || appointmentData.modelId || null,
+            modelName: vehicle.modelName || appointmentData.modelName || '',
+            vehicleId: vehicle.vehicleId || appointmentData.vehicleId || null,
+            vin: vehicle.vin || appointmentData.vin || '',
+            year: vehicle.year || appointmentData.year || 2020
+          }
+
+          // Extract service types
+          const serviceTypeIds = appointmentData.serviceTypeIds || []
+          const serviceTypes = appointmentData.serviceTypes || appointmentData.serviceTypeList || []
+
+          // Fill form values
+          form.setFieldsValue({
+            phone: phoneValue,
+            name: customer.fullName || customer.name || appointmentData.customerName || '',
+            address: customer.address || appointmentData.address || '',
+            customerType: customer.customerType || appointmentData.customerType || 'DOANH_NGHIEP',
+            plate: appointmentVehicle.licensePlate || '',
+            brand: appointmentVehicle.brandId || undefined,
+            model: appointmentVehicle.modelId || undefined,
+            vin: appointmentVehicle.vin || '',
+            year: appointmentVehicle.year || 2020,
+            note: appointmentData.note || appointmentData.receiveCondition || '',
+            service: serviceTypeIds,
+            techs: appointmentData.assignedTechnicianIds || [],
+          })
+
+          // Set customer state
+          if (customer.customerId || appointmentData.customerId) {
+            setCustomerId(customer.customerId || appointmentData.customerId)
+            setCustomerExists(true)
+            setCustomerDiscountPolicyId(customer.discountPolicyId || appointmentData.discountPolicyId || 0)
+          }
+
+          // Set vehicle state
+          if (appointmentVehicle.brandId) {
+            setSelectedBrandId(appointmentVehicle.brandId)
+            await handleBrandChange(appointmentVehicle.brandId)
+            // Sau khi load models xong, set modelId
+            setTimeout(() => {
+              if (appointmentVehicle.modelId) {
+                setSelectedModelId(appointmentVehicle.modelId)
+              }
+            }, 500)
+          } else if (appointmentVehicle.modelId) {
+            setSelectedModelId(appointmentVehicle.modelId)
+          }
+
+          // Set date
+          if (appointmentData.appointmentDate || appointmentData.expectedDeliveryAt) {
+            const dateStr = appointmentData.appointmentDate || appointmentData.expectedDeliveryAt
+            const parsedDate = dayjs(dateStr, 'YYYY-MM-DD', true)
+            if (!parsedDate.isValid()) {
+              const parsedDate2 = dayjs(dateStr, 'DD/MM/YYYY', true)
+              if (parsedDate2.isValid()) {
+                setSelectedDate(parsedDate2.toDate())
+                form.setFieldsValue({ receiveDate: parsedDate2.toDate() })
+              }
+            } else {
+              setSelectedDate(parsedDate.toDate())
+              form.setFieldsValue({ receiveDate: parsedDate.toDate() })
+            }
+          }
+
+          // Fetch customer by phone if phone exists
+          if (phoneValue) {
+            setCurrentPhone(phoneValue)
+            setPhoneLocked(true)
+            fetchCustomerByPhone(phoneValue)
+          }
+
+          // Lưu appointment data để các useEffect khác sử dụng
+          console.log('Setting appointmentDataFromAPI:', appointmentData)
+          setAppointmentDataFromAPI(appointmentData)
+          
+          // Nếu có serviceTypes array đầy đủ, set serviceOptions ngay lập tức và sync selectedServices
+          if (serviceTypes && Array.isArray(serviceTypes) && serviceTypes.length > 0) {
+            console.log('Found serviceTypes array:', serviceTypes)
+            const serviceOptions = serviceTypes.map(item => ({ 
+              value: item.serviceTypeId || item.id || item.value, 
+              label: item.serviceTypeName || item.name || item.label 
+            }))
+            console.log('Mapped serviceOptions:', serviceOptions)
+            setServiceOptions(serviceOptions)
+            // Sync selectedServices ngay sau khi set serviceOptions - dùng setTimeout để đảm bảo state đã được update
+            setTimeout(() => {
+              if (serviceTypeIds.length > 0) {
+                const matched = serviceOptions.filter(opt => serviceTypeIds.map(String).includes(String(opt.value)))
+                console.log('Setting selectedServices from serviceTypes array:', { serviceTypeIds, matched, serviceOptions })
+                if (matched.length > 0) {
+                  setSelectedServices(matched)
+                }
+              }
+            }, 100)
+          } else if (serviceTypeIds && Array.isArray(serviceTypeIds) && serviceTypeIds.length > 0) {
+            // Nếu chỉ có serviceTypeIds, đảm bảo form values được set để useEffect sync có thể dùng
+            console.log('Appointment has serviceTypeIds but no serviceTypes array:', serviceTypeIds)
+          } else {
+            console.log('No serviceTypes or serviceTypeIds found in appointment data')
+          }
+
+        } catch (err) {
+          console.error('Error fetching appointment data:', err)
+          message.error('Đã xảy ra lỗi khi lấy thông tin lịch hẹn')
+        }
+      } else {
+        console.log('Conditions not met for fetching appointment data')
       }
     }
-  }, [appointmentPrefill, form])
+
+    fetchAndFillAppointmentData()
+  }, [appointmentPrefill])
 
   useEffect(() => {
     form.setFieldsValue({ customerType: 'DOANH_NGHIEP', year: 2020 })
@@ -234,10 +463,15 @@ export default function CreateTicket() {
     fetchBrands()
   }, [])
 
-  // Fetch service types
+  // State để lưu appointment data từ API
+  const [appointmentDataFromAPI, setAppointmentDataFromAPI] = useState(null)
+
+  // Fetch service types - luôn lấy tất cả từ API để hiển thị trong dropdown
   useEffect(() => {
     const fetchServiceTypes = async () => {
       setServiceLoading(true)
+      
+      // Luôn fetch tất cả service types từ API
       const { data, error } = await serviceTypeAPI.getAll()
       if (error) {
         message.error('Không thể tải danh sách loại dịch vụ')
@@ -245,29 +479,60 @@ export default function CreateTicket() {
         return
       }
       const list = data?.result || data || []
-      setServiceOptions(list.map(item => ({ value: item.serviceTypeId || item.id || item.value, label: item.serviceTypeName || item.name || item.label })))
+      const allServiceOptions = list.map(item => ({ 
+        value: item.serviceTypeId || item.id || item.value, 
+        label: item.serviceTypeName || item.name || item.label 
+      }))
+      
+      // Set tất cả service types vào dropdown
+      setServiceOptions(allServiceOptions)
+      
+      // Nếu có appointment, pre-select các service types từ appointment
+      if (appointmentPrefill?.fromAppointment && appointmentDataFromAPI) {
+        let serviceTypeIdsToSelect = []
+        
+        // Nếu có serviceTypeIds, dùng luôn
+        if (appointmentDataFromAPI.serviceTypeIds && Array.isArray(appointmentDataFromAPI.serviceTypeIds) && appointmentDataFromAPI.serviceTypeIds.length > 0) {
+          serviceTypeIdsToSelect = appointmentDataFromAPI.serviceTypeIds
+        }
+        // Nếu không có serviceTypeIds nhưng có serviceType (array of names), match theo tên
+        else if (appointmentDataFromAPI.serviceType && Array.isArray(appointmentDataFromAPI.serviceType) && appointmentDataFromAPI.serviceType.length > 0) {
+          const serviceTypeNames = appointmentDataFromAPI.serviceType.map(name => String(name).trim().toLowerCase())
+          const matchedServices = allServiceOptions.filter(opt => {
+            const optLabel = String(opt.label || '').trim().toLowerCase()
+            return serviceTypeNames.includes(optLabel)
+          })
+          serviceTypeIdsToSelect = matchedServices.map(opt => opt.value)
+          
+          // Update form và appointmentDataFromAPI với serviceTypeIds
+          if (serviceTypeIdsToSelect.length > 0) {
+            form.setFieldsValue({ service: serviceTypeIdsToSelect })
+            setAppointmentDataFromAPI({ ...appointmentDataFromAPI, serviceTypeIds: serviceTypeIdsToSelect })
+          }
+        }
+        // Nếu có serviceTypes array đầy đủ từ API
+        else if (appointmentDataFromAPI.serviceTypes && Array.isArray(appointmentDataFromAPI.serviceTypes) && appointmentDataFromAPI.serviceTypes.length > 0) {
+          serviceTypeIdsToSelect = appointmentDataFromAPI.serviceTypes
+            .map(item => item.serviceTypeId || item.id || item.value)
+            .filter(Boolean)
+        }
+        
+        // Sync selectedServices với các service types đã match
+        if (serviceTypeIdsToSelect.length > 0) {
+          setTimeout(() => {
+            const matched = allServiceOptions.filter(opt => serviceTypeIdsToSelect.map(String).includes(String(opt.value)))
+            console.log('Pre-selecting service types from appointment:', { serviceTypeIdsToSelect, matched })
+            if (matched.length > 0) {
+              setSelectedServices(matched)
+            }
+          }, 100)
+        }
+      }
+      
       setServiceLoading(false)
     }
     fetchServiceTypes()
-  }, [])
-
-  const handleBrandChange = async (brandId) => {
-    setSelectedBrandId(brandId)
-    setSelectedModelId(null)
-    form.setFieldsValue({ model: undefined })
-    if (!brandId) { setModels([]); return }
-    setModelsLoading(true)
-    const { data, error } = await vehiclesAPI.getModelsByBrand(brandId)
-    if (error) {
-      message.error('Không thể tải danh sách mẫu xe')
-      setModels([])
-      setModelsLoading(false)
-      return
-    }
-    const modelList = data?.result || data || []
-    setModels(modelList.map(m => ({ id: m.vehicleModelId || m.id, name: m.vehicleModelName || m.name })))
-    setModelsLoading(false)
-  }
+  }, [appointmentPrefill, appointmentDataFromAPI])
 
   // Handlers for react-select
   const handleServiceChange = (selected) => {
@@ -284,18 +549,49 @@ export default function CreateTicket() {
 
   // Sync react-select values from form (useful on prefill or edit)
   useEffect(() => {
-    const sv = form.getFieldValue('service') || []
-    if (Array.isArray(sv) && serviceOptionsStable.length > 0) {
-      setSelectedServices(serviceOptionsStable.filter(opt => sv.map(String).includes(String(opt.value))))
+    // Lấy giá trị từ form hoặc từ appointmentDataFromAPI nếu có
+    const sv = form.getFieldValue('service') || appointmentDataFromAPI?.serviceTypeIds || []
+    console.log('Sync selectedServices useEffect:', { 
+      sv, 
+      serviceOptionsStableLength: serviceOptionsStable.length,
+      appointmentDataFromAPI: appointmentDataFromAPI?.serviceTypeIds,
+      selectedServicesLength: selectedServices.length
+    })
+    
+    if (Array.isArray(sv) && sv.length > 0 && serviceOptionsStable.length > 0) {
+      const matched = serviceOptionsStable.filter(opt => {
+        const optValue = String(opt.value)
+        const svStrings = sv.map(String)
+        return svStrings.includes(optValue)
+      })
+      console.log('Matched services:', matched)
+      if (matched.length > 0) {
+        // Chỉ set nếu khác với giá trị hiện tại để tránh loop
+        const currentValues = selectedServices.map(s => String(s.value)).sort().join(',')
+        const newValues = matched.map(s => String(s.value)).sort().join(',')
+        if (currentValues !== newValues) {
+          console.log('Setting selectedServices:', matched)
+          setSelectedServices(matched)
+        }
+      } else {
+        console.warn('No matched services found. Service IDs:', sv, 'Available options:', serviceOptionsStable.map(o => o.value))
+      }
+    } else if (Array.isArray(sv) && sv.length === 0 && selectedServices.length > 0) {
+      setSelectedServices([])
     }
-  }, [serviceOptionsStable])
+  }, [serviceOptionsStable, appointmentDataFromAPI, form])
 
   useEffect(() => {
     const tv = form.getFieldValue('techs') || []
-    if (Array.isArray(tv) && techOptionsStable.length > 0) {
-      setSelectedTechs(techOptionsStable.filter(opt => tv.map(String).includes(String(opt.value))))
+    if (Array.isArray(tv) && tv.length > 0 && techOptionsStable.length > 0) {
+      const matched = techOptionsStable.filter(opt => tv.map(String).includes(String(opt.value)))
+      if (matched.length > 0) {
+        setSelectedTechs(matched)
+      }
+    } else if (Array.isArray(tv) && tv.length === 0) {
+      setSelectedTechs([])
     }
-  }, [techOptionsStable])
+  }, [techOptionsStable, appointmentPrefill, form])
 
   const handleCreate = async (values) => {
     // same logic as original file, but uses form values which we've synced from react-select
@@ -387,8 +683,8 @@ export default function CreateTicket() {
   }
 
   const cardTitle = (
-    <div>
-      <span className="h4" style={{ fontWeight: 600, display: 'block' }}>
+    <div style={{ textAlign: 'center' }}>
+      <span className="h4" style={{ fontWeight: 600, display: 'block', fontSize: '32px', color: '#CBB081' }}>
         Tạo phiếu dịch vụ
       </span>
       <span className="caption" style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>
@@ -407,10 +703,18 @@ export default function CreateTicket() {
                 <div style={{ background: '#ffffff', borderRadius: 12, padding: '16px 16px 8px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Thông tin khách hàng</h3>
 
-                  <Form.Item label="Số điện thoại" name="phone" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]} style={formItemStyle}> 
+                  <Form.Item 
+                    label={<span>Số điện thoại <span style={{ color: '#ff4d4f' }}>*</span></span>} 
+                    name="phone" 
+                    rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]} 
+                    style={formItemStyle}
+                    required={false}
+                  > 
                     <Input
                       style={inputStyle}
                       placeholder={customerLookupLoading ? 'Đang kiểm tra...' : 'VD: 0123456789'}
+                      readOnly
+                      disabled
                       onBlur={(e) => {
                         const raw = e.target.value.trim()
                         if (!raw) { resetCustomerSelection(); setPhoneLocked(false); return }
@@ -433,12 +737,25 @@ export default function CreateTicket() {
                     />
                   </Form.Item>
 
-                  <Form.Item label="Họ và tên" name="name" rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]} style={formItemStyle}>
-                    <Input style={inputStyle} placeholder="VD: Đặng Thị Huyền" />
+                  <Form.Item 
+                    label={<span>Họ và tên <span style={{ color: '#ff4d4f' }}>*</span></span>} 
+                    name="name" 
+                    rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]} 
+                    style={formItemStyle}
+                    required={false}
+                  >
+                    <Input style={inputStyle} placeholder="VD: Đặng Thị Huyền" readOnly disabled />
                   </Form.Item>
 
-                  <Form.Item label="Địa chỉ" name="address" rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]} style={formItemStyle}>
-                    <Input style={inputStyle} placeholder="VD: Hòa Lạc - Hà Nội" />
+                  <Form.Item 
+                    label="Địa chỉ" 
+                    name="address" 
+                    rules={[
+                      { max: 100, message: 'Địa chỉ không được vượt quá 100 ký tự' }
+                    ]} 
+                    style={formItemStyle}
+                  >
+                    <Input style={inputStyle} placeholder="VD: Hòa Lạc - Hà Nội" maxLength={100} showCount />
                   </Form.Item>
                 </div>
               </Col>
@@ -447,7 +764,13 @@ export default function CreateTicket() {
                 <div style={{ background: '#ffffff', borderRadius: 12, padding: '16px 16px 8px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)', display: 'flex', flexDirection: 'column', height: '100%' }}>
                   <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
 
-                  <Form.Item label="Loại dịch vụ" name="service" rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 loại dịch vụ' }]} style={formItemStyle}> 
+                  <Form.Item 
+                    label={<span>Loại dịch vụ <span style={{ color: '#ff4d4f' }}>*</span></span>} 
+                    name="service" 
+                    rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 loại dịch vụ' }]} 
+                    style={formItemStyle}
+                    required={false}
+                  > 
                     <div>
                       <ReactSelect
                         isMulti
@@ -460,11 +783,16 @@ export default function CreateTicket() {
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         classNamePrefix="react-select"
                       />
+                      {appointmentPrefill?.fromAppointment && selectedServices.length > 0 && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280', fontStyle: 'italic' }}>
+                          Loại dịch vụ từ lịch hẹn (có thể chỉnh sửa)
+                        </div>
+                      )}
                       <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>{ (form.getFieldValue('service') || []).length ? `Đã chọn ${ (form.getFieldValue('service') || []).length }` : 'Chưa chọn dịch vụ' }</div>
                     </div>
                   </Form.Item>
 
-                  <Form.Item label="Kỹ thuật viên sửa chữa" name="techs" style={formItemStyle}>
+                  <Form.Item label="Thợ sửa chữa" name="techs" style={formItemStyle}>
                     <div>
                       <ReactSelect
                         isMulti
@@ -472,18 +800,18 @@ export default function CreateTicket() {
                         value={selectedTechs}
                         onChange={handleTechChange}
                         styles={multiSelectStyles}
-                        placeholder={techLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                        placeholder={techLoading ? 'Đang tải...' : 'Chọn thợ sửa chữa'}
                         isDisabled={techLoading || techOptionsStable.length === 0}
                         menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                         classNamePrefix="react-select"
                       />
-                      <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>{ (form.getFieldValue('techs') || []).length ? `Đã chọn ${ (form.getFieldValue('techs') || []).length }` : 'Chưa chọn kỹ thuật viên' }</div>
+                      <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>{ (form.getFieldValue('techs') || []).length ? `Đã chọn ${ (form.getFieldValue('techs') || []).length }` : 'Chưa chọn thợ sửa chữa' }</div>
                     </div>
                   </Form.Item>
-
+{/* 
                   <Form.Item label="Ngày dự đoán nhận xe" name="receiveDate" rules={[{ required: false, message: 'Vui lòng chọn ngày dự đoán nhận xe' }]} style={formItemStyle}>
                     <DatePicker selected={selectedDate} onChange={(date) => { setSelectedDate(date); form.setFieldsValue({ receiveDate: date }) }} dateFormat="dd/MM/yyyy" minDate={new Date()} placeholderText="dd/mm/yyyy" customInput={<DateInput />} popperPlacement="bottom-start" popperModifiers={[{ name: 'offset', options: { offset: [0, 8] } }]} shouldCloseOnSelect withPortal portalId="create-ticket-date-portal" />
-                  </Form.Item>
+                  </Form.Item> */}
                 </div>
               </Col>
             </Row>
@@ -496,28 +824,108 @@ export default function CreateTicket() {
                     <Col span={12}>
                       <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Thông tin xe</h3>
 
-                      <Form.Item label="Biển số xe" name="plate" rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]} style={formItemStyle}>
-                        <Input style={inputStyle} placeholder="VD: 30A-12345" />
+                      <Form.Item 
+                        label={<span>Biển số xe <span style={{ color: '#ff4d4f' }}>*</span></span>} 
+                        name="plate" 
+                        rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]} 
+                        style={formItemStyle}
+                        required={false}
+                      >
+                        <Input style={inputStyle} placeholder="VD: 30A-12345" readOnly disabled />
                       </Form.Item>
 
-                      <Form.Item label="Hãng xe" name="brand" rules={[{ required: true, message: 'Vui lòng chọn hãng xe' }]} style={formItemStyle}>
+                      <Form.Item 
+                        label={<span>Hãng xe <span style={{ color: '#ff4d4f' }}>*</span></span>} 
+                        name="brand" 
+                        rules={[{ required: true, message: 'Vui lòng chọn hãng xe' }]} 
+                        style={formItemStyle}
+                        required={false}
+                      >
                         <select className="form-control" disabled={brandsLoading} onChange={(e) => { const value = e.target.value ? Number(e.target.value) : undefined; form.setFieldsValue({ brand: value, model: undefined }); setSelectedBrandId(value); setSelectedModelId(null); handleBrandChange(value) }} value={selectedBrandId || ''} style={selectStyle} onFocus={(e) => { e.target.style.borderColor = '#1890ff'; e.target.style.boxShadow = '0 0 0 2px rgba(24, 144, 255, 0.1)'}} onBlur={(e) => { e.target.style.borderColor = '#d9d9d9'; e.target.style.boxShadow = 'none' }}>
                           <option value="" style={{ color: '#bfbfbf' }}>{brandsLoading ? 'Đang tải hãng xe...' : 'Chọn hãng xe'}</option>
                           {brandOptions.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
                         </select>
                       </Form.Item>
 
-                      <Form.Item label="Loại xe" name="model" rules={[{ required: true, message: 'Vui lòng chọn mẫu xe' }]} style={formItemStyle}>
+                      <Form.Item 
+                        label={<span>Loại xe <span style={{ color: '#ff4d4f' }}>*</span></span>} 
+                        name="model" 
+                        rules={[{ required: true, message: 'Vui lòng chọn mẫu xe' }]} 
+                        style={formItemStyle}
+                        required={false}
+                      >
                         <select className="form-control" disabled={models.length === 0 || modelsLoading} onChange={(e) => { const value = e.target.value ? Number(e.target.value) : undefined; form.setFieldsValue({ model: value }); setSelectedModelId(value) }} value={selectedModelId || ''} style={{ ...selectStyle, backgroundColor: models.length === 0 || modelsLoading ? '#f5f5f5' : '#fff', cursor: models.length === 0 || modelsLoading ? 'not-allowed' : 'pointer', opacity: models.length === 0 || modelsLoading ? 0.6 : 1 }} onFocus={(e) => { if (!(models.length === 0 || modelsLoading)) { e.target.style.borderColor = '#1890ff'; e.target.style.boxShadow = '0 0 0 2px rgba(24, 144, 255, 0.1)' } }} onBlur={(e) => { e.target.style.borderColor = '#d9d9d9'; e.target.style.boxShadow = 'none' }}>
                           <option value="" style={{ color: '#bfbfbf' }}>{modelsLoading ? 'Đang tải loại xe...' : models.length === 0 ? 'Chọn hãng xe trước' : 'Chọn loại xe'}</option>
                           {modelOptions.map((option) => (<option key={option.value} value={option.value}>{option.label}</option>))}
                         </select>
                       </Form.Item>
 
-                      <Form.Item label="Số khung" name="vin" style={formItemStyle}><Input style={inputStyle} placeholder="VD: RL4XW430089206813" /></Form.Item>
+                      <Form.Item 
+                        label="Số khung" 
+                        name="vin" 
+                        rules={[
+                          { 
+                            max: 20, 
+                            message: 'Số khung không được vượt quá 20 ký tự',
+                            validator: (_, value) => {
+                              if (!value) return Promise.resolve()
+                              if (value.length > 20) {
+                                return Promise.reject(new Error('Số khung không được vượt quá 20 ký tự'))
+                              }
+                              return Promise.resolve()
+                            }
+                          }
+                        ]} 
+                        style={formItemStyle}
+                      >
+                        <Input 
+                          style={inputStyle} 
+                          placeholder="VD: RL4XW430089206813" 
+                          maxLength={20}
+                          onInput={(e) => {
+                            // Đảm bảo không cho nhập quá 20 ký tự
+                            if (e.target.value.length > 20) {
+                              e.target.value = e.target.value.slice(0, 20)
+                            }
+                          }}
+                          showCount 
+                        />
+                      </Form.Item>
                     </Col>
 
-                    <Col span={12}><Form.Item label="Ghi chú" name="note"><TextArea rows={8} style={{ minHeight: 320 }} placeholder="Nhập ghi chú..." /></Form.Item></Col>
+                    <Col span={12}>
+                      <Form.Item 
+                        label="Ghi chú" 
+                        name="note"
+                        rules={[
+                          { 
+                            max: 200, 
+                            message: 'Ghi chú không được vượt quá 200 ký tự',
+                            validator: (_, value) => {
+                              if (!value) return Promise.resolve()
+                              if (value.length > 200) {
+                                return Promise.reject(new Error('Ghi chú không được vượt quá 200 ký tự'))
+                              }
+                              return Promise.resolve()
+                            }
+                          }
+                        ]}
+                      >
+                        <TextArea 
+                          rows={8} 
+                          style={{ minHeight: 320 }} 
+                          placeholder="Nhập ghi chú..." 
+                          maxLength={200}
+                          onInput={(e) => {
+                            // Đảm bảo không cho nhập quá 200 ký tự
+                            if (e.target.value.length > 200) {
+                              e.target.value = e.target.value.slice(0, 200)
+                            }
+                          }}
+                          showCount 
+                        />
+                      </Form.Item>
+                    </Col>
                   </Row>
                 </div>
               </Col>

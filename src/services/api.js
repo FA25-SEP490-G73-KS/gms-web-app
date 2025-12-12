@@ -351,8 +351,8 @@ export const authAPI = {
       { phone, otpCode, newPassword },
       { skipAuth: true }
     ),
-  changePassword: (currentPassword, newPassword) =>
-    put("/auth/change-password", { currentPassword, newPassword }),
+  changePassword: (currentPassword, newPassword, confirmPassword) =>
+    put("/auth/change-password", { currentPassword, newPassword, confirmPassword }),
 };
 
 function buildQueryString(params = {}) {
@@ -449,7 +449,7 @@ export const customersAPI = {
   getByPhone: (phone) =>
     get(`/customers/phone?phone=${encodeURIComponent(phone)}`),
   create: (payload) => post("/customers", payload),
-  update: (id, payload) => put(`/customers/${id}`, payload),
+  update: (id, payload) => patch(`/customers/${id}`, payload),
   toggleActive: (id) => patch(`/customers/${id}/toggle-active`, {}),
 };
 
