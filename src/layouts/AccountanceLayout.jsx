@@ -162,12 +162,6 @@ export default function AccountanceLayout({ children }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button
-                  className={`submenu-item ${isActive('/accountance/hr/list') ? 'active' : ''}`}
-                  onClick={() => navigate('/accountance/hr/list')}
-                >
-                  Danh sách
-                </button>
-                <button
                   className={`submenu-item ${isActive('/accountance/hr/attendance') ? 'active' : ''}`}
                   onClick={() => navigate('/accountance/hr/attendance')}
                 >

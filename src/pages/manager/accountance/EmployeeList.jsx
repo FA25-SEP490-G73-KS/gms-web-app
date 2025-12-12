@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Table, Input, Button, Space, Tag, Avatar, message, Modal, Form, Select, DatePicker, Checkbox, Drawer } from 'antd'
+import { Table, Input, Button, Space, Tag, Avatar, message, Modal, Form, Select, DatePicker, Checkbox, Drawer, InputNumber } from 'antd'
 import { SearchOutlined, PlusOutlined, FilterOutlined, EditOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
@@ -82,6 +82,22 @@ const formatEmployee = (employee, index) => {
     return date.toLocaleDateString('vi-VN')
   })()
 
+  // Map status: true -> "Đang hoạt động", false -> "Nghỉ làm"
+  const getStatusLabel = () => {
+    if (employee.active !== undefined) {
+      return employee.active ? 'Đang hoạt động' : 'Nghỉ làm'
+    }
+    if (employee.status !== undefined) {
+      // Handle boolean status
+      if (typeof employee.status === 'boolean') {
+        return employee.status ? 'Đang hoạt động' : 'Nghỉ làm'
+      }
+      // Handle string status (fallback)
+      return employee.status === 'Đang hoạt động' || employee.status === 'Đang làm việc' ? 'Đang hoạt động' : 'Nghỉ làm'
+    }
+    return 'Đang hoạt động' // Default
+  }
+
   return {
     id: employee.employeeId || employee.id || `emp-${index}`,
     name: employee.fullName || employee.name || 'Không rõ',
@@ -90,7 +106,7 @@ const formatEmployee = (employee, index) => {
     department: employee.department || employee.departmentName || '—',
     position: employee.role || employee.position || employee.jobTitle || '—',
     joinDate,
-    status: employee.status || 'Đang hoạt động',
+    status: getStatusLabel(),
     avatar: employee.avatarUrl || employee.avatar || undefined
   }
 }
@@ -160,6 +176,20 @@ export default function EmployeeListForManager() {
       if (error) throw new Error(error)
       const employee = data?.result || data
       setSelectedEmployee(employee)
+      // Map status: true -> "true", false -> "false" for dropdown
+      let activeValue = true // Default
+      if (employee.active !== undefined) {
+        activeValue = employee.active
+      } else if (employee.status !== undefined) {
+        // Handle boolean status
+        if (typeof employee.status === 'boolean') {
+          activeValue = employee.status
+        } else {
+          // Handle string status (fallback)
+          activeValue = employee.status === 'Đang hoạt động' || employee.status === 'Đang làm việc'
+        }
+      }
+      
       form.setFieldsValue({
         fullName: employee.fullName,
         phone: employee.phone,
@@ -167,7 +197,7 @@ export default function EmployeeListForManager() {
         dailySalary: employee.dailySalary,
         hireDate: employee.hireDate ? dayjs(employee.hireDate) : null,
         terminationDate: employee.terminationDate ? dayjs(employee.terminationDate) : null,
-        status: employee.status,
+        active: String(activeValue),
         province: employee.province,
         ward: employee.ward,
         addressDetail: employee.addressDetail
@@ -195,21 +225,22 @@ export default function EmployeeListForManager() {
     try {
       const values = await form.validateFields()
       
-      // Prepare payload for API
+      // Prepare payload for API according to the API structure
       const payload = {
+        active: values.active === 'true' || values.active === true,
+        addressDetail: values.addressDetail || '',
+        dailySalary: Number(values.dailySalary) || 0,
         fullName: values.fullName,
+        hireDate: values.hireDate ? values.hireDate.toISOString() : null,
         phone: values.phone,
         position: values.position,
-        dailySalary: Number(values.dailySalary),
-        hireDate: values.hireDate ? values.hireDate.toISOString() : null,
-        terminationDate: values.terminationDate ? values.terminationDate.toISOString() : null,
-        status: values.status,
         province: values.province || '',
-        ward: values.ward || '',
-        addressDetail: values.addressDetail || ''
+        terminationDate: values.terminationDate ? values.terminationDate.toISOString() : null,
+        ward: values.ward || ''
       }
 
-      const { error } = await employeesAPI.update(selectedEmployee.employeeId, payload)
+      const employeeId = selectedEmployee.employeeId || selectedEmployee.id
+      const { error } = await employeesAPI.update(employeeId, payload)
       
       if (error) {
         throw new Error(error)
@@ -407,7 +438,6 @@ export default function EmployeeListForManager() {
             onClick={() => handleEdit(record)}
             loading={loadingDetail}
           />
-          <Button type="text" size="small" danger icon={<i className="bi bi-trash3" />} />
         </Space>
       )
     }
@@ -429,20 +459,7 @@ export default function EmployeeListForManager() {
             <p style={{ color: '#98a2b3', margin: 0 }}>Theo dõi trạng thái và thông tin nhân viên</p>
           </div>
 
-          <div className="employee-filters" style={{ gap: 16 }}>
-            <div className="status-filters">
-              {statusFilters.map((item) => (
-                <Button
-                  key={item.key}
-                  type={status === item.key ? 'primary' : 'default'}
-                  onClick={() => setStatus(item.key)}
-                  className={status === item.key ? 'status-btn active' : 'status-btn'}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-            <div className="employee-actions">
+          <div className="employee-filters" style={{ gap: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Input
                 prefix={<SearchOutlined />}
                 placeholder="Tìm kiếm"
@@ -450,12 +467,14 @@ export default function EmployeeListForManager() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="employee-search"
+              style={{ width: 300 }}
               />
+            <div className="employee-actions" style={{ display: 'flex', gap: 12 }}>
               <Button type="primary" icon={<PlusOutlined />} className="add-btn" onClick={handleAddEmployee}>
                 Thêm nhân viên
               </Button>
               <Button icon={<FilterOutlined />} className="sort-btn" onClick={handleOpenFilterDrawer}>
-                Sort
+                Bộ lọc
               </Button>
             </div>
           </div>
@@ -472,7 +491,7 @@ export default function EmployeeListForManager() {
                 pageSize,
                 total,
                 showSizeChanger: true,
-                showTotal: (t) => `0 of ${t} row(s) selected.`,
+                showTotal: (t) => `0 trong số ${t} hàng đã chọn.`,
                 pageSizeOptions: ['10', '20', '50', '100'],
                 onChange: (current, size) => {
                   fetchEmployees(current - 1, size)
@@ -485,96 +504,127 @@ export default function EmployeeListForManager() {
       </div>
 
       {/* Edit Employee Modal */}
-            {/* Edit Employee Modal */}
-            <Modal
+      <Modal
         open={editModalVisible}
         onCancel={handleCloseModal}
         width={960}
         footer={null}
         closable={false}
-        styles={{ header: { display: 'none' }, body: { padding: 0, background: '#fff', borderRadius: 12 } }}
+        styles={{
+          header: { display: 'none' },
+          body: { padding: 0, background: '#fff' },
+          content: { padding: 0, borderRadius: 12, overflow: 'hidden', background: '#fff' },
+        }}
       >
         <div
           style={{
-            background: '#CBB081',
-            padding: '20px 24px',
+          background: '#CBB081', 
+          padding: '20px 24px', 
             borderRadius: '12px 12px 0 0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#000' }}>Thông tin nhân viên</h2>
-          <Button type="text" onClick={handleCloseModal} style={{ fontSize: 20, color: '#000' }} aria-label="Đóng">
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#000' }}>Thông tin nhân viên</h2>
+          <Button type="text" onClick={handleCloseModal} style={{ fontSize: 22, color: '#000' }} aria-label="Đóng">
             ×
           </Button>
-        </div>
+          </div>
 
-        <div style={{ padding: 32 }}>
+        <div style={{ padding: '32px 36px 28px 36px', background: '#fff' }}>
           <Form form={form} layout="vertical">
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 24 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <Form.Item label={<span>Tên nhân viên <span style={{ color: 'red' }}>*</span></span>} name="fullName" rules={[{ required: true, message: 'Vui lòng nhập tên nhân viên' }]}>
-                  <Input placeholder="Nguyễn Văn A" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 28 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <Form.Item label="Tên nhân viên" name="fullName" rules={[{ required: true, message: 'Vui lòng nhập tên nhân viên' }]}>
+                  <Input placeholder="Nguyễn Văn A" disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
                 </Form.Item>
-                <Form.Item label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>} name="phone" rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}>
-                  <Input placeholder="0987654321" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+            <Form.Item
+                  label="Số điện thoại"
+              name="phone"
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập số điện thoại' },
+                    { pattern: /^0\d{9}$/, message: 'Số điện thoại phải bắt đầu bằng 0 và đủ 10 số' }
+                  ]}
+            >
+                  <Input placeholder="0987654321" disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
+            </Form.Item>
+                <Form.Item label="Chức vụ" name="position" rules={[{ required: true, message: 'Vui lòng nhập chức vụ' }]}>
+                  <Input placeholder="Kỹ thuật viên" disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
                 </Form.Item>
-                <Form.Item label={<span>Chức vụ <span style={{ color: 'red' }}>*</span></span>} name="position" rules={[{ required: true, message: 'Vui lòng nhập chức vụ' }]}>
-                  <Input placeholder="Kỹ thuật viên" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
-                </Form.Item>
-                <Form.Item label={<span>Lương cơ bản <span style={{ color: 'red' }}>*</span></span>} name="dailySalary" rules={[{ required: true, message: 'Vui lòng nhập lương' }]}>
-                  <Input placeholder="10.000.000" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
-                </Form.Item>
-              </div>
+                <Form.Item label="Lương cơ bản" name="dailySalary" rules={[{ required: true, message: 'Vui lòng nhập lương' }]}>
+                  <InputNumber
+                    placeholder="10.000.000"
+                disabled={!isEditing}
+                    style={{ background: '#fff', borderRadius: 10, height: 48, width: '100%' }}
+                    formatter={(value) => {
+                      if (!value) return ''
+                      const onlyDigits = `${value}`.replace(/\D/g, '')
+                      return onlyDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                    }}
+                    parser={(value) => (value ? value.replace(/\./g, '') : '')}
+                    controls={false}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key)) e.preventDefault()
+                }}
+                    min={0}
+              />
+            </Form.Item>
+          </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                <Form.Item label={<span>Tỉnh thành <span style={{ color: 'red' }}>*</span></span>} name="province" rules={[{ required: true, message: 'Vui lòng nhập tỉnh thành' }]}>
-                  <Input disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
-                </Form.Item>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+                <Form.Item label="Tỉnh thành" name="province" rules={[{ required: true, message: 'Vui lòng nhập tỉnh thành' }]}>
+                  <Input disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
+            </Form.Item>
                 <Form.Item label="Phường xã" name="ward">
-                  <Input disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
-                </Form.Item>
+                  <Input disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
+            </Form.Item>
                 <Form.Item label="Địa chỉ chi tiết" name="addressDetail">
-                  <Input placeholder="Trung tâm thạch thất" disabled={!isEditing} style={{ background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} />
+                  <Input placeholder="Trung tâm thạch thất" disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
                 </Form.Item>
-                <Form.Item label={<span>Trạng thái <span style={{ color: 'red' }}>*</span></span>} name="status" rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}>
-                  <Select placeholder="Đang làm việc" disabled={!isEditing} style={{ borderRadius: 8 }}>
-                    <Select.Option value="Đang hoạt động">Đang làm việc</Select.Option>
-                    <Select.Option value="Nghỉ phép">Nghỉ phép</Select.Option>
-                    <Select.Option value="Nghỉ làm">Nghỉ làm</Select.Option>
+                <Form.Item label="Trạng thái" name="active" rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}>
+                  <Select placeholder="Đang làm việc" disabled={!isEditing} style={{ borderRadius: 10, height: 48 }}>
+                    <Select.Option value="true">Đang làm việc</Select.Option>
+                    <Select.Option value="false">Nghỉ làm</Select.Option>
                   </Select>
-                </Form.Item>
+            </Form.Item>
               </div>
-            </div>
+          </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 20, marginTop: 18 }}>
               <Form.Item label="Ngày bắt đầu" name="hireDate">
-                <DatePicker style={{ width: '100%', background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} format="DD/MM/YYYY" placeholder="11/10/2025" disabled={!isEditing} />
-              </Form.Item>
+                <DatePicker style={{ width: '100%', borderRadius: 10, height: 48 }} format="DD/MM/YYYY" placeholder="11/10/2025" disabled={!isEditing} />
+            </Form.Item>
               <Form.Item label="Ngày kết thúc" name="terminationDate">
-                <DatePicker style={{ width: '100%', background: isEditing ? '#fff' : '#f5f5f5', borderRadius: 8 }} format="DD/MM/YYYY" placeholder="11/10/2025" disabled={!isEditing} />
-              </Form.Item>
-            </div>
+                <DatePicker style={{ width: '100%', borderRadius: 10, height: 48 }} format="DD/MM/YYYY" placeholder="11/10/2025" disabled={!isEditing} />
+            </Form.Item>
+          </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-              <Button
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 28 }}>
+              <Button 
                 type="primary"
-                onClick={handleSave}
+                onClick={() => {
+                  if (!isEditing) {
+                    setIsEditing(true)
+                    return
+                  }
+                  handleSave()
+                }}
                 style={{
                   background: '#CBB081',
                   borderColor: '#CBB081',
-                  borderRadius: 8,
-                  padding: '8px 32px',
+                  borderRadius: 10,
+                  padding: '10px 34px',
                   height: 'auto',
                   fontSize: 16,
-                  fontWeight: 500,
+                  fontWeight: 600,
+                  color: '#000',
                 }}
               >
-                Chỉnh sửa
+                {isEditing ? 'Lưu' : 'Chỉnh sửa'}
               </Button>
-            </div>
-          </Form>
+          </div>
+        </Form>
         </div>
       </Modal>
 
@@ -582,132 +632,132 @@ export default function EmployeeListForManager() {
       <Modal
         open={addModalVisible}
         onCancel={handleCloseAddModal}
-        width={900}
+        width={960}
         footer={null}
-        closeIcon={<span style={{ fontSize: 24 }}>×</span>}
+        closable={false}
+        styles={{
+          header: { display: 'none' },
+          body: { padding: 0, background: '#fff' },
+          content: { padding: 0, borderRadius: 12, overflow: 'hidden', background: '#fff' },
+        }}
       >
-        <div style={{ 
+        <div
+          style={{
           background: '#CBB081', 
           padding: '20px 24px', 
-          margin: '-20px -24px 24px -24px',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: '#000' }}>
-            Thêm thông tin nhân viên
-          </h2>
+            borderRadius: '12px 12px 0 0',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#000' }}>Thêm thông tin nhân viên</h2>
+          <Button type="text" onClick={handleCloseAddModal} style={{ fontSize: 22, color: '#000' }} aria-label="Đóng">
+            ×
+          </Button>
         </div>
 
+        <div style={{ padding: '32px 36px 28px 36px', background: '#fff' }}>
         <Form
           form={addForm}
           layout="vertical"
         >
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 28 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <Form.Item
-              label={<span>Tên nhân viên <span style={{ color: 'red' }}>*</span></span>}
+                  label="Tên nhân viên"
               name="fullName"
               rules={[{ required: true, message: 'Vui lòng nhập tên nhân viên' }]}
             >
               <Input 
-                placeholder="VD: Nguyễn Văn A" 
-                style={{ borderRadius: 8 }}
+                    placeholder="Nguyễn Văn A" 
+                    style={{ background: '#fff', borderRadius: 10, height: 48 }}
               />
             </Form.Item>
 
             <Form.Item
-              label={<span>Tỉnh thành <span style={{ color: 'red' }}>*</span></span>}
-              name="city"
-              rules={[{ required: true, message: 'Vui lòng nhập tỉnh thành' }]}
+                  label="Số điện thoại"
+                  name="phone"
+                  rules={[
+                    { required: true, message: 'Vui lòng nhập số điện thoại' },
+                    { pattern: /^0\d{9}$/, message: 'Số điện thoại phải bắt đầu bằng 0 và đủ 10 số' }
+                  ]}
             >
               <Input 
-                placeholder="VD: Hà Nội" 
-                style={{ borderRadius: 8 }}
+                    placeholder="0987654321" 
+                    style={{ background: '#fff', borderRadius: 10, height: 48 }}
               />
             </Form.Item>
 
             <Form.Item
-              label="Phường xã"
-              name="ward"
+                  label="Chức vụ"
+                  name="role"
+                  rules={[{ required: true, message: 'Vui lòng chọn chức vụ' }]}
             >
-              <Input 
-                placeholder="VD: Thạch Thất" 
-                style={{ borderRadius: 8 }}
+                  <Select 
+                    placeholder="Kỹ thuật viên" 
+                    style={{ borderRadius: 10, height: 48 }}
+                  >
+                    <Select.Option value="TECHNICIAN">Kỹ thuật viên</Select.Option>
+                    <Select.Option value="ACCOUNTANT">Kế toán</Select.Option>
+                    <Select.Option value="MANAGER">Quản lý</Select.Option>
+                    <Select.Option value="SERVICE_ADVISOR">Cố vấn dịch vụ</Select.Option>
+                    <Select.Option value="WAREHOUSE">Nhân viên kho</Select.Option>
+                  </Select>
+            </Form.Item>
+
+            <Form.Item
+                  label="Lương cơ bản"
+                  name="dailySalary"
+                  rules={[{ required: true, message: 'Vui lòng nhập lương' }]}
+            >
+                  <InputNumber
+                    placeholder="10.000.000"
+                    style={{ background: '#fff', borderRadius: 10, height: 48, width: '100%' }}
+                    formatter={(value) => {
+                      if (!value) return ''
+                      const onlyDigits = `${value}`.replace(/\D/g, '')
+                      return onlyDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                    }}
+                    parser={(value) => (value ? value.replace(/\./g, '') : '')}
+                    controls={false}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key)) e.preventDefault()
+                    }}
+                    min={0}
               />
             </Form.Item>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <Form.Item
-              label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>}
-              name="phone"
-              rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+                  label="Tỉnh thành"
+                  name="city"
+                  rules={[{ required: true, message: 'Vui lòng nhập tỉnh thành' }]}
+            >
+                  <Input 
+                    placeholder="Hà Nội" 
+                    style={{ background: '#fff', borderRadius: 10, height: 48 }}
+              />
+            </Form.Item>
+
+            <Form.Item
+                  label="Phường xã"
+                  name="ward"
+            >
+                  <Input 
+                    placeholder="Thạch Thất" 
+                    style={{ background: '#fff', borderRadius: 10, height: 48 }}
+              />
+            </Form.Item>
+
+            <Form.Item
+                  label="Địa chỉ chi tiết"
+                  name="detailAddress"
             >
               <Input 
-                placeholder="VD: 0987654321" 
-                style={{ borderRadius: 8 }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Địa chỉ chi tiết"
-              name="detailAddress"
-            >
-              <Input 
-                placeholder="VD: Trung tâm thạch thất" 
-                style={{ borderRadius: 8 }}
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span>Chức vụ <span style={{ color: 'red' }}>*</span></span>}
-              name="role"
-              rules={[{ required: true, message: 'Vui lòng chọn chức vụ' }]}
-            >
-              <Select 
-                placeholder="Chọn chức vụ" 
-                style={{ borderRadius: 8 }}
-              >
-                <Select.Option value="Kỹ thuật viên">Kỹ thuật viên</Select.Option>
-                <Select.Option value="Kế toán">Kế toán</Select.Option>
-                <Select.Option value="Quản lý">Quản lý</Select.Option>
-                <Select.Option value="Cố vấn dịch vụ">Cố vấn dịch vụ</Select.Option>
-                <Select.Option value="Nhân viên kho">Nhân viên kho</Select.Option>
-              </Select>
-            </Form.Item>
-
-            <Form.Item
-              label="Ngày bắt đầu"
-              name="startDate"
-            >
-              <DatePicker 
-                style={{ width: '100%', borderRadius: 8 }} 
-                format="DD/MM/YYYY"
-                placeholder="11/10/2025"
-              />
-            </Form.Item>
-
-            <Form.Item
-              label="Ngày kết thúc"
-              name="endDate"
-            >
-              <DatePicker 
-                style={{ width: '100%', borderRadius: 8 }} 
-                format="DD/MM/YYYY"
-                placeholder="11/10/2025"
-              />
-            </Form.Item>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <Form.Item
-              label={<span>Lương cơ bản <span style={{ color: 'red' }}>*</span></span>}
-              name="dailySalary"
-              rules={[{ required: true, message: 'Vui lòng nhập lương' }]}
-            >
-              <Input 
-                placeholder="VD: 10.000.000" 
-                style={{ borderRadius: 8 }}
+                    placeholder="Trung tâm thạch thất" 
+                    style={{ background: '#fff', borderRadius: 10, height: 48 }}
               />
             </Form.Item>
 
@@ -716,46 +766,43 @@ export default function EmployeeListForManager() {
               name="dateOfBirth"
             >
               <DatePicker 
-                style={{ width: '100%', borderRadius: 8 }} 
+                    style={{ width: '100%', borderRadius: 10, height: 48 }} 
                 format="DD/MM/YYYY"
                 placeholder="01/01/1990"
               />
             </Form.Item>
+              </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'flex-end', marginTop: 24 }}>
-            <Button 
-              onClick={handleCloseAddModal}
-              style={{
-                background: '#d93006ff',
-                borderColor: '#d90d06ff',
-                color: '#fff',
-                borderRadius: 8,
-                padding: '8px 32px',
-                height: 'auto',
-                fontSize: 16,
-                fontWeight: 500
-              }}
-            >
-              Hủy
-            </Button>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 20, marginTop: 18 }}>
+              <Form.Item label="Ngày bắt đầu" name="startDate">
+                <DatePicker style={{ width: '100%', borderRadius: 10, height: 48 }} format="DD/MM/YYYY" placeholder="11/10/2025" />
+              </Form.Item>
+              <Form.Item label="Ngày kết thúc" name="endDate">
+                <DatePicker style={{ width: '100%', borderRadius: 10, height: 48 }} format="DD/MM/YYYY" placeholder="11/10/2025" />
+              </Form.Item>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 28 }}>
             <Button 
               type="primary"
               onClick={handleCreateEmployee}
               style={{
-                background: '#16a34a',
-                borderColor: '#16a34a',
-                borderRadius: 8,
-                padding: '8px 32px',
+                  background: '#CBB081',
+                  borderColor: '#CBB081',
+                  borderRadius: 10,
+                  padding: '10px 34px',
                 height: 'auto',
                 fontSize: 16,
-                fontWeight: 500
+                  fontWeight: 600,
+                  color: '#000',
               }}
             >
               Tạo
             </Button>
           </div>
         </Form>
+        </div>
       </Modal>
 
       {/* Filter Modal */}
@@ -765,18 +812,31 @@ export default function EmployeeListForManager() {
         onCancel={handleCloseFilterDrawer}
         width={420}
         footer={
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+            <Button 
+              onClick={handleResetFilter}
+              style={{
+                borderRadius: 8,
+                height: 40,
+                padding: '0 24px'
+              }}
+            >
+              Đặt lại
+            </Button>
           <Button 
             onClick={handleApplyFilter}
             type="primary"
-            block
             style={{
               background: '#3b82f6',
               borderColor: '#3b82f6',
-              height: 40
+                borderRadius: 8,
+                height: 40,
+                padding: '0 24px'
             }}
           >
             Tìm kiếm
           </Button>
+          </div>
         }
       >
         <div style={{ marginBottom: 16 }}>
@@ -788,7 +848,6 @@ export default function EmployeeListForManager() {
           >
             <Checkbox value="Đang hoạt động">Đang hoạt động</Checkbox>
             <Checkbox value="Nghỉ làm">Nghỉ làm</Checkbox>
-            <Checkbox value="Nghỉ phép">Nghỉ phép</Checkbox>
           </Checkbox.Group>
         </div>
 
@@ -807,7 +866,7 @@ export default function EmployeeListForManager() {
         </div>
 
         <div>
-          <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>Khoảng ngày tao</div>
+          <div style={{ marginBottom: 8, fontSize: 14, fontWeight: 500 }}>Ngày tham gia</div>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
               <div style={{ marginBottom: 4, fontSize: 13, color: '#666' }}>Từ ngày</div>

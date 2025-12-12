@@ -22,92 +22,47 @@ export default function ManagerImportRequestDetail() {
       const { data: response, error } = await purchaseRequestAPI.getById(id)
       
       if (error) {
-        console.log('API error, using mock data:', error)
-        // Use mock data if API fails
-        setDetailData(getMockDetail())
+        console.error('API error:', error)
+        message.error(error || 'Không thể tải thông tin chi tiết yêu cầu mua hàng')
+        setDetailData(null)
         return
       }
 
       const result = response?.result
       
       if (!result) {
-        console.log('No data from API, using mock data')
-        setDetailData(getMockDetail())
-      } else {
-        // Map API response to UI structure
-        const mappedData = {
-          code: result.code || 'N/A',
-          type: result.reason || 'Từ báo giá',
-          quotationCode: result.quotationCode || 'N/A',
-          createdBy: result.createdBy || 'N/A',
-          reviewStatus: result.reviewStatus || 'Chờ duyệt',
-          customerName: result.customerName || 'N/A',
-          items: (result.items || []).map((item, index) => ({
-            id: index + 1,
-            sku: item.sku || 'N/A',
-            name: item.partName || 'N/A',
-            quantity: item.quantity || 0,
-            unitPrice: item.estimatedPurchasePrice || 0,
-            totalPrice: item.total || 0,
-            unit: item.unit || 'Cái'
-          }))
-        }
-        setDetailData(mappedData)
+        message.error('Không tìm thấy dữ liệu')
+        setDetailData(null)
+        return
       }
+
+      // Map API response to UI structure
+      const mappedData = {
+        code: result.code || 'N/A',
+        type: result.reason || 'Từ báo giá',
+        quotationCode: result.quotationCode || 'N/A',
+        createdBy: result.createdBy || 'N/A',
+        reviewStatus: result.reviewStatus || 'Chờ duyệt',
+        customerName: result.customerName || 'N/A',
+        items: (result.items || []).map((item, index) => ({
+          id: index + 1,
+          sku: item.sku || 'N/A',
+          name: item.partName || 'N/A',
+          quantity: item.quantity || 0,
+          unitPrice: item.estimatedPurchasePrice || 0,
+          totalPrice: item.total || 0,
+          unit: item.unit || 'Cái'
+        }))
+      }
+      setDetailData(mappedData)
     } catch (err) {
       console.error('Failed to fetch detail:', err)
-      setDetailData(getMockDetail())
+      message.error('Không thể tải thông tin chi tiết yêu cầu mua hàng')
+      setDetailData(null)
     } finally {
       setLoading(false)
     }
   }
-
-  const getMockDetail = () => ({
-    code: 'PR-2025-00001',
-    type: 'Từ báo giá',
-    quotationCode: 'BG-2025-00001',
-    createdBy: 'Nam',
-    reviewStatus: 'Chờ duyệt',
-    customerName: 'Nguyễn Văn A',
-    items: [
-      {
-        id: 1,
-        sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-        name: 'Lọc gió động cơ 30W',
-        quantity: 10,
-        unitPrice: 100000,
-        totalPrice: 1000000,
-        unit: 'Cái'
-      },
-      {
-        id: 2,
-        sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-        name: 'Lọc gió động cơ 30W',
-        quantity: 10,
-        unitPrice: 100000,
-        totalPrice: 1000000,
-        unit: 'Cái'
-      },
-      {
-        id: 3,
-        sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-        name: 'Lọc gió động cơ 30W',
-        quantity: 10,
-        unitPrice: 100000,
-        totalPrice: 1000000,
-        unit: 'Cái'
-      },
-      {
-        id: 4,
-        sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-        name: 'Lọc gió động cơ 30W',
-        quantity: 10,
-        unitPrice: 100000,
-        totalPrice: 1000000,
-        unit: 'Cái'
-      }
-    ]
-  })
 
   const getStatusConfig = (status) => {
     const configs = {

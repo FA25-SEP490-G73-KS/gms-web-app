@@ -152,6 +152,16 @@ export default function ManagerLayout({ children }) {
       return { parent: 'Dịch vụ', parentPath: null, current: 'Loại dịch vụ' }
     }
     if (path.startsWith('/manager/warehouse/import-request')) {
+      // Check if it's detail page (has ID in path)
+      const isDetail = /\/manager\/warehouse\/import-request\/\d+/.test(path)
+      if (isDetail) {
+        return {
+          grandParent: 'Kho',
+          parent: 'Yêu cầu mua hàng',
+          parentPath: '/manager/warehouse/import-request',
+          current: 'Chi tiết'
+        }
+      }
       return { parent: 'Kho', parentPath: null, current: 'Yêu cầu mua hàng' }
     }
     return { parent: '', parentPath: null, current: 'Thống kê' }
@@ -369,7 +379,7 @@ export default function ManagerLayout({ children }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button
-                  className={`submenu-item ${isActive('/manager/warehouse/import-request') ? 'active' : ''}`}
+                  className={`submenu-item ${isActiveParent('/manager/warehouse/import-request') ? 'active' : ''}`}
                   onClick={() => navigate('/manager/warehouse/import-request')}
                 >
                   Yêu cầu mua hàng

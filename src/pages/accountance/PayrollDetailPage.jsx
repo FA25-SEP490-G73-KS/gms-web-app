@@ -71,8 +71,16 @@ export default function PayrollDetailPage() {
       const payload = {
         employeeId: parseInt(employeeId, 10),
         type: values.category || '', 
-        amount: values.amount || 0
+        amount: values.amount || 0,
+        month: parseInt(month, 10),
+        year: parseInt(year, 10)
       }
+
+      console.log('=== Create Allowance Payload ===')
+      console.log('Payload:', payload)
+      console.log('Month:', month, '->', parseInt(month, 10))
+      console.log('Year:', year, '->', parseInt(year, 10))
+      console.log('================================')
 
       const { data: response, error } = await payrollAPI.createAllowance(payload)
 
@@ -102,8 +110,16 @@ export default function PayrollDetailPage() {
         employeeId: parseInt(employeeId, 10),
         type: values.category || '', 
         content: values.type || '', 
-        amount: values.amount || 0
+        amount: values.amount || 0,
+        month: parseInt(month, 10),
+        year: parseInt(year, 10)
       }
+
+      console.log('=== Create Deduction Payload ===')
+      console.log('Payload:', payload)
+      console.log('Month:', month, '->', parseInt(month, 10))
+      console.log('Year:', year, '->', parseInt(year, 10))
+      console.log('================================')
 
       const { data: response, error } = await payrollAPI.createDeduction(payload)
 
@@ -164,8 +180,12 @@ export default function PayrollDetailPage() {
           statusText === 'paid' ||
           statusText.includes('đã thanh toán') ||
           statusText.includes('đã chi trả')
+        const isApproved =
+          statusText === 'approved' ||
+          statusText === 'duyệt' ||
+          statusText.includes('đã duyệt')
         const canDelete =
-          payrollDetail?.canPaySalary === false && !isPaid
+          payrollDetail?.canPaySalary === false && !isPaid && !isApproved
         const allowanceId = record?.id || record?.allowanceId || record?._id
 
         if (!canDelete) return null
@@ -323,8 +343,12 @@ export default function PayrollDetailPage() {
           statusText === 'paid' ||
           statusText.includes('đã thanh toán') ||
           statusText.includes('đã chi trả')
+        const isApproved =
+          statusText === 'approved' ||
+          statusText === 'duyệt' ||
+          statusText.includes('đã duyệt')
         const canDelete =
-          payrollDetail?.canPaySalary === false && !isPaid
+          payrollDetail?.canPaySalary === false && !isPaid && !isApproved
         const deductionId = record?.id || record?.deductionId || record?._id
 
         if (!canDelete) return null
@@ -399,22 +423,35 @@ export default function PayrollDetailPage() {
                 ]}
                 className="payroll-detail-tabs"
               />
-              {(activeTab === 'allowances' || activeTab === 'deductions') && (
-                <Button
-                  type="default"
-                  icon={<PlusOutlined />}
-                  onClick={() => {
-                    if (activeTab === 'allowances') {
-                      setShowAllowanceModal(true)
-                    } else {
-                      setShowDeductionModal(true)
-                    }
-                  }}
-                  className="add-item-btn"
-                >
-                  Thêm
-                </Button>
-              )}
+              {(() => {
+                const statusText = (payrollDetail?.status || '').toLowerCase()
+                const isPaid =
+                  statusText === 'paid' ||
+                  statusText.includes('đã thanh toán') ||
+                  statusText.includes('đã chi trả')
+                const isApproved =
+                  statusText === 'approved' ||
+                  statusText === 'duyệt' ||
+                  statusText.includes('đã duyệt')
+                const canAdd = payrollDetail?.canPaySalary === false && !isPaid && !isApproved
+                
+                return (activeTab === 'allowances' || activeTab === 'deductions') && canAdd && (
+                  <Button
+                    type="default"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      if (activeTab === 'allowances') {
+                        setShowAllowanceModal(true)
+                      } else {
+                        setShowDeductionModal(true)
+                      }
+                    }}
+                    className="add-item-btn"
+                  >
+                    Thêm
+                  </Button>
+                )
+              })()}
             </div>
 
             {/* Overview Tab */}

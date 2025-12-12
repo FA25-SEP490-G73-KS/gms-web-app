@@ -400,18 +400,18 @@ export default function AttendanceForManager() {
 
   const handleSave = async () => {
     try {
-      // Build array of attendance records for employees who are checked
+      // Build array of attendance records for ALL employees
+      // isPresent will be true if checked, false if not checked
       const attendanceRecords = filtered
-        .filter(emp => emp.present)
         .filter(emp => emp.id != null && emp.id !== undefined) // Filter out invalid IDs
         .map(emp => ({
           employeeId: Number(emp.id), // Ensure it's a number
-          isPresent: true, // Backend requires this field
+          isPresent: emp.present || false, // true if checked, false if not checked
           note: emp.note || ''
         }))
 
       if (attendanceRecords.length === 0) {
-        message.warning('Vui lòng chọn ít nhất một nhân viên để điểm danh')
+        message.warning('Không có nhân viên nào để điểm danh')
         return
       }
 
@@ -430,7 +430,8 @@ export default function AttendanceForManager() {
       }
 
       console.log('Success:', data)
-      message.success(`Đã điểm danh thành công cho ${attendanceRecords.length} nhân viên`)
+      const presentCount = attendanceRecords.filter(r => r.isPresent).length
+      message.success(`Đã điểm danh thành công cho ${attendanceRecords.length} nhân viên (${presentCount} có mặt)`)
       
       // Fetch today's attendance again to update checkboxes
       await fetchTodayAttendance()
@@ -469,6 +470,7 @@ export default function AttendanceForManager() {
         key: 'totalWorking',
         width: 120,
         align: 'center',
+        fixed: 'left',
         render: (value) => <span style={{ fontWeight: 600 }}>{value}</span>,
       },
     ]
@@ -519,33 +521,10 @@ export default function AttendanceForManager() {
         >
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 16,
               marginBottom: 24,
             }}
           >
-            <div>
-              <div style={{ fontSize: 14, color: '#98A2B3', marginBottom: 4 }}>manager / Chấm công</div>
-              <h2 style={{ marginBottom: 0, fontSize: 28, fontWeight: 700, color: '#1a1a1a' }}>Chấm công</h2>
-            </div>
-            <Input
-              allowClear
-              prefix={<i className="bi bi-search" style={{ fontSize: 16, color: '#667085' }} />}
-              placeholder="Tìm kiếm"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{ 
-                maxWidth: 320, 
-                height: 42,
-                background: '#F9FAFB',
-                borderRadius: 8,
-                border: '1px solid #E5E7EB',
-                fontSize: 14
-              }}
-            />
+            <h2 style={{ marginBottom: 0, fontSize: 28, fontWeight: 700, color: '#1a1a1a' }}>Chấm công</h2>
           </div>
 
           <Tabs
@@ -592,11 +571,26 @@ export default function AttendanceForManager() {
             </>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 16 }}>
+                <Input
+                  allowClear
+                  prefix={<i className="bi bi-search" style={{ fontSize: 16, color: '#667085' }} />}
+                  placeholder="Tìm kiếm"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  style={{ 
+                    width: 300, 
+                    height: 42,
+                    background: '#F9FAFB',
+                    borderRadius: 8,
+                    border: '1px solid #E5E7EB',
+                    fontSize: 14
+                  }}
+                />
                 <div style={{ position: 'relative', width: 180 }}>
                   <select
                     ref={monthInputRef}
-                  value={selectedMonth}
+                    value={selectedMonth}
                     onChange={(e) => {
                       e.stopPropagation()
                       setSelectedMonth(e.target.value)
@@ -661,38 +655,46 @@ export default function AttendanceForManager() {
                       transition: 'color 0.2s ease',
                       zIndex: 1
                     }} 
-                />
-                </div>
-                <div style={{ display: 'flex', gap: 16 }}>
-                  {[
-                    { color: STATUS_COLORS.present, label: 'Có mặt' },
-                    { color: STATUS_COLORS.absent, label: 'Vắng' },
-                    { color: STATUS_COLORS.leave, label: 'Làm nửa ngày' },
-                    { color: STATUS_COLORS.remote, label: 'Phép có đăng ký' },
-                  ].map((item) => (
-                    <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span
-                        style={{
-                          width: 14,
-                          height: 14,
-                          borderRadius: '50%',
-                          background: item.color,
-                          display: 'inline-block',
-                        }}
-                      />
-                      <span style={{ color: '#475467', fontSize: 13 }}>{item.label}</span>
-                    </div>
-                  ))}
+                  />
                 </div>
               </div>
               <Table
                 columns={overviewColumns}
-                dataSource={overviewData.map((item) => ({ ...item, key: item.id }))}
+                dataSource={overviewData
+                  .filter((item) => {
+                    if (!search || search.trim() === '') return true
+                    const lower = search.toLowerCase()
+                    return (
+                      (item.fullName || '').toLowerCase().includes(lower) ||
+                      (item.phone || '').includes(lower)
+                    )
+                  })
+                  .map((item) => ({ ...item, key: item.id }))}
                 pagination={false}
                 scroll={{ x: 2200 }}
                 components={goldTableHeader}
                 loading={overviewLoading}
               />
+              <div style={{ display: 'flex', gap: 16, marginTop: 16 }}>
+                {[
+                  { color: STATUS_COLORS.present, label: 'Có mặt' },
+                  { color: STATUS_COLORS.absent, label: 'Vắng' },
+                  { color: STATUS_COLORS.empty, label: 'Không có dữ liệu' },
+                ].map((item) => (
+                  <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: '50%',
+                        background: item.color,
+                        display: 'inline-block',
+                      }}
+                    />
+                    <span style={{ color: '#475467', fontSize: 13 }}>{item.label}</span>
+                  </div>
+                ))}
+              </div>
             </>
           )}
         </div>

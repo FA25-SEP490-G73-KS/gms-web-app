@@ -217,6 +217,11 @@ export default function ImportList() {
   return (
     <WarehouseLayout>
       <div style={{ marginBottom: 24 }}>
+        {/* Heading */}
+        <h1 style={{ margin: 0, marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+          Danh sách nhập kho
+        </h1>
+
         {/* Search and Filter Row */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           {/* Search Box */}

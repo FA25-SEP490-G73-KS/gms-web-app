@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { Table, Input, Button, Tag, message } from 'antd'
-import { SearchOutlined, FilterOutlined, CalendarOutlined } from '@ant-design/icons'
+import { Table, Input, Tag, message } from 'antd'
+import { SearchOutlined, CalendarOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { attendanceAPI } from '../../services/api'
@@ -12,8 +12,6 @@ const DAYS_IN_MONTH = 31
 const DAY_COLORS = {
   present: { bg: '#d0f5d6', label: 'Có mặt' },
   absent: { bg: '#ffd6d6', label: 'Vắng' },
-  leave: { bg: '#ffe8a3', label: 'Làm nửa ngày' },
-  remote: { bg: '#e2e8f0', label: 'Phép có đăng ký' },
   empty: { bg: '#f0f1f5', label: 'Không có dữ liệu' }
 }
 
@@ -42,7 +40,7 @@ const dayColumns = Array.from({ length: DAYS_IN_MONTH }, (_, index) => ({
           color: status !== 'empty' ? '#000' : 'transparent'
         }}
       >
-        {status === 'present' ? 'P' : status === 'absent' ? 'A' : status === 'leave' ? 'HR' : ''}
+        {status === 'present' ? 'P' : status === 'absent' ? 'A' : ''}
       </div>
     )
   }
@@ -172,6 +170,7 @@ export function AccountanceAttendanceContent() {
       key: 'totalWorking',
       width: 100,
       align: 'center',
+      fixed: 'left',
       render: (value) => <span style={{ fontWeight: 600 }}>{value}</span>
     },
     ...dayColumns
@@ -183,8 +182,17 @@ export function AccountanceAttendanceContent() {
           <h1>Ngày công nhân viên</h1>
         </div>
 
-        <div className="attendance-filters">
-          <div className="attendance-month-picker-wrapper">
+        <div className="attendance-filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16 }}>
+          <Input
+            prefix={<SearchOutlined />}
+            placeholder="Tìm kiếm"
+            allowClear
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="attendance-search"
+            style={{ width: 300 }}
+          />
+          <div className="attendance-month-picker-wrapper" style={{ position: 'relative', width: 180 }}>
             <select
               ref={monthInputRef}
               value={selectedMonth}
@@ -217,17 +225,6 @@ export function AccountanceAttendanceContent() {
             </select>
             <CalendarOutlined className="attendance-month-icon" />
           </div>
-          <Input
-            prefix={<SearchOutlined />}
-            placeholder="Tìm kiếm"
-            allowClear
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="attendance-search"
-          />
-          <Button icon={<FilterOutlined />} className="sort-btn">
-            Sort
-          </Button>
         </div>
 
         <div className="attendance-table-card">

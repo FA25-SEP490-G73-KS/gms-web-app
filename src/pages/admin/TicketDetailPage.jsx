@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { 
   Row, Col, Card, Button, Table, Space, 
-  DatePicker, Modal, message, Tabs, Calendar, Input
+  DatePicker, Modal, message, Tabs, Calendar, Input, Popconfirm
 } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, CloseOutlined, FilePdfOutlined, FileTextOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
@@ -124,6 +124,27 @@ export default function TicketDetailPage() {
   const isWaitingCustomerConfirm = quotationStatusConfig.label === 'Chờ khách xác nhận'
   const isWarehouseConfirmed = quotationStatusConfig.label === 'Kho đã duyệt'
   const isCustomerConfirmed = quotationStatusConfig.label === 'Khách đã xác nhận'
+  
+  // Kiểm tra xem có item nào bị từ chối không
+  const hasRejectedItem = replaceItems.some(item => {
+    const reviewStatus = (item.warehouseReviewStatus || '').toString()
+    const normalizedStatus = reviewStatus.toUpperCase().trim()
+    // Kiểm tra nhiều cách viết "Từ chối"
+    return normalizedStatus === 'TỪ CHỐI' || 
+           normalizedStatus === 'REJECTED' ||
+           normalizedStatus.includes('TỪ CHỐI') ||
+           normalizedStatus.includes('REJECTED')
+  })
+  
+  // Debug log để kiểm tra
+  if (isWaitingWarehouse) {
+    console.log('isWaitingWarehouse:', isWaitingWarehouse)
+    console.log('replaceItems:', replaceItems)
+    console.log('hasRejectedItem:', hasRejectedItem)
+    replaceItems.forEach((item, index) => {
+      console.log(`Item ${index} warehouseReviewStatus:`, item.warehouseReviewStatus)
+    })
+  }
   
   const inputsDisabled = isHistoryPage || actionLoading || 
     (isWaitingWarehouse
@@ -670,18 +691,6 @@ export default function TicketDetailPage() {
       unitPriceLocked: false
     }
     setReplaceItems([...replaceItems, newReplace])
-
-
-    const newService = { 
-      id: Date.now() + 1, 
-      priceQuotationItemId: null,
-      task: 'Tiền công',
-      quantity: 1, 
-      unit: '',
-      unitPrice: 0,
-      total: 0
-    }
-    setServiceItems([...serviceItems, newService])
   }
 
   const addServiceItem = () => {
@@ -696,12 +705,48 @@ export default function TicketDetailPage() {
     }])
   }
 
-  const deleteReplaceItem = (id) => {
-    setReplaceItems(replaceItems.filter(item => item.id !== id))
+  const deleteReplaceItem = async (id, priceQuotationItemId) => {
+    // Nếu có priceQuotationItemId, gọi API để xóa
+    if (priceQuotationItemId) {
+      try {
+        const { data, error } = await priceQuotationAPI.deleteItem(priceQuotationItemId)
+        if (error) {
+          message.error(error || 'Không thể xóa mục báo giá')
+          return
+        }
+        message.success('Đã xóa mục báo giá thành công')
+        // Refresh data sau khi xóa
+        await fetchTicketDetail()
+      } catch (err) {
+        console.error('Error deleting quotation item:', err)
+        message.error('Đã xảy ra lỗi khi xóa mục báo giá')
+      }
+    } else {
+      // Nếu không có priceQuotationItemId, chỉ xóa khỏi state (item mới chưa lưu)
+      setReplaceItems(replaceItems.filter(item => item.id !== id))
+    }
   }
 
-  const deleteServiceItem = (id) => {
-    setServiceItems(serviceItems.filter(item => item.id !== id))
+  const deleteServiceItem = async (id, priceQuotationItemId) => {
+    // Nếu có priceQuotationItemId, gọi API để xóa
+    if (priceQuotationItemId) {
+      try {
+        const { data, error } = await priceQuotationAPI.deleteItem(priceQuotationItemId)
+        if (error) {
+          message.error(error || 'Không thể xóa mục báo giá')
+          return
+        }
+        message.success('Đã xóa mục báo giá thành công')
+        // Refresh data sau khi xóa
+        await fetchTicketDetail()
+      } catch (err) {
+        console.error('Error deleting quotation item:', err)
+        message.error('Đã xảy ra lỗi khi xóa mục báo giá')
+      }
+    } else {
+      // Nếu không có priceQuotationItemId, chỉ xóa khỏi state (item mới chưa lưu)
+      setServiceItems(serviceItems.filter(item => item.id !== id))
+    }
   }
 
   const handleCreateQuote = async () => {
@@ -844,7 +889,9 @@ export default function TicketDetailPage() {
 
   const setQuotationDraft = async () => {
     const quotationId = getQuotationId()
-    if (!quotationId) return
+    if (!quotationId) {
+      throw new Error('Không tìm thấy ID báo giá')
+    }
     try {
       const { data: response, error } = await priceQuotationAPI.setDraft(quotationId)
       if (error) throw new Error(error)
@@ -862,6 +909,7 @@ export default function TicketDetailPage() {
       return response
     } catch (err) {
       console.error('Không thể chuyển báo giá về nháp:', err)
+      throw err // Re-throw để caller có thể xử lý
     }
   }
 
@@ -872,6 +920,24 @@ export default function TicketDetailPage() {
     if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
       await setQuotationDraft()
       setIsEditMode(true)
+      return
+    }
+    
+    // Nếu đang chờ kho duyệt và có item bị từ chối, chuyển về nháp
+    if (isWaitingWarehouse && hasRejectedItem) {
+      console.log('Calling setQuotationDraft API - hasRejectedItem:', hasRejectedItem)
+      setActionLoading(true)
+      try {
+        const result = await setQuotationDraft()
+        console.log('setQuotationDraft result:', result)
+        message.success('Đã chuyển báo giá về nháp')
+        await fetchTicketDetail() // Refresh data để cập nhật UI
+      } catch (err) {
+        console.error('Error in setQuotationDraft:', err)
+        message.error(err?.message || 'Không thể chuyển báo giá về nháp')
+      } finally {
+        setActionLoading(false)
+      }
       return
     }
     
@@ -1277,9 +1343,11 @@ export default function TicketDetailPage() {
             }}
             isPartSelect
           />
-          <div className="td-error-placeholder">
-            {errors[`replace_${record.id}_category`] || ''}
-          </div>
+          {errors[`replace_${record.id}_category`] && (
+            <div className="td-error-placeholder">
+              {errors[`replace_${record.id}_category`]}
+            </div>
+          )}
         </div>
       )
     },
@@ -1288,25 +1356,39 @@ export default function TicketDetailPage() {
       key: 'quantity',
       width: 120,
       align: 'center',
-      render: (_, record) => (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <input
-            type="number"
-            min={1}
-            value={record.quantity ?? 1}
-            onChange={(e) =>
-              updateReplaceItem(record.id, {
-                quantity: Number(e.target.value) || 1
-              })
-            }
-            style={baseInputStyle}
-            onFocus={handleInputFocus}
-            onBlur={handleInputBlur}
-            disabled={inputsDisabled}
-          />
-          <div className="td-error-placeholder" />
-        </div>
-      )
+      render: (_, record) => {
+        // Lấy quantity của part (availableQuantity)
+        const partQuantity = record.availableQuantity != null ? Number(record.availableQuantity) : null
+        // Lấy số lượng hiện tại
+        const currentQuantity = Number(record.quantity) || 0
+        // Kiểm tra nếu số lượng hiện tại lớn hơn quantity của part
+        const isOutOfStock = partQuantity != null && 
+                             Number.isFinite(partQuantity) && 
+                             currentQuantity > partQuantity
+        
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <input
+              type="number"
+              min={1}
+              value={record.quantity ?? 1}
+              onChange={(e) =>
+                updateReplaceItem(record.id, {
+                  quantity: Number(e.target.value) || 1
+                })
+              }
+              style={{
+                ...baseInputStyle,
+                borderColor: isOutOfStock ? '#ef4444' : baseInputStyle.borderColor,
+                borderWidth: isOutOfStock ? '2px' : baseInputStyle.borderWidth || '1px'
+              }}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              disabled={inputsDisabled}
+            />
+          </div>
+        )
+      }
     },
     {
       title: 'Đơn vị',
@@ -1366,9 +1448,11 @@ export default function TicketDetailPage() {
               })
             }}
           />
-          <div className="td-error-placeholder">
-            {errors[`replace_${record.id}_unit`] || ''}
-          </div>
+          {errors[`replace_${record.id}_unit`] && (
+            <div className="td-error-placeholder">
+              {errors[`replace_${record.id}_unit`]}
+            </div>
+          )}
         </div>
       )
     },
@@ -1402,9 +1486,11 @@ export default function TicketDetailPage() {
             onBlur={handleInputBlur}
             disabled={inputsDisabled || record.unitPriceLocked}
           />
-          <div className="td-error-placeholder">
-            {errors[`replace_${record.id}_unitPrice`] || ''}
-          </div>
+          {errors[`replace_${record.id}_unitPrice`] && (
+            <div className="td-error-placeholder">
+              {errors[`replace_${record.id}_unitPrice`]}
+            </div>
+          )}
         </div>
       )
     },
@@ -1418,7 +1504,6 @@ export default function TicketDetailPage() {
           <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
             {record.total ? record.total.toLocaleString('vi-VN') : '--'}
           </span>
-          <div className="td-error-placeholder" />
         </div>
       )
     },
@@ -1454,14 +1539,28 @@ export default function TicketDetailPage() {
               })()}
             </span>
             {!isHistoryPage && !inputsDisabled && (
-              <DeleteOutlined
-                style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                onClick={() => deleteReplaceItem(record.id)}
-                title="Xóa dòng"
-              />
+              record.priceQuotationItemId ? (
+                <Popconfirm
+                  title="Xóa mục báo giá"
+                  description="Bạn có chắc chắn muốn xóa mục này?"
+                  onConfirm={() => deleteReplaceItem(record.id, record.priceQuotationItemId)}
+                  okText="Xác nhận"
+                  cancelText="Hủy"
+                >
+                  <DeleteOutlined
+                    style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                    title="Xóa dòng"
+                  />
+                </Popconfirm>
+              ) : (
+                <DeleteOutlined
+                  style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                  onClick={() => deleteReplaceItem(record.id, null)}
+                  title="Xóa dòng"
+                />
+              )
             )}
           </div>
-          <div className="td-error-placeholder" />
         </div>
       )
     }
@@ -1495,9 +1594,11 @@ export default function TicketDetailPage() {
             onBlur={handleInputBlur}
             disabled={inputsDisabled}
           />
-          <div className="td-error-placeholder">
-            {errors[`service_${record.id}_task`] || ''}
-          </div>
+          {errors[`service_${record.id}_task`] && (
+            <div className="td-error-placeholder">
+              {errors[`service_${record.id}_task`]}
+            </div>
+          )}
         </div>
       )
     },
@@ -1530,9 +1631,11 @@ export default function TicketDetailPage() {
             onBlur={handleInputBlur}
             disabled={inputsDisabled}
           />
-          <div className="td-error-placeholder">
-            {errors[`service_${record.id}_unitPrice`] || ''}
-          </div>
+          {errors[`service_${record.id}_unitPrice`] && (
+            <div className="td-error-placeholder">
+              {errors[`service_${record.id}_unitPrice`]}
+            </div>
+          )}
         </div>
       )
     },
@@ -1546,7 +1649,6 @@ export default function TicketDetailPage() {
           <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
             {record.total ? record.total.toLocaleString('vi-VN') : '--'}
           </span>
-          <div className="td-error-placeholder" />
         </div>
       )
     },
@@ -1558,10 +1660,24 @@ export default function TicketDetailPage() {
       render: (_, record) => (
         <Space>
           {!inputsDisabled && (
-            <DeleteOutlined
-              style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
-              onClick={() => deleteServiceItem(record.id)}
-            />
+            record.priceQuotationItemId ? (
+              <Popconfirm
+                title="Xóa mục báo giá"
+                description="Bạn có chắc chắn muốn xóa mục này?"
+                onConfirm={() => deleteServiceItem(record.id, record.priceQuotationItemId)}
+                okText="Xác nhận"
+                cancelText="Hủy"
+              >
+                <DeleteOutlined
+                  style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
+                />
+              </Popconfirm>
+            ) : (
+              <DeleteOutlined
+                style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
+                onClick={() => deleteServiceItem(record.id, null)}
+              />
+            )
           )}
         </Space>
       )
@@ -1794,11 +1910,6 @@ export default function TicketDetailPage() {
                 tableLayout="fixed"
                 components={goldTableHeader}
                 locale={{ emptyText: ' ' }}
-                rowClassName={(record) => {
-                  const avail = Number(record.availableQuantity)
-                  const qty = Number(record.quantity) || 0
-                  return Number.isFinite(avail) && qty > avail ? 'row-out-of-stock' : ''
-                }}
                 footer={() =>
                   !isHistoryPage && !inputsDisabled && (
                     <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
@@ -1894,23 +2005,35 @@ export default function TicketDetailPage() {
                   {normalizedQuotationStatus !== 'WAITING_CUSTOMER_CONFIRM' && (
                     <Button 
                             onClick={handleSendQuote}
-                    disabled={
-                      actionLoading ||
-                        isWaitingWarehouse ||
-                        ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode 
-                          ? false  
-                          : ((isWarehouseConfirmed || isCustomerConfirmed) && isEditMode
-                              ? (replaceItems.length === 0 && serviceItems.length === 0)  
-                              : inputsDisabled))  
-                    }
+                    disabled={(() => {
+                      // Nếu đang loading thì disable
+                      if (actionLoading) return true
+                      
+                      // Nếu đang chờ kho duyệt
+                      if (isWaitingWarehouse) {
+                        // Chỉ enable nếu có item bị từ chối
+                        return !hasRejectedItem
+                      }
+                      
+                      // Các trường hợp khác
+                      if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
+                        return false
+                      }
+                      
+                      if ((isWarehouseConfirmed || isCustomerConfirmed) && isEditMode) {
+                        return replaceItems.length === 0 && serviceItems.length === 0
+                      }
+                      
+                      return inputsDisabled
+                    })()}
                     loading={actionLoading}
                     style={{
-                        background: isWaitingWarehouse
+                        background: (isWaitingWarehouse && !hasRejectedItem)
                           ? '#9ca3af'
                           : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
                             ? '#CBB081'
                             : '#22c55e',
-                        borderColor: isWaitingWarehouse
+                        borderColor: (isWaitingWarehouse && !hasRejectedItem)
                           ? '#9ca3af'
                           : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
                             ? '#CBB081'
@@ -1919,7 +2042,7 @@ export default function TicketDetailPage() {
                       fontWeight: 600,
                       padding: '0 24px',
                         height: '40px',
-                        cursor: isWaitingWarehouse ? 'not-allowed' : 'pointer'
+                        cursor: (isWaitingWarehouse && !hasRejectedItem) ? 'not-allowed' : 'pointer'
                     }}
                     >
                       {actionButtonLabel}

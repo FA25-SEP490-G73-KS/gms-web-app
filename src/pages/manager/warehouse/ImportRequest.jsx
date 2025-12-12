@@ -10,17 +10,10 @@ import dayjs from 'dayjs'
 const { Search } = Input
 const { RangePicker } = DatePicker
 
-const STATUS_FILTERS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'pending', label: 'Chờ duyệt' },
-  { key: 'approved', label: 'Đã duyệt' },
-  { key: 'rejected', label: 'Từ chối' }
-]
 
 export default function ManagerImportRequest() {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [page, setPage] = useState(1)
@@ -33,54 +26,6 @@ export default function ManagerImportRequest() {
     statuses: [],
     dateRange: null
   })
-
-  // Mock data
-  const mockData = [
-    {
-      id: 1,
-      code: 'MH-000001',
-      type: 'Theo báo giá',
-      customerName: 'Nguyễn Văn A',
-      customerPhone: '0123456789',
-      quoteCode: 'BG-10000',
-      totalAmount: 100000,
-      createdAt: '2025-11-10T10:50:00',
-      status: 'Đã duyệt'
-    },
-    {
-      id: 2,
-      code: 'MH-000002',
-      type: 'Theo báo giá',
-      customerName: 'Nguyễn Văn A',
-      customerPhone: '0123456789',
-      quoteCode: 'BG-10000',
-      totalAmount: 100000,
-      createdAt: '2025-11-10T10:50:00',
-      status: 'Đã duyệt'
-    },
-    {
-      id: 3,
-      code: 'MH-000003',
-      type: 'Theo báo giá',
-      customerName: 'Nguyễn Văn A',
-      customerPhone: '0123456789',
-      quoteCode: 'BG-10000',
-      totalAmount: 100000,
-      createdAt: '2025-11-10T10:50:00',
-      status: 'Chờ nhập'
-    },
-    {
-      id: 4,
-      code: 'MH-000004',
-      type: 'Theo báo giá',
-      customerName: 'Nguyễn Văn A',
-      customerPhone: '0123456789',
-      quoteCode: 'BG-10000',
-      totalAmount: 100000,
-      createdAt: '2025-11-10T10:50:00',
-      status: 'Từ chối'
-    }
-  ]
 
   useEffect(() => {
     fetchData()
@@ -113,43 +58,36 @@ export default function ManagerImportRequest() {
       const { data: response, error } = await purchaseRequestAPI.getAll(page - 1, pageSize, queryString)
       
       if (error) {
-        console.log('API error, using mock data:', error)
-        // Use mock data if API fails
-        setData(mockData)
-        setTotal(mockData.length)
+        console.error('API error:', error)
+        message.error(error || 'Không thể tải danh sách yêu cầu mua hàng')
+        setData([])
+        setTotal(0)
         return
       }
 
       const result = response?.result || {}
       const content = result.content || []
       
-      if (content.length === 0) {
-        console.log('No data from API, using mock data')
-        // Use mock data if response is empty
-        setData(mockData)
-        setTotal(mockData.length)
-      } else {
-        // Map API response to UI structure
-        const mappedData = content.map(item => ({
-          id: item.id || 0,
-          code: item.code || 'N/A',
-          type: 'Từ báo giá', // Default type since API doesn't provide this
-          customerName: 'N/A', // API doesn't provide customer info
-          customerPhone: 'N/A', // API doesn't provide customer info
-          quoteCode: item.quotationCode || 'N/A',
-          totalAmount: item.totalEstimatedAmount || 0,
-          createdAt: item.createdAt || new Date().toISOString(),
-          status: item.reviewStatus || 'Chờ duyệt'
-        }))
-        
-        setData(mappedData)
-        setTotal(result.totalElements || content.length)
-      }
+      // Map API response to UI structure
+      const mappedData = content.map(item => ({
+        id: item.id || 0,
+        code: item.code || 'N/A',
+        type: 'Từ báo giá', // Default type since API doesn't provide this
+        customerName: 'N/A', // API doesn't provide customer info
+        customerPhone: 'N/A', // API doesn't provide customer info
+        quoteCode: item.quotationCode || 'N/A',
+        totalAmount: item.totalEstimatedAmount || 0,
+        createdAt: item.createdAt || new Date().toISOString(),
+        status: item.reviewStatus || 'Chờ duyệt'
+      }))
+      
+      setData(mappedData)
+      setTotal(result.totalElements || content.length)
     } catch (err) {
       console.error('Failed to fetch import requests:', err)
-      // Use mock data on error
-      setData(mockData)
-      setTotal(mockData.length)
+      message.error('Không thể tải danh sách yêu cầu mua hàng')
+      setData([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
@@ -203,12 +141,7 @@ export default function ManagerImportRequest() {
       item.customerPhone.includes(searchTerm) ||
       item.quoteCode.toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesStatus = statusFilter === 'all' || 
-      (statusFilter === 'approved' && item.status === 'Đã duyệt') ||
-      (statusFilter === 'pending' && (item.status === 'Chờ nhập' || item.status === 'Chờ duyệt')) ||
-      (statusFilter === 'rejected' && item.status === 'Từ chối')
-    
-    return matchesSearch && matchesStatus
+    return matchesSearch
   })
 
   const columns = [
@@ -338,25 +271,8 @@ export default function ManagerImportRequest() {
               prefix={<SearchOutlined />}
             />
             
-            {/* Right side - Filter buttons */}
+            {/* Right side - Filter button */}
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              {STATUS_FILTERS.map((filter) => (
-                <Button
-                  key={filter.key}
-                  type={statusFilter === filter.key ? 'primary' : 'default'}
-                  onClick={() => setStatusFilter(filter.key)}
-                  style={{
-                    background: statusFilter === filter.key ? '#CBB081' : '#fff',
-                    borderColor: statusFilter === filter.key ? '#CBB081' : '#d9d9d9',
-                    color: statusFilter === filter.key ? '#fff' : '#666',
-                    fontWeight: 500,
-                    borderRadius: 6
-                  }}
-                >
-                  {filter.label}
-                </Button>
-              ))}
-              
               <Button
                 icon={<FilterOutlined />}
                 onClick={() => setFilterModalVisible(true)}
@@ -366,7 +282,7 @@ export default function ManagerImportRequest() {
                   fontWeight: 500
                 }}
               >
-        
+                Bộ lọc
               </Button>
             </div>
           </div>

@@ -169,6 +169,8 @@ export const serviceTicketAPI = {
 
 export const serviceTypeAPI = {
   getAll: () => get("/services"),
+  create: (payload) => post("/services", payload),
+  delete: (id) => del(`/services/${id}`),
 };
 
 export const inventoryAPI = {
@@ -275,7 +277,7 @@ export const vehiclesAPI = {
 
 export const priceQuotationAPI = {
   create: (ticketId) => post(`/price-quotations?ticketId=${ticketId}`),
-  update: (id, payload) => patch(`/price-quotations/${id}`, payload),
+  update: (id, payload) => put(`/price-quotations/${id}`, payload),
   updateStatus: (id, status) =>
     patch(`/price-quotations/${id}/status`, { status }),
   setDraft: (id) => patch(`/price-quotations/${id}/draft`),
@@ -293,6 +295,7 @@ export const priceQuotationAPI = {
     post(`/quotation-items/${itemId}/confirm/create`, payload),
   rejectItem: (itemId, reason) =>
     patch(`/quotation-items/${itemId}/reject`, reason),
+  deleteItem: (itemId) => del(`/quotation-items/${itemId}`),
   confirmQuotation: (id) => post(`/price-quotations/${id}/confirm`),
   rejectQuotation: (id, reason) =>
     post(`/price-quotations/${id}/reject`, reason),
@@ -425,8 +428,9 @@ export const suppliersAPI = {
   getAll: (page = 0, size = 6) => get(`/suppliers?page=${page}&size=${size}`),
   getById: (id) => get(`/suppliers/${id}`),
   create: (payload) => post("/suppliers", payload),
-  update: (id, payload) => put(`/suppliers/${id}`, payload),
+  update: (id, payload) => patch(`/suppliers/${id}`, payload),
   remove: (id) => del(`/suppliers/${id}`),
+  toggleActive: (id) => patch(`/suppliers/${id}/toggle-active`),
 };
 
 export const customersAPI = {
@@ -488,15 +492,18 @@ export const ledgerVoucherAPI = {
 };
 
 export const attendanceAPI = {
-  mark: (data) => post("/attendances/mark", data),
+  mark: (data) => put("/attendances/mark", data),
   getDaily: (date) => get(`/attendances/daily?date=${date}`),
   getSummary: (startDate, endDate) =>
     get(`/attendances/summary?startDate=${startDate}&endDate=${endDate}`),
 };
 
 export const payrollAPI = {
+  checkExists: (month, year) =>
+    get(`/payroll/check-exists?month=${month}&year=${year}`),
   getPreview: (month, year) =>
     get(`/payroll/preview?month=${month}&year=${year}`),
+  getList: (month, year) => get(`/payroll/list?month=${month}&year=${year}`),
   getDetail: (employeeId, month, year) =>
     get(`/payroll/detail?employeeId=${employeeId}&month=${month}&year=${year}`),
   getSummary: (month, year) =>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Button, Card, Input, Space, message } from 'antd'
+import { Button, Card, Input, Space, message, Modal, Form } from 'antd'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { serviceTypeAPI } from '../../../services/api'
 
@@ -7,6 +7,9 @@ export default function ManagerServiceTypes() {
   const [types, setTypes] = useState([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [form] = Form.useForm()
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     const fetchTypes = async () => {
@@ -36,6 +39,60 @@ export default function ManagerServiceTypes() {
     const text = search.toLowerCase()
     return types.filter((type) => type.name.toLowerCase().includes(text))
   }, [search, types])
+
+  const handleAddServiceType = async (values) => {
+    setSubmitting(true)
+    try {
+      const { data, error } = await serviceTypeAPI.create({ name: values.name })
+      if (error) throw new Error(error)
+      
+      message.success('Thêm loại dịch vụ thành công!')
+      setShowAddModal(false)
+      form.resetFields()
+      
+      // Refresh the list
+      const { data: refreshData, error: refreshError } = await serviceTypeAPI.getAll()
+      if (!refreshError) {
+        const payload = refreshData?.result || refreshData?.data || refreshData
+        const list = Array.isArray(payload) ? payload : payload?.items || []
+        setTypes(list.map((item, idx) => ({ id: item.id || `type-${idx}`, name: item.name || 'Không rõ' })))
+      }
+    } catch (err) {
+      message.error(err.message || 'Không thể thêm loại dịch vụ')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteServiceType = (id, name) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa',
+      content: `Bạn có chắc chắn muốn xóa loại dịch vụ "${name}"?`,
+      okText: 'Xác nhận',
+      cancelText: 'Hủy',
+      okButtonProps: {
+        danger: true
+      },
+      onOk: async () => {
+        try {
+          const { error } = await serviceTypeAPI.delete(id)
+          if (error) throw new Error(error)
+          
+          message.success('Xóa loại dịch vụ thành công!')
+          
+          // Refresh the list
+          const { data: refreshData, error: refreshError } = await serviceTypeAPI.getAll()
+          if (!refreshError) {
+            const payload = refreshData?.result || refreshData?.data || refreshData
+            const list = Array.isArray(payload) ? payload : payload?.items || []
+            setTypes(list.map((item, idx) => ({ id: item.id || `type-${idx}`, name: item.name || 'Không rõ' })))
+          }
+        } catch (err) {
+          message.error(err.message || 'Không thể xóa loại dịch vụ')
+        }
+      }
+    })
+  }
 
   return (
     <ManagerLayout>
@@ -73,7 +130,11 @@ export default function ManagerServiceTypes() {
             />
             <Space>
               <Button> Sắp xếp A-Z </Button>
-              <Button type="primary" style={{ background: '#CBB081', borderColor: '#CBB081' }}>
+              <Button 
+                type="primary" 
+                style={{ background: '#CBB081', borderColor: '#CBB081' }}
+                onClick={() => setShowAddModal(true)}
+              >
                 + Thêm loại dịch vụ
               </Button>
             </Space>
@@ -93,15 +154,64 @@ export default function ManagerServiceTypes() {
                 bodyStyle={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
                 <span style={{ fontSize: 18, fontWeight: 600 }}>{type.name}</span>
-                <Space>
-                  <Button type="text" icon={<i className="bi bi-pencil" />} />
-                  <Button type="text" danger icon={<i className="bi bi-trash" />} />
-                </Space>
+                <Button 
+                  type="text" 
+                  danger 
+                  icon={<i className="bi bi-trash" />}
+                  onClick={() => handleDeleteServiceType(type.id, type.name)}
+                />
               </Card>
             ))}
           </Space>
         </div>
       </div>
+
+      {/* Add Service Type Modal */}
+      <Modal
+        title="Thêm loại dịch vụ"
+        open={showAddModal}
+        onCancel={() => {
+          setShowAddModal(false)
+          form.resetFields()
+        }}
+        footer={null}
+        width={500}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleAddServiceType}
+        >
+          <Form.Item
+            label="Tên loại dịch vụ"
+            name="name"
+            rules={[{ required: true, message: 'Vui lòng nhập tên loại dịch vụ' }]}
+          >
+            <Input 
+              placeholder="VD: Bảo dưỡng"
+              style={{ height: 40 }}
+            />
+          </Form.Item>
+          <Form.Item style={{ marginBottom: 0, marginTop: 24 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <Button onClick={() => {
+                setShowAddModal(false)
+                form.resetFields()
+              }}>
+                Hủy
+              </Button>
+              <Button 
+                type="primary" 
+                htmlType="submit"
+                loading={submitting}
+                style={{ background: '#CBB081', borderColor: '#CBB081' }}
+              >
+                Lưu
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
+      </Modal>
     </ManagerLayout>
   )
 }

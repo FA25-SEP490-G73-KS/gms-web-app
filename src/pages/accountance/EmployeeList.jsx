@@ -128,7 +128,20 @@ const formatEmployee = (employee, index) => {
     department: employee.department || employee.departmentName || '—',
     position: employee.position || employee.jobTitle || '—',
     joinDate,
-    status: (employee.status || 'active').toLowerCase(),
+    status: (() => {
+      // Handle boolean status
+      if (employee.active !== undefined) {
+        return employee.active ? 'đang hoạt động' : 'nghỉ làm'
+      }
+      if (employee.status !== undefined) {
+        if (typeof employee.status === 'boolean') {
+          return employee.status ? 'đang hoạt động' : 'nghỉ làm'
+        }
+        // Handle string status
+        return String(employee.status || 'active').toLowerCase()
+      }
+      return 'active'
+    })(),
     avatar: employee.avatarUrl || employee.avatar || undefined
   }
 }

@@ -304,6 +304,10 @@ export default function ExportList() {
       
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
+          {/* Heading */}
+          <h1 style={{ margin: 0, marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+            Danh sách xuất kho
+          </h1>
 
           <div style={{ 
             display: 'flex', 

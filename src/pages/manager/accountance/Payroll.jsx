@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { Table, Input, Button, Tag, DatePicker, message, Modal, Tabs, Spin, Row, Col, Form, Input as AntInput, Card } from 'antd'
-import { SearchOutlined, FilterOutlined, CloseOutlined } from '@ant-design/icons'
+import { SearchOutlined, CloseOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { goldTableHeader } from '../../../utils/tableComponents'
 import { payrollAPI } from '../../../services/api'
@@ -65,6 +65,51 @@ export default function PayrollForManager() {
   const [processing, setProcessing] = useState(false)
   const [approvingAll, setApprovingAll] = useState(false)
 
+  // Helper function to transform payroll data
+  const transformPayrollData = (items) => {
+    return items.map((item) => {
+      // Map status từ API (enum hoặc text tiếng Việt) sang key trong STATUS_CONFIG
+      const rawStatus = String(item.status || '').trim()
+      
+      // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
+      const statusMap = {
+        'Chờ quản lý duyệt': 'pending',
+        'PENDING_MANAGER_APPROVAL': 'pending',
+        'Đã duyệt': 'approved',
+        'Duyệt': 'approved',
+        'APPROVED': 'approved',
+        'Đã thanh toán': 'paid',
+        'Đã chi trả': 'paid',
+        'PAID': 'paid',
+        'Đang làm lương': 'pending'
+      }
+      
+      // Tìm status key: ưu tiên exact match
+      let statusKey = statusMap[rawStatus]
+      
+      // Nếu không tìm thấy exact match, thử case-insensitive
+      if (!statusKey) {
+        const foundKey = Object.keys(statusMap).find(key => 
+          key.toLowerCase() === rawStatus.toLowerCase()
+        )
+        statusKey = foundKey ? statusMap[foundKey] : 'pending'
+      }
+
+      return {
+        id: item.employeeId,
+        name: item.employeeName || 'Không rõ',
+        phone: item.phone || '',
+        baseSalary: item.baseSalary || 0,
+        allowance: item.allowance || 0,
+        deduction: item.deduction || 0,
+        advanceSalary: item.advanceSalary || 0,
+        netSalary: item.netSalary || 0,
+        workingDays: item.workingDays || 0,
+        status: statusKey
+      }
+    })
+  }
+
   // Memoize fetchPayrollData to prevent re-creation on every render
   const fetchPayrollData = useCallback(async () => {
     try {
@@ -72,85 +117,86 @@ export default function PayrollForManager() {
       const month = selectedDate.month() + 1 // dayjs month is 0-based, API expects 1-based
       const year = selectedDate.year()
 
-      console.log('=== Fetching Payroll Preview ===')
+      console.log('=== Checking Payroll Exists ===')
       console.log('Month:', month)
       console.log('Year:', year)
       console.log('===============================')
 
-      const { data, error } = await payrollAPI.getPreview(month, year)
+      // Bước 1: Kiểm tra payroll có tồn tại không
+      const { data: checkData, error: checkError } = await payrollAPI.checkExists(month, year)
 
-      if (error) {
-        console.error('=== Payroll API Error ===')
-        console.error('Error:', error)
-        console.error('Error message:', error?.message || error)
-        console.error('========================')
-        
-        // Check for specific backend errors
-        const errorMessage = error?.message || error || ''
-        const errorString = typeof error === 'string' ? error : JSON.stringify(error)
-        
-        if (errorString.includes('getDailySalary') || errorString.includes('null')) {
-          message.error('Một số nhân viên chưa có thông tin lương cơ bản. Vui lòng kiểm tra lại dữ liệu nhân viên.')
-        } else {
-          message.error(errorMessage || 'Không thể tải dữ liệu lương')
-        }
-        
+      if (checkError) {
+        console.error('=== Check Exists API Error ===')
+        console.error('Error:', checkError)
+        message.error(checkError?.message || checkError || 'Không thể kiểm tra payroll')
         setPayrollData([])
         return
       }
 
-      console.log('API Response:', data)
+      const isExists = checkData?.result?.isExists === true
+      console.log('Payroll exists:', isExists)
 
-      if (data && data.result && data.result.items) {
-        // Transform API response to match table format
-        const transformedData = data.result.items.map((item) => {
-          // Map status từ API (enum hoặc text tiếng Việt) sang key trong STATUS_CONFIG
-          const rawStatus = String(item.status || '').trim()
+      let payrollResponse
+
+      if (isExists) {
+        // Nếu tồn tại, gọi API getList
+        console.log('=== Fetching Payroll List (exists) ===')
+        const { data, error } = await payrollAPI.getList(month, year)
+
+        if (error) {
+          console.error('=== Payroll List API Error ===')
+          console.error('Error:', error)
+          message.error(error?.message || error || 'Không thể tải danh sách lương')
+          setPayrollData([])
+          return
+        }
+
+        payrollResponse = data
+      } else {
+        // Nếu không tồn tại, gọi API getPreview (API hiện tại)
+        console.log('=== Fetching Payroll Preview (not exists) ===')
+        const { data, error } = await payrollAPI.getPreview(month, year)
+
+        if (error) {
+          console.error('=== Payroll Preview API Error ===')
+          console.error('Error:', error)
           
-          // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
-          const statusMap = {
-            'Chờ quản lý duyệt': 'pending',
-            'PENDING_MANAGER_APPROVAL': 'pending',
-            'Đã duyệt': 'approved',
-            'Duyệt': 'approved',
-            'APPROVED': 'approved',
-            'Đã thanh toán': 'paid',
-            'Đã chi trả': 'paid',
-            'PAID': 'paid'
+          // Check for specific backend errors
+          const errorMessage = error?.message || error || ''
+          const errorString = typeof error === 'string' ? error : JSON.stringify(error)
+          
+          if (errorString.includes('getDailySalary') || errorString.includes('null')) {
+            message.error('Một số nhân viên chưa có thông tin lương cơ bản. Vui lòng kiểm tra lại dữ liệu nhân viên.')
+          } else {
+            message.error(errorMessage || 'Không thể tải dữ liệu lương')
           }
           
-          // Tìm status key: ưu tiên exact match
-          let statusKey = statusMap[rawStatus]
-          
-          // Nếu không tìm thấy exact match, thử case-insensitive
-          if (!statusKey) {
-            const foundKey = Object.keys(statusMap).find(key => 
-              key.toLowerCase() === rawStatus.toLowerCase()
-            )
-            statusKey = foundKey ? statusMap[foundKey] : 'pending'
-          }
+          setPayrollData([])
+          return
+        }
 
-          // Debug log để kiểm tra
-          console.log('Mapping status (Manager):', { 
-            rawStatus, 
-            statusKey, 
-            itemStatus: item.status 
-          })
+        payrollResponse = data
+      }
 
-          return {
-            id: item.employeeId,
-            name: item.employeeName || 'Không rõ',
-            phone: item.phone || '',
-            baseSalary: item.baseSalary || 0,
-            allowance: item.allowance || 0,
-            deduction: item.deduction || 0,
-            advanceSalary: item.advanceSalary || 0,
-            netSalary: item.netSalary || 0,
-            workingDays: item.workingDays || 0,
-            status: statusKey
-          }
-        })
+      console.log('API Response:', payrollResponse)
 
+      // Xử lý response từ cả 2 API
+      let items = []
+      
+      if (isExists) {
+        // API getList trả về result là array trực tiếp
+        if (payrollResponse && payrollResponse.result && Array.isArray(payrollResponse.result)) {
+          items = payrollResponse.result
+        }
+      } else {
+        // API getPreview trả về result.items
+        if (payrollResponse && payrollResponse.result && payrollResponse.result.items) {
+          items = payrollResponse.result.items
+        }
+      }
+
+      if (items.length > 0) {
+        const transformedData = transformPayrollData(items)
         console.log('Transformed data:', transformedData.length, 'employees')
         setPayrollData(transformedData)
       } else {
@@ -163,18 +209,8 @@ export default function PayrollForManager() {
       console.error('Error message:', err?.message || err)
       console.error('==================================')
       
-      // Check for specific backend errors
       const errorMessage = err?.message || err?.response?.data?.message || ''
-      const errorString = typeof err === 'string' ? err : JSON.stringify(err)
-      
-      if (errorString.includes('getDailySalary') || errorString.includes('null') || errorMessage.includes('getDailySalary')) {
-        message.error('Một số nhân viên chưa có thông tin lương cơ bản. Vui lòng kiểm tra lại dữ liệu nhân viên.')
-      } else if (err?.response?.status === 500) {
-        message.error('Lỗi server khi tính toán lương. Vui lòng thử lại sau.')
-      } else {
-        message.error(errorMessage || 'Đã xảy ra lỗi khi tải dữ liệu lương')
-      }
-      
+      message.error(errorMessage || 'Đã xảy ra lỗi khi tải dữ liệu lương')
       setPayrollData([])
     } finally {
       setLoading(false)
@@ -529,35 +565,33 @@ export default function PayrollForManager() {
             <p style={{ color: '#98a2b3', margin: 0 }}>Theo dõi các khoản lương và trạng thái chi trả</p>
           </div>
 
-          <div className="payroll-filters" style={{ gap: 16 }}>
-            <PayrollDatePicker
-              value={selectedDate}
-              onChange={handleDateChange}
+          <div className="payroll-filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <Input
+              prefix={<SearchOutlined />}
+              placeholder="Tìm kiếm"
+              allowClear
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="payroll-search"
+              style={{ width: 300 }}
             />
-            <div className="status-filters">
-              {statusFilters.map((item) => (
-                <Button
-                  key={item.key}
-                  type={status === item.key ? 'primary' : 'default'}
-                  onClick={() => setStatus(item.key)}
-                  className={status === item.key ? 'status-btn active' : 'status-btn'}
-                >
-                  {item.label}
-                </Button>
-              ))}
-            </div>
-            <div className="payroll-actions">
-              <Input
-                prefix={<SearchOutlined />}
-                placeholder="Tìm kiếm"
-                allowClear
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="payroll-search"
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div className="status-filters">
+                {statusFilters.map((item) => (
+                  <Button
+                    key={item.key}
+                    type={status === item.key ? 'primary' : 'default'}
+                    onClick={() => setStatus(item.key)}
+                    className={status === item.key ? 'status-btn active' : 'status-btn'}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </div>
+              <PayrollDatePicker
+                value={selectedDate}
+                onChange={handleDateChange}
               />
-              <Button icon={<FilterOutlined />} className="sort-btn">
-                Sort
-              </Button>
             </div>
           </div>
 

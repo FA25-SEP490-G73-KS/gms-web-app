@@ -202,25 +202,25 @@ export default function ManagerSuppliers() {
               Sửa
             </Button>
             <Popconfirm
-              title="Xóa nhà cung cấp?"
-              description="Hệ thống sẽ vô hiệu hóa nhà cung cấp này."
-              okText="Xóa"
+              title={record.isActive ? "Vô hiệu hóa nhà cung cấp?" : "Kích hoạt nhà cung cấp?"}
+              description={record.isActive ? "Hệ thống sẽ vô hiệu hóa nhà cung cấp này." : "Hệ thống sẽ kích hoạt nhà cung cấp này."}
+              okText={record.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
               cancelText="Hủy"
               onConfirm={async () => {
                 try {
-                  const { error } = await suppliersAPI.remove(record.id)
+                  const { error } = await suppliersAPI.toggleActive(record.id)
                   if (error) {
                     throw new Error(error)
                   }
-                  message.success('Đã xóa nhà cung cấp')
+                  message.success(record.isActive ? 'Đã vô hiệu hóa nhà cung cấp' : 'Đã kích hoạt nhà cung cấp')
                   fetchSuppliers(page - 1, pageSize)
                 } catch (err) {
-                  message.error(err.message || 'Không thể xóa nhà cung cấp')
+                  message.error(err.message || (record.isActive ? 'Không thể vô hiệu hóa nhà cung cấp' : 'Không thể kích hoạt nhà cung cấp'))
                 }
               }}
             >
-              <Button type="link" danger>
-                Xóa
+              <Button type="link" danger={record.isActive}>
+                {record.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}
               </Button>
             </Popconfirm>
           </Space>
@@ -236,16 +236,41 @@ export default function ManagerSuppliers() {
             <i className="bi bi-truck" style={{ marginRight: '8px', fontSize: '20px' }} />
             <h1>Nhà cung cấp</h1>
           </div>
-          <div className="suppliers-actions">
-            <Input
-              prefix={<SearchOutlined />}
-              placeholder="Tìm kiếm"
-              allowClear
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="suppliers-search"
-              style={{ width: 300 }}
-            />
+        </div>
+
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: 24,
+          gap: 16
+        }}>
+          <Input
+            prefix={<SearchOutlined />}
+            placeholder="Tìm kiếm"
+            allowClear
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="suppliers-search"
+            style={{ width: 300 }}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Space>
+              {statusFilters.map((filter) => (
+                <Button
+                  key={filter.key}
+                  type={status === filter.key ? 'primary' : 'default'}
+                  onClick={() => setStatus(filter.key)}
+                  className={status === filter.key ? 'status-btn active' : 'status-btn'}
+                  style={{
+                    borderRadius: '8px',
+                    fontWeight: 600
+                  }}
+                >
+                  {filter.label}
+                </Button>
+              ))}
+            </Space>
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -261,25 +286,6 @@ export default function ManagerSuppliers() {
               Thêm nhà cung cấp
             </Button>
           </div>
-        </div>
-
-        <div className="suppliers-filters">
-          <Space>
-            {statusFilters.map((filter) => (
-              <Button
-                key={filter.key}
-                type={status === filter.key ? 'primary' : 'default'}
-                onClick={() => setStatus(filter.key)}
-                className={status === filter.key ? 'status-btn active' : 'status-btn'}
-                style={{
-                  borderRadius: '8px',
-                  fontWeight: 600
-                }}
-              >
-                {filter.label}
-              </Button>
-            ))}
-          </Space>
         </div>
 
         <div className="suppliers-table-card">

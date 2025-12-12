@@ -81,6 +81,53 @@ export function AccountancePayrollContent() {
     fetchPayrollData()
   }, [selectedMonth, page, pageSize])
 
+  // Helper function to transform payroll data
+  const transformPayrollData = (items) => {
+    return items.map((item) => {
+      // Map status từ API (enum hoặc text tiếng Việt) sang key trong STATUS_CONFIG
+      const rawStatus = String(item.status || '').trim()
+      
+      // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
+      const statusMap = {
+        'Đang làm lương': 'pending',
+        'PENDING': 'pending',
+        'Chờ quản lý duyệt': 'pending_manager_approval',
+        'PENDING_MANAGER_APPROVAL': 'pending_manager_approval',
+        'Đã duyệt': 'approved',
+        'Duyệt': 'approved',
+        'APPROVED': 'approved',
+        'Đã thanh toán': 'paid',
+        'Đã chi trả': 'paid',
+        'PAID': 'paid'
+      }
+      
+      // Tìm status key: ưu tiên exact match
+      let statusKey = statusMap[rawStatus]
+      
+      // Nếu không tìm thấy exact match, thử case-insensitive
+      if (!statusKey) {
+        const foundKey = Object.keys(statusMap).find(key => 
+          key.toLowerCase() === rawStatus.toLowerCase()
+        )
+        statusKey = foundKey ? statusMap[foundKey] : 'pending_manager_approval'
+      }
+      
+      return {
+        id: item.employeeId,
+        name: item.employeeName || 'Không rõ',
+        phone: item.phone || '',
+        baseSalary: item.baseSalary || 0,
+        allowance: item.allowance || 0,
+        deduction: item.deduction || 0,
+        netSalary: item.netSalary || 0,
+        status: statusKey,
+        employeeId: item.employeeId,
+        workingDays: item.workingDays || 0,
+        advanceSalary: item.advanceSalary || 0
+      }
+    })
+  }
+
   const fetchPayrollData = async () => {
     if (!selectedMonth) return
     
@@ -90,74 +137,88 @@ export function AccountancePayrollContent() {
       const month = parseInt(monthYear[1], 10)
       const year = parseInt(monthYear[0], 10)
 
-      const { data: response, error } = await payrollAPI.getPreview(month, year)
-      
-      if (error) {
-        message.error('Không thể tải danh sách lương')
+      console.log('=== Checking Payroll Exists ===')
+      console.log('Month:', month)
+      console.log('Year:', year)
+      console.log('===============================')
+
+      // Bước 1: Kiểm tra payroll có tồn tại không
+      const { data: checkData, error: checkError } = await payrollAPI.checkExists(month, year)
+
+      if (checkError) {
+        console.error('=== Check Exists API Error ===')
+        console.error('Error:', checkError)
+        message.error(checkError?.message || checkError || 'Không thể kiểm tra payroll')
         setLoading(false)
         return
       }
 
-      const result = response?.result || {}
-      const items = result.items || result.content || (Array.isArray(result) ? result : [])
+      const isExists = checkData?.result?.isExists === true
+      console.log('Payroll exists:', isExists)
+
+      let payrollResponse
+
+      if (isExists) {
+        // Nếu tồn tại, gọi API getList
+        console.log('=== Fetching Payroll List (exists) ===')
+        const { data, error } = await payrollAPI.getList(month, year)
+
+        if (error) {
+          console.error('=== Payroll List API Error ===')
+          console.error('Error:', error)
+          message.error(error?.message || error || 'Không thể tải danh sách lương')
+          setLoading(false)
+          return
+        }
+
+        payrollResponse = data
+      } else {
+        // Nếu không tồn tại, gọi API getPreview
+        console.log('=== Fetching Payroll Preview (not exists) ===')
+        const { data, error } = await payrollAPI.getPreview(month, year)
+
+        if (error) {
+          console.error('=== Payroll Preview API Error ===')
+          console.error('Error:', error)
+          message.error(error?.message || error || 'Không thể tải danh sách lương')
+          setLoading(false)
+          return
+        }
+
+        payrollResponse = data
+      }
+
+      console.log('API Response:', payrollResponse)
+
+      // Xử lý response từ cả 2 API
+      let items = []
       
-      // Transform API data to match UI structure
-      const transformedData = items.map((item) => {
-        // Map status từ API (enum hoặc text tiếng Việt) sang key trong STATUS_CONFIG
-        const rawStatus = String(item.status || '').trim()
-        
-        // Object mapping rõ ràng: status từ API -> key trong STATUS_CONFIG
-        const statusMap = {
-          'Đang làm lương': 'pending',
-          'PENDING': 'pending',
-          'Chờ quản lý duyệt': 'pending_manager_approval',
-          'PENDING_MANAGER_APPROVAL': 'pending_manager_approval',
-          'Đã duyệt': 'approved',
-          'Duyệt': 'approved',
-          'APPROVED': 'approved',
-          'Đã thanh toán': 'paid',
-          'Đã chi trả': 'paid',
-          'PAID': 'paid'
+      if (isExists) {
+        // API getList trả về result là array trực tiếp
+        if (payrollResponse && payrollResponse.result && Array.isArray(payrollResponse.result)) {
+          items = payrollResponse.result
         }
-        
-        // Tìm status key: ưu tiên exact match
-        let statusKey = statusMap[rawStatus]
-        
-        // Nếu không tìm thấy exact match, thử case-insensitive
-        if (!statusKey) {
-          const foundKey = Object.keys(statusMap).find(key => 
-            key.toLowerCase() === rawStatus.toLowerCase()
-          )
-          statusKey = foundKey ? statusMap[foundKey] : 'pending_manager_approval'
-        }
+      } else {
+        // API getPreview trả về result.items hoặc result.content
+        const result = payrollResponse?.result || {}
+        items = result.items || result.content || (Array.isArray(result) ? result : [])
+      }
 
-        // Debug log để kiểm tra
-        console.log('Mapping status:', { 
-          rawStatus, 
-          statusKey, 
-          itemStatus: item.status 
-        })
-        
-        return {
-          id: item.employeeId,
-          name: item.employeeName || 'Không rõ',
-          phone: item.phone || '',
-          baseSalary: item.baseSalary || 0,
-          allowance: item.allowance || 0,
-          deduction: item.deduction || 0,
-          netSalary: item.netSalary || 0,
-          status: statusKey,
-          employeeId: item.employeeId,
-          workingDays: item.workingDays || 0,
-          advanceSalary: item.advanceSalary || 0
-        }
-      })
-
-      setPayrollData(transformedData)
-      setTotal(items.length || 0)
+      if (items.length > 0) {
+        const transformedData = transformPayrollData(items)
+        console.log('Transformed data:', transformedData.length, 'employees')
+        setPayrollData(transformedData)
+        setTotal(items.length || 0)
+      } else {
+        console.warn('No items in API response')
+        setPayrollData([])
+        setTotal(0)
+      }
     } catch (err) {
       console.error('Failed to fetch payroll:', err)
       message.error('Đã xảy ra lỗi khi tải dữ liệu')
+      setPayrollData([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
