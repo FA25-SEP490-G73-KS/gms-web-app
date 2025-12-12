@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react'
-import { Modal, Form, Input, DatePicker, Button, Row, Col, message, Checkbox } from 'antd'
+import { Modal, Form, Input, DatePicker, Button, Row, Col, message } from 'antd'
 import { serviceTicketAPI, vehiclesAPI, serviceTypeAPI, employeesAPI } from '../../../services/api'
 import { normalizePhoneTo84, displayPhoneFrom84 } from '../../../utils/helpers'
 import dayjs from 'dayjs'
+import ReactSelect from 'react-select'
 
 export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }) {
   const [form] = Form.useForm()
@@ -25,6 +26,46 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
   const [currentUserName, setCurrentUserName] = useState('')
   const [selectedBrandId, setSelectedBrandId] = useState(null)
   const [selectedModelId, setSelectedModelId] = useState(null)
+  const [selectedTechs, setSelectedTechs] = useState([])
+  const [selectedServices, setSelectedServices] = useState([])
+
+  const inputHeight = 40
+  
+  const multiSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: inputHeight,
+      borderRadius: 6,
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      transition: 'all 0.15s ease',
+      '&:hover': { borderColor: '#3b82f6' }
+    }),
+    indicatorsContainer: (base) => ({ ...base, paddingRight: 8, gap: 0 }),
+    valueContainer: (base) => ({ ...base, padding: '4px 8px', gap: 4, flexWrap: 'wrap', alignItems: 'center' }),
+    placeholder: (base) => ({ ...base, color: '#9ca3af', fontWeight: 500 }),
+    multiValue: (base) => ({ ...base, borderRadius: 12, backgroundColor: '#e0f2ff', border: '1px solid #bae6fd' }),
+    multiValueLabel: (base) => ({ ...base, color: '#0f172a', fontWeight: 600, padding: '2px 8px', fontSize: 13 }),
+    multiValueRemove: (base) => ({ ...base, color: '#0ea5e9', borderLeft: '1px solid #bae6fd', padding: '2px 6px', ':hover': { backgroundColor: '#bae6fd', color: '#0284c7' } }),
+    menu: (base) => ({ ...base, zIndex: 9999, borderRadius: 12, overflow: 'hidden' }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+    option: (base, state) => ({ ...base, backgroundColor: state.isSelected ? '#dbeafe' : state.isFocused ? '#f8fafc' : 'white', color: '#0f172a', fontWeight: state.isSelected ? 600 : 500 })
+  }
+
+  const techOptionsStable = useMemo(() => technicianOptions, [technicianOptions])
+  const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
+
+  const handleTechChange = (selected) => {
+    const arr = selected || []
+    setSelectedTechs(arr)
+    form.setFieldsValue({ assignedTechnicianIds: arr.map(s => s.value) })
+  }
+
+  const handleServiceChange = (selected) => {
+    const arr = selected || []
+    setSelectedServices(arr)
+    form.setFieldsValue({ serviceTypes: arr.map(s => s.value) })
+  }
 
   useEffect(() => {
     try {
@@ -74,12 +115,32 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       return []
     }
     const list = data?.result || data || []
-    setModels(list)
-    return list
+    const mapped = list.map((model) => ({
+      id: model.vehicleModelId || model.id,
+      name: model.vehicleModelName || model.name
+    }))
+    setModels(mapped)
+    
+    // Nếu có currentModelId trong form, thử match sau khi models được load
+    const currentModelId = form.getFieldValue('modelId')
+    if (currentModelId && mapped.length > 0) {
+      const matchedModel = mapped.find((model) => String(model.id) === String(currentModelId))
+      if (matchedModel) {
+        setSelectedModelId(matchedModel.id)
+        form.setFieldsValue({ modelId: matchedModel.id })
+      }
+    }
+    
+    return mapped
   }
 
   useEffect(() => {
     if (open && ticketId) {
+      // Reset states trước khi fetch
+      setSelectedTechs([])
+      setSelectedServices([])
+      setSelectedBrandId(null)
+      setSelectedModelId(null)
       fetchTicketData()
     } else {
       form.resetFields()
@@ -92,6 +153,8 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       setPendingModelId(null)
       setSelectedBrandId(null)
       setSelectedModelId(null)
+      setSelectedTechs([])
+      setSelectedServices([])
     }
   }, [open, ticketId])
 
@@ -105,7 +168,11 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
         return
       }
       const list = data?.result || data || []
-      setBrands(list)
+      const mapped = list.map((brand) => ({
+        id: brand.brandId || brand.id,
+        name: brand.brandName || brand.name
+      }))
+      setBrands(mapped)
     }
     loadBrands()
   }, [])
@@ -240,6 +307,107 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     }
   }, [pendingModelName, pendingModelId, selectedBrandId, models, form])
 
+  // Sync modelId khi models được load
+  useEffect(() => {
+    const modelIdFromForm = form.getFieldValue('modelId')
+    if (modelIdFromForm && models.length > 0) {
+      const modelIdNum = Number(modelIdFromForm)
+      const modelExists = models.find(m => {
+        const mId = m.id || m.vehicleModelId
+        return mId === modelIdNum || Number(mId) === modelIdNum
+      })
+      if (modelExists && selectedModelId !== modelIdNum) {
+        setSelectedModelId(modelIdNum)
+      }
+    } else if (!modelIdFromForm && selectedModelId) {
+      setSelectedModelId(null)
+    }
+  }, [models, form, selectedModelId])
+
+  // Sync brandId khi brands được load
+  useEffect(() => {
+    const brandIdFromForm = form.getFieldValue('brandId')
+    if (brandIdFromForm && brands.length > 0) {
+      const brandIdNum = Number(brandIdFromForm)
+      const brandExists = brands.find(b => {
+        const bId = b.id || b.brandId
+        return bId === brandIdNum || Number(bId) === brandIdNum
+      })
+      if (brandExists && selectedBrandId !== brandIdNum) {
+        setSelectedBrandId(brandIdNum)
+      }
+    } else if (!brandIdFromForm && selectedBrandId) {
+      setSelectedBrandId(null)
+    }
+  }, [brands, form, selectedBrandId])
+
+  // Sync selectedTechs và selectedServices khi form values hoặc options thay đổi
+  useEffect(() => {
+    const techIds = form.getFieldValue('assignedTechnicianIds') || []
+    if (Array.isArray(techIds) && techIds.length > 0) {
+      if (technicianOptions.length > 0) {
+        const matched = technicianOptions.filter(opt => techIds.map(String).includes(String(opt.value)))
+        if (matched.length > 0) {
+          const currentValues = selectedTechs.map(s => String(s.value)).sort().join(',')
+          const newValues = matched.map(m => String(m.value)).sort().join(',')
+          if (currentValues !== newValues) {
+            console.log('Syncing selectedTechs:', matched, 'from IDs:', techIds)
+            setSelectedTechs(matched)
+          }
+        } else {
+          console.warn('No matched technicians found. IDs:', techIds, 'Available:', technicianOptions.map(o => o.value))
+        }
+      } else {
+        // Nếu options chưa được load, đợi một chút rồi thử lại
+        const timer = setTimeout(() => {
+          const currentTechIds = form.getFieldValue('assignedTechnicianIds') || []
+          if (Array.isArray(currentTechIds) && currentTechIds.length > 0 && technicianOptions.length > 0) {
+            const matched = technicianOptions.filter(opt => currentTechIds.map(String).includes(String(opt.value)))
+            if (matched.length > 0) {
+              setSelectedTechs(matched)
+            }
+          }
+        }, 500)
+        return () => clearTimeout(timer)
+      }
+    } else if (techIds.length === 0 && selectedTechs.length > 0) {
+      setSelectedTechs([])
+    }
+  }, [form, technicianOptions, selectedTechs])
+
+  useEffect(() => {
+    const serviceIds = form.getFieldValue('serviceTypes') || []
+    if (Array.isArray(serviceIds) && serviceIds.length > 0) {
+      if (serviceOptions.length > 0) {
+        const matched = serviceOptions.filter(opt => serviceIds.map(String).includes(String(opt.value)))
+        if (matched.length > 0) {
+          const currentValues = selectedServices.map(s => String(s.value)).sort().join(',')
+          const newValues = matched.map(m => String(m.value)).sort().join(',')
+          if (currentValues !== newValues) {
+            console.log('Syncing selectedServices:', matched, 'from IDs:', serviceIds)
+            setSelectedServices(matched)
+          }
+        } else {
+          console.warn('No matched services found. IDs:', serviceIds, 'Available:', serviceOptions.map(o => o.value))
+        }
+      } else {
+        // Nếu options chưa được load, đợi một chút rồi thử lại
+        const timer = setTimeout(() => {
+          const currentServiceIds = form.getFieldValue('serviceTypes') || []
+          if (Array.isArray(currentServiceIds) && currentServiceIds.length > 0 && serviceOptions.length > 0) {
+            const matched = serviceOptions.filter(opt => currentServiceIds.map(String).includes(String(opt.value)))
+            if (matched.length > 0) {
+              setSelectedServices(matched)
+            }
+          }
+        }, 500)
+        return () => clearTimeout(timer)
+      }
+    } else if (serviceIds.length === 0 && selectedServices.length > 0) {
+      setSelectedServices([])
+    }
+  }, [form, serviceOptions, selectedServices])
+
   const fetchTicketData = async () => {
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getById(ticketId)
@@ -306,43 +474,43 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
 
     if (brandId) {
       setSelectedBrandId(brandId)
+      form.setFieldsValue({ brandId })
       const list = await handleBrandSelect(brandId)
       
-      if (modelId) {
-       
-        const matchedModel = list && list.length 
-          ? list.find((model) => String(model.id) === String(modelId))
-          : null
-        
+      // Set modelId ngay sau khi models được load từ handleBrandSelect
+      if (modelId && list && list.length > 0) {
+        const matchedModel = list.find((model) => String(model.id) === String(modelId))
         if (matchedModel) {
           setSelectedModelId(matchedModel.id)
           form.setFieldsValue({ modelId: matchedModel.id })
         } else {
-          
+          // Nếu không tìm thấy, vẫn set để giữ giá trị
           setPendingModelId(modelId)
           setSelectedModelId(modelId)
           form.setFieldsValue({ modelId })
         }
-      } else if (modelName) {
-        
-        const matchedModel = list && list.length
-          ? list.find((model) => 
-              model.name?.toLowerCase().trim() === modelName.toLowerCase().trim()
-            )
-          : null
-        
+      } else if (modelName && list && list.length > 0) {
+        const matchedModel = list.find((model) => 
+          model.name?.toLowerCase().trim() === modelName.toLowerCase().trim()
+        )
         if (matchedModel) {
           setSelectedModelId(matchedModel.id)
           form.setFieldsValue({ modelId: matchedModel.id })
         } else {
           setPendingModelName(modelName)
         }
+      } else if (modelId) {
+        // Nếu có modelId nhưng chưa có models, set vào form để useEffect sync sau
+        setPendingModelId(modelId)
+        setSelectedModelId(modelId)
+        form.setFieldsValue({ modelId })
+      } else if (modelName) {
+        setPendingModelName(modelName)
       }
     } else if (brandName) {
       setPendingBrandName(brandName)
       setPendingModelName(modelName)
     } else if (modelName && brands.length > 0) {
-   
       setPendingModelName(modelName)
     }
 
@@ -369,6 +537,9 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       serviceTypes: serviceTypeIds.length > 0 ? serviceTypeIds : undefined,
       assignedTechnicianIds: assignedTechnicianIds.length > 0 ? assignedTechnicianIds : undefined
     })
+
+    // Sync selectedTechs và selectedServices sẽ được xử lý bởi useEffect khi options được load
+    // Không cần setTimeout ở đây vì useEffect sẽ tự động sync
   }
 
   const handleSubmit = async () => {
@@ -624,43 +795,22 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
               name="assignedTechnicianIds"
               rules={[{ required: true, message: 'Vui lòng chọn kỹ thuật viên' }]}
             >
-              <Checkbox.Group
-                style={{ width: '100%' }}
-                value={form.getFieldValue('assignedTechnicianIds') || []}
-                onChange={(checkedValues) => {
-                  form.setFieldsValue({ assignedTechnicianIds: checkedValues })
-                }}
-              >
-                <Row gutter={[8, 8]}>
-                  {technicianLoading ? (
-                    <Col span={24}>
-                      <div style={{ padding: '8px 0', color: '#999' }}>Đang tải...</div>
-                    </Col>
-                  ) : technicianOptions.length === 0 ? (
-                    <Col span={24}>
-                      <div style={{ padding: '8px 0', color: '#999' }}>Không có dữ liệu</div>
-                    </Col>
-                  ) : (
-                    technicianOptions.map((tech) => (
-                      <Col span={12} key={tech.value}>
-                        <Checkbox
-                          value={tech.value}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: 6,
-                            margin: 0,
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {tech.label}
-                        </Checkbox>
-                      </Col>
-                    ))
-                  )}
-                </Row>
-              </Checkbox.Group>
+              <div>
+                <ReactSelect
+                  isMulti
+                  options={techOptionsStable}
+                  value={selectedTechs}
+                  onChange={handleTechChange}
+                  styles={multiSelectStyles}
+                  placeholder={technicianLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                  isDisabled={technicianLoading || techOptionsStable.length === 0}
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                  classNamePrefix="react-select"
+                />
+                <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                  {selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn kỹ thuật viên'}
+                </div>
+              </div>
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -669,43 +819,22 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
               name="serviceTypes"
               rules={[{ required: true, message: 'Vui lòng chọn loại dịch vụ' }]}
             >
-              <Checkbox.Group
-                style={{ width: '100%' }}
-                value={form.getFieldValue('serviceTypes') || []}
-                onChange={(checkedValues) => {
-                  form.setFieldsValue({ serviceTypes: checkedValues })
-                }}
-              >
-                <Row gutter={[8, 8]}>
-                  {serviceLoading ? (
-                    <Col span={24}>
-                      <div style={{ padding: '8px 0', color: '#999' }}>Đang tải...</div>
-                    </Col>
-                  ) : serviceOptions.length === 0 ? (
-                    <Col span={24}>
-                      <div style={{ padding: '8px 0', color: '#999' }}>Không có dữ liệu</div>
-                    </Col>
-                  ) : (
-                    serviceOptions.map((service) => (
-                      <Col span={12} key={service.value}>
-                        <Checkbox
-                          value={service.value}
-                          style={{
-                            width: '100%',
-                            padding: '8px 12px',
-                            border: '1px solid #d9d9d9',
-                            borderRadius: 6,
-                            margin: 0,
-                            transition: 'all 0.2s'
-                          }}
-                        >
-                          {service.label}
-                        </Checkbox>
-                      </Col>
-                    ))
-                  )}
-                </Row>
-              </Checkbox.Group>
+              <div>
+                <ReactSelect
+                  isMulti
+                  options={serviceOptionsStable}
+                  value={selectedServices}
+                  onChange={handleServiceChange}
+                  styles={multiSelectStyles}
+                  placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
+                  isDisabled={serviceLoading || serviceOptionsStable.length === 0}
+                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                  classNamePrefix="react-select"
+                />
+                <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
+                  {selectedServices.length ? `Đã chọn ${selectedServices.length}` : 'Chưa chọn loại dịch vụ'}
+                </div>
+              </div>
             </Form.Item>
           </Col>
         </Row>
