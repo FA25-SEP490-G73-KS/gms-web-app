@@ -120,15 +120,20 @@ export function decodeJWT(token) {
 }
 
 
+// Import authStore trực tiếp (không dùng require vì không hoạt động trong browser ES modules)
+import useAuthStore from '../store/authStore';
+
 export function getToken() {
   if (typeof window === 'undefined') return null;
   
-  return sessionStorage.getItem('token') || 
-         sessionStorage.getItem('accessToken') || 
-         sessionStorage.getItem('authToken') ||
-         localStorage.getItem('token') || 
-         localStorage.getItem('accessToken') || 
-         localStorage.getItem('authToken');
+  try {
+    // Lấy token từ authStore (memory) thay vì storage
+    const accessToken = useAuthStore.getState().getAccessToken();
+    return accessToken;
+  } catch (error) {
+    console.error('Error getting token from store:', error);
+    return null;
+  }
 }
 
 export function getUserNameFromToken() {
@@ -136,7 +141,8 @@ export function getUserNameFromToken() {
     const token = getToken();
     if (!token) return null;
     const decoded = decodeJWT(token);
-    const username = decoded?.fullName || decoded?.name || decoded?.username || decoded?.sub || null;
+    // Backend lưu fullName vào claim "fullName"
+    const username = decoded?.fullName || decoded?.name || decoded?.username || null;
     return username;
   } catch (error) {
     console.error('Error getting user name from token:', error);
@@ -178,6 +184,7 @@ export function getUserPhoneFromToken() {
     const token = getToken();
     if (!token) return null;
     const decoded = decodeJWT(token);
+    // Backend lưu phone vào claim "phone"
     const phone = decoded?.phone || null;
     return phone ? displayPhoneFrom84(phone) : null;
   } catch (error) {

@@ -15,13 +15,13 @@ export default function ProtectedRoute({
   requireAuth = true 
 }) {
   const location = useLocation();
-  const { user } = useAuthStore();
+  const { user, accessToken } = useAuthStore();
   
-  // Lấy token từ sessionStorage hoặc localStorage
-  const token = getToken();
+  // Lấy token từ store (memory) hoặc từ helper function
+  const token = accessToken || getToken();
   
-  // Kiểm tra xem có token không
-  if (requireAuth && !token) {
+  // Kiểm tra xem có token hoặc user không
+  if (requireAuth && !token && !user) {
     // Lưu đường dẫn hiện tại để redirect lại sau khi login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -31,19 +31,17 @@ export default function ProtectedRoute({
     return children;
   }
   
-  // Lấy role từ token hoặc từ user store
-  let userRole = null;
+  // Lấy role từ user store (ưu tiên) hoặc từ token
+  let userRole = user?.role;
   
-  if (token) {
+  // Nếu không có role từ user store, thử lấy từ token
+  if (!userRole && token) {
     userRole = getRoleFromToken();
-    // Nếu không lấy được từ token, thử từ user store
-    if (!userRole && user?.role) {
-      userRole = user.role;
-    }
   }
   
   // Nếu không có role, chuyển về trang login
   if (!userRole) {
+    console.log('ProtectedRoute: No role found, redirecting to login. user:', user, 'token:', token ? 'exists' : 'missing');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
   

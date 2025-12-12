@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
-import { Table, Input, Button, Space, Tag, message, Modal, Tabs, Spin } from 'antd'
-import { SearchOutlined } from '@ant-design/icons'
+import { Table, Input, Button, Space, Tag, message, Modal, Tabs, Spin, Checkbox, DatePicker } from 'antd'
+import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
 import { usePayOS } from '@payos/payos-checkout'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
@@ -8,15 +9,9 @@ import { goldTableHeader } from '../../utils/tableComponents'
 import { debtsAPI, invoiceAPI } from '../../services/api'
 import '../../styles/pages/accountance/debts.css'
 
-const STATUS_FILTERS = [
-  { key: 'CON_NO', label: 'Chưa hoàn tất' },
-  { key: 'DA_TAT_TOAN', label: 'Đã thanh toán' },
-  { key: 'ALL', label: 'Tất cả' }
-]
-
 const STATUS_COLORS = {
-  pending: { color: '#c2410c', bg: '#fff7ed', text: 'Chưa hoàn tất' },
-  paid: { color: '#15803d', bg: '#dcfce7', text: 'Đã thanh toán' }
+  OUTSTANDING: { color: '#c2410c', bg: '#fff7ed', text: 'Chờ công nợ' },
+  PAID_IN_FULL: { color: '#15803d', bg: '#dcfce7', text: 'Hoàn thành' }
 }
 
 const detailStatusConfig = {
@@ -25,8 +20,8 @@ const detailStatusConfig = {
 }
 
 const normalizeStatus = (rawStatus) => {
-  if (rawStatus === 'DA_TAT_TOAN') return 'paid'
-  return 'pending'
+  if (rawStatus === 'PAID_IN_FULL') return 'PAID_IN_FULL'
+  return 'OUTSTANDING'
 }
 
 const safeNumber = (value) => {
@@ -46,7 +41,6 @@ const formatDate = (value) => {
 export function AccountanceDebtsContent() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
-  const [status, setStatus] = useState('CON_NO')
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
   const [loading, setLoading] = useState(false)
   const [debts, setDebts] = useState([])
@@ -55,6 +49,9 @@ export function AccountanceDebtsContent() {
     size: 10,
     total: 0
   })
+  const [filterVisible, setFilterVisible] = useState(false)
+  const [selectedStatuses, setSelectedStatuses] = useState([])
+  const [createdDateRange, setCreatedDateRange] = useState([null, null])
 
   // Payment modal states
   const [showPaymentModal, setShowPaymentModal] = useState(false)
@@ -96,7 +93,24 @@ export function AccountanceDebtsContent() {
   }, [payOSConfig])
 
   const normalizedDebts = useMemo(() => {
-    return debts.map((item, index) => {
+    const [fromDate, toDate] = createdDateRange
+    
+    return debts
+      .filter((item) => {
+        // Filter theo date range nếu có
+        if (fromDate && toDate) {
+          const createdAt = item.createdAt ? new Date(item.createdAt) : null
+          if (createdAt) {
+            const from = dayjs(fromDate).startOf('day').toDate()
+            const to = dayjs(toDate).endOf('day').toDate()
+            if (createdAt < from || createdAt > to) {
+              return false
+            }
+          }
+        }
+        return true
+      })
+      .map((item, index) => {
       const customerName =
         item.customerFullName ||
         item.customerName ||
@@ -144,20 +158,14 @@ export function AccountanceDebtsContent() {
         }))
       }
     })
-  }, [debts])
+  }, [debts, createdDateRange])
 
   const fetchDebts = useCallback(
     async (page = 0, size = 10) => {
       setLoading(true)
       try {
-        // Map status: CON_NO -> OUTSTANDING, DA_TAT_TOAN -> PAID_IN_FULL
-        let apiStatus = undefined
-        if (status === 'CON_NO') {
-          apiStatus = 'OUTSTANDING'
-        } else if (status === 'DA_TAT_TOAN') {
-          apiStatus = 'PAID_IN_FULL'
-        }
-        // status === 'ALL' thì không truyền status
+        // Nếu có nhiều status được chọn, chỉ lấy status đầu tiên (hoặc có thể gửi array nếu API hỗ trợ)
+        const apiStatus = selectedStatuses.length > 0 ? selectedStatuses[0] : undefined
         
         const { data, error } = await debtsAPI.list({
           status: apiStatus,
@@ -217,12 +225,12 @@ export function AccountanceDebtsContent() {
         setLoading(false)
       }
     },
-    [query, status]
+    [query, selectedStatuses]
   )
 
   useEffect(() => {
     setPagination((prev) => ({ ...prev, page: 0 }))
-  }, [query, status])
+  }, [query, selectedStatuses])
 
   useEffect(() => {
     fetchDebts(0, pagination.size)
@@ -346,7 +354,7 @@ export function AccountanceDebtsContent() {
       width: 140,
       align: 'center',
       render: (value) => {
-        const config = STATUS_COLORS[value] || STATUS_COLORS.pending
+        const config = STATUS_COLORS[value] || STATUS_COLORS.OUTSTANDING
         return (
           <Tag
             style={{
@@ -495,8 +503,7 @@ export function AccountanceDebtsContent() {
           <h1>Công nợ</h1>
         </div>
 
-        <div className="debts-filters" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          {/* Left side - Search */}
+        <div className="debts-filters" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '12px', flexWrap: 'wrap' }}>
           <Input
             prefix={<SearchOutlined />}
             placeholder="Tìm kiếm"
@@ -504,59 +511,54 @@ export function AccountanceDebtsContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="debts-search"
-            style={{ width: 320 }}
+            style={{ width: 260 }}
           />
-          
-          {/* Right side - Filter buttons */}
-          <Space wrap>
-            {STATUS_FILTERS.map((filter) => (
-              <Button
-                key={filter.key}
-                type={status === filter.key ? 'primary' : 'default'}
-                onClick={() => setStatus(filter.key)}
-                style={{
-                  background: status === filter.key ? '#CBB081' : '#fff',
-                  borderColor: status === filter.key ? '#CBB081' : '#d9d9d9',
-                  color: status === filter.key ? '#fff' : '#666',
-                  fontWeight: 500,
-                  borderRadius: 6
-                }}
-              >
-                {filter.label}
-              </Button>
-            ))}
-          </Space>
+          <Button
+            onClick={() => setFilterVisible(true)}
+            icon={<FilterOutlined />}
+            style={{
+              borderColor: '#d9d9d9',
+              fontWeight: 700,
+              borderRadius: 10,
+              height: 40,
+              padding: '0 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}
+          >
+            Bộ lọc
+          </Button>
         </div>
 
-        <div className="debts-table-card">
-          <Table
-            className="debts-table"
-            columns={columns}
-            dataSource={normalizedDebts.map((item, index) => ({
-              ...item,
-              index
-            }))}
-            loading={loading}
-            expandable={{
-              expandedRowRender,
-              expandedRowKeys,
-              onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
-              expandIconColumnIndex: -1,
-            }}
-            pagination={{
-              pageSize: pagination.size,
-              current: pagination.page + 1,
-              total: pagination.total,
-              showTotal: (total) => `Tổng ${total} bản ghi`,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              onChange: (page, size) => {
-                fetchDebts(page - 1, size)
-              }
-            }}
-            components={goldTableHeader}
-          />
-        </div>
+        <Table
+          className="debts-table"
+          columns={columns}
+          dataSource={normalizedDebts.map((item, index) => ({
+            ...item,
+            index
+          }))}
+          loading={loading}
+          expandable={{
+            expandedRowRender,
+            expandedRowKeys,
+            onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
+            expandIconColumnIndex: -1,
+          }}
+          pagination={{
+            pageSize: pagination.size,
+            current: pagination.page + 1,
+            total: pagination.total,
+            showTotal: (total) => `Tổng ${total} bản ghi`,
+            showSizeChanger: true,
+            pageSizeOptions: ['10', '20', '50', '100'],
+            onChange: (page, size) => {
+              fetchDebts(page - 1, size)
+            }
+          }}
+          components={goldTableHeader}
+        />
 
         {/* Payment Modal */}
         <Modal
@@ -823,6 +825,85 @@ export function AccountanceDebtsContent() {
               </div>
             )}
           </div>
+        </Modal>
+
+        {/* Filter Modal */}
+        <Modal
+          open={filterVisible}
+          onCancel={() => setFilterVisible(false)}
+          footer={null}
+          title="Bộ lọc"
+          width={420}
+        >
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Trạng thái</div>
+            <Space direction="vertical">
+              {[
+                { key: 'OUTSTANDING', label: 'Chờ công nợ' },
+                { key: 'PAID_IN_FULL', label: 'Hoàn thành' }
+              ].map((opt) => (
+                <Checkbox
+                  key={opt.key}
+                  checked={selectedStatuses.includes(opt.key)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedStatuses((prev) => [...prev, opt.key])
+                    } else {
+                      setSelectedStatuses((prev) => prev.filter((v) => v !== opt.key))
+                    }
+                  }}
+                >
+                  {opt.label}
+                </Checkbox>
+              ))}
+            </Space>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Khoảng ngày tạo</div>
+            <Space direction="vertical" style={{ width: '100%', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, color: '#444', marginBottom: 6 }}>Từ ngày</div>
+                <DatePicker
+                  style={{ width: '100%', height: 40, borderRadius: 8 }}
+                  placeholder="dd/mm/yyyy"
+                  value={createdDateRange[0]}
+                  format="DD/MM/YYYY"
+                  allowClear
+                  onChange={(val) => setCreatedDateRange([val, createdDateRange[1]])}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 14, color: '#444', marginBottom: 6 }}>Đến ngày</div>
+                <DatePicker
+                  style={{ width: '100%', height: 40, borderRadius: 8 }}
+                  placeholder="dd/mm/yyyy"
+                  value={createdDateRange[1]}
+                  format="DD/MM/YYYY"
+                  allowClear
+                  onChange={(val) => setCreatedDateRange([createdDateRange[0], val])}
+                />
+              </div>
+            </Space>
+          </div>
+
+          <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
+            <Button
+              onClick={() => {
+                setSelectedStatuses([])
+                setCreatedDateRange([null, null])
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => setFilterVisible(false)}
+              style={{ background: '#CBB081', borderColor: '#CBB081' }}
+            >
+              Áp dụng
+            </Button>
+          </Space>
         </Modal>
       </div>
   )

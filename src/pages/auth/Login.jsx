@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Form, Input, Button, Card, Checkbox, message } from 'antd'
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
@@ -14,6 +14,37 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const login = useAuthStore((state) => state.login)
+  const { user } = useAuthStore()
+  
+  // Nếu đã đăng nhập (có user trong store), tự động redirect đến trang đúng với role
+  useEffect(() => {
+    console.log('[Login] useEffect - user:', user, 'user?.role:', user?.role);
+    if (user?.role) {
+      console.log('[Login] User found, redirecting...');
+      const from = location.state?.from?.pathname
+      
+      // Nếu có trang được lưu từ trước, redirect về đó
+      if (from) {
+        console.log('[Login] Redirecting to saved path:', from);
+        navigate(from, { replace: true })
+        return
+      }
+      
+      // Redirect theo role
+      if (ROLE_ROUTES[user.role]) {
+        const targetRoute = ROLE_ROUTES[user.role];
+        console.log('[Login] Redirecting to role route:', targetRoute);
+        navigate(targetRoute, { replace: true })
+        return
+      }
+      
+      // Fallback: redirect về trang chủ
+      console.log('[Login] No role route found, redirecting to home');
+      navigate('/', { replace: true })
+    } else {
+      console.log('[Login] No user found, staying on login page');
+    }
+  }, [user, location.state, navigate])
 
   const handleLogoLoad = useCallback(() => {
     setLogoLoaded(true)
@@ -24,29 +55,40 @@ export default function Login() {
     []
   )
 
-  const redirectAfterLogin = useCallback(() => {
-    // Lấy role từ token (ưu tiên) hoặc từ user store
-    let userRole = getRoleFromToken()
+  const redirectAfterLogin = useCallback((userRole) => {
+    // userRole được truyền vào từ login function
+    // Nếu không có, thử lấy từ store
+    let role = userRole || useAuthStore.getState().user?.role
     
-    if (!userRole) {
-      userRole = useAuthStore.getState().user?.role
+    // Nếu vẫn không có, thử lấy từ token
+    if (!role) {
+      role = getRoleFromToken()
     }
     
+    console.log('Redirect after login - role:', role, 'user:', useAuthStore.getState().user)
+    console.log('ROLE_ROUTES:', ROLE_ROUTES)
+    console.log('ROLE_ROUTES[role]:', role ? ROLE_ROUTES[role] : 'undefined')
+    
     const from = location.state?.from?.pathname
+    console.log('from pathname:', from)
 
     // Nếu có trang được lưu từ trước, redirect về đó
     if (from) {
+      console.log('Redirecting to saved path:', from)
       navigate(from, { replace: true })
       return
     }
 
     // Redirect theo role
-    if (userRole && ROLE_ROUTES[userRole]) {
-      navigate(ROLE_ROUTES[userRole], { replace: true })
+    if (role && ROLE_ROUTES[role]) {
+      const targetRoute = ROLE_ROUTES[role]
+      console.log('Redirecting to role route:', targetRoute)
+      navigate(targetRoute, { replace: true })
       return
     }
 
     // Fallback: redirect về trang chủ
+    console.log('No role route found, redirecting to home')
     navigate('/', { replace: true })
   }, [location.state, navigate])
 
@@ -60,7 +102,7 @@ export default function Login() {
         const trimmedPassword = password?.trim() || ''
         const rememberMe = !!remember
         
-        await login(normalizePhoneTo0(trimmedPhone), trimmedPassword, rememberMe)
+        const response = await login(normalizePhoneTo0(trimmedPhone), trimmedPassword, rememberMe)
         message.success('Đăng nhập thành công!')
 
         if (remember) {
@@ -69,7 +111,14 @@ export default function Login() {
           localStorage.removeItem('rememberedPhone')
         }
 
-        redirectAfterLogin()
+        // Đợi một chút để đảm bảo state đã được cập nhật
+        // Lấy role từ store sau khi login thành công
+        setTimeout(() => {
+          const state = useAuthStore.getState()
+          const userRole = state.user?.role
+          console.log('Login successful - userRole from store:', userRole, 'user:', state.user, 'accessToken:', state.accessToken ? 'exists' : 'missing')
+          redirectAfterLogin(userRole)
+        }, 50)
       } catch (error) {
         const errorMessage = error?.message || 'Đăng nhập thất bại. Vui lòng thử lại!'
         message.error(errorMessage)

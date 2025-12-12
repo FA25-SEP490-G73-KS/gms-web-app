@@ -94,8 +94,16 @@ function AdminOrdersRedirect() {
 }
 
 function App() {
-  const { user } = useAuthStore();
+  const { user, initialize } = useAuthStore();
   const { connect, disconnect, isConnected } = useWebSocketStore();
+  
+  // Initialize auth store on app load (refresh token if available)
+  useEffect(() => {
+    console.log('[App] Initializing auth store...');
+    initialize().then(() => {
+      console.log('[App] Auth store initialized');
+    });
+  }, [initialize]);
   
   useEffect(() => {
     if (user) {
