@@ -342,7 +342,7 @@ export default function AdminCustomers() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: 24, minHeight: '100vh', background: '#f5f5f5' }}>
+      <div style={{ padding: 24, minHeight: '100vh', background: '#fff' }}>
         <div
           style={{
             background: '#fff',

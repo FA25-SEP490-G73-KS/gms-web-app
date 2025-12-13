@@ -15,6 +15,8 @@ export default function AppointmentService() {
   const [phoneError, setPhoneError] = useState('')
   const [licenseError, setLicenseError] = useState('')
   const [fullNameError, setFullNameError] = useState('')
+  const [dateError, setDateError] = useState('')
+  const [noteError, setNoteError] = useState('')
   const [serviceTypes, setServiceTypes] = useState([])
   const [serviceTypesLoading, setServiceTypesLoading] = useState(false)
   const [timeSlots, setTimeSlots] = useState([])
@@ -398,6 +400,52 @@ export default function AppointmentService() {
     }
   }
 
+  const validateDate = (dateStr) => {
+    if (!dateStr) {
+      return {
+        isValid: false,
+        errorMessage: 'Vui lòng chọn ngày đặt lịch'
+      }
+    }
+
+    const selectedDate = new Date(dateStr + 'T00:00:00')
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    if (selectedDate < today) {
+      return {
+        isValid: false,
+        errorMessage: 'Không thể chọn ngày trong quá khứ'
+      }
+    }
+
+    return {
+      isValid: true,
+      errorMessage: ''
+    }
+  }
+
+  const validateNote = (value) => {
+    if (!value || value.trim() === '') {
+      return {
+        isValid: true,
+        errorMessage: ''
+      }
+    }
+
+    if (value.length > 200) {
+      return {
+        isValid: false,
+        errorMessage: 'Không thể vượt quá 200 ký tự'
+      }
+    }
+
+    return {
+      isValid: true,
+      errorMessage: ''
+    }
+  }
+
   const handleSendOTP = async () => {
     if (!form.phoneNumber) {
       setPhoneError('Vui lòng nhập số điện thoại hợp lệ (9–10 chữ số).')
@@ -558,6 +606,24 @@ export default function AppointmentService() {
       return
     }
     setLicenseError('')
+
+    // Validate ngày đặt
+    const dateValidation = validateDate(form.date)
+    if (!dateValidation.isValid) {
+      setDateError(dateValidation.errorMessage)
+      message.error(dateValidation.errorMessage)
+      return
+    }
+    setDateError('')
+
+    // Validate mô tả chi tiết
+    const noteValidation = validateNote(form.note)
+    if (!noteValidation.isValid) {
+      setNoteError(noteValidation.errorMessage)
+      message.error(noteValidation.errorMessage)
+      return
+    }
+    setNoteError('')
 
     const selectedSlot = timeSlots.find(slot => slot.value === parseInt(form.time))
     if (!selectedSlot) {
@@ -961,10 +1027,37 @@ export default function AppointmentService() {
                   <input
                     type="date"
                     value={form.date}
-                    onChange={update('date')}
-                    style={inputStyle}
+                    onChange={(e) => {
+                      const selectedDate = e.target.value
+                      setForm({ ...form, date: selectedDate })
+                      // Validate ngay khi chọn
+                      const validation = validateDate(selectedDate)
+                      if (!validation.isValid) {
+                        setDateError(validation.errorMessage)
+                      } else {
+                        setDateError('')
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Validate lại khi blur
+                      const validation = validateDate(e.target.value)
+                      if (!validation.isValid) {
+                        setDateError(validation.errorMessage)
+                      } else {
+                        setDateError('')
+                      }
+                    }}
+                    style={{ 
+                      ...inputStyle, 
+                      ...(dateError ? { borderColor: '#ef4444' } : {})
+                    }}
                     min={new Date().toISOString().split('T')[0]}
                   />
+                  {dateError && (
+                    <div style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                      {dateError}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={labelStyle}>Khung giờ <span style={{ color: '#ef4444' }}>*</span></label>
@@ -989,7 +1082,52 @@ export default function AppointmentService() {
                 </div>
                 <div style={{ gridColumn: '1 / span 2' }}>
                   <label style={labelStyle}>Mô tả chi tiết</label>
-                  <textarea value={form.note} onChange={update('note')} placeholder="Nhập mô tả thêm.." style={{ ...inputStyle, height: 96, paddingTop: '10px', paddingBottom: '10px' }} />
+                  <textarea 
+                    value={form.note} 
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setForm({ ...form, note: value })
+                      // Validate ngay khi nhập
+                      const validation = validateNote(value)
+                      if (!validation.isValid) {
+                        setNoteError(validation.errorMessage)
+                      } else {
+                        setNoteError('')
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Validate lại khi blur
+                      const validation = validateNote(e.target.value)
+                      if (!validation.isValid) {
+                        setNoteError(validation.errorMessage)
+                      } else {
+                        setNoteError('')
+                      }
+                    }}
+                    placeholder="Nhập mô tả thêm.." 
+                    maxLength={200}
+                    style={{ 
+                      ...inputStyle, 
+                      height: 96, 
+                      paddingTop: '10px', 
+                      paddingBottom: '10px',
+                      ...(noteError ? { borderColor: '#ef4444' } : {})
+                    }} 
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                    {noteError && (
+                      <div style={{ color: '#ef4444', fontSize: 12 }}>
+                        {noteError}
+                      </div>
+                    )}
+                    <div style={{ 
+                      color: form.note.length > 200 ? '#ef4444' : '#6b7280', 
+                      fontSize: 12, 
+                      marginLeft: 'auto' 
+                    }}>
+                      {form.note.length}/200
+                    </div>
+                  </div>
                 </div>
               </div>
               <div className="appointment-buttons" style={rowBtns}>

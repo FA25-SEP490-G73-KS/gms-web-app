@@ -65,6 +65,7 @@ export default function CreateTicketNewCustomer() {
   const [plateOptionsSource, setPlateOptionsSource] = useState([]) // Danh sách đầy đủ các biển số
   const [plateOptions, setPlateOptions] = useState([]) // Danh sách đã filter để hiển thị
   const [plateSelectValue, setPlateSelectValue] = useState(null) // Giá trị đã chọn trong CreatableSelect
+  const [plateOption, setPlateOption] = useState(null) // Option đang chọn cho CreatableSelect
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [isNewVehicle, setIsNewVehicle] = useState(false)
 
@@ -176,6 +177,9 @@ export default function CreateTicketNewCustomer() {
   // Hàm để xóa chỉ thông tin xe (giữ lại thông tin khách hàng)
   const resetVehicleInfo = () => {
     setIsNewVehicle(true)
+    setSelectedVehicle(null)
+    setPlateSelectValue(null)
+    setPlateOption(null)
     setSelectedVehicle(null)
     setPlateSelectValue(null)
     setPlateOption(null)
@@ -859,6 +863,7 @@ export default function CreateTicketNewCustomer() {
   }
 
   const handleCreate = async (values) => {
+    console.log('[CreateTicketNewCustomer] onFinish payload:', values)
     if (!Array.isArray(values.service) || values.service.length === 0) {
       message.warning('Vui lòng chọn ít nhất một loại dịch vụ')
       return
@@ -867,7 +872,12 @@ export default function CreateTicketNewCustomer() {
 
 
     const normalizedPhone = normalizePhoneTo84(values.phone)
-    
+    const plateValueRaw = values.plate
+    const plateValue =
+      typeof plateValueRaw === 'string'
+        ? plateValueRaw
+        : plateValueRaw?.value || plateValueRaw?.label || ''
+    const plateUpper = plateValue ? plateValue.toString().toUpperCase().trim() : ''
     
     const finalBrandId = selectedBrandId || values.brand || null
     const finalModelId = selectedModelId || values.model || null
@@ -892,7 +902,7 @@ export default function CreateTicketNewCustomer() {
       vehicle: {
         brandId: finalBrandId ? Number(finalBrandId) : null,
         brandName: selectedBrand?.name || '',
-        licensePlate: values.plate?.toUpperCase() || '',
+        licensePlate: plateUpper,
         modelId: finalModelId ? Number(finalModelId) : null,
         modelName: selectedModel?.name || '',
         vehicleId: '',
@@ -902,11 +912,11 @@ export default function CreateTicketNewCustomer() {
     }
 
    
-    const plate = values.plate || form.getFieldValue('plate')
+    const plate = plateUpper || form.getFieldValue('plate')
     if (plate) {
       try {
         const { data: checkRes, error: checkError } = await vehiclesAPI.checkPlate(
-          plate,
+          typeof plate === 'string' ? plate : plate?.value || plate?.label || plateUpper,
           customerId || null
         )
         if (checkError) {
@@ -982,7 +992,7 @@ export default function CreateTicketNewCustomer() {
         Tạo phiếu dịch vụ
       </span>
       <span className="caption" style={{ color: '#6b7280', display: 'block', marginTop: '4px' }}>
-        Dành cho khách chưa có tài khoản trong hệ thống. Vui lòng nhập đầy đủ thông tin trước khi tạo phiếu.
+        Dành cho khách vãng lai
       </span>
     </div>
   )
@@ -991,7 +1001,19 @@ export default function CreateTicketNewCustomer() {
     <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
         <Card title={cardTitle} style={{ borderRadius: '12px' }}>
-          <Form form={form} layout="vertical" onFinish={handleCreate}>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleCreate}
+            onFinishFailed={(info) => {
+              const firstError = info?.errorFields?.[0]?.errors?.[0]
+              if (firstError) {
+                message.error(firstError)
+              } else {
+                message.error('Vui lòng kiểm tra lại các trường bắt buộc')
+              }
+            }}
+          >
             <Row gutter={24} align="stretch">
               <Col span={12}>
                 <div
@@ -1009,7 +1031,7 @@ export default function CreateTicketNewCustomer() {
                 <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Thông tin khách hàng</h3>
 
                 <Form.Item
-                  label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>}
+                  label="Số điện thoại"
                   name="phone"
                   rules={[
                     {
@@ -1226,7 +1248,7 @@ export default function CreateTicketNewCustomer() {
                 </Form.Item>
 
                 <Form.Item
-                  label={<span>Họ và tên <span style={{ color: 'red' }}>*</span></span>}
+                  label="Họ và tên"
                   name="name"
                   rules={[
                     {
@@ -1246,7 +1268,8 @@ export default function CreateTicketNewCustomer() {
                       }
                     }
                   ]}
-                  normalize={(value) => value?.replace(/\s+/g, ' ').trim()} // Loại bỏ nhiều khoảng trắng liên tiếp
+                  // Cho phép nhập khoảng trắng tự do, chỉ kiểm tra ở validator
+                  normalize={(value) => value}
                   style={formItemStyle}
                 >
                   <Input 
@@ -1291,7 +1314,8 @@ export default function CreateTicketNewCustomer() {
                       }
                     }
                   ]}
-                  normalize={(value) => value?.trim()} // Trim khoảng trắng đầu cuối
+                  // Cho phép khoảng trắng tự do, chỉ kiểm tra bằng validator
+                  normalize={(value) => value}
                   style={formItemStyle}
                 >
                   <Input 
@@ -1325,7 +1349,7 @@ export default function CreateTicketNewCustomer() {
                 <h3 style={{ marginBottom: '12px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
 
                 <Form.Item
-                  label={<span>Loại dịch vụ <span style={{ color: 'red' }}>*</span></span>}
+                  label="Loại dịch vụ"
                   name="service"
                   rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 loại dịch vụ' }]}
                   style={formItemStyle}
@@ -1443,6 +1467,7 @@ export default function CreateTicketNewCustomer() {
                         value={plateSelectValue}
    onChange={(option) => {
      setPlateOption(option);
+     setPlateSelectValue(option);
      const plateValue = option?.value || "";
      form.setFieldsValue({ plate: plateValue });
 
@@ -1503,7 +1528,7 @@ export default function CreateTicketNewCustomer() {
      }
    }}
 
-  onCreateOption={(inputValue) => {
+   onCreateOption={(inputValue) => {
     const formatted = formatLicensePlate(inputValue);
     const newOption = { value: formatted, label: formatted };
 
@@ -1516,15 +1541,18 @@ export default function CreateTicketNewCustomer() {
                             form.setFieldsValue({ plate: formatted })
                           }}
 
-  onInputChange={(inputValue, action) => {
+   onInputChange={(inputValue, action) => {
     // Cập nhật form value khi người dùng đang nhập để giữ giá trị
     if (action.action === 'input-change' && inputValue) {
       const formatted = formatLicensePlate(inputValue);
       form.setFieldsValue({ plate: formatted });
+      setPlateSelectValue({ value: formatted, label: formatted });
+      setPlateOption({ value: formatted, label: formatted });
     } else if (action.action === 'input-change' && !inputValue) {
       // Nếu xóa hết biển số xe, chỉ xóa thông tin xe (giữ lại thông tin khách hàng nếu số điện thoại không null)
       form.setFieldsValue({ plate: '' });
       setPlateOption(null);
+      setPlateSelectValue(null);
       const currentPhone = form.getFieldValue('phone')
       if (currentPhone) {
         // Nếu có số điện thoại, chỉ xóa thông tin xe
@@ -1663,7 +1691,7 @@ export default function CreateTicketNewCustomer() {
                                 return Promise.resolve()
                               }
                               
-                              const cleanValue = value.toString().replace(/\s/g, '')
+                        const cleanValue = value.toString().replace(/\s/g, '')
                               
                               // Kiểm tra độ dài tối đa
                               if (cleanValue.length > 20) {
@@ -1674,7 +1702,8 @@ export default function CreateTicketNewCustomer() {
                             }
                           }
                         ]}
-                        normalize={(value) => value?.toUpperCase().replace(/\s/g, '')} // Chuyển hoa và loại bỏ khoảng trắng
+                        // Giữ khoảng trắng, chỉ chuyển hoa (validator kiểm tra độ dài)
+                        normalize={(value) => value?.toUpperCase()}
                         style={formItemStyle}
                       >
                         <Input 
@@ -1918,4 +1947,3 @@ export default function CreateTicketNewCustomer() {
     </AdminLayout>
   )
 }
-

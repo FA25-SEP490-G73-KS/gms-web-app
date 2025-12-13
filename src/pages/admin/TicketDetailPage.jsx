@@ -163,6 +163,13 @@ export default function TicketDetailPage() {
     )
   })()
 
+  const ticketStatusNormalized = (ticketData?.status || '').toString().toUpperCase()
+  const isTicketCancelled =
+    ticketStatusNormalized === 'CANCELED' ||
+    ticketStatusNormalized === 'CANCELLED' ||
+    ticketStatusNormalized === 'HỦY' ||
+    ticketStatusNormalized.includes('HỦY')
+
   const isWaitingWarehouse = quotationStatusConfig.label === 'Chờ kho duyệt'
   const isWaitingCustomerConfirm = quotationStatusConfig.label === 'Chờ khách xác nhận'
   const isWarehouseConfirmed = quotationStatusConfig.label === 'Kho đã duyệt'
@@ -189,7 +196,7 @@ export default function TicketDetailPage() {
     })
   }
   
-  const inputsDisabled = isHistoryPage || actionLoading || 
+  const inputsDisabled = isHistoryPage || actionLoading || isTicketCancelled ||
     (isWaitingWarehouse
       ? true
       : (isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm)
@@ -1856,6 +1863,26 @@ export default function TicketDetailPage() {
     : ticketData?.serviceType || null
 
   const quoteCreator = getDisplayValue(ticketData?.createdBy)
+
+  const technicianText = (() => {
+    if (Array.isArray(ticketData?.technicians) && ticketData.technicians.length > 0) {
+      return ticketData.technicians.join(', ')
+    }
+    if (selectedTechs.length > 0) {
+      return selectedTechs.map((t) => t.label || t.value).join(', ')
+    }
+    return 'Chưa chọn thợ sửa chữa'
+  })()
+
+  const serviceTypeText = (() => {
+    if (Array.isArray(ticketData?.serviceType) && ticketData.serviceType.length > 0) {
+      return ticketData.serviceType.join(', ')
+    }
+    if (selectedServices.length > 0) {
+      return selectedServices.map((s) => s.label || s.value).join(', ')
+    }
+    return 'Chưa chọn dịch vụ'
+  })()
   const createdDate = ticketData?.createdAt
     ? new Date(ticketData.createdAt).toLocaleDateString('vi-VN')
     : null
@@ -1963,42 +1990,12 @@ export default function TicketDetailPage() {
                 <span>{getDisplayValue(createdDate)}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <strong>Thợ sửa chữa:</strong>
-                <div style={{ marginTop: 4 }}>
-                  <ReactSelect
-                    isMulti
-                    options={techOptionsStable}
-                    value={selectedTechs}
-                    onChange={handleTechChange}
-                    styles={multiSelectStyles}
-                    placeholder={techLoading ? 'Đang tải...' : 'Chọn thợ sửa chữa'}
-                    isDisabled={techLoading || techOptionsStable.length === 0 || inputsDisabled}
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                    classNamePrefix="react-select"
-                  />
-                  <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-                    {selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn thợ sửa chữa'}
-                  </div>
-                </div>
+                <strong>Thợ sửa chữa:</strong>{' '}
+                <span>{technicianText}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
-                <strong>Loại dịch vụ:</strong>
-                <div style={{ marginTop: 4 }}>
-                  <ReactSelect
-                    isMulti
-                    options={serviceOptionsStable}
-                    value={selectedServices}
-                    onChange={handleServiceChange}
-                    styles={multiSelectStyles}
-                    placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
-                    isDisabled={serviceLoading || serviceOptionsStable.length === 0 || inputsDisabled}
-                    menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                    classNamePrefix="react-select"
-                  />
-                  <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-                    {selectedServices.length ? `Đã chọn ${selectedServices.length}` : 'Chưa chọn dịch vụ'}
-                  </div>
-                </div>
+                <strong>Loại dịch vụ:</strong>{' '}
+                <span>{serviceTypeText}</span>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <strong>Ngày dự đoán giao xe:</strong>
@@ -2187,7 +2184,7 @@ export default function TicketDetailPage() {
                             onClick={handleSendQuote}
                     disabled={(() => {
                       // Nếu đang loading thì disable
-                      if (actionLoading) return true
+                      if (actionLoading || isTicketCancelled) return true
                       
                       // Nếu đang chờ kho duyệt
                       if (isWaitingWarehouse) {
@@ -2208,24 +2205,28 @@ export default function TicketDetailPage() {
                     })()}
                     loading={actionLoading}
                     style={{
-                        background: (isWaitingWarehouse && !hasRejectedItem)
+                        background: isTicketCancelled
                           ? '#9ca3af'
-                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                            ? '#CBB081'
-                            : '#22c55e',
-                        borderColor: (isWaitingWarehouse && !hasRejectedItem)
+                          : (isWaitingWarehouse && !hasRejectedItem)
+                            ? '#9ca3af'
+                            : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
+                              ? '#CBB081'
+                              : '#22c55e',
+                        borderColor: isTicketCancelled
                           ? '#9ca3af'
-                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                            ? '#CBB081'
-                            : '#22c55e',
+                          : (isWaitingWarehouse && !hasRejectedItem)
+                            ? '#9ca3af'
+                            : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
+                              ? '#CBB081'
+                              : '#22c55e',
                       color: '#fff',
                       fontWeight: 600,
                       padding: '0 24px',
                         height: '40px',
-                        cursor: (isWaitingWarehouse && !hasRejectedItem) ? 'not-allowed' : 'pointer'
+                        cursor: (isTicketCancelled || (isWaitingWarehouse && !hasRejectedItem)) ? 'not-allowed' : 'pointer'
                     }}
                     >
-                      {actionButtonLabel}
+                      {isTicketCancelled ? 'Phiếu đã hủy' : actionButtonLabel}
                     </Button>
                   )}
                   {canSendToCustomer && (

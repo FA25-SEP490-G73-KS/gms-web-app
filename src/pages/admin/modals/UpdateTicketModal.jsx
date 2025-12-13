@@ -29,6 +29,38 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
   const [selectedTechs, setSelectedTechs] = useState([])
   const [selectedServices, setSelectedServices] = useState([])
 
+  const buildSelectionsFromIds = (ids, options) => {
+    if (!Array.isArray(ids)) return []
+    return ids
+      .filter((id) => id !== undefined && id !== null)
+      .map((id) => {
+        const match = (options || []).find((opt) => String(opt.value) === String(id))
+        if (match) {
+          return {
+            value: match.value,
+            label: match.label || String(match.value ?? '')
+          }
+        }
+        return { value: id, label: String(id) }
+      })
+  }
+
+  const normalizeOptions = (list) => {
+    return (list || [])
+      .filter(Boolean)
+      .map((opt) => {
+        const value = opt?.value ?? opt
+        let label = opt?.label
+        if (!label) {
+          if (typeof opt === 'string') label = opt
+          else if (opt?.name) label = opt.name
+          else if (value !== undefined && value !== null) label = String(value)
+          else label = 'N/A'
+        }
+        return { value, label }
+      })
+  }
+
   const inputHeight = 40
   
   const multiSelectStyles = {
@@ -55,16 +87,33 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
   const techOptionsStable = useMemo(() => technicianOptions, [technicianOptions])
   const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
 
+  // Bổ sung options tạm thời từ selections để ReactSelect hiển thị chip ngay cả khi option chưa tải kịp
+  const techOptionsWithFallback = useMemo(() => {
+    const existingValues = new Set((technicianOptions || []).map((opt) => String(opt.value)))
+    const fallback = (selectedTechs || [])
+      .filter((opt) => opt && opt.value && !existingValues.has(String(opt.value)))
+      .map((opt) => ({ value: opt.value, label: opt.label || opt.value }))
+    return [...technicianOptions, ...fallback]
+  }, [technicianOptions, selectedTechs])
+
+  const serviceOptionsWithFallback = useMemo(() => {
+    const existingValues = new Set((serviceOptions || []).map((opt) => String(opt.value)))
+    const fallback = (selectedServices || [])
+      .filter((opt) => opt && opt.value && !existingValues.has(String(opt.value)))
+      .map((opt) => ({ value: opt.value, label: opt.label || opt.value }))
+    return [...serviceOptions, ...fallback]
+  }, [serviceOptions, selectedServices])
+
   const handleTechChange = (selected) => {
-    const arr = selected || []
+    const arr = normalizeOptions(selected)
     setSelectedTechs(arr)
-    form.setFieldsValue({ assignedTechnicianIds: arr.map(s => s.value) })
+    form.setFieldsValue({ assignedTechnicianIds: arr.map((s) => s.value) })
   }
 
   const handleServiceChange = (selected) => {
-    const arr = selected || []
+    const arr = normalizeOptions(selected)
     setSelectedServices(arr)
-    form.setFieldsValue({ serviceTypes: arr.map(s => s.value) })
+    form.setFieldsValue({ serviceTypes: arr.map((s) => s.value) })
   }
 
   useEffect(() => {
@@ -221,35 +270,40 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
 
   useEffect(() => {
     if (!pendingServiceNames.length || !serviceOptions.length) return
-    const mapped = pendingServiceNames
+    const matchedOptions = pendingServiceNames
       .map((name) => {
         const lower = name.toLowerCase().trim()
         return serviceOptions.find((option) => {
           const optionLabel = option.label?.toLowerCase().trim()
           return optionLabel === lower || optionLabel?.includes(lower) || lower.includes(optionLabel)
-        })?.value
+        })
       })
       .filter(Boolean)
-    if (mapped.length) {
-      form.setFieldsValue({ serviceTypes: mapped })
+
+    const mappedIds = matchedOptions.map((opt) => opt.value).filter(Boolean)
+    if (mappedIds.length) {
+      form.setFieldsValue({ serviceTypes: mappedIds })
+      setSelectedServices(normalizeOptions(matchedOptions))
     }
     setPendingServiceNames([])
   }, [pendingServiceNames, serviceOptions, form])
 
   useEffect(() => {
     if (!pendingTechnicianNames.length || !technicianOptions.length) return
-    const mapped = pendingTechnicianNames
+    const matchedOptions = pendingTechnicianNames
       .map((name) => {
         const lower = name.toLowerCase().trim()
         return technicianOptions.find((option) => {
           const optionLabel = option.label?.toLowerCase()
-          
           return optionLabel?.includes(lower) || optionLabel?.startsWith(lower)
-        })?.value
+        })
       })
       .filter(Boolean)
-    if (mapped.length) {
-      form.setFieldsValue({ assignedTechnicianIds: mapped })
+
+    const mappedIds = matchedOptions.map((opt) => opt.value).filter(Boolean)
+    if (mappedIds.length) {
+      form.setFieldsValue({ assignedTechnicianIds: mappedIds })
+      setSelectedTechs(normalizeOptions(matchedOptions))
     }
     setPendingTechnicianNames([])
   }, [pendingTechnicianNames, technicianOptions, form])
@@ -426,7 +480,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       const vehicle = data.vehicle || {}
       const vehicleModel = vehicle.vehicleModel || {}
     const brandId = vehicle.brandId ?? vehicleModel.brandId ?? null
-    const modelId = vehicle.modelId ?? vehicleModel.modelId ?? null
+    const modelId = vehicle.modelId ?? vehicle.vehicleModelId ?? vehicleModel.modelId ?? null
     const brandName = vehicle.brandName || vehicleModel.brandName || ''
     const modelName = vehicle.modelName || vehicleModel.modelName || ''
     const vehicleId = vehicle.vehicleId || data.vehicleId || 0
@@ -440,12 +494,17 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
           ? data.serviceTypes.map((item) => Number(item.serviceTypeId || item.id)).filter(Boolean)
           : [])
 
+    let serviceNameValues = []
     if (!serviceTypeIds.length && Array.isArray(data.serviceType)) {
       const serviceNames = data.serviceType
         .map((item) => (typeof item === 'string' ? item : item?.name || item?.serviceTypeName || ''))
         .filter(Boolean)
       if (serviceNames.length > 0) {
+        serviceNameValues = serviceNames
+        // Hiển thị ngay với label tạm, sẽ đồng bộ id khi options tải xong
+        setSelectedServices(serviceNames.map((name) => ({ label: name, value: name })))
         setPendingServiceNames(serviceNames)
+        form.setFieldsValue({ serviceTypes: serviceNames })
       }
     }
 
@@ -454,13 +513,17 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       ? data.assignedTechnicianIds
       : []
 
-  
+    let technicianNameValues = []
     if (!assignedTechnicianIds.length && Array.isArray(data.technicians)) {
       const technicianNames = data.technicians
         .map((item) => (typeof item === 'string' ? item : item?.fullName || item?.name || ''))
         .filter(Boolean)
       if (technicianNames.length > 0) {
+        technicianNameValues = technicianNames
+        // Hiển thị ngay với label tạm, sẽ đồng bộ id khi options tải xong
+        setSelectedTechs(technicianNames.map((name) => ({ label: name, value: name })))
         setPendingTechnicianNames(technicianNames)
+        form.setFieldsValue({ assignedTechnicianIds: technicianNames })
       }
     }
 
@@ -524,6 +587,9 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
   
     const finalModelId = form.getFieldValue('modelId') || (modelId || null)
       
+    const serviceTypesValue = serviceTypeIds.length > 0 ? serviceTypeIds : (serviceNameValues.length ? serviceNameValues : undefined)
+    const technicianIdsValue = assignedTechnicianIds.length > 0 ? assignedTechnicianIds : (technicianNameValues.length ? technicianNameValues : undefined)
+
     form.setFieldsValue({
       customerName: data.customer?.fullName || '',
       phone: displayPhoneFrom84(data.customer?.phone || ''),
@@ -534,9 +600,13 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       year: year || 2020,
       quoteStaff: quoteStaffName,
       receiveDate: receiveDate,
-      serviceTypes: serviceTypeIds.length > 0 ? serviceTypeIds : undefined,
-      assignedTechnicianIds: assignedTechnicianIds.length > 0 ? assignedTechnicianIds : undefined
+      serviceTypes: serviceTypesValue,
+      assignedTechnicianIds: technicianIdsValue
     })
+
+    // Hiển thị ngay selection từ IDs (fallback label = id nếu chưa có option)
+    setSelectedServices(buildSelectionsFromIds(serviceTypesValue || [], serviceOptions))
+    setSelectedTechs(buildSelectionsFromIds(technicianIdsValue || [], technicianOptions))
 
     // Sync selectedTechs và selectedServices sẽ được xử lý bởi useEffect khi options được load
     // Không cần setTimeout ở đây vì useEffect sẽ tự động sync
@@ -794,23 +864,21 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
               label="Kỹ thuật viên"
               name="assignedTechnicianIds"
               rules={[{ required: true, message: 'Vui lòng chọn kỹ thuật viên' }]}
+              extra={selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn kỹ thuật viên'}
             >
-              <div>
-                <ReactSelect
-                  isMulti
-                  options={techOptionsStable}
-                  value={selectedTechs}
-                  onChange={handleTechChange}
-                  styles={multiSelectStyles}
-                  placeholder={technicianLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
-                  isDisabled={technicianLoading || techOptionsStable.length === 0}
-                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                  classNamePrefix="react-select"
-                />
-                <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-                  {selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn kỹ thuật viên'}
-                </div>
-              </div>
+              <ReactSelect
+                isMulti
+                options={techOptionsWithFallback}
+                value={selectedTechs}
+                onChange={handleTechChange}
+                getOptionLabel={(opt) => opt?.label || String(opt?.value ?? '')}
+                getOptionValue={(opt) => String(opt?.value ?? '')}
+                styles={multiSelectStyles}
+                placeholder={technicianLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                isDisabled={technicianLoading || techOptionsWithFallback.length === 0}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                classNamePrefix="react-select"
+              />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -818,23 +886,21 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
               label="Loại dịch vụ"
               name="serviceTypes"
               rules={[{ required: true, message: 'Vui lòng chọn loại dịch vụ' }]}
+              extra={selectedServices.length ? `Đã chọn ${selectedServices.length}` : 'Chưa chọn loại dịch vụ'}
             >
-              <div>
-                <ReactSelect
-                  isMulti
-                  options={serviceOptionsStable}
-                  value={selectedServices}
-                  onChange={handleServiceChange}
-                  styles={multiSelectStyles}
-                  placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
-                  isDisabled={serviceLoading || serviceOptionsStable.length === 0}
-                  menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                  classNamePrefix="react-select"
-                />
-                <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-                  {selectedServices.length ? `Đã chọn ${selectedServices.length}` : 'Chưa chọn loại dịch vụ'}
-                </div>
-              </div>
+              <ReactSelect
+                isMulti
+                options={serviceOptionsWithFallback}
+                value={selectedServices}
+                onChange={handleServiceChange}
+                getOptionLabel={(opt) => opt?.label || String(opt?.value ?? '')}
+                getOptionValue={(opt) => String(opt?.value ?? '')}
+                styles={multiSelectStyles}
+                placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
+                isDisabled={serviceLoading || serviceOptionsWithFallback.length === 0}
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                classNamePrefix="react-select"
+              />
             </Form.Item>
           </Col>
         </Row>

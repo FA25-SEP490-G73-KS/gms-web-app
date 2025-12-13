@@ -758,7 +758,7 @@ export default function TicketService() {
                   gap: '8px'
                 }}
               >
-                Sort
+                Bộ lọc
               </Button>
             </Col>
           </Row>
