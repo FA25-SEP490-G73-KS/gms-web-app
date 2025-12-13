@@ -30,24 +30,28 @@ export default function ResetPassword() {
     e.preventDefault()
     setError('')
     
-    if (!form.newPassword || !form.confirmPassword) {
+    // Trim tất cả password input
+    const trimmedNewPassword = form.newPassword?.trim() || ''
+    const trimmedConfirmPassword = form.confirmPassword?.trim() || ''
+    
+    if (!trimmedNewPassword || !trimmedConfirmPassword) {
       setError('Vui lòng nhập đầy đủ thông tin')
       return
     }
 
-    if (form.newPassword.length < 6) {
+    if (trimmedNewPassword.length < 6) {
       setError('Mật khẩu phải có ít nhất 6 ký tự')
       return
     }
 
-    if (form.newPassword !== form.confirmPassword) {
+    if (trimmedNewPassword !== trimmedConfirmPassword) {
       setError('Mật khẩu xác nhận không khớp')
       return
     }
 
     setLoading(true)
     try {
-      const { data, error: apiError } = await authAPI.updatePassword(phone, otp, form.newPassword)
+      const { data, error: apiError } = await authAPI.updatePassword(phone, otp, trimmedNewPassword)
       
       if (apiError) {
         setError(apiError || 'Không thể cập nhật mật khẩu. Vui lòng thử lại.')

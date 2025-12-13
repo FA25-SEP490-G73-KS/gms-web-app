@@ -5,7 +5,7 @@ export default function WarehouseHome() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    navigate('/warehouse/import/request', { replace: true })
+    navigate('/warehouse/report', { replace: true })
   }, [navigate])
 
   return null

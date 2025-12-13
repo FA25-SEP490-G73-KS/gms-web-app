@@ -4,22 +4,22 @@ import '../../styles/components/hero-slider.css';
 const slides = [
   {
     id: 1,
-    src: '/image/gr1.jpg',
+    src: '/image/slider1.png',
     alt: 'Garage Hoàng Tuấn - Dịch vụ sơn, bảo dưỡng, phục hồi xe ô tô chuyên nghiệp'
   },
   {
     id: 2,
-    src: '/image/gr2.jpg',
+    src: '/image/slider2.png',
     alt: 'Garage Hoàng Tuấn - Xưởng sửa chữa và bảo dưỡng ô tô hiện đại'
   },
   {
     id: 3,
-    src: '/image/gr3.jpg',
+    src: '/image/slider3.png',
     alt: 'Garage Hoàng Tuấn - Chuyên sơn phục hồi và bảo dưỡng xe ô tô'
   },
   {
     id: 4,
-    src: '/image/gara.png',
+    src: '/image/slider4.png',
     alt: 'Garage Hoàng Tuấn - Xưởng sơn, bảo dưỡng và phục hồi xe ô tô chuyên nghiệp tại Thanh Hóa'
   }
 ];
@@ -158,4 +158,3 @@ export default function HeroSlider() {
     </div>
   );
 }
-

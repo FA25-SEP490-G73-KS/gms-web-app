@@ -1,0 +1,37 @@
+.error-page-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.error-page-container .ant-result {
+  background: white;
+  border-radius: 12px;
+  padding: 48px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  max-width: 600px;
+  width: 100%;
+}
+
+.error-page-container .ant-result-title {
+  font-size: 72px;
+  font-weight: bold;
+  color: #667eea;
+}
+
+.error-page-container .ant-result-subtitle {
+  font-size: 18px;
+  color: #666;
+  margin-top: 16px;
+}
+
+.error-page-container .ant-btn {
+  margin: 0 8px;
+  height: 40px;
+  padding: 0 24px;
+  font-size: 16px;
+}
+

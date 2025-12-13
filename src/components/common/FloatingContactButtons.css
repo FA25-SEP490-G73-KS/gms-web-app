@@ -1,0 +1,223 @@
+.floating-contact-buttons {
+  position: fixed;
+  bottom: 40px;
+  right: 30px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  pointer-events: none;
+}
+
+.floating-button-wrapper {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  pointer-events: all;
+  cursor: pointer;
+}
+
+/* Glow Ring - Vòng tròn vàng bên ngoài */
+.floating-button-glow-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  border: 3px solid #FFC300;
+  box-shadow: 
+    0 0 20px rgba(255, 195, 0, 0.6),
+    0 0 40px rgba(255, 195, 0, 0.4),
+    0 0 60px rgba(255, 195, 0, 0.2);
+  opacity: 0.8;
+  animation: pulseGlow 2.5s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* Button Circle - Nút tròn nền trắng */
+.floating-button-circle {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 
+    0 8px 16px rgba(0, 0, 0, 0.15),
+    0 4px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+  animation: floatPulse 3s ease-in-out infinite;
+}
+
+/* Icons */
+.floating-button-icon {
+  width: 32px;
+  height: 32px;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 3;
+}
+
+.floating-button-phone {
+  color: #25D366;
+  font-size: 32px;
+}
+
+/* Zalo icon image styling */
+.floating-button-zalo-img {
+  width: 36px;
+  height: 36px;
+  display: block;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+/* Hover Effects */
+.floating-button-wrapper:hover .floating-button-circle {
+  transform: scale(1.1);
+  box-shadow: 
+    0 12px 24px rgba(0, 0, 0, 0.2),
+    0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.floating-button-wrapper:hover .floating-button-glow-ring {
+  opacity: 1;
+  box-shadow: 
+    0 0 30px rgba(255, 195, 0, 0.8),
+    0 0 50px rgba(255, 195, 0, 0.6),
+    0 0 70px rgba(255, 195, 0, 0.4);
+  animation: pulseGlowHover 1.5s ease-in-out infinite;
+}
+
+.floating-button-wrapper:hover .floating-button-icon,
+.floating-button-wrapper:hover .floating-button-zalo-img {
+  transform: scale(1.1);
+}
+
+.floating-button-wrapper:active .floating-button-circle {
+  transform: scale(1.05);
+}
+
+/* Pulse Glow Animation - Vòng vàng pulse */
+@keyframes pulseGlow {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.4;
+  }
+}
+
+/* Pulse Glow Hover Animation */
+@keyframes pulseGlowHover {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0.6;
+  }
+}
+
+/* Float Pulse Animation - Nút nổi nhẹ */
+@keyframes floatPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .floating-contact-buttons {
+    bottom: 30px;
+    right: 20px;
+    gap: 16px;
+  }
+
+  .floating-button-wrapper {
+    width: 60px;
+    height: 60px;
+  }
+
+  .floating-button-glow-ring {
+    width: 60px;
+    height: 60px;
+    border-width: 2.5px;
+  }
+
+  .floating-button-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .floating-button-phone {
+    font-size: 28px;
+  }
+
+  .floating-button-zalo-img {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .floating-contact-buttons {
+    bottom: 20px;
+    right: 16px;
+    gap: 14px;
+  }
+
+  .floating-button-wrapper {
+    width: 56px;
+    height: 56px;
+  }
+
+  .floating-button-glow-ring {
+    width: 56px;
+    height: 56px;
+    border-width: 2px;
+  }
+
+  .floating-button-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .floating-button-phone {
+    font-size: 24px;
+  }
+
+  .floating-button-zalo-img {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .floating-button-circle {
+    animation: none;
+  }
+
+  .floating-button-glow-ring {
+    animation: none;
+  }
+
+  .floating-button-wrapper:hover .floating-button-circle {
+    transform: scale(1.05);
+  }
+}
+
