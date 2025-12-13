@@ -14,6 +14,8 @@ import BlogDetail from './pages/blog/BlogDetail';
 import AppointmentService from './pages/customer/appointment/appointmentservice';
 import Login from './pages/auth/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
+import ConfirmPhone from './pages/auth/ConfirmPhone';
+import EnterOTP from './pages/auth/EnterOTP';
 import ChangePassword from './pages/auth/ChangePassword';
 import Profile from './pages/auth/Profile';
 import AdminHome from './pages/admin/AdminHome';
@@ -134,6 +136,8 @@ function App() {
         <Route path="/appointment" element={<AppointmentService />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
+        <Route path="/auth/confirm-phone" element={<ConfirmPhone />} />
+        <Route path="/auth/enter-otp" element={<EnterOTP />} />
         <Route path="/auth/change-password" element={<ChangePassword />} />
         <Route path="/auth/profile" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.ADMIN, USER_ROLES.SERVICE_ADVISOR, USER_ROLES.MANAGER, USER_ROLES.ACCOUNTANT, USER_ROLES.WAREHOUSE]}>

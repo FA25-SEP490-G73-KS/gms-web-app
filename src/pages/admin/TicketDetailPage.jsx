@@ -196,18 +196,12 @@ export default function TicketDetailPage() {
     })
   }
   
-  const inputsDisabled = isHistoryPage || actionLoading || isTicketCancelled ||
-    (isWaitingWarehouse
-      ? true
-      : (isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm)
-        ? !isEditMode
-        : !quotationStatusConfig.canEdit)
+  // Logic mới: Khi vào xem chi tiết, mặc định disable tất cả
+  // Chỉ enable khi ấn "Cập nhật" (chuyển sang isEditMode = true)
+  const inputsDisabled = isHistoryPage || actionLoading || isTicketCancelled || !isEditMode
   
-  const actionButtonLabel = isWaitingWarehouse 
-    ? 'Cập nhật' 
-    : ((isWarehouseConfirmed || isCustomerConfirmed)
-        ? (isEditMode ? 'Lưu' : 'Cập nhật')
-        : 'Lưu')
+  // Button luôn hiển thị "Cập nhật" khi chưa edit mode, "Lưu" khi đang edit mode
+  const actionButtonLabel = isEditMode ? 'Lưu' : 'Cập nhật'
   
   const canSendToCustomer = isWarehouseConfirmed
 
@@ -1073,13 +1067,6 @@ export default function TicketDetailPage() {
   const handleSendQuote = async () => {
     if (actionLoading) return
     
-    
-    if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
-      await setQuotationDraft()
-      setIsEditMode(true)
-      return
-    }
-    
     // Nếu đang chờ kho duyệt và có item bị từ chối, chuyển về nháp
     if (isWaitingWarehouse && hasRejectedItem) {
       console.log('Calling setQuotationDraft API - hasRejectedItem:', hasRejectedItem)
@@ -1098,17 +1085,20 @@ export default function TicketDetailPage() {
       return
     }
     
-   
+    // Nếu đang chờ kho duyệt, không cho chỉnh sửa
     if (isWaitingWarehouse) {
       message.warning('Báo giá đang chờ kho duyệt, không thể chỉnh sửa.')
       return
     }
     
-    if (inputsDisabled) {
-      message.warning('Báo giá chưa thể chỉnh sửa ở trạng thái hiện tại.')
+    // Logic mới: Nếu chưa vào edit mode, chỉ cần chuyển sang edit mode
+    if (!isEditMode) {
+      setIsEditMode(true)
+      message.info('Đã bật chế độ chỉnh sửa')
       return
     }
     
+    // Nếu đã ở edit mode, thực hiện validate và lưu
     if (!validateForm()) {
       message.error('Vui lòng điền đầy đủ thông tin')
       return

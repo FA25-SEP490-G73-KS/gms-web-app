@@ -4,8 +4,6 @@ import { otpAPI } from '../../services/api'
 import '../../styles/pages/auth/forgot-password.css'
 import { normalizePhoneTo84 } from '../../utils/helpers'
 
-const imgImage15 = "http://localhost:3845/assets/e3f06dc74cc8cb44cf93eb05563cb8c82f9ac956.png"
-
 export default function ForgotPassword() {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
@@ -74,8 +72,8 @@ export default function ForgotPassword() {
 
       // Check if API call was successful
       if (data && (data.statusCode === 200 || data.result)) {
-        // Navigate to OTP page with phone number
-        navigate('/auth/enter-otp', { state: { phone: cleanedPhone, purpose: 'RESET_PASSWORD' } })
+        // Navigate to confirm phone page with phone number
+        navigate('/auth/confirm-phone', { state: { phone: cleanedPhone, purpose: 'RESET_PASSWORD' } })
       } else {
         setError('Không thể gửi mã OTP. Vui lòng thử lại.')
         setLoading(false)
@@ -88,28 +86,25 @@ export default function ForgotPassword() {
 
   return (
     <div className="forgot-password">
-      <div className="forgot-password__logo-container">
-        <img 
-          alt="Logo" 
-          src={imgImage15}
-          className="forgot-password__logo-image"
-        />
-      </div>
+      <div className="forgot-password__card">
+        <div className="forgot-password__logo-container">
+          <img 
+            alt="Logo Garage Hoàng Tuấn" 
+            src="/image/mainlogo.png"
+            className="forgot-password__logo-image"
+          />
+        </div>
 
-      <p className="forgot-password__title-text">
-        <span className="forgot-password__title-text--white">Garage</span>{' '}
-        <span className="forgot-password__title-text--black">Hoàng Tuấn</span>
-      </p>
-
-      <div className="forgot-password__card" />
-
-      <div className="forgot-password__form-container">
         <p className="forgot-password__form-title">
-          Nhập số điện thoại
+          Quên mật khẩu
+        </p>
+        <p className="forgot-password__subtitle">
+          Nhập số điện thoại để nhận mã OTP
         </p>
 
-        <form onSubmit={handleSubmit} className="forgot-password__form">
-          <div className="forgot-password__input-group">
+        <div className="forgot-password__form-container">
+          <form onSubmit={handleSubmit} className="forgot-password__form">
+            <div className="forgot-password__input-group">
             <input
               type="tel"
               value={phone}
@@ -149,6 +144,7 @@ export default function ForgotPassword() {
             <p>Vui lòng nhập OTP ở bước tiếp theo.</p>
           </div>
         </form>
+        </div>
       </div>
     </div>
   )
