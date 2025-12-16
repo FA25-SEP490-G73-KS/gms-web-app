@@ -1,11 +1,11 @@
 ﻿import React, { useState, useEffect } from 'react'
-import { Table, Input, Button, Tag, message, Modal, Select, Checkbox, DatePicker, InputNumber } from 'antd'
+import { Table, Input, Button, Tag, message, Modal, Select, Checkbox, DatePicker, InputNumber, Spin } from 'antd'
 import { SearchOutlined, CloseOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import dayjs from 'dayjs'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { priceQuotationAPI, partCategoriesAPI, marketsAPI, vehiclesAPI, suppliersAPI } from '../../services/api'
+import { priceQuotationAPI, partCategoriesAPI, marketsAPI, vehiclesAPI, suppliersAPI, unitsAPI } from '../../services/api'
 
 const { Search } = Input
 const { Option } = Select
@@ -33,6 +33,7 @@ export default function ExportRequest() {
   const [brands, setBrands] = useState([]) // Danh sách hãng xe
   const [carModels, setCarModels] = useState([]) // Danh sách dòng xe theo hãng đã chọn
   const [suppliers, setSuppliers] = useState([]) // Danh sách nhà cung cấp
+  const [units, setUnits] = useState([]) // Danh sách đơn vị
   const [errors, setErrors] = useState({}) // Lưu lỗi validation cho từng field
   
   // Form state
@@ -99,7 +100,7 @@ export default function ExportRequest() {
           sku: partItem.part?.sku || null,
           name: partItem.itemName,
           quantity: partItem.quantity,
-          unit: partItem.unit,
+          unit: partItem.part?.unitName || partItem.unit || '', // Ưu tiên unitName từ part, fallback về unit
           unitPrice: partItem.unitPrice,
           totalPrice: partItem.totalPrice,
           itemType: partItem.itemType,
@@ -277,29 +278,82 @@ export default function ExportRequest() {
   }
 
   const getStatusConfig = (status) => {
-    // WAITING_WAREHOUSE_CONFIRM, DRAFT, PENDING -> Chờ xác nhận
-    // CONFIRMED, APPROVED -> Xác nhận
-    if (status === 'CONFIRMED' || status === 'APPROVED' || status === 'Xác nhận') {
-      return { 
-        color: '#22c55e', 
-        bgColor: '#f6ffed',
-        borderColor: '#b7eb8f',
-        text: 'Xác nhận'
-      }
-    }
-    if (status === 'WAITING_WAREHOUSE_CONFIRM' || status === 'DRAFT' || status === 'PENDING' || status === 'Chờ xác nhận') {
-      return { 
-        color: '#1677ff', 
-        bgColor: '#e6f4ff',
-        borderColor: '#91caff',
-        text: 'Chờ xác nhận'
-      }
-    }
-    return { 
-      color: '#666', 
-      bgColor: '#fafafa',
-      borderColor: '#d9d9d9',
-      text: status || 'Không rõ'
+    // Map theo enum PriceQuotationStatus
+    switch (status) {
+      case 'DRAFT':
+        return { 
+          color: '#666', 
+          bgColor: '#fafafa',
+          borderColor: '#d9d9d9',
+          text: 'Nháp'
+        }
+      case 'WAITING_WAREHOUSE_CONFIRM':
+        return { 
+          color: '#1677ff', 
+          bgColor: '#e6f4ff',
+          borderColor: '#91caff',
+          text: 'Chờ kho xác nhận'
+        }
+      case 'WAREHOUSE_CONFIRMED':
+        return { 
+          color: '#22c55e', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Kho đã xác nhận'
+        }
+      case 'WAITING_CUSTOMER_CONFIRM':
+        return { 
+          color: '#faad14', 
+          bgColor: '#fffbe6',
+          borderColor: '#ffe58f',
+          text: 'Chờ khách hàng xác nhận'
+        }
+      case 'CUSTOMER_CONFIRMED':
+        return { 
+          color: '#22c55e', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Khách hàng đã xác nhận'
+        }
+      case 'CUSTOMER_REJECTED':
+        return { 
+          color: '#ff4d4f', 
+          bgColor: '#fff2f0',
+          borderColor: '#ffccc7',
+          text: 'Khách hàng từ chối'
+        }
+      case 'COMPLETED':
+        return { 
+          color: '#52c41a', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Hoàn thành'
+        }
+      // Fallback cho các trạng thái cũ (backward compatibility)
+      case 'CONFIRMED':
+      case 'APPROVED':
+      case 'Xác nhận':
+        return { 
+          color: '#22c55e', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Xác nhận'
+        }
+      case 'PENDING':
+      case 'Chờ xác nhận':
+        return { 
+          color: '#1677ff', 
+          bgColor: '#e6f4ff',
+          borderColor: '#91caff',
+          text: 'Chờ xác nhận'
+        }
+      default:
+        return { 
+          color: '#666', 
+          bgColor: '#fafafa',
+          borderColor: '#d9d9d9',
+          text: status || 'Không rõ'
+        }
     }
   }
 
@@ -385,14 +439,46 @@ export default function ExportRequest() {
     }
   }
 
+  const fetchUnits = async () => {
+    try {
+      // Gọi API với size lớn để lấy tất cả units
+      const { data, error } = await unitsAPI.getAll({ page: 0, size: 1000 })
+      if (error) {
+        console.error('Failed to fetch units:', error)
+        setUnits([]) // Set empty array on error
+        return
+      }
+      // API có thể trả về array trực tiếp hoặc có result wrapper với content
+      let unitsList = []
+      if (Array.isArray(data)) {
+        unitsList = data
+      } else if (data?.result) {
+        // Nếu có result wrapper, kiểm tra xem result có content không
+        unitsList = Array.isArray(data.result) ? data.result : (data.result?.content || [])
+      } else if (data?.content) {
+        unitsList = data.content
+      }
+      console.log('Fetched units:', unitsList)
+      setUnits(unitsList)
+    } catch (err) {
+      console.error('Error fetching units:', err)
+      setUnits([]) // Set empty array on error
+    }
+  }
+
   const handleOpenModal = async (partRecord) => {
     console.log('handleOpenModal called with partRecord:', partRecord)
     setSelectedPart(partRecord)
     setIsModalOpen(true)
     setModalLoading(true)
     
-    // Fetch part categories, markets, brands, and suppliers when opening modal
-    await Promise.all([fetchPartCategories(), fetchMarkets(), fetchBrands(), fetchSuppliers()])
+    try {
+      // Fetch part categories, markets, brands, suppliers, and units when opening modal
+      await Promise.all([fetchPartCategories(), fetchMarkets(), fetchBrands(), fetchSuppliers(), fetchUnits()])
+    } catch (err) {
+      console.error('Error fetching modal data:', err)
+      message.error('Không thể tải dữ liệu form')
+    }
     
     // Lưu priceQuotationItemId ngay từ đầu
     const itemId = partRecord.id // partRecord.id chính là priceQuotationItemId
@@ -480,6 +566,8 @@ export default function ExportRequest() {
     } catch (error) {
       console.error('Error loading item details:', error)
       message.error('Không thể tải thông tin chi tiết')
+      // Đảm bảo modal vẫn hiển thị ngay cả khi có lỗi
+      setModalLoading(false)
     } finally {
       setModalLoading(false)
     }
@@ -505,6 +593,37 @@ export default function ExportRequest() {
         return newErrors
       })
     }
+  }
+
+  // Helper functions để map từ name sang ID
+  const getCategoryIdByName = (categoryName) => {
+    if (!categoryName) return 0
+    const category = partCategories.find(cat => cat.name === categoryName)
+    return category?.id || 0
+  }
+
+  const getMarketIdByName = (marketName) => {
+    if (!marketName) return 0
+    const market = markets.find(m => m.name === marketName)
+    return market?.id || 0
+  }
+
+  const getUnitIdByName = (unitName) => {
+    if (!unitName) return 0
+    const unit = units.find(u => u.name === unitName)
+    return unit?.id || 0
+  }
+
+  const getSupplierIdByName = (supplierName) => {
+    if (!supplierName) return 0
+    const supplier = suppliers.find(s => s.name === supplierName)
+    return supplier?.id || 0
+  }
+
+  const getVehicleModelIdByName = (modelName) => {
+    if (!modelName) return null
+    const model = carModels.find(m => m.name === modelName)
+    return model?.id || null
   }
 
   const handleConfirm = async () => {
@@ -533,6 +652,13 @@ export default function ExportRequest() {
 
       if (!formData.priceSell || parseFloat(formData.priceSell) <= 0) {
         newErrors.priceSell = 'Vui lòng nhập giá bán hợp lệ'
+      } else {
+        // Kiểm tra giá bán phải lớn hơn hoặc bằng giá nhập
+        const priceImport = parseFloat(formData.priceImport) || 0
+        const priceSell = parseFloat(formData.priceSell) || 0
+        if (priceSell < priceImport) {
+          newErrors.priceSell = 'Giá bán không được nhỏ hơn giá nhập'
+        }
       }
 
       if (!formData.origin || formData.origin.trim() === '') {
@@ -580,17 +706,17 @@ export default function ExportRequest() {
         // POST /api/quotation-items/{itemId}/confirm/create
         const payload = {
           name: formData.partName,
-          categoryId: 0, // TODO: Map from categoryName to ID
-          marketId: 0, // TODO: Map from marketName to ID
+          categoryId: getCategoryIdByName(formData.partType),
+          marketId: getMarketIdByName(formData.origin),
           note: formData.note || '',
           purchasePrice: parseFloat(formData.priceImport) || 0,
           sellingPrice: parseFloat(formData.priceSell) || 0,
           reorderLevel: 0.1,
           specialPart: formData.specialPart || false,
-          supplierId: 0, // TODO: Map from supplierName to ID
-          unitId: 0, // TODO: Map from unitName to ID
+          supplierId: getSupplierIdByName(formData.manufacturer),
+          unitId: getUnitIdByName(formData.unit),
           universal: formData.usedForAllCars || false,
-          vehicleModelId: formData.usedForAllCars ? 0 : null // TODO: Map from modelName to ID
+          vehicleModelId: formData.usedForAllCars ? null : getVehicleModelIdByName(formData.carModel)
         }
         
         console.log('Creating new part:', selectedItemId, payload)
@@ -622,17 +748,17 @@ export default function ExportRequest() {
         // PATCH /api/quotation-items/{itemId}/confirm/update
         const payload = {
           name: formData.partName,
-          categoryId: 0, // TODO: Map from categoryName to ID
-          marketId: 0, // TODO: Map from marketName to ID
+          categoryId: getCategoryIdByName(formData.partType),
+          marketId: getMarketIdByName(formData.origin),
           note: formData.note || '',
           purchasePrice: parseFloat(formData.priceImport) || 0,
           sellingPrice: parseFloat(formData.priceSell) || 0,
           reorderLevel: 0.1,
           specialPart: true,
-          supplierId: 0, // TODO: Map from supplierName to ID
-          unitId: 0, // TODO: Map from unitName to ID
+          supplierId: getSupplierIdByName(formData.manufacturer),
+          unitId: getUnitIdByName(formData.unit),
           universal: formData.usedForAllCars || false,
-          vehicleModelId: formData.usedForAllCars ? 0 : null // TODO: Map from modelName to ID
+          vehicleModelId: formData.usedForAllCars ? null : getVehicleModelIdByName(formData.carModel)
         }
         
         console.log('Updating special part:', selectedItemId, payload)
@@ -659,7 +785,10 @@ export default function ExportRequest() {
 
   const handleReject = async () => {
     if (!formData.note || formData.note.trim() === '') {
-      message.warning('Vui lòng nhập ghi chú/lý do từ chối')
+      setErrors(prev => ({
+        ...prev,
+        note: 'Vui lòng nhập ghi chú/lý do từ chối'
+      }))
       return
     }
     
@@ -1024,8 +1153,9 @@ export default function ExportRequest() {
             />
           </div>
 
-          <div style={{ padding: '24px' }}>
-            {/* Status và Quantity */}
+          <Spin spinning={modalLoading} tip="Đang tải dữ liệu...">
+            <div style={{ padding: '24px' }}>
+              {/* Status và Quantity */}
             <div style={{ 
               display: 'grid', 
               gridTemplateColumns: '1fr 1fr', 
@@ -1074,7 +1204,36 @@ export default function ExportRequest() {
                   </label>
                   <InputNumber
                     value={formData.priceImport ? Number(formData.priceImport.toString().replace(/\./g, '')) : undefined}
-                    onChange={(value) => handleFormChange('priceImport', value ? value.toString() : '')}
+                    onChange={(value) => {
+                      handleFormChange('priceImport', value ? value.toString() : '')
+                      // Kiểm tra lại giá bán khi thay đổi giá nhập
+                      const priceSell = parseFloat(formData.priceSell) || 0
+                      const newPriceImport = parseFloat(value) || 0
+                      if (priceSell > 0 && newPriceImport > 0 && priceSell < newPriceImport) {
+                        setErrors(prev => ({
+                          ...prev,
+                          priceSell: 'Giá bán không được nhỏ hơn giá nhập'
+                        }))
+                      } else if (errors.priceSell && errors.priceSell.includes('nhỏ hơn')) {
+                        // Clear error nếu giá bán đã hợp lệ
+                        setErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors.priceSell
+                          return newErrors
+                        })
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Validate giá nhập khi blur
+                      const priceImport = parseFloat(formData.priceImport) || 0
+                      const priceSell = parseFloat(formData.priceSell) || 0
+                      if (priceImport > 0 && priceSell > 0 && priceSell < priceImport) {
+                        setErrors(prev => ({
+                          ...prev,
+                          priceSell: 'Giá bán không được nhỏ hơn giá nhập'
+                        }))
+                      }
+                    }}
                     placeholder="Nhập giá nhập"
                     disabled={hasExistingPart || formData.isReviewed}
                     style={{ width: '100%', borderRadius: 8, height: 40, borderColor: errors.priceImport ? '#ff4d4f' : undefined }}
@@ -1134,7 +1293,28 @@ export default function ExportRequest() {
                   </label>
                   <InputNumber
                     value={formData.priceSell ? Number(formData.priceSell.toString().replace(/\./g, '')) : undefined}
-                    onChange={(value) => handleFormChange('priceSell', value ? value.toString() : '')}
+                    onChange={(value) => {
+                      handleFormChange('priceSell', value ? value.toString() : '')
+                      // Clear error khi user thay đổi giá trị
+                      if (errors.priceSell) {
+                        setErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors.priceSell
+                          return newErrors
+                        })
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Validate giá bán khi blur
+                      const priceSell = parseFloat(formData.priceSell) || 0
+                      const priceImport = parseFloat(formData.priceImport) || 0
+                      if (priceSell > 0 && priceImport > 0 && priceSell < priceImport) {
+                        setErrors(prev => ({
+                          ...prev,
+                          priceSell: 'Giá bán không được nhỏ hơn giá nhập'
+                        }))
+                      }
+                    }}
                     placeholder="Nhập giá bán"
                     disabled={hasExistingPart || formData.isReviewed}
                     style={{ width: '100%', borderRadius: 8, height: 40, borderColor: errors.priceSell ? '#ff4d4f' : undefined }}
@@ -1192,26 +1372,22 @@ export default function ExportRequest() {
                   <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
                     Đơn vị <span style={{ color: 'red' }}>*</span>
                   </label>
-                  <InputNumber
-                    value={formData.unit ? Number(formData.unit.toString().replace(/\./g, '')) : undefined}
-                    onChange={(value) => handleFormChange('unit', value ? value.toString() : '')}
-                    placeholder="Nhập đơn vị"
+                  <Select
+                    value={formData.unit || undefined}
+                    onChange={(value) => handleFormChange('unit', value)}
                     disabled={hasExistingPart || formData.isReviewed}
-                    style={{ width: '100%', borderRadius: 8, height: 40, borderColor: errors.unit ? '#ff4d4f' : undefined }}
-                    formatter={(value) => {
-                      if (!value) return ''
-                      const onlyDigits = `${value}`.replace(/\D/g, '')
-                      return onlyDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-                    }}
-                    parser={(value) => (value ? value.replace(/\./g, '') : '')}
-                    controls={false}
-                    onKeyPress={(e) => {
-                      if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
-                        e.preventDefault()
-                      }
-                    }}
-                    min={0}
-                  />
+                    placeholder="Chọn đơn vị"
+                    style={{ width: '100%', borderRadius: 8, height: 40 }}
+                    allowClear
+                    loading={modalLoading && units.length === 0}
+                    status={errors.unit ? 'error' : ''}
+                  >
+                    {Array.isArray(units) && units.map((unit) => (
+                      <Option key={unit?.id || unit?.unitId || Math.random()} value={unit?.name || ''}>
+                        {unit?.name || ''}
+                      </Option>
+                    ))}
+                  </Select>
                   {errors.unit && (
                     <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
                       {errors.unit}
@@ -1403,7 +1579,8 @@ export default function ExportRequest() {
                 </Button>
               </div>
             )}
-          </div>
+            </div>
+          </Spin>
         </Modal>
       </div>
     </WarehouseLayout>

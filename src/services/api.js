@@ -1,5 +1,5 @@
 import axios from "axios";
-import useAuthStore from '../store/authStore';
+import useAuthStore from "../store/authStore";
 
 const BASE_URL =
   import.meta.env.VITE_API_URL ||
@@ -8,7 +8,7 @@ const BASE_URL =
 function getToken() {
   try {
     if (typeof window === "undefined") return null;
-    
+
     // Lấy token từ authStore (memory) thay vì storage
     const accessToken = useAuthStore.getState().getAccessToken();
     return accessToken;
@@ -61,14 +61,14 @@ let isRefreshing = false;
 let failedQueue = [];
 
 const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => {
+  failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
     } else {
       prom.resolve(token);
     }
   });
-  
+
   failedQueue = [];
 };
 
@@ -86,11 +86,11 @@ axiosClient.interceptors.response.use(
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
-          .then(token => {
+          .then((token) => {
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return axiosClient(originalRequest);
           })
-          .catch(err => {
+          .catch((err) => {
             return Promise.reject(err);
           });
       }
@@ -99,7 +99,9 @@ axiosClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const newAccessToken = await useAuthStore.getState().refreshAccessToken();
+        const newAccessToken = await useAuthStore
+          .getState()
+          .refreshAccessToken();
 
         if (newAccessToken) {
           // Retry request với token mới
@@ -108,31 +110,63 @@ axiosClient.interceptors.response.use(
           isRefreshing = false;
           return axiosClient(originalRequest);
         } else {
-        // Refresh thất bại, redirect về login
-        processQueue(new Error('Token refresh failed'), null);
-        isRefreshing = false;
-        
-        // Clear auth state
-        useAuthStore.getState().logout();
-          
-          // Redirect to login (chỉ khi không phải đang ở trang login)
-          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+          // Refresh thất bại, redirect về login
+          processQueue(new Error("Token refresh failed"), null);
+          isRefreshing = false;
+
+          // Chỉ logout nếu:
+          // 1. Không phải là request logout (tránh vòng lặp)
+          // 2. Không đang ở trang login (tránh logout khi chưa đăng nhập)
+          const isLogoutRequest = originalRequest.url?.includes("/auth/logout");
+          const isOnLoginPage =
+            typeof window !== "undefined" &&
+            window.location.pathname.includes("/login");
+
+          if (!isLogoutRequest && !isOnLoginPage) {
+            // Clear auth state
+            useAuthStore.getState().logout();
           }
-          
-          return Promise.reject(new Error('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'));
+
+          // Redirect to login (chỉ khi không phải đang ở trang login)
+          if (
+            typeof window !== "undefined" &&
+            !window.location.pathname.includes("/login")
+          ) {
+            window.location.href = "/login";
+          }
+
+          return Promise.reject(
+            new Error(
+              "Tài khoản hoặc mật khẩu không hợp lệ. Vui lòng đăng nhập lại."
+            )
+          );
         }
       } catch (refreshError) {
         processQueue(refreshError, null);
         isRefreshing = false;
-        
-        useAuthStore.getState().logout();
-        
-        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          window.location.href = '/login';
+
+        // Chỉ logout nếu:
+        // 1. Không phải là request logout (tránh vòng lặp)
+        // 2. Không đang ở trang login (tránh logout khi chưa đăng nhập)
+        const isLogoutRequest = originalRequest.url?.includes("/auth/logout");
+        const isOnLoginPage =
+          typeof window !== "undefined" &&
+          window.location.pathname.includes("/login");
+
+        if (!isLogoutRequest && !isOnLoginPage) {
+          useAuthStore.getState().logout();
         }
-        
-        return Promise.reject(new Error('Không thể làm mới token. Vui lòng đăng nhập lại.'));
+
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.includes("/login")
+        ) {
+          window.location.href = "/login";
+        }
+
+        return Promise.reject(
+          new Error("Không thể làm mới token. Vui lòng đăng nhập lại.")
+        );
       }
     }
 
@@ -426,7 +460,11 @@ export const authAPI = {
       { skipAuth: true }
     ),
   changePassword: (currentPassword, newPassword, confirmPassword) =>
-    put("/auth/change-password", { currentPassword, newPassword, confirmPassword }),
+    put("/auth/change-password", {
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    }),
 };
 
 function buildQueryString(params = {}) {

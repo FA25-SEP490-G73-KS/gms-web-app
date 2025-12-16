@@ -46,21 +46,42 @@ const statusToKeyMap = {
 }
 
 const getStatusConfig = (status) => {
-  switch (status) {
+  if (!status) return { color: '#111', text: 'Không rõ' }
+  
+  const statusStr = String(status).trim()
+  
+  // Xử lý tiếng Việt
+  switch (statusStr) {
     case 'Hủy':
     case 'Đã hủy':
       return { color: '#ef4444', text: 'Hủy' }
     case 'Đã đến':
-      return { color: '#16a34a', text: status }
+      return { color: '#16a34a', text: 'Đã đến' }
     case 'Đã xác nhận':
-      return { color: '#e89400', text: status }
+      return { color: '#e89400', text: 'Đã xác nhận' }
     case 'Chờ':
-      return { color: '#e89400', text: status }
+      return { color: '#e89400', text: 'Chờ' }
     case 'Quá hạn':
-      return { color: '#666', text: status }
-    default:
-      return { color: '#111', text: status }
+      return { color: '#666', text: 'Quá hạn' }
   }
+  
+  // Xử lý tiếng Anh (enum values)
+  switch (statusStr.toUpperCase()) {
+    case 'CANCELLED':
+    case 'CANCELED':
+      return { color: '#ef4444', text: 'Hủy' }
+    case 'ARRIVED':
+      return { color: '#16a34a', text: 'Đã đến' }
+    case 'CONFIRMED':
+      return { color: '#e89400', text: 'Đã xác nhận' }
+    case 'OVERDUE':
+      return { color: '#666', text: 'Quá hạn' }
+    case 'COMPLETED':
+      return { color: '#16a34a', text: 'Hoàn thành' }
+  }
+  
+  // Fallback: trả về status gốc nếu không match
+  return { color: '#111', text: statusStr }
 }
 
 const formatLicensePlate = (value) => {
@@ -1056,7 +1077,18 @@ export default function AdminAppointments() {
                     </div>
                     <div style={{ marginBottom: '16px' }}>
                         <div style={{ fontSize: '13px', color: '#888' }}>Trạng thái</div>
-                        <Badge {...getStatusConfig(selectedFull?.statusKey || selected?.status)} />
+                        {(() => {
+                          // Ưu tiên status từ response (selectedFull?.status), fallback về statusKey hoặc selected?.status
+                          const statusToDisplay = selectedFull?.status || selectedFull?.statusKey || selected?.status || ''
+                          const statusConfig = getStatusConfig(statusToDisplay)
+                          return (
+                            <Badge 
+                              color={statusConfig.color} 
+                              text={statusConfig.text}
+                              style={{ fontSize: '16px', fontWeight: 600 }}
+                            />
+                          )
+                        })()}
                     </div>
                 </div>
             </div>

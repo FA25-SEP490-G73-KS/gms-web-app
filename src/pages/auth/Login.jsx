@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { Form, Input, Button, Card, Checkbox, message } from 'antd'
 import { UserOutlined, LockOutlined, EyeInvisibleOutlined, EyeTwoTone } from '@ant-design/icons'
 import useAuthStore from '../../store/authStore'
+import ErrorAlert from '../../components/common/ErrorAlert'
 import '../../styles/pages/auth/login.css'
 import { normalizePhoneTo0, getRoleFromToken } from '../../utils/helpers'
 import { ROLE_ROUTES, USER_ROLES } from '../../utils/constants'
@@ -11,6 +12,7 @@ export default function Login() {
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [logoLoaded, setLogoLoaded] = useState(false)
+  const [error, setError] = useState(null)
   const navigate = useNavigate()
   const location = useLocation()
   const login = useAuthStore((state) => state.login)
@@ -121,7 +123,9 @@ export default function Login() {
         }, 50)
       } catch (error) {
         const errorMessage = error?.message || 'Đăng nhập thất bại. Vui lòng thử lại!'
-        message.error(errorMessage)
+        setError(errorMessage)
+        // Vẫn giữ message.error để hiển thị trong console hoặc fallback
+        // message.error(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -241,6 +245,15 @@ export default function Login() {
           </Form>
         </Card>
       </div>
+      
+      {/* Error Alert */}
+      {error && (
+        <ErrorAlert
+          message={error}
+          onClose={() => setError(null)}
+          duration={5000}
+        />
+      )}
     </div>
   )
 }

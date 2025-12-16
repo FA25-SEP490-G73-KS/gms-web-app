@@ -880,8 +880,8 @@ export default function TicketDetailPage() {
       }
     } else {
       // Nếu không có priceQuotationItemId, chỉ xóa khỏi state (item mới chưa lưu)
-      setReplaceItems(replaceItems.filter(item => item.id !== id))
-    }
+    setReplaceItems(replaceItems.filter(item => item.id !== id))
+  }
   }
 
   const deleteServiceItem = async (id, priceQuotationItemId) => {
@@ -902,7 +902,7 @@ export default function TicketDetailPage() {
       }
     } else {
       // Nếu không có priceQuotationItemId, chỉ xóa khỏi state (item mới chưa lưu)
-      setServiceItems(serviceItems.filter(item => item.id !== id))
+    setServiceItems(serviceItems.filter(item => item.id !== id))
     }
   }
 
@@ -1332,7 +1332,18 @@ export default function TicketDetailPage() {
       return
     }
 
-    
+    const hide = message.loading('Đang gửi báo giá...', 0)
+    setActionLoading(true)
+    try {
+      // Bước 1: Cập nhật ngày dự kiến giao xe trước
+      const dateStr = expectedDate.format('YYYY-MM-DD')
+      const { error: deliveryError } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
+      
+      if (deliveryError) {
+        throw new Error(deliveryError || 'Cập nhật ngày giao xe không thành công')
+      }
+
+      // Bước 2: Lưu báo giá (setQuotationDraft)
     await setQuotationDraft()
 
     const payload = {
@@ -1343,9 +1354,7 @@ export default function TicketDetailPage() {
       status: 'DRAFT'
     }
 
-    const hide = message.loading('Đang gửi báo giá...', 0)
-    setActionLoading(true)
-    try {
+      // Bước 3: Cập nhật báo giá
       const { data: response, error } = await priceQuotationAPI.update(quotationId, payload)
       
       if (error) {
@@ -1501,9 +1510,9 @@ export default function TicketDetailPage() {
             isPartSelect
           />
           {errors[`replace_${record.id}_category`] && (
-            <div className="td-error-placeholder">
+          <div className="td-error-placeholder">
               {errors[`replace_${record.id}_category`]}
-            </div>
+          </div>
           )}
         </div>
       )
@@ -1524,27 +1533,27 @@ export default function TicketDetailPage() {
                              currentQuantity > partQuantity
         
         return (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <input
-              type="number"
-              min={1}
-              value={record.quantity ?? 1}
-              onChange={(e) =>
-                updateReplaceItem(record.id, {
-                  quantity: Number(e.target.value) || 1
-                })
-              }
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <input
+            type="number"
+            min={1}
+            value={record.quantity ?? 1}
+            onChange={(e) =>
+              updateReplaceItem(record.id, {
+                quantity: Number(e.target.value) || 1
+              })
+            }
               style={{
                 ...baseInputStyle,
                 borderColor: isOutOfStock ? '#ef4444' : baseInputStyle.borderColor,
                 borderWidth: isOutOfStock ? '2px' : baseInputStyle.borderWidth || '1px'
               }}
-              onFocus={handleInputFocus}
-              onBlur={handleInputBlur}
-              disabled={inputsDisabled}
-            />
-          </div>
-        )
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
+          />
+        </div>
+      )
       }
     },
     {
@@ -1606,9 +1615,9 @@ export default function TicketDetailPage() {
             }}
           />
           {errors[`replace_${record.id}_unit`] && (
-            <div className="td-error-placeholder">
+          <div className="td-error-placeholder">
               {errors[`replace_${record.id}_unit`]}
-            </div>
+          </div>
           )}
         </div>
       )
@@ -1644,9 +1653,9 @@ export default function TicketDetailPage() {
             disabled={inputsDisabled || record.unitPriceLocked}
           />
           {errors[`replace_${record.id}_unitPrice`] && (
-            <div className="td-error-placeholder">
+          <div className="td-error-placeholder">
               {errors[`replace_${record.id}_unitPrice`]}
-            </div>
+          </div>
           )}
         </div>
       )
@@ -1704,10 +1713,10 @@ export default function TicketDetailPage() {
                   okText="Xác nhận"
                   cancelText="Hủy"
                 >
-                  <DeleteOutlined
-                    style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                    title="Xóa dòng"
-                  />
+              <DeleteOutlined
+                style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                title="Xóa dòng"
+              />
                 </Popconfirm>
               ) : (
                 <DeleteOutlined
@@ -1752,9 +1761,9 @@ export default function TicketDetailPage() {
             disabled={inputsDisabled}
           />
           {errors[`service_${record.id}_task`] && (
-            <div className="td-error-placeholder">
+          <div className="td-error-placeholder">
               {errors[`service_${record.id}_task`]}
-            </div>
+          </div>
           )}
         </div>
       )
@@ -1789,9 +1798,9 @@ export default function TicketDetailPage() {
             disabled={inputsDisabled}
           />
           {errors[`service_${record.id}_unitPrice`] && (
-            <div className="td-error-placeholder">
+          <div className="td-error-placeholder">
               {errors[`service_${record.id}_unitPrice`]}
-            </div>
+          </div>
           )}
         </div>
       )
@@ -1825,15 +1834,15 @@ export default function TicketDetailPage() {
                 okText="Xác nhận"
                 cancelText="Hủy"
               >
-                <DeleteOutlined
-                  style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
+            <DeleteOutlined
+              style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
                 />
               </Popconfirm>
             ) : (
               <DeleteOutlined
                 style={{ fontSize: '16px', cursor: 'pointer', color: '#ef4444' }}
                 onClick={() => deleteServiceItem(record.id, null)}
-              />
+            />
             )
           )}
         </Space>
@@ -2208,17 +2217,17 @@ export default function TicketDetailPage() {
                         background: isTicketCancelled
                           ? '#9ca3af'
                           : (isWaitingWarehouse && !hasRejectedItem)
-                            ? '#9ca3af'
-                            : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                              ? '#CBB081'
-                              : '#22c55e',
+                          ? '#9ca3af'
+                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
+                            ? '#CBB081'
+                            : '#22c55e',
                         borderColor: isTicketCancelled
                           ? '#9ca3af'
                           : (isWaitingWarehouse && !hasRejectedItem)
-                            ? '#9ca3af'
-                            : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                              ? '#CBB081'
-                              : '#22c55e',
+                          ? '#9ca3af'
+                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
+                            ? '#CBB081'
+                            : '#22c55e',
                       color: '#fff',
                       fontWeight: 600,
                       padding: '0 24px',

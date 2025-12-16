@@ -5,6 +5,7 @@ import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/accountance/materials.css'
 import { stockReceiptAPI } from '../../services/api'
+import dayjs from 'dayjs'
 
 export default function Materials() {
   const [query, setQuery] = useState('')
@@ -68,8 +69,7 @@ export default function Materials() {
         amount: paymentDetail?.amount || 0,
         description: 'Thanh toán phiếu nhập kho',
         relatedEmployeeId: 0,
-        relatedSupplierId: 0,
-        type: 'Thanh toán phiếu nhập kho'
+        relatedSupplierId: paymentDetail?.supplierId || 0
       }
       formData.append('data', JSON.stringify(paymentData))
       
@@ -113,10 +113,23 @@ export default function Materials() {
 
       if (data?.result) {
         const { content = [], totalElements } = data.result
-        setMaterialsData(content)
+        
+        // Transform API data to match UI structure
+        const transformedData = content.map((item) => ({
+          id: item.historyId,
+          receiptCode: item.receiptCode || 'N/A',
+          sku: item.sku || 'N/A',
+          quantity: item.quantity || 0,
+          unitPrice: item.quantity > 0 ? (item.totalPrice / item.quantity) : 0,
+          totalPrice: item.totalPrice || 0,
+          receivedAt: item.receivedAt || null,
+          paymentStatus: item.paymentStatus || null
+        }))
+        
+        setMaterialsData(transformedData)
         setPagination(prev => ({
           ...prev,
-          total: totalElements ?? content.length ?? 0,
+          total: totalElements ?? transformedData.length ?? 0,
           current: page + 1
         }))
       } else {
@@ -146,23 +159,66 @@ export default function Materials() {
         const matchesQuery =
           !query ||
           item.receiptCode?.toLowerCase().includes(query.toLowerCase()) ||
-          item.partSKU?.toLowerCase().includes(query.toLowerCase())
+          item.sku?.toLowerCase().includes(query.toLowerCase())
         const matchesPaymentStatus =
           selectedPaymentStatuses.length === 0 ||
           selectedPaymentStatuses.includes((item.paymentStatus || '').toUpperCase())
-        const createdAt = item.createdAt ? new Date(item.createdAt) : null
+        // Xử lý receivedAt: có thể là format sẵn "DD/MM/YYYY HH:mm" hoặc ISO string
+        let receivedAt = null
+        if (item.receivedAt) {
+          const datePattern = /^\d{2}\/\d{2}\/\d{4}(\s+\d{2}:\d{2})?$/
+          if (datePattern.test(item.receivedAt)) {
+            // Parse format DD/MM/YYYY HH:mm
+            const [datePart] = item.receivedAt.split(' ')
+            const [day, month, year] = datePart.split('/')
+            receivedAt = dayjs(`${year}-${month}-${day}`)
+          } else {
+            // Parse ISO string hoặc timestamp
+            receivedAt = dayjs(item.receivedAt)
+          }
+        }
+        
         const matchesDate =
           !fromDate ||
           !toDate ||
-          (createdAt &&
-            createdAt >= new Date(fromDate.startOf('day').toISOString()) &&
-            createdAt <= new Date(toDate.endOf('day').toISOString()))
+          (receivedAt && receivedAt.isValid() &&
+            receivedAt.isAfter(fromDate.startOf('day').subtract(1, 'day')) &&
+            receivedAt.isBefore(toDate.endOf('day').add(1, 'day')))
         return matchesQuery
           && matchesPaymentStatus
           && matchesDate
       })
       .map((item, index) => ({ ...item, key: item.id, index }))
   }, [query, materialsData, selectedPaymentStatuses, createdDateRange])
+
+  // Helper function để format tiền VN với dấu . làm ngăn cách
+  const formatCurrency = (value) => {
+    if (!value && value !== 0) return '0'
+    return value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  }
+
+  // Helper function để format date
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A'
+    
+    // Kiểm tra xem có phải là format DD/MM/YYYY HH:mm hoặc DD/MM/YYYY không (đã được format sẵn từ backend)
+    const datePattern = /^\d{2}\/\d{2}\/\d{4}(\s+\d{2}:\d{2})?$/
+    if (datePattern.test(dateString)) {
+      // Đã format sẵn, chỉ lấy phần ngày (bỏ phần giờ nếu có)
+      return dateString.split(' ')[0]
+    }
+    
+    // Nếu là ISO string hoặc timestamp, parse bằng dayjs
+    try {
+      const parsed = dayjs(dateString)
+      if (parsed.isValid()) {
+        return parsed.format('DD/MM/YYYY')
+      }
+      return 'N/A'
+    } catch (e) {
+      return 'N/A'
+    }
+  }
 
   const mainColumns = [
     {
@@ -174,14 +230,14 @@ export default function Materials() {
     },
     {
       title: 'Mã SKU',
-      dataIndex: 'partSKU',
-      key: 'partSKU',
+      dataIndex: 'sku',
+      key: 'sku',
       width: 250
     },
     {
       title: 'SL nhận',
-      dataIndex: 'receivedQuantity',
-      key: 'receivedQuantity',
+      dataIndex: 'quantity',
+      key: 'quantity',
       width: 120,
       align: 'center',
       render: (value) => value || 0
@@ -191,8 +247,8 @@ export default function Materials() {
       dataIndex: 'unitPrice',
       key: 'unitPrice',
       width: 150,
-      align: 'center',
-      render: (value) => value || 0
+      align: 'right',
+      render: (value) => formatCurrency(value || 0)
     },
     {
       title: 'Thành tiền',
@@ -200,29 +256,32 @@ export default function Materials() {
       key: 'totalPrice',
       width: 150,
       align: 'right',
-      render: (value) => (value || 0).toLocaleString('vi-VN')
+      render: (value) => formatCurrency(value || 0)
     },
     {
       title: 'Ngày nhập',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
+      dataIndex: 'receivedAt',
+      key: 'receivedAt',
       width: 150,
       align: 'center',
-      render: (date) => date ? new Date(date).toLocaleDateString('vi-VN') : 'N/A'
+      render: (date) => formatDate(date)
     },
     {
       title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
+      dataIndex: 'paymentStatus',
+      key: 'paymentStatus',
       width: 160,
       align: 'center',
-      render: (text) => {
+      render: (status) => {
         const statusMap = {
           'PENDING': { label: 'Chờ xử lý', color: '#3b82f6' },
           'COMPLETED': { label: 'Đã thanh toán', color: '#1f8f4d' },
+          'PAID': { label: 'Đã thanh toán', color: '#1f8f4d' },
+          'UNPAID': { label: 'Chưa thanh toán', color: '#faad14' },
+          'PARTIAL_PAID': { label: 'Thanh toán 1 phần', color: '#1677ff' },
           'CANCELLED': { label: 'Đã hủy', color: '#ef4444' }
         }
-        const statusInfo = statusMap[text] || { label: text, color: '#b45309' }
+        const statusInfo = statusMap[status] || { label: status || 'N/A', color: '#b45309' }
         return (
           <Tag
             style={{
@@ -291,9 +350,21 @@ export default function Materials() {
             loading={loading}
             pagination={{
               ...pagination,
-              showTotal: (total, range) => `${range[0]} of ${total} row(s) selected.`,
+              showTotal: (total, range) => `Hiển thị ${range[0]}-${range[1]} của ${total} bản ghi`,
               showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100']
+              pageSizeOptions: ['10', '20', '50', '100'],
+              locale: {
+                items_per_page: ' / trang',
+                jump_to: 'Đi đến',
+                jump_to_confirm: 'Xác nhận',
+                page: 'Trang',
+                prev_page: 'Trang trước',
+                next_page: 'Trang sau',
+                prev_5: 'Trước 5 trang',
+                next_5: 'Sau 5 trang',
+                prev_3: 'Trước 3 trang',
+                next_3: 'Sau 3 trang'
+              }
             }}
             onChange={handleTableChange}
             components={goldTableHeader}
@@ -362,7 +433,7 @@ export default function Materials() {
                 gap: '12px'
               }}>
                 <span style={{ fontWeight: 600, fontSize: '14px' }}>
-                  Nhà phân phối <span style={{ color: 'red' }}>*</span>:
+                  Nhà phân phối:
                 </span>
                 <span style={{ fontSize: '14px', color: '#666' }}>
                   {paymentDetail.supplier || 'Toyota'}
@@ -377,7 +448,7 @@ export default function Materials() {
                 gap: '12px'
               }}>
                 <span style={{ fontWeight: 600, fontSize: '14px' }}>
-                  Số tiền <span style={{ color: 'red' }}>*</span>:
+                  Số tiền:
                 </span>
                 <span style={{ fontSize: '14px', color: '#666' }}>
                   {(paymentDetail.amount || 600000).toLocaleString('vi-VN')}

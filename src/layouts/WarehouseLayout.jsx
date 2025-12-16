@@ -294,7 +294,7 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
       {/* Main Content */}
       <main className="warehouse-main">
         <div className="warehouse-content">
-          {children}
+            {children}
         </div>
       </main>
     </div>

@@ -25,7 +25,7 @@ import {
 } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import { partsAPI, partCategoriesAPI, unitsAPI, marketsAPI, suppliersAPI } from '../../services/api'
+import { partsAPI, partCategoriesAPI, unitsAPI, marketsAPI, suppliersAPI, vehiclesAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 import '../../styles/pages/warehouse/import-list.css'
 import '../../styles/pages/warehouse/parts-list.css'
@@ -54,6 +54,8 @@ export default function PartsList() {
   const [units, setUnits] = useState([])
   const [markets, setMarkets] = useState([])
   const [suppliers, setSuppliers] = useState([])
+  const [brands, setBrands] = useState([])
+  const [models, setModels] = useState([])
   const [newPartModalOpen, setNewPartModalOpen] = useState(false)
   const [newPartForm] = Form.useForm()
   const [tempFilters, setTempFilters] = useState({
@@ -86,7 +88,16 @@ export default function PartsList() {
     fetchUnits()
     fetchMarkets()
     fetchSuppliers()
+    fetchBrands()
   }, [])
+
+  // Reset models khi mở modal "Thêm linh kiện"
+  useEffect(() => {
+    if (newPartModalOpen) {
+      setModels([])
+      newPartForm.setFieldsValue({ vehicleBrand: undefined, vehicleModel: undefined })
+    }
+  }, [newPartModalOpen])
 
   const fetchCategories = async () => {
     try {
@@ -151,6 +162,44 @@ export default function PartsList() {
     } catch (err) {
       console.error('Failed to fetch suppliers:', err)
       setSuppliers([])
+    }
+  }
+
+  const fetchBrands = async () => {
+    try {
+      const { data, error } = await vehiclesAPI.getBrands()
+      if (error) {
+        console.error('Error fetching brands:', error)
+        return
+      }
+      
+      const result = data?.result || data || []
+      setBrands(Array.isArray(result) ? result : [])
+    } catch (err) {
+      console.error('Failed to fetch brands:', err)
+      setBrands([])
+    }
+  }
+
+  const fetchModelsByBrand = async (brandId) => {
+    if (!brandId) {
+      setModels([])
+      return
+    }
+    
+    try {
+      const { data, error } = await vehiclesAPI.getModelsByBrand(brandId)
+      if (error) {
+        console.error('Error fetching models:', error)
+        setModels([])
+        return
+      }
+      
+      const result = data?.result || data || []
+      setModels(Array.isArray(result) ? result : [])
+    } catch (err) {
+      console.error('Failed to fetch models:', err)
+      setModels([])
     }
   }
 
@@ -384,17 +433,23 @@ export default function PartsList() {
         console.log('Detail:', detail)
         console.log('===========================')
         
+        // Lưu full detail để dùng id khi build payload update
         setSelectedPart((prev) => ({ ...prev, originalItem: detail }))
+
+        // Đổ dữ liệu vào form để hiển thị (map đúng theo mô tả)
         editForm.setFieldsValue({
-          name: detail.name,
-          origin: detail.marketId || detail.market?.id || detail.marketName,
-          vehicleBrand: detail.categoryName,
-          vehicleModel: detail.universal ? 'All' : (detail.modelName || ''),
-          sellingPrice: detail.sellingPrice,
-          importPrice: detail.purchasePrice,
-          alertThreshold: detail.reorderLevel ?? detail.alertThreshold ?? 0,
-          useForAllModels: detail.universal,
-          unit: detail.unitId || detail.unitName
+          name: detail.name,                              // Tên linh kiện
+          category: detail.categoryId,                    // Danh mục: id, hiển thị label categoryName
+          origin: detail.marketId,                        // Xuất xứ: id, hiển thị label marketName
+          supplier: detail.supplierId,                    // Nhà cung cấp: id, hiển thị label supplierName
+          alertThreshold: detail.reorderLevel ?? 0,       // Lượng tối thiểu
+          unit: detail.unitId,                            // Đơn vị: id, hiển thị label unitName
+          useForAllModels: detail.universal,              // Dùng chung
+          vehicleBrand: detail.brandName || undefined,    // Hãng xe
+          vehicleModel: detail.modelName || undefined,    // Dòng xe
+          importPrice: detail.purchasePrice,              // Giá nhập
+          sellingPrice: detail.sellingPrice,              // Giá bán
+          note: detail.note || ''
         })
         return
       }
@@ -422,20 +477,75 @@ export default function PartsList() {
 
   const handleCreatePart = async (values) => {
     try {
+      // Helper function để convert value thành number hoặc null nếu không hợp lệ
+      const toNumberOrNull = (value) => {
+        if (value === null || value === undefined || value === '') return null
+        const num = Number(value)
+        return isNaN(num) ? null : num
+      }
+
+      // Đảm bảo tất cả ID fields đều là số hợp lệ (không null)
+      const marketId = toNumberOrNull(values.origin)
+      const categoryId = toNumberOrNull(values.categoryId)
+      const unitId = toNumberOrNull(values.unit)
+      const supplierId = toNumberOrNull(values.supplier)
+      
+      // Validate các field bắt buộc trước khi build payload
+      if (!values.name) {
+        message.error('Vui lòng nhập tên linh kiện')
+        return
+      }
+      if (marketId === null || marketId === undefined) {
+        message.error('Vui lòng chọn xuất xứ')
+        return
+      }
+      if (categoryId === null || categoryId === undefined || categoryId === 0) {
+        message.error('Vui lòng chọn danh mục')
+        return
+      }
+      if (unitId === null || unitId === undefined) {
+        message.error('Vui lòng chọn đơn vị')
+        return
+      }
+      if (supplierId === null || supplierId === undefined) {
+        message.error('Vui lòng chọn nhà cung cấp')
+        return
+      }
+
+      // Build payload với các ID đã được validate (không null)
       const payload = {
         name: values.name,
-        marketId: values.origin,
-        categoryId: values.categoryId || 0,
-        purchasePrice: values.importPrice || 0,
-        sellingPrice: values.sellingPrice || 0,
-        reorderLevel: values.alertThreshold || 0,
-        unitId: values.unit,
-        supplierId: values.supplier,
+        marketId: marketId,  // Đã validate, chắc chắn là số
+        categoryId: categoryId,  // Đã validate, chắc chắn là số > 0
+        purchasePrice: values.importPrice ?? 0,
+        sellingPrice: values.sellingPrice ?? 0,
+        reorderLevel: values.alertThreshold ?? 0,
+        unitId: unitId,  // Đã validate, chắc chắn là số
+        supplierId: supplierId,  // Đã validate, chắc chắn là số
         universal: values.useForAllModels || false,
         specialPart: false,
-        compatibleVehicleModelIds: values.useForAllModels ? [] : (values.vehicleModelIds || []),
         discountRate: 0
       }
+
+      // Chỉ thêm compatibleVehicleModelIds nếu không phải universal và có chọn model
+      if (!payload.universal) {
+        if (!values.vehicleModel) {
+          message.error('Vui lòng chọn dòng xe hoặc chọn "Dùng chung"')
+          return
+        }
+        const vehicleModelId = toNumberOrNull(values.vehicleModel)
+        if (vehicleModelId === null) {
+          message.error('Vui lòng chọn dòng xe hợp lệ')
+          return
+        }
+        payload.compatibleVehicleModelIds = [vehicleModelId]
+      } else {
+        payload.compatibleVehicleModelIds = []
+      }
+
+      console.log('=== Create Part Payload ===')
+      console.log('Payload:', JSON.stringify(payload, null, 2))
+      console.log('===========================')
 
       const { data: response, error } = await partsAPI.create(payload)
       if (error || !response) {
@@ -467,18 +577,23 @@ export default function PartsList() {
       console.log('Form Values:', values)
       
       const payload = {
-        name: values.name,
-        marketId: values.origin || detail.marketId || detail.market?.id || 1,
-        categoryId: detail.categoryId || detail.category?.id || 1,
-        purchasePrice: values.importPrice || 0,
-        sellingPrice: values.sellingPrice || 0,
-        reorderLevel: values.alertThreshold || detail.reorderLevel || 0,
-        unitId: values.unit || detail.unitId || detail.unit?.id || 1,
-        universal: values.useForAllModels || false,
-        specialPart: detail.specialPart || false,
-        vehicleModelId: detail.vehicleModelId || detail.vehicleModel?.id || detail.modelId || 1,
-        discountRate: detail.discountRate || 0,
-        note: values.note || ''
+        // cho phép sửa các trường (trừ SKU) qua form; id lấy từ form nếu có, fallback từ detail
+        name: values.name || detail.name,
+        note: values.note ?? detail.note ?? '',
+
+        categoryId: values.category || detail.categoryId,           // Danh mục (id từ form)
+        marketId: values.origin || detail.marketId,                // Xuất xứ (id)
+        supplierId: values.supplier || detail.supplierId,          // Nhà cung cấp (id)
+        unitId: values.unit || detail.unitId,                      // Đơn vị (id)
+        vehicleModelId: detail.modelId ?? detail.vehicleModelId ?? 0,
+
+        purchasePrice: values.importPrice ?? detail.purchasePrice ?? 0,
+        sellingPrice: values.sellingPrice ?? detail.sellingPrice ?? 0,
+        reorderLevel: values.alertThreshold ?? detail.reorderLevel ?? 0,
+
+        universal: values.useForAllModels ?? detail.universal ?? false,
+        specialPart: detail.specialPart ?? false,
+        discountRate: detail.discountRate ?? 0
       }
 
       console.log('Final Payload:', JSON.stringify(payload, null, 2))
@@ -497,6 +612,12 @@ export default function PartsList() {
       console.error(err)
       message.error(err.message || 'Không thể cập nhật linh kiện')
     }
+  }
+
+  // Gọi khi ấn nút "Lưu" – chủ động lấy values từ form, tránh submit form tự động
+  const handleSavePart = () => {
+    const values = editForm.getFieldsValue()
+    handleUpdatePart(values)
   }
 
   const handleCreateModalClose = () => {
@@ -638,7 +759,7 @@ export default function PartsList() {
             </div>
 
             <div style={{ padding: '24px 32px' }}>
-              <Form layout="vertical" form={editForm} onFinish={handleUpdatePart}>
+            <Form layout="vertical" form={editForm}>
                 <Row gutter={16}>
                   <Col span={12}>
                     <Form.Item label="Mã SKU" style={{ marginBottom: 16 }}>
@@ -650,9 +771,9 @@ export default function PartsList() {
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item label="Nhà cung cấp" style={{ marginBottom: 16 }}>
+                    <Form.Item label="Số lượng tồn" style={{ marginBottom: 16 }}>
                       <Input 
-                        value={selectedPart.supplierName || selectedPart.originalItem?.supplierName || '—'}
+                        value={selectedPart.quantityOnHand || selectedPart.quantity || 0}
                         disabled
                         style={{ backgroundColor: '#f5f5f5' }}
                       />
@@ -667,6 +788,28 @@ export default function PartsList() {
                   style={{ marginBottom: 16 }}
                 >
                   <Input disabled={!isEditMode} />
+                </Form.Item>
+
+                {/* Danh mục - Select dropdown, cho phép sửa khi ấn Cập nhật */}
+                <Form.Item
+                  label="Danh mục" 
+                  name="category" 
+                  rules={[{ required: true, message: 'Chọn danh mục' }]}
+                  style={{ marginBottom: 16 }}
+                >
+                  <Select
+                    placeholder="Chọn danh mục"
+                    showSearch
+                    allowClear
+                    disabled={!isEditMode}
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    options={categories.map(cat => ({
+                      value: cat.id || cat.partCategoryId,
+                      label: cat.name
+                    }))}
+                  />
                 </Form.Item>
 
                 <Row gutter={16}>
@@ -693,11 +836,24 @@ export default function PartsList() {
                     </Form.Item>
                   </Col>
                   <Col span={12}>
-                    <Form.Item label="Số lượng tồn" style={{ marginBottom: 16 }}>
-                      <Input 
-                        value={selectedPart.quantityOnHand || selectedPart.quantity || 0}
-                        disabled
-                        style={{ backgroundColor: '#f5f5f5' }}
+                    <Form.Item 
+                      label="Nhà cung cấp" 
+                      name="supplier"
+                      rules={[{ required: true, message: 'Chọn nhà cung cấp' }]}
+                      style={{ marginBottom: 16 }}
+                    >
+                      <Select
+                        placeholder="Chọn nhà cung cấp"
+                        showSearch
+                        allowClear
+                        disabled={!isEditMode}
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        options={suppliers.map(supplier => ({
+                          value: supplier.id || supplier.supplierId,
+                          label: supplier.name || supplier.supplierName || supplier.companyName || ''
+                        }))}
                       />
                     </Form.Item>
                   </Col>
@@ -749,36 +905,30 @@ export default function PartsList() {
                   <Checkbox disabled={!isEditMode}>Dùng chung</Checkbox>
                 </Form.Item>
 
-                <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.useForAllModels !== currentValues.useForAllModels}>
+                {/* Nếu không dùng chung thì hiển thị hãng xe / dòng xe */}
+                <Form.Item
+                  noStyle
+                  shouldUpdate={(prev, curr) => prev.useForAllModels !== curr.useForAllModels}
+                >
                   {({ getFieldValue }) =>
                     !getFieldValue('useForAllModels') ? (
                       <Row gutter={16}>
                         <Col span={12}>
-                          <Form.Item label="Hãng xe" name="vehicleBrand" style={{ marginBottom: 16 }}>
-                            <Select
-                              placeholder="Chọn hãng xe"
-                              disabled={!isEditMode}
-                              options={[
-                                { value: 'Castrol', label: 'Castrol' },
-                                { value: 'Toyota', label: 'Toyota' },
-                                { value: 'Honda', label: 'Honda' },
-                                { value: 'Mazda', label: 'Mazda' }
-                              ]}
-                            />
+                          <Form.Item
+                            label="Hãng xe"
+                            name="vehicleBrand"
+                            style={{ marginBottom: 16 }}
+                          >
+                            <Input disabled={!isEditMode} />
                           </Form.Item>
                         </Col>
                         <Col span={12}>
-                          <Form.Item label="Dòng xe" name="vehicleModel" style={{ marginBottom: 16 }}>
-                            <Select
-                              placeholder="Chọn dòng xe"
-                              disabled={!isEditMode}
-                              options={[
-                                { value: 'All', label: 'All' },
-                                { value: 'Camry', label: 'Camry' },
-                                { value: 'Vios', label: 'Vios' },
-                                { value: 'Civic', label: 'Civic' }
-                              ]}
-                            />
+                          <Form.Item
+                            label="Dòng xe"
+                            name="vehicleModel"
+                            style={{ marginBottom: 16 }}
+                          >
+                            <Input disabled={!isEditMode} />
                           </Form.Item>
                         </Col>
                       </Row>
@@ -862,7 +1012,7 @@ export default function PartsList() {
                   {isEditMode ? (
                     <Button 
                       type="primary"
-                      htmlType="submit"
+                      onClick={handleSavePart}
                       style={{
                         backgroundColor: '#52c41a',
                         border: 'none',
@@ -1163,6 +1313,7 @@ export default function PartsList() {
         onCancel={() => {
           setNewPartModalOpen(false)
           newPartForm.resetFields()
+          setModels([]) // Reset models khi đóng modal
         }}
         closable={false}
         footer={null}
@@ -1199,7 +1350,7 @@ export default function PartsList() {
             </Form.Item>
 
             <Form.Item
-              label={<span><span style={{ color: '#ef4444' }}>*</span> Loại linh kiện</span>}
+              label={<span><span style={{ color: '#ef4444' }}>*</span> Danh mục</span>}
               name="categoryId"
               required={false}
               style={{ marginBottom: 16 }}
@@ -1326,9 +1477,14 @@ export default function PartsList() {
                           filterOption={(input, option) =>
                             (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
                           }
-                          options={categories.map(cat => ({
-                            value: cat.id || cat.partCategoryId,
-                            label: cat.name
+                          onChange={(brandId) => {
+                            // Reset dòng xe khi đổi hãng xe
+                            newPartForm.setFieldsValue({ vehicleModel: undefined })
+                            fetchModelsByBrand(brandId)
+                          }}
+                          options={brands.map(brand => ({
+                            value: brand.id || brand.brandId,
+                            label: brand.name || brand.brandName || ''
                           }))}
                         />
                       </Form.Item>
@@ -1337,12 +1493,16 @@ export default function PartsList() {
                       <Form.Item label="Dòng xe" name="vehicleModel" style={{ marginBottom: 16 }}>
                         <Select
                           placeholder="Chọn dòng xe"
-                          options={[
-                            { value: 'All', label: 'All' },
-                            { value: 'Camry', label: 'Camry' },
-                            { value: 'Vios', label: 'Vios' },
-                            { value: 'Civic', label: 'Civic' }
-                          ]}
+                          showSearch
+                          allowClear
+                          disabled={!newPartForm.getFieldValue('vehicleBrand')}
+                          filterOption={(input, option) =>
+                            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                          }
+                          options={models.map(model => ({
+                            value: model.id || model.modelId,
+                            label: model.name || model.modelName || ''
+                          }))}
                         />
                       </Form.Item>
                     </Col>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Table, Button, Tag, Input, Dropdown, message, Modal, DatePicker } from 'antd'
+import { Table, Button, Tag, Input, Dropdown, message, Modal, DatePicker, Checkbox, Space } from 'antd'
 import { SearchOutlined, FilterOutlined, MoreOutlined, CalendarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
@@ -18,6 +18,8 @@ export default function ImportList() {
   const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [dateRange, setDateRange] = useState([null, null])
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
+  const [tempStatuses, setTempStatuses] = useState([])
+  const [tempDateRange, setTempDateRange] = useState([null, null])
 
   useEffect(() => {
     fetchImportList()
@@ -26,7 +28,7 @@ export default function ImportList() {
   const getStatusParam = (filter) => {
     const statusMap = {
       'Chờ nhập': 'PENDING',
-      'Nhập một phần': 'PARTIALLY_RECEIVED',
+      'Nhập một phần': 'PARTIAL_RECEIVED',
       'Đã nhập': 'RECEIVED',
       'Tất cả': null
     }
@@ -57,18 +59,36 @@ export default function ImportList() {
       const content = result.content || []
       
       // Transform API data to match UI structure
-      const transformedData = content.map((item) => ({
-        key: item.id,
-        id: item.id,
-        code: item.code || 'N/A',
-        supplierName: item.supplierName || 'N/A',
-        purchaseRequestCode: item.purchaseRequestCode || 'N/A',
-        receivedQty: item.receivedQty || 0,
-        totalQty: item.totalQty || 0,
-        lineCount: item.lineCount || 0,
-        createdAt: item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY HH:mm') : 'N/A',
-        status: mapStatus(item.status)
-      }))
+      const transformedData = content.map((item) => {
+        // Xử lý createdAt: nếu đã là chuỗi format sẵn (DD/MM/YYYY HH:mm) thì dùng trực tiếp
+        // Nếu là ISO string hoặc timestamp thì parse bằng dayjs
+        let formattedDate = 'N/A'
+        if (item.createdAt) {
+          // Kiểm tra xem có phải là format DD/MM/YYYY HH:mm không (đã được format sẵn từ backend)
+          const datePattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/
+          if (datePattern.test(item.createdAt)) {
+            // Đã format sẵn, dùng trực tiếp
+            formattedDate = item.createdAt
+          } else {
+            // Parse bằng dayjs (cho ISO string hoặc timestamp)
+            const parsed = dayjs(item.createdAt)
+            formattedDate = parsed.isValid() ? parsed.format('DD/MM/YYYY HH:mm') : item.createdAt
+          }
+        }
+
+        return {
+          key: item.id,
+          id: item.id,
+          code: item.code || 'N/A',
+          supplierName: item.supplierName || 'N/A',
+          purchaseRequestCode: item.purchaseRequestCode || 'N/A',
+          receivedQty: item.receivedQty || 0,
+          totalQty: item.totalQty || 0,
+          lineCount: item.lineCount || 0,
+          createdAt: formattedDate,
+          status: mapStatus(item.status)
+        }
+      })
 
       setImportList(transformedData)
       setTotal(result.totalElements || 0)
@@ -86,7 +106,8 @@ export default function ImportList() {
     const statusMap = {
       'RECEIVED': 'Đã nhập',
       'PENDING': 'Chờ nhập',
-      'PARTIALLY_RECEIVED': 'Nhập một phần',
+      'PARTIAL_RECEIVED': 'Chờ nhập kho',
+      'PARTIALLY_RECEIVED': 'Chờ nhập kho',
       'CANCELLED': 'Đã hủy'
     }
     return statusMap[status] || status || 'N/A'
@@ -109,7 +130,7 @@ export default function ImportList() {
       key: 'view',
       label: (
         <span onClick={() => handleViewDetail(record.id)}>
-          👁️ Xem chi tiết
+          Xem chi tiết
         </span>
       )
     },
@@ -117,7 +138,7 @@ export default function ImportList() {
       key: 'import',
       label: (
         <span onClick={() => handleImportWarehouse(record.id)}>
-          📦 Nhập kho
+          Nhập kho
         </span>
       )
     }
@@ -127,6 +148,7 @@ export default function ImportList() {
     const statusMap = {
       'Đã nhập': { color: '#22c55e', bgColor: '#f6ffed', borderColor: '#b7eb8f', text: 'Đã nhập' },
       'Chờ nhập': { color: '#faad14', bgColor: '#fffbe6', borderColor: '#ffe58f', text: 'Chờ nhập' },
+      'Chờ nhập kho': { color: '#faad14', bgColor: '#fffbe6', borderColor: '#ffe58f', text: 'Chờ nhập kho' },
       'Nhập một phần': { color: '#1677ff', bgColor: '#e6f4ff', borderColor: '#91caff', text: 'Nhập một phần' },
       'Đã hủy': { color: '#ff4d4f', bgColor: '#fff1f0', borderColor: '#ffccc7', text: 'Đã hủy' }
     }
@@ -216,59 +238,50 @@ export default function ImportList() {
 
   return (
     <WarehouseLayout>
-      <div style={{ marginBottom: 24 }}>
+      <div style={{ padding: 24 }}>
         {/* Heading */}
         <h1 style={{ margin: 0, marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
           Danh sách nhập kho
         </h1>
 
         {/* Search and Filter Row */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16
+          }}
+        >
           {/* Search Box */}
           <Input
             placeholder="Tìm kiếm"
             prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ 
+            style={{
               width: 300,
               borderRadius: '8px'
             }}
           />
 
-          {/* Filter Buttons */}
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            {['Tất cả', 'Chờ nhập', 'Nhập một phần', 'Đã nhập'].map((filter) => (
-              <Button
-                key={filter}
-                type={statusFilter === filter ? 'primary' : 'default'}
-                onClick={() => {
-                  setStatusFilter(filter)
-                  setPage(1)
-                }}
-                style={{
-                  borderRadius: '8px',
-                  fontWeight: 500,
-                  ...(statusFilter === filter && {
-                    background: '#CBB081',
-                    borderColor: '#CBB081',
-                    color: '#fff'
-                  })
-                }}
-              >
-                {filter}
-              </Button>
-            ))}
-            
-            <Button
-              icon={<FilterOutlined />}
-              onClick={() => setIsFilterModalOpen(true)}
-              style={{
-                borderRadius: '8px',
-                marginLeft: 4
-              }}
-            />
-          </div>
+          {/* Filter Button */}
+          <Button
+            icon={<FilterOutlined />}
+            onClick={() => {
+              setTempStatuses(
+                statusFilter && statusFilter !== 'Tất cả' ? [statusFilter] : []
+              )
+              setTempDateRange(dateRange)
+              setIsFilterModalOpen(true)
+            }}
+            style={{
+              borderRadius: '8px',
+              marginLeft: 4
+            }}
+          >
+            Bộ lọc
+          </Button>
         </div>
 
         <Table
@@ -297,52 +310,113 @@ export default function ImportList() {
         title="Bộ lọc"
         open={isFilterModalOpen}
         onCancel={() => setIsFilterModalOpen(false)}
-        footer={[
-          <Button 
-            key="reset" 
-            onClick={() => {
-              setDateRange([null, null])
-              setIsFilterModalOpen(false)
-            }}
-          >
-            Đặt lại
-          </Button>,
-          <Button
-            key="submit"
-            type="primary"
-            onClick={() => setIsFilterModalOpen(false)}
-            style={{
-              background: '#CBB081',
-              borderColor: '#CBB081'
-            }}
-          >
-            Tìm kiếm
-          </Button>
-        ]}
-        width={400}
+        footer={null}
+        width={450}
       >
-        <div style={{ marginTop: 16 }}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Từ ngày</label>
-            <DatePicker
-              placeholder="Chọn ngày bắt đầu"
-              value={dateRange[0]}
-              onChange={(date) => setDateRange([date, dateRange[1]])}
-              format="DD/MM/YYYY"
-              suffixIcon={<CalendarOutlined />}
-              style={{ width: '100%', borderRadius: '8px' }}
-            />
+        <div style={{ padding: '8px 0' }}>
+          {/* Trạng thái */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Trạng thái</div>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Checkbox
+                checked={tempStatuses.includes('Chờ nhập')}
+                onChange={() => {
+                  setTempStatuses((prev) =>
+                    prev.includes('Chờ nhập') ? [] : ['Chờ nhập']
+                  )
+                }}
+              >
+                Chờ nhập
+              </Checkbox>
+              <Checkbox
+                checked={tempStatuses.includes('Nhập một phần')}
+                onChange={() => {
+                  setTempStatuses((prev) =>
+                    prev.includes('Nhập một phần') ? [] : ['Nhập một phần']
+                  )
+                }}
+              >
+                Nhập một phần
+              </Checkbox>
+              <Checkbox
+                checked={tempStatuses.includes('Đã nhập')}
+                onChange={() => {
+                  setTempStatuses((prev) =>
+                    prev.includes('Đã nhập') ? [] : ['Đã nhập']
+                  )
+                }}
+              >
+                Đã nhập
+              </Checkbox>
+            </Space>
           </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 8, fontWeight: 500 }}>Đến ngày</label>
-            <DatePicker
-              placeholder="Chọn ngày kết thúc"
-              value={dateRange[1]}
-              onChange={(date) => setDateRange([dateRange[0], date])}
-              format="DD/MM/YYYY"
-              suffixIcon={<CalendarOutlined />}
-              style={{ width: '100%', borderRadius: '8px' }}
-            />
+
+          {/* Khoảng ngày tạo */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Khoảng ngày tạo</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Từ ngày</div>
+                <DatePicker
+                  placeholder="dd/mm/yyyy"
+                  style={{ width: '100%', borderRadius: 6 }}
+                  format="DD/MM/YYYY"
+                  value={tempDateRange[0]}
+                  onChange={(date) => {
+                    setTempDateRange([date, tempDateRange[1]])
+                  }}
+                  suffixIcon={<CalendarOutlined />}
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Đến ngày</div>
+                <DatePicker
+                  placeholder="dd/mm/yyyy"
+                  style={{ width: '100%', borderRadius: 6 }}
+                  format="DD/MM/YYYY"
+                  value={tempDateRange[1]}
+                  onChange={(date) => {
+                    setTempDateRange([tempDateRange[0], date])
+                  }}
+                  suffixIcon={<CalendarOutlined />}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12,
+              marginTop: 24
+            }}
+          >
+            <Button
+              onClick={() => {
+                setTempStatuses([])
+                setTempDateRange([null, null])
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                const appliedStatus = tempStatuses[0] || 'Tất cả'
+                setStatusFilter(appliedStatus)
+                setDateRange(tempDateRange)
+                setPage(1)
+                setIsFilterModalOpen(false)
+              }}
+              style={{
+                backgroundColor: '#1890ff',
+                borderColor: '#1890ff'
+              }}
+            >
+              Tìm kiếm
+            </Button>
           </div>
         </div>
       </Modal>

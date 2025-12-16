@@ -97,7 +97,7 @@ export default function ImportDetail() {
         const mapStatus = (status) => {
           const statusMap = {
             'PENDING': 'Chờ nhập kho',
-            'PARTIALLY_RECEIVED': 'Nhập một phần',
+            'PARTIAL_RECEIVED': 'Chờ nhập kho',
             'RECEIVED': 'Đã nhập kho',
             'CANCELLED': 'Đã hủy'
           }
@@ -327,7 +327,7 @@ export default function ImportDetail() {
       key: 'view',
       label: (
         <span onClick={() => handleViewItemDetail(record)}>
-          👁️ Xem chi tiết
+          Xem chi tiết
         </span>
       )
     }
@@ -467,7 +467,19 @@ export default function ImportDetail() {
           </div>
           <div style={{ display: 'flex', marginBottom: 12 }}>
             <span style={{ width: 150, fontWeight: 500 }}>Ngày tạo</span>
-            <span>: {detailData.createdAt ? dayjs(detailData.createdAt).format('DD/MM/YYYY HH:mm') : 'N/A'}</span>
+            <span>: {(() => {
+              if (!detailData.createdAt) return 'N/A'
+              // Kiểm tra xem có phải là format DD/MM/YYYY HH:mm không (đã được format sẵn từ backend)
+              const datePattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/
+              if (datePattern.test(detailData.createdAt)) {
+                // Đã format sẵn, dùng trực tiếp
+                return detailData.createdAt
+              } else {
+                // Parse bằng dayjs (cho ISO string hoặc timestamp)
+                const parsed = dayjs(detailData.createdAt)
+                return parsed.isValid() ? parsed.format('DD/MM/YYYY HH:mm') : detailData.createdAt
+              }
+            })()}</span>
           </div>
           <div style={{ display: 'flex', marginBottom: 12 }}>
             <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua</span>
@@ -604,7 +616,19 @@ export default function ImportDetail() {
                   dataIndex: 'receivedAt',
                   key: 'receivedAt',
                   width: 150,
-                  render: (date) => date ? dayjs(date).format('DD/MM/YYYY') : 'N/A'
+                  render: (date) => {
+                    if (!date) return 'N/A'
+                    // Kiểm tra xem có phải là format DD/MM/YYYY hoặc DD/MM/YYYY HH:mm không
+                    const datePattern = /^\d{2}\/\d{2}\/\d{4}(\s+\d{2}:\d{2})?$/
+                    if (datePattern.test(date)) {
+                      // Đã format sẵn, lấy phần ngày (bỏ phần giờ nếu có)
+                      return date.split(' ')[0]
+                    } else {
+                      // Parse bằng dayjs (cho ISO string hoặc timestamp)
+                      const parsed = dayjs(date)
+                      return parsed.isValid() ? parsed.format('DD/MM/YYYY') : date
+                    }
+                  }
                 },
                 {
                   title: 'Người nhập',
@@ -747,23 +771,6 @@ export default function ImportDetail() {
                     backgroundColor: '#f5f5f5',
                     cursor: 'not-allowed'
                   }}
-                />
-              </div>
-
-              {/* Đơn giá */}
-              <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>
-                  Đơn giá
-                </label>
-                <InputNumber
-                  min={0}
-                  placeholder="Nhập đơn giá"
-                  value={importFormData.unitPrice}
-                  onChange={(value) => setImportFormData({ ...importFormData, unitPrice: value || 0 })}
-                  formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                  onKeyDown={handleNumberKeyDown}
-                  style={{ width: '100%', borderRadius: '6px' }}
                 />
               </div>
 

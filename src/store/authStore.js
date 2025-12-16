@@ -1,85 +1,133 @@
-import { create } from 'zustand';
-import { authAPI } from '../services/api';
-import { normalizePhoneTo0, decodeJWT, normalizeRole } from '../utils/helpers';
+import { create } from "zustand";
+import { authAPI } from "../services/api";
+import { normalizePhoneTo0, decodeJWT, normalizeRole } from "../utils/helpers";
 
 // Initialize user from refreshToken if available (on page reload)
 const initializeUser = async () => {
   try {
-    if (typeof window === 'undefined') return null;
-    
-    // Chỉ lấy refreshToken từ localStorage (nếu rememberMe = true)
-    const refreshToken = localStorage.getItem('refreshToken');
-    console.log('[AuthStore] initializeUser - refreshToken exists:', !!refreshToken);
-    
+    if (typeof window === "undefined") return null;
+
+    // Lấy refreshToken từ localStorage (rememberMe = true) hoặc sessionStorage (rememberMe = false)
+    // Ưu tiên localStorage trước
+    const refreshTokenFromLocal = localStorage.getItem("refreshToken");
+    const refreshTokenFromSession = sessionStorage.getItem("refreshToken");
+    const refreshToken = refreshTokenFromLocal || refreshTokenFromSession;
+    const isFromLocalStorage = !!refreshTokenFromLocal;
+
+    console.log(
+      "[AuthStore] initializeUser - refreshToken exists:",
+      !!refreshToken,
+      "from localStorage:",
+      isFromLocalStorage,
+      "from sessionStorage:",
+      !!refreshTokenFromSession
+    );
+
     if (refreshToken) {
       try {
-        console.log('[AuthStore] Attempting to refresh token...');
+        console.log("[AuthStore] Attempting to refresh token...");
         // Thử refresh token để lấy accessToken mới
-        const { data: response, error } = await authAPI.refreshToken(refreshToken);
-        console.log('[AuthStore] Refresh token response:', { 
-          hasError: !!error, 
+        const { data: response, error } = await authAPI.refreshToken(
+          refreshToken
+        );
+        console.log("[AuthStore] Refresh token response:", {
+          hasError: !!error,
           hasAccessToken: !!response?.result?.accessToken,
           statusCode: response?.statusCode,
           errorMessage: error,
-          responseData: response
+          responseData: response,
         });
-        
+
         if (!error && response?.result?.accessToken) {
           const accessToken = response.result.accessToken;
           const decoded = decodeJWT(accessToken);
           if (decoded) {
-            const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority;
+            const rawRole =
+              decoded?.role ||
+              decoded?.userRole ||
+              decoded?.authorities?.[0] ||
+              decoded?.authority;
             if (rawRole) {
               const normalizedRole = normalizeRole(rawRole);
-              console.log('[AuthStore] Token refreshed successfully, role:', normalizedRole);
+              console.log(
+                "[AuthStore] Token refreshed successfully, role:",
+                normalizedRole
+              );
+              const newRefreshToken =
+                response.result.refreshToken || refreshToken;
+
+              // Lưu refreshToken mới vào đúng storage (localStorage hoặc sessionStorage)
+              if (isFromLocalStorage) {
+                localStorage.setItem("refreshToken", newRefreshToken);
+              } else {
+                sessionStorage.setItem("refreshToken", newRefreshToken);
+              }
+
               return {
                 accessToken, // Lưu trong memory
-                refreshToken: response.result.refreshToken || refreshToken, // Cập nhật refreshToken mới
+                refreshToken: newRefreshToken, // Cập nhật refreshToken mới
                 user: {
                   id: decoded?.userId || decoded?.id || decoded?.sub || null,
                   role: normalizedRole,
-                  fullName: decoded?.fullName || decoded?.name || decoded?.username || null,
+                  fullName:
+                    decoded?.fullName ||
+                    decoded?.name ||
+                    decoded?.username ||
+                    null,
                   email: decoded?.email || null,
                   phone: decoded?.phone || null,
-                }
+                },
               };
             } else {
-              console.warn('[AuthStore] Token decoded but no role found in token');
+              console.warn(
+                "[AuthStore] Token decoded but no role found in token"
+              );
             }
           } else {
-            console.warn('[AuthStore] Failed to decode access token');
+            console.warn("[AuthStore] Failed to decode access token");
           }
         } else {
           // Refresh token không hợp lệ hoặc có lỗi từ server
-          console.error('[AuthStore] Refresh token failed:', {
+          console.error("[AuthStore] Refresh token failed:", {
             error,
             statusCode: response?.statusCode,
-            message: response?.message || error
+            message: response?.message || error,
           });
-          
-          // Nếu là lỗi 500 (server error), có thể là lỗi tạm thời
-          // Không xóa refreshToken ngay, để user có thể thử lại
-          if (response?.statusCode === 500) {
-            console.warn('[AuthStore] Server error (500) during refresh, keeping refreshToken for retry');
-            // Có thể retry sau, nhưng hiện tại return null để user phải login lại
-            return null;
+
+          // Chỉ xóa refreshToken khi chắc chắn nó không hợp lệ (401, 403)
+          // Không xóa khi là lỗi server (500) hoặc network error
+          const statusCode = response?.statusCode;
+          if (statusCode === 401 || statusCode === 403) {
+            // RefreshToken không hợp lệ hoặc đã hết hạn, xóa từ cả localStorage và sessionStorage
+            console.log(
+              "[AuthStore] Refresh token invalid (401/403), removing from storage"
+            );
+            localStorage.removeItem("refreshToken");
+            sessionStorage.removeItem("refreshToken");
+          } else {
+            // Lỗi server (500) hoặc network error - giữ refreshToken để retry sau
+            console.warn(
+              "[AuthStore] Server/network error during refresh, keeping refreshToken for retry. Status:",
+              statusCode
+            );
+            // Không xóa refreshToken, để có thể retry sau
           }
-          
-          // Các lỗi khác (401, 403, etc.) - refreshToken không hợp lệ, xóa
-          console.log('[AuthStore] Refresh token invalid, removing from localStorage');
-          localStorage.removeItem('refreshToken');
+          return null;
         }
       } catch (err) {
-        console.error('[AuthStore] Exception during token refresh:', err);
-        // Lỗi network hoặc exception khác - không xóa refreshToken ngay
-        // Có thể là lỗi tạm thời
+        console.error("[AuthStore] Exception during token refresh:", err);
+        // Lỗi network hoặc exception khác - KHÔNG xóa refreshToken
+        // Có thể là lỗi tạm thời, giữ refreshToken để retry sau
+        // Chỉ return null để không set user, nhưng vẫn giữ refreshToken
         return null;
       }
     } else {
-      console.log('[AuthStore] No refreshToken found in localStorage');
+      console.log(
+        "[AuthStore] No refreshToken found in localStorage or sessionStorage"
+      );
     }
   } catch (error) {
-    console.error('[AuthStore] Error initializing user:', error);
+    console.error("[AuthStore] Error initializing user:", error);
   }
   return null;
 };
@@ -87,30 +135,43 @@ const initializeUser = async () => {
 const useAuthStore = create((set, get) => ({
   // accessToken lưu trong memory (state)
   accessToken: null,
-  // refreshToken chỉ lưu trong localStorage nếu rememberMe = true
-  refreshToken: typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null,
+  // refreshToken lưu trong localStorage (rememberMe = true) hoặc sessionStorage (rememberMe = false)
+  refreshToken:
+    typeof window !== "undefined"
+      ? localStorage.getItem("refreshToken") ||
+        sessionStorage.getItem("refreshToken")
+      : null,
   user: null,
   loading: false,
   isRefreshing: false, // Flag để tránh multiple refresh requests
-  
+  isLoggingOut: false, // Flag để tránh multiple logout requests
+
   // Initialize store on mount (for page reload)
   initialize: async () => {
-    console.log('[AuthStore] initialize() called');
+    console.log("[AuthStore] initialize() called");
     const initialized = await initializeUser();
     if (initialized) {
-      console.log('[AuthStore] User initialized successfully:', initialized.user);
+      console.log(
+        "[AuthStore] User initialized successfully:",
+        initialized.user
+      );
       // Cập nhật refreshToken trong localStorage nếu có refreshToken mới
-      if (initialized.refreshToken && typeof window !== 'undefined') {
-        localStorage.setItem('refreshToken', initialized.refreshToken);
+      if (initialized.refreshToken && typeof window !== "undefined") {
+        localStorage.setItem("refreshToken", initialized.refreshToken);
       }
       set({
         accessToken: initialized.accessToken,
         refreshToken: initialized.refreshToken,
-        user: initialized.user
+        user: initialized.user,
       });
-      console.log('[AuthStore] State updated with user:', initialized.user?.role);
+      console.log(
+        "[AuthStore] State updated with user:",
+        initialized.user?.role
+      );
     } else {
-      console.log('[AuthStore] No user initialized (no refreshToken or refresh failed)');
+      console.log(
+        "[AuthStore] No user initialized (no refreshToken or refresh failed)"
+      );
     }
   },
 
@@ -118,53 +179,73 @@ const useAuthStore = create((set, get) => ({
     const normalizedPhone = normalizePhoneTo0(phone);
     set({ loading: true });
     try {
-      const { data: response, error } = await authAPI.login(normalizedPhone, password, rememberMe);
-      
+      const { data: response, error } = await authAPI.login(
+        normalizedPhone,
+        password,
+        rememberMe
+      );
+
       if (error) {
         set({ loading: false });
         throw new Error(error);
       }
 
-      if (!response || (response.statusCode !== 200 && response.statusCode !== 201)) {
+      if (
+        !response ||
+        (response.statusCode !== 200 && response.statusCode !== 201)
+      ) {
         set({ loading: false });
-        throw new Error(response?.message || 'Đăng nhập thất bại');
+        throw new Error(response?.message || "Đăng nhập thất bại");
       }
 
       const result = response.result || response;
       const accessToken = result?.accessToken;
       const refreshToken = result?.refreshToken;
-      
+
       if (!accessToken) {
         set({ loading: false });
-        throw new Error('Không nhận được access token từ server');
+        throw new Error("Không nhận được access token từ server");
       }
 
       // Decode accessToken để lấy thông tin user
       const decoded = decodeJWT(accessToken);
       if (!decoded) {
         set({ loading: false });
-        throw new Error('Không thể decode access token');
+        throw new Error("Không thể decode access token");
       }
 
       // Lấy role từ token
       let userRole = null;
-      const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority;
+      const rawRole =
+        decoded?.role ||
+        decoded?.userRole ||
+        decoded?.authorities?.[0] ||
+        decoded?.authority;
       if (rawRole) {
         userRole = normalizeRole(rawRole);
       }
 
       // Nếu không có role từ token, thử lấy từ response
       if (!userRole) {
-        const rawRoleFromResponse = result?.role || result?.userRole || result?.user?.role;
-        userRole = rawRoleFromResponse ? normalizeRole(rawRoleFromResponse) : null;
+        const rawRoleFromResponse =
+          result?.role || result?.userRole || result?.user?.role;
+        userRole = rawRoleFromResponse
+          ? normalizeRole(rawRoleFromResponse)
+          : null;
       }
 
       const userData = result?.user || {
         id: decoded?.userId || decoded?.id || decoded?.sub || null,
         phone: decoded?.phone || normalizedPhone,
         role: userRole,
-        fullName: decoded?.fullName || decoded?.name || decoded?.username || result?.fullName || result?.name || '',
-        email: decoded?.email || result?.email || ''
+        fullName:
+          decoded?.fullName ||
+          decoded?.name ||
+          decoded?.username ||
+          result?.fullName ||
+          result?.name ||
+          "",
+        email: decoded?.email || result?.email || "",
       };
 
       // Normalize role nếu chưa được normalize
@@ -174,24 +255,31 @@ const useAuthStore = create((set, get) => ({
         userData.role = userRole;
       }
 
-      // Lưu refreshToken vào localStorage CHỈ KHI rememberMe = true
-      if (rememberMe && refreshToken) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('refreshToken', refreshToken);
-        }
-      } else {
-        // Nếu không rememberMe, xóa refreshToken khỏi localStorage
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('refreshToken');
+      // Lưu refreshToken vào localStorage (rememberMe = true) hoặc sessionStorage (rememberMe = false)
+      if (refreshToken && typeof window !== "undefined") {
+        if (rememberMe) {
+          // Lưu vào localStorage - sẽ giữ khi đóng tab
+          localStorage.setItem("refreshToken", refreshToken);
+          sessionStorage.removeItem("refreshToken"); // Xóa sessionStorage nếu có
+          console.log(
+            "[AuthStore] RefreshToken saved to localStorage (rememberMe=true)"
+          );
+        } else {
+          // Lưu vào sessionStorage - sẽ tự xóa khi đóng tab
+          sessionStorage.setItem("refreshToken", refreshToken);
+          localStorage.removeItem("refreshToken"); // Xóa localStorage nếu có
+          console.log(
+            "[AuthStore] RefreshToken saved to sessionStorage (rememberMe=false)"
+          );
         }
       }
 
       // Lưu accessToken trong memory (state), KHÔNG lưu vào storage
-      set({ 
+      set({
         accessToken: accessToken,
         refreshToken: rememberMe && refreshToken ? refreshToken : null,
         user: userData,
-        loading: false 
+        loading: false,
       });
 
       return response;
@@ -204,14 +292,26 @@ const useAuthStore = create((set, get) => ({
   // Refresh accessToken bằng refreshToken
   refreshAccessToken: async () => {
     const state = get();
-    
+
     // Nếu đang refresh, không refresh lại
     if (state.isRefreshing) {
       return state.accessToken;
     }
 
     // Nếu không có refreshToken, không thể refresh
-    const refreshToken = state.refreshToken || (typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null);
+    // Lấy từ cả localStorage và sessionStorage
+    const refreshTokenFromLocal =
+      typeof window !== "undefined"
+        ? localStorage.getItem("refreshToken")
+        : null;
+    const refreshTokenFromSession =
+      typeof window !== "undefined"
+        ? sessionStorage.getItem("refreshToken")
+        : null;
+    const refreshToken =
+      state.refreshToken || refreshTokenFromLocal || refreshTokenFromSession;
+    const isFromLocalStorage = !!refreshTokenFromLocal;
+
     if (!refreshToken) {
       return null;
     }
@@ -219,18 +319,21 @@ const useAuthStore = create((set, get) => ({
     set({ isRefreshing: true });
 
     try {
-      const { data: response, error } = await authAPI.refreshToken(refreshToken);
-      
+      const { data: response, error } = await authAPI.refreshToken(
+        refreshToken
+      );
+
       if (error || !response?.result?.accessToken) {
-        // Refresh token không hợp lệ, xóa và logout
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('refreshToken');
+        // Refresh token không hợp lệ, xóa từ cả localStorage và sessionStorage
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("refreshToken");
+          sessionStorage.removeItem("refreshToken");
         }
-        set({ 
-          accessToken: null, 
-          refreshToken: null, 
+        set({
+          accessToken: null,
+          refreshToken: null,
           user: null,
-          isRefreshing: false 
+          isRefreshing: false,
         });
         return null;
       }
@@ -241,27 +344,45 @@ const useAuthStore = create((set, get) => ({
       // Decode để cập nhật user info
       const decoded = decodeJWT(newAccessToken);
       if (decoded) {
-        const rawRole = decoded?.role || decoded?.userRole || decoded?.authorities?.[0] || decoded?.authority;
+        const rawRole =
+          decoded?.role ||
+          decoded?.userRole ||
+          decoded?.authorities?.[0] ||
+          decoded?.authority;
         if (rawRole) {
           const normalizedRole = normalizeRole(rawRole);
           const userData = {
-            id: decoded?.userId || decoded?.id || decoded?.sub || state.user?.id || null,
+            id:
+              decoded?.userId ||
+              decoded?.id ||
+              decoded?.sub ||
+              state.user?.id ||
+              null,
             role: normalizedRole,
-            fullName: decoded?.fullName || decoded?.name || decoded?.username || state.user?.fullName || null,
+            fullName:
+              decoded?.fullName ||
+              decoded?.name ||
+              decoded?.username ||
+              state.user?.fullName ||
+              null,
             email: decoded?.email || state.user?.email || null,
             phone: decoded?.phone || state.user?.phone || null,
           };
 
-          // Cập nhật refreshToken trong localStorage nếu có
-          if (newRefreshToken && typeof window !== 'undefined') {
-            localStorage.setItem('refreshToken', newRefreshToken);
+          // Cập nhật refreshToken vào đúng storage (localStorage hoặc sessionStorage)
+          if (newRefreshToken && typeof window !== "undefined") {
+            if (isFromLocalStorage) {
+              localStorage.setItem("refreshToken", newRefreshToken);
+            } else {
+              sessionStorage.setItem("refreshToken", newRefreshToken);
+            }
           }
 
           set({
             accessToken: newAccessToken,
             refreshToken: newRefreshToken || state.refreshToken,
             user: userData,
-            isRefreshing: false
+            isRefreshing: false,
           });
 
           return newAccessToken;
@@ -271,63 +392,89 @@ const useAuthStore = create((set, get) => ({
       // Nếu không decode được, vẫn cập nhật accessToken
       set({
         accessToken: newAccessToken,
-        isRefreshing: false
+        isRefreshing: false,
       });
 
       return newAccessToken;
     } catch (error) {
-      console.error('Error refreshing token:', error);
-      // Xóa refreshToken nếu refresh thất bại
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('refreshToken');
+      console.error("Error refreshing token:", error);
+      // Xóa refreshToken từ cả localStorage và sessionStorage nếu refresh thất bại
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("refreshToken");
+        sessionStorage.removeItem("refreshToken");
       }
-      set({ 
-        accessToken: null, 
-        refreshToken: null, 
+      set({
+        accessToken: null,
+        refreshToken: null,
         user: null,
-        isRefreshing: false 
+        isRefreshing: false,
       });
       return null;
     }
   },
-  
+
   logout: async () => {
+    const state = get();
+
+    // Tránh gọi logout nhiều lần liên tiếp (tránh vòng lặp)
+    if (state.isLoggingOut) {
+      return;
+    }
+
+    set({ isLoggingOut: true });
+
     try {
-      await authAPI.logout();
+      // Chỉ gọi API logout nếu có token (tránh vòng lặp khi chưa đăng nhập)
+      const accessToken = state.accessToken;
+      const refreshTokenFromLocal =
+        typeof window !== "undefined"
+          ? localStorage.getItem("refreshToken")
+          : null;
+      const refreshTokenFromSession =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("refreshToken")
+          : null;
+      const refreshToken =
+        state.refreshToken || refreshTokenFromLocal || refreshTokenFromSession;
+
+      if (accessToken || refreshToken) {
+        await authAPI.logout();
+      }
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     } finally {
       try {
-        const wsStore = (await import('./websocketStore')).default;
+        const wsStore = (await import("./websocketStore")).default;
         wsStore.getState().disconnect();
       } catch (wsError) {
-        console.error('Error disconnecting WebSocket:', wsError);
+        console.error("Error disconnecting WebSocket:", wsError);
       }
-     
+
       // Xóa tất cả token khỏi memory và storage
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('token');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('user');
-        sessionStorage.removeItem('token');
-        sessionStorage.removeItem('accessToken');
-        sessionStorage.removeItem('refreshToken');
-        sessionStorage.removeItem('authToken');
-        sessionStorage.removeItem('user');
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("refreshToken");
+        localStorage.removeItem("token");
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("authToken");
+        localStorage.removeItem("user");
+        sessionStorage.removeItem("token");
+        sessionStorage.removeItem("accessToken");
+        sessionStorage.removeItem("refreshToken");
+        sessionStorage.removeItem("authToken");
+        sessionStorage.removeItem("user");
       }
-      
-      set({ 
+
+      set({
         accessToken: null,
         refreshToken: null,
-        user: null 
+        user: null,
+        isLoggingOut: false,
       });
     }
   },
-  
+
   setUser: (user) => set({ user }),
-  
+
   // Getter để lấy accessToken từ store
   getAccessToken: () => get().accessToken,
 }));

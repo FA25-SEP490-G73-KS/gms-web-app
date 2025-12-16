@@ -22,6 +22,7 @@ import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { ledgerVoucherAPI, suppliersAPI, employeeAPI, invoiceAPI } from '../../services/api'
 import { getUserNameFromToken, getEmployeeIdFromToken } from '../../utils/helpers'
+import { downloadFile } from '../../utils/fileDownload'
 import '../../styles/pages/accountance/finance.css'
 
 const { Option } = Select
@@ -136,6 +137,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
   const [detailModalVisible, setDetailModalVisible] = useState(false)
   const [detailData, setDetailData] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
+  const [downloadingFile, setDownloadingFile] = useState(false)
 
   useEffect(() => {
     const userName = getUserNameFromToken()
@@ -1380,7 +1382,21 @@ export function AccountanceFinanceContent({ isManager = false }) {
                     <Button
                       type="link"
                       icon={<i className="bi bi-download"></i>}
-                      onClick={() => window.open(detailData.attachmentUrl, '_blank')}
+                      loading={downloadingFile}
+                      onClick={async () => {
+                        if (!detailData.attachmentUrl) {
+                          message.warning('Không có file đính kèm')
+                          return
+                        }
+                        
+                        setDownloadingFile(true)
+                        try {
+                          const fileName = detailData.attachmentUrl.split('/').pop() || 'file'
+                          await downloadFile(detailData.attachmentUrl, fileName)
+                        } finally {
+                          setDownloadingFile(false)
+                        }
+                      }}
                     />
                   </div>
                 </div>
