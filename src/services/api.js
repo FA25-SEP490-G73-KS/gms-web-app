@@ -692,6 +692,12 @@ export const dashboardAPI = {
     if (month) params.append("month", month);
     return get(`/dashboard/warehouse/overview?${params.toString()}`);
   },
+
+  
+  getServiceAdvisorOverview: () => {
+    
+    return get("/dashboard/service-advisor/overview");
+  },
 };
 
 export const purchaseRequestAPI = {

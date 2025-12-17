@@ -91,6 +91,9 @@ export default function CreateTicketNewCustomer() {
 
   const inputHeight = 40
 
+  // Luôn theo dõi giá trị plate trong form để sync với plateSelectValue
+  const watchedPlate = Form.useWatch('plate', form)
+
   const multiSelectStyles = {
     control: (base, state) => ({
       ...base,
@@ -228,6 +231,53 @@ export default function CreateTicketNewCustomer() {
     setPhoneSelectValue(null)
     setCurrentPhone('')
   }
+
+  // Đồng bộ plateSelectValue với giá trị plate trong form
+  useEffect(() => {
+    // Khi không có biển số -> clear select
+    if (!watchedPlate || typeof watchedPlate !== 'string' || !watchedPlate.trim()) {
+      if (plateSelectValue !== null) {
+        setPlateSelectValue(null)
+        setPlateOption(null)
+      }
+      return
+    }
+
+    const formatted = formatLicensePlate(watchedPlate.trim())
+
+    // Tìm trong source options để giữ lại vehicle nếu có
+    const existing = plateOptionsSource.find((opt) => {
+      const optValue = opt.value || opt.label || ''
+      return formatLicensePlate(optValue) === formatted
+    })
+
+    const syncedOption = existing
+      ? {
+          label: existing.label || existing.value,
+          value: existing.value || existing.label
+        }
+      : { label: formatted, value: formatted }
+
+    // Nếu đã cùng giá trị thì không cần set lại để tránh re-render không cần thiết
+    if (
+      !plateSelectValue ||
+      plateSelectValue.value !== syncedOption.value ||
+      plateSelectValue.label !== syncedOption.label
+    ) {
+      setPlateSelectValue(syncedOption)
+      setPlateOption(existing || syncedOption)
+    }
+  }, [watchedPlate, plateOptionsSource]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Bảo vệ hiển thị: nếu state plateSelectValue bị mất, fallback từ giá trị trong form
+  const plateSelectDisplayValue = useMemo(() => {
+    if (plateSelectValue && plateSelectValue.value) return plateSelectValue
+    if (watchedPlate && typeof watchedPlate === 'string' && watchedPlate.trim()) {
+      const formatted = formatLicensePlate(watchedPlate.trim())
+      return { label: formatted, value: formatted }
+    }
+    return null
+  }, [plateSelectValue, watchedPlate])
   
   // Fetch vehicles của khách hàng
   const fetchCustomerVehicles = async (customerId) => {
