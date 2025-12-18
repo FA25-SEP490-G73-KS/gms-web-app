@@ -31,6 +31,21 @@ const PUBLIC_ENDPOINTS = [
   "/auth/update-password",
 ];
 
+// Kiểm tra xem endpoint có phải là public quotation endpoint không
+const isQuotationPublicEndpoint = (url) => {
+  if (!url) return false;
+  // Kiểm tra các endpoint quotation công khai
+  // /service-tickets/{code}/quotation - xem quotation theo code
+  // /price-quotations/{id}/confirm - xác nhận quotation
+  // /price-quotations/{id}/reject - từ chối quotation
+  // /service-tickets/{id}/status?status=Hủy - hủy service ticket
+  return (
+    (url.includes("/service-tickets/") && url.includes("/quotation")) ||
+    (url.includes("/price-quotations/") && (url.includes("/confirm") || url.includes("/reject"))) ||
+    (url.includes("/service-tickets/") && url.includes("/status"))
+  );
+};
+
 axiosClient.interceptors.request.use(
   (config) => {
     const skipAuth = config.skipAuth === true || config.skipAuth === "true";
@@ -40,13 +55,18 @@ axiosClient.interceptors.request.use(
         config.url?.includes(endpoint) || config.url?.endsWith(endpoint)
     );
 
-    if (!skipAuth && !isPublicEndpoint) {
+    // Với skipAuth: true, vẫn gửi token nếu có (để backend validate)
+    // nhưng khi lỗi 401 sẽ không redirect về login
+    // Với public endpoint thực sự, không gửi token
+    if (!isPublicEndpoint) {
       const token = getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
 
+    // Lưu skipAuth vào config để interceptor response có thể kiểm tra
+    config._skipAuth = skipAuth;
     delete config.skipAuth;
 
     return config;
@@ -73,15 +93,50 @@ const processQueue = (error, token = null) => {
 };
 
 axiosClient.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
 
-    // Nếu là lỗi 401 và chưa retry
+    const skipAuth =
+      originalRequest._skipAuth === true ||
+      originalRequest._skipAuth === "true";
+
+    const isPublicEndpoint = PUBLIC_ENDPOINTS.some(
+      (endpoint) =>
+        originalRequest.url?.includes(endpoint) ||
+        originalRequest.url?.endsWith(endpoint)
+    );
+
+    const isQuotationEndpoint = isQuotationPublicEndpoint(originalRequest.url);
+
+    /**
+     * ===============================
+     * 1️⃣ API PUBLIC → RETURN SỚM
+     * ===============================
+     * ❌ KHÔNG refresh
+     * ❌ KHÔNG logout
+     * ❌ KHÔNG redirect
+     */
+    if (
+      error.response?.status === 401 &&
+      (skipAuth || isPublicEndpoint || isQuotationEndpoint)
+    ) {
+      return Promise.reject(
+        new Error(
+          error.response?.data?.message ||
+            error.response?.data?.error ||
+            "Bạn không có quyền thực hiện thao tác này"
+        )
+      );
+    }
+
+    /**
+     * ===============================
+     * 2️⃣ API PRIVATE → HANDLE 401
+     * ===============================
+     */
     if (error.response?.status === 401 && !originalRequest._retry) {
-      // Nếu đang refresh, thêm request vào queue
+      // Nếu đang refresh token → đưa request vào queue
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -90,9 +145,7 @@ axiosClient.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return axiosClient(originalRequest);
           })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
@@ -104,51 +157,21 @@ axiosClient.interceptors.response.use(
           .refreshAccessToken();
 
         if (newAccessToken) {
-          // Retry request với token mới
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           processQueue(null, newAccessToken);
           isRefreshing = false;
           return axiosClient(originalRequest);
-        } else {
-          // Refresh thất bại, redirect về login
-          processQueue(new Error("Token refresh failed"), null);
-          isRefreshing = false;
-
-          // Chỉ logout nếu:
-          // 1. Không phải là request logout (tránh vòng lặp)
-          // 2. Không đang ở trang login (tránh logout khi chưa đăng nhập)
-          const isLogoutRequest = originalRequest.url?.includes("/auth/logout");
-          const isOnLoginPage =
-            typeof window !== "undefined" &&
-            window.location.pathname.includes("/login");
-
-          if (!isLogoutRequest && !isOnLoginPage) {
-            // Clear auth state
-            useAuthStore.getState().logout();
-          }
-
-          // Redirect to login (chỉ khi không phải đang ở trang login)
-          if (
-            typeof window !== "undefined" &&
-            !window.location.pathname.includes("/login")
-          ) {
-            window.location.href = "/login";
-          }
-
-          return Promise.reject(
-            new Error(
-              "Tài khoản hoặc mật khẩu không hợp lệ. Vui lòng đăng nhập lại."
-            )
-          );
         }
+
+        // ❌ Refresh thất bại
+        throw new Error("Refresh token failed");
       } catch (refreshError) {
         processQueue(refreshError, null);
         isRefreshing = false;
 
-        // Chỉ logout nếu:
-        // 1. Không phải là request logout (tránh vòng lặp)
-        // 2. Không đang ở trang login (tránh logout khi chưa đăng nhập)
-        const isLogoutRequest = originalRequest.url?.includes("/auth/logout");
+        // Clear auth state
+        const isLogoutRequest =
+          originalRequest.url?.includes("/auth/logout");
         const isOnLoginPage =
           typeof window !== "undefined" &&
           window.location.pathname.includes("/login");
@@ -165,27 +188,38 @@ axiosClient.interceptors.response.use(
         }
 
         return Promise.reject(
-          new Error("Không thể làm mới token. Vui lòng đăng nhập lại.")
+          new Error(
+            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+          )
         );
       }
     }
 
-    // Xử lý các lỗi khác
+    /**
+     * ===============================
+     * 3️⃣ CÁC LỖI KHÁC
+     * ===============================
+     */
     if (error.response) {
-      const errorMessage =
-        error.response.data?.message ||
-        error.response.data?.error ||
-        error.message;
-      return Promise.reject(new Error(errorMessage));
-    } else if (error.request) {
       return Promise.reject(
-        new Error("Không thể kết nối đến server. Vui lòng thử lại.")
+        new Error(
+          error.response.data?.message ||
+            error.response.data?.error ||
+            "Đã xảy ra lỗi"
+        )
       );
-    } else {
-      return Promise.reject(error);
     }
+
+    if (error.request) {
+      return Promise.reject(
+        new Error("Không thể kết nối đến server")
+      );
+    }
+
+    return Promise.reject(error);
   }
 );
+
 
 async function request(method, path, body, init = {}) {
   try {
@@ -262,14 +296,16 @@ export const serviceTicketAPI = {
     console.log("====================================");
     return patch(`/service-tickets/${id}`, data);
   },
-  updateStatus: (id, status) =>
-    patch(`/service-tickets/${id}/status?status=${status}`),
+  updateStatus: (id, status, options = {}) =>
+    patch(`/service-tickets/${id}/status?status=${status}`, null, options),
   updateDeliveryAt: (id, date) =>
     patch(`/service-tickets/${id}/delivery-at`, date),
   getCompletedPerMonth: () => get("/service-tickets/completed-per-month"),
   getCount: (date) => get(`/service-tickets/count?date=${date}`),
   getCountByType: (year, month) =>
     get(`/service-tickets/count-by-type?year=${year}&month=${month}`),
+  getQuotationByCode: (serviceTicketCode, options = {}) =>
+    get(`/service-tickets/${serviceTicketCode}/quotation`, options),
 };
 
 export const serviceTypeAPI = {
@@ -401,9 +437,9 @@ export const priceQuotationAPI = {
   rejectItem: (itemId, reason) =>
     patch(`/quotation-items/${itemId}/reject`, reason),
   deleteItem: (itemId) => del(`/quotation-items/${itemId}`),
-  confirmQuotation: (id) => post(`/price-quotations/${id}/confirm`),
-  rejectQuotation: (id, reason) =>
-    post(`/price-quotations/${id}/reject`, reason),
+  confirmQuotation: (id, options = {}) => post(`/price-quotations/${id}/confirm`, null, options),
+  rejectQuotation: (id, reason, options = {}) =>
+    post(`/price-quotations/${id}/reject`, reason, options),
   exportPDF: (id) =>
     get(`/price-quotations/${id}/pdf`, { responseType: "blob" }),
 };

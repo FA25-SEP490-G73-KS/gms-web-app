@@ -12,6 +12,7 @@ import ContactPage from './pages/home/contact';
 import BlogList from './pages/blog/BlogList';
 import BlogDetail from './pages/blog/BlogDetail';
 import AppointmentService from './pages/customer/appointment/appointmentservice';
+import ServiceTicketQuotation from './pages/customer/ServiceTicketQuotation';
 import Login from './pages/auth/Login';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ChangePassword from './pages/auth/ChangePassword';
@@ -132,6 +133,7 @@ function App() {
         <Route path="/blog" element={<BlogList />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/appointment" element={<AppointmentService />} />
+        <Route path="/service-tickets/:serviceTicketCode/quotation" element={<ServiceTicketQuotation />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/change-password" element={<ChangePassword />} />
