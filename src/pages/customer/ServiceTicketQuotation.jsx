@@ -78,12 +78,52 @@ const numberToVietnameseWords = (num) => {
   }
 };
 
+// Cấu hình trạng thái báo giá (dùng để hiển thị cho khách)
+const QUOTATION_STATUS_CONFIG = {
+  DRAFT: {
+    label: 'Nháp',
+    badgeBg: '#f3f4f6',
+    badgeColor: '#6b7280',
+  },
+  WAITING_WAREHOUSE_CONFIRM: {
+    label: 'Chờ kho duyệt',
+    badgeBg: '#fef3c7',
+    badgeColor: '#92400e',
+  },
+  WAREHOUSE_CONFIRMED: {
+    label: 'Kho đã duyệt',
+    badgeBg: '#dcfce7',
+    badgeColor: '#15803d',
+  },
+  WAITING_CUSTOMER_CONFIRM: {
+    label: 'Chờ khách xác nhận',
+    badgeBg: '#e0e7ff',
+    badgeColor: '#3730a3',
+  },
+  CUSTOMER_CONFIRMED: {
+    label: 'Khách đã xác nhận',
+    badgeBg: '#d1fae5',
+    badgeColor: '#065f46',
+  },
+  CUSTOMER_REJECTED: {
+    label: 'Khách từ chối',
+    badgeBg: '#fee2e2',
+    badgeColor: '#991b1b',
+  },
+  COMPLETED: {
+    label: 'Hoàn thành',
+    badgeBg: '#dbeafe',
+    badgeColor: '#1e40af',
+  },
+};
+
 export default function ServiceTicketQuotation() {
   const { serviceTicketCode } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [quotationData, setQuotationData] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [hasCancelled, setHasCancelled] = useState(false);
 
   useEffect(() => {
     if (serviceTicketCode) {
@@ -210,7 +250,12 @@ export default function ServiceTicketQuotation() {
     setActionLoading(true);
     try {
       // Allow action without authentication (public endpoint)
-      const { data: response, error } = await serviceTicketAPI.updateStatus(serviceTicketId, 'Hủy', { skipAuth: true });
+      // Backend enum ServiceTicketStatus dùng key tiếng Anh, ví dụ: CANCELED
+      const { data: response, error } = await serviceTicketAPI.updateStatus(
+        serviceTicketId,
+        'CANCELED',
+        { skipAuth: true }
+      );
       
       if (error) {
         message.error(error || 'Không thể hủy phiếu dịch vụ');
@@ -220,11 +265,12 @@ export default function ServiceTicketQuotation() {
       // Check if response indicates success
       if (response && (response.statusCode === 200 || response.message)) {
         message.success('Hủy phiếu dịch vụ thành công');
-        // Refresh data after cancellation to get updated status
+        setHasCancelled(true);
+        // Refresh data sau khi hủy (nếu còn truy cập được)
         await fetchQuotation();
       } else {
         message.success('Hủy phiếu dịch vụ thành công');
-        // Refresh data anyway
+        setHasCancelled(true);
         await fetchQuotation();
       }
     } catch (err) {
@@ -305,74 +351,6 @@ export default function ServiceTicketQuotation() {
   const vehicle = quotationData?.vehicle || {};
   const priceQuotation = quotationData?.priceQuotation || {};
   const quotationItems = priceQuotation?.items || [];
-  const serviceTicketStatus = quotationData?.status || '';
-  
-  // Lấy status của quotation
-  const quotationStatus = priceQuotation?.status || '';
-  
-  // Kiểm tra xem có nên hiển thị nút hay không
-  // Chỉ hiển thị nút khi status là WAITING_CUSTOMER_CONFIRM và serviceTicket chưa bị hủy
-  const shouldShowButtons = quotationStatus === 'WAITING_CUSTOMER_CONFIRM' && 
-                            serviceTicketStatus !== 'Hủy' &&
-                            serviceTicketStatus !== 'CANCELED';
-  
-  // Hàm lấy text trạng thái
-  const getStatusText = () => {
-    // Nếu service ticket bị hủy
-    if (serviceTicketStatus === 'Hủy' || serviceTicketStatus === 'CANCELED') {
-      return 'Phiếu dịch vụ đã bị hủy';
-    }
-    
-    // Kiểm tra status của quotation
-    const normalizedStatus = String(quotationStatus).toUpperCase();
-    
-    switch (normalizedStatus) {
-      case 'CUSTOMER_CONFIRMED':
-        return 'Báo giá đã được xác nhận';
-      case 'CUSTOMER_REJECTED':
-        return 'Báo giá đã bị từ chối';
-      case 'WAITING_CUSTOMER_CONFIRM':
-        return 'Chờ khách hàng xác nhận';
-      case 'WAREHOUSE_CONFIRMED':
-        return 'Kho đã duyệt';
-      case 'WAITING_WAREHOUSE_CONFIRM':
-        return 'Chờ kho duyệt';
-      case 'COMPLETED':
-        return 'Báo giá đã hoàn thành';
-      case 'DRAFT':
-        return 'Báo giá nháp';
-      default:
-        return quotationStatus || 'Đang xử lý';
-    }
-  };
-  
-  // Hàm lấy màu cho trạng thái
-  const getStatusColor = () => {
-    if (serviceTicketStatus === 'Hủy' || serviceTicketStatus === 'CANCELED') {
-      return { color: '#991b1b', backgroundColor: '#fee2e2' };
-    }
-    
-    const normalizedStatus = String(quotationStatus).toUpperCase();
-    
-    switch (normalizedStatus) {
-      case 'CUSTOMER_CONFIRMED':
-        return { color: '#065f46', backgroundColor: '#d1fae5' };
-      case 'CUSTOMER_REJECTED':
-        return { color: '#991b1b', backgroundColor: '#fee2e2' };
-      case 'WAITING_CUSTOMER_CONFIRM':
-        return { color: '#3730a3', backgroundColor: '#e0e7ff' };
-      case 'WAREHOUSE_CONFIRMED':
-        return { color: '#15803d', backgroundColor: '#dcfce7' };
-      case 'WAITING_WAREHOUSE_CONFIRM':
-        return { color: '#92400e', backgroundColor: '#fef3c7' };
-      case 'COMPLETED':
-        return { color: '#1e40af', backgroundColor: '#dbeafe' };
-      case 'DRAFT':
-        return { color: '#6b7280', backgroundColor: '#f3f4f6' };
-      default:
-        return { color: '#6b7280', backgroundColor: '#f3f4f6' };
-    }
-  };
 
   const totalMerchandise = quotationItems.reduce(
     (sum, item) => sum + (item.totalPrice || 0),
@@ -380,6 +358,24 @@ export default function ServiceTicketQuotation() {
   );
   const discount = priceQuotation?.discount || 0;
   const estimateAmount = priceQuotation?.estimateAmount || 0;
+
+  // Trạng thái báo giá hiện tại
+  const quotationStatusRaw = priceQuotation?.status;
+  const normalizedQuotationStatus = quotationStatusRaw
+    ? String(quotationStatusRaw).toUpperCase()
+    : 'DRAFT';
+  const quotationStatusConfig =
+    QUOTATION_STATUS_CONFIG[normalizedQuotationStatus] ||
+    QUOTATION_STATUS_CONFIG.DRAFT;
+
+  // Cho phép khách thao tác khi:
+  // - Kho đã duyệt  (WAREHOUSE_CONFIRMED)
+  // - Chờ khách xác nhận (WAITING_CUSTOMER_CONFIRM)
+  // Và chưa bấm Hủy trên màn này
+  const showActionButtons =
+    !hasCancelled &&
+    (normalizedQuotationStatus === 'WAREHOUSE_CONFIRMED' ||
+      normalizedQuotationStatus === 'WAITING_CUSTOMER_CONFIRM');
 
   // Get quotation date
   const quotationDate = priceQuotation?.createdAt 
@@ -841,6 +837,32 @@ export default function ServiceTicketQuotation() {
           />
         </div>
 
+        {/* Trạng thái báo giá */}
+        {/* <div
+          style={{
+            marginTop: '8px',
+            marginBottom: '12px',
+            display: 'flex',
+            justifyContent: 'flex-end',
+          }}
+        >
+          <span style={{ marginRight: 8, fontWeight: 500, color: '#374151' }}>
+            Trạng thái:
+          </span>
+          <span
+            style={{
+              padding: '4px 10px',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 600,
+              backgroundColor: quotationStatusConfig.badgeBg,
+              color: quotationStatusConfig.badgeColor,
+            }}
+          >
+            {quotationStatusConfig.label}
+          </span>
+        </div> */}
+
         {/* Amount in Words */}
         <div
           className="quotation-amount-words"
@@ -865,59 +887,105 @@ export default function ServiceTicketQuotation() {
         </div>
 
         {/* Policies & Terms */}
-<div
-  className="quotation-policies"
-  style={{
-    border: '1px solid #D1D5DB',   
-    borderRadius: '8px',          
-    padding: '20px 24px',
-    marginTop: '32px',
-    backgroundColor: '#FFFFFF'
-  }}
->
-  <div
-    className="quotation-policies-title"
-    style={{
-      fontWeight: 700,
-      fontSize: '16px',
-      color: '#CBB081',
-      marginBottom: '16px'
-    }}
-  >
-    Chính sách & điều khoản
-  </div>
+        <div
+          className="quotation-policies"
+          style={{
+            border: '1px solid #D1D5DB',
+            borderRadius: '8px',
+            padding: '20px 24px',
+            marginTop: '32px',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
+          <div
+            className="quotation-policies-title"
+            style={{
+              fontWeight: 700,
+              fontSize: '16px',
+              color: '#CBB081',
+              marginBottom: '16px',
+            }}
+          >
+            Chính sách & điều khoản
+          </div>
 
-  <ul
-    className="quotation-policies-list"
-    style={{
-      margin: 0,
-      paddingLeft: '18px',         // để bullet gọn gàng
-      listStyle: 'disc',
-      color: '#374151',
-      fontSize: '15px',
-      lineHeight: '1.8'
-    }}
-  >
-    <li style={{ marginBottom: '8px' }}>
-      Cung cấp phụ tùng chính hãng.
-    </li>
-    <li style={{ marginBottom: '8px' }}>
-      Những phát sinh sẽ được báo giá sau khi thực hiện cụ thể.
-    </li>
-    <li style={{ marginBottom: '8px' }}>
-      Báo giá có hiệu lực trong vòng 07 ngày kể từ ngày báo giá.
-    </li>
-    <li style={{ marginBottom: '8px' }}>
-      Khi đặt hàng khách hàng vui lòng đặt tiền trước 50% tổng giá trị thanh toán.
-    </li>
-    <li>
-      Một số phụ tùng đặc biệt cần đặt trước 100% giá trị đơn hàng.
-    </li>
-  </ul>
-</div>
+          <ul
+            className="quotation-policies-list"
+            style={{
+              margin: 0,
+              paddingLeft: '18px', // để bullet gọn gàng
+              listStyle: 'disc',
+              color: '#374151',
+              fontSize: '15px',
+              lineHeight: '1.8',
+            }}
+          >
+            <li style={{ marginBottom: '8px' }}>
+              Cung cấp phụ tùng chính hãng.
+            </li>
+            <li style={{ marginBottom: '8px' }}>
+              Những phát sinh sẽ được báo giá sau khi thực hiện cụ thể.
+            </li>
+            <li style={{ marginBottom: '8px' }}>
+              Báo giá có hiệu lực trong vòng 07 ngày kể từ ngày báo giá.
+            </li>
+            <li style={{ marginBottom: '8px' }}>
+              Khi đặt hàng khách hàng vui lòng đặt tiền trước 50% tổng giá trị thanh toán.
+            </li>
+            <li>
+              Một số phụ tùng đặc biệt cần đặt trước 100% giá trị đơn hàng.
+            </li>
+          </ul>
+        </div>
 
-        {/* Action Buttons hoặc Trạng thái */}
-        {shouldShowButtons ? (
+        {/* Thông báo trạng thái sau khi khách thao tác */}
+        {normalizedQuotationStatus === 'CUSTOMER_REJECTED' && (
+          <div
+            style={{
+              marginTop: 16,
+              marginBottom: 8,
+              textAlign: 'center',
+              fontSize: 15,
+              fontWeight: 600,
+              color: '#b91c1c',
+            }}
+          >
+            Khách hàng đã từ chối báo giá này.
+          </div>
+        )}
+
+        {normalizedQuotationStatus === 'CUSTOMER_CONFIRMED' && (
+          <div
+            style={{
+              marginTop: 16,
+              marginBottom: 8,
+              textAlign: 'center',
+              fontSize: 15,
+              fontWeight: 600,
+              color: '#166534',
+            }}
+          >
+            Khách hàng đã xác nhận báo giá này.
+          </div>
+        )}
+
+        {hasCancelled && (
+          <div
+            style={{
+              marginTop: 16,
+              marginBottom: 8,
+              textAlign: 'center',
+              fontSize: 15,
+              fontWeight: 600,
+              color: '#1e40af',
+            }}
+          >
+            Phiếu dịch vụ đã được hủy.
+          </div>
+        )}
+
+        {/* Action Buttons (chỉ hiển thị khi chờ khách xác nhận) */}
+        {showActionButtons && (
           <div
             className="quotation-action-buttons"
             style={{
@@ -969,28 +1037,6 @@ export default function ServiceTicketQuotation() {
             >
               Hủy
             </Button>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              marginTop: '32px',
-              marginBottom: '24px',
-            }}
-          >
-            <div
-              style={{
-                padding: '12px 24px',
-                borderRadius: '8px',
-                fontSize: '16px',
-                fontWeight: 600,
-                textAlign: 'center',
-                ...getStatusColor(),
-              }}
-            >
-              {getStatusText()}
-            </div>
           </div>
         )}
 
