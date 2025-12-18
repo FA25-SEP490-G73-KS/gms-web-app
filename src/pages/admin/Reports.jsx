@@ -3,6 +3,7 @@ import { Card, Row, Col, Statistic, Spin, message } from 'antd'
 import { CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import { dashboardAPI } from '../../services/api'
+import { displayPhoneFrom84 } from '../../utils/helpers'
 import '../../styles/pages/admin/reports.css'
 
 export default function Reports() {
@@ -56,15 +57,22 @@ export default function Reports() {
   const ticketsByMonthRaw = overview?.ticketsByMonth || []
   const serviceTypeDistributionRaw = overview?.serviceTypeDistribution || []
   const ratingRaw = overview?.rating || {}
-  const potentialCustomersRaw = overview?.potentialCustomers || []
+  const topCustomersRaw = overview?.topCustomers || []
 
-  const ticketsByMonth = ticketsByMonthRaw.length ? ticketsByMonthRaw : sampleTicketsByMonth
+  const ticketsByMonth = ticketsByMonthRaw.length 
+    ? ticketsByMonthRaw.map(item => ({
+        ...item,
+        monthName: item.year && item.month 
+          ? `Tháng ${item.month}/${item.year}` 
+          : item.monthName || item.month || `Tháng ${item.month || ''}`
+      }))
+    : sampleTicketsByMonth
   const serviceTypeDistribution = serviceTypeDistributionRaw.length
     ? serviceTypeDistributionRaw
     : sampleServiceTypeDistribution
   const rating = Object.keys(ratingRaw).length ? ratingRaw : sampleRating
-  const potentialCustomers = potentialCustomersRaw.length
-    ? potentialCustomersRaw
+  const topCustomers = topCustomersRaw.length
+    ? topCustomersRaw
     : samplePotentialCustomers
 
   const totalTicketsInYear = useMemo(
@@ -169,7 +177,7 @@ export default function Reports() {
       if (pctSum > 0) {
         grandTotal = pctSum
       }
-    }
+      }
 
     if (!grandTotal) return null
 
@@ -215,29 +223,29 @@ export default function Reports() {
   useEffect(() => {
     const fetchOverview = async () => {
       setLoading(true)
-      try {
+    try {
         const { data, error } = await dashboardAPI.getServiceAdvisorOverview()
-
-        if (error) {
+      
+      if (error) {
           console.error('Error fetching service advisor overview:', error)
           message.error('Không thể tải dữ liệu báo cáo')
           setOverview(null)
-          return
-        }
+        return
+      }
 
         if (data && data.result) {
           setOverview(data.result)
-        } else {
+      } else {
           setOverview(data || null)
-        }
-      } catch (err) {
+      }
+    } catch (err) {
         console.error('Error fetching service advisor overview:', err)
         message.error('Không thể tải dữ liệu báo cáo')
         setOverview(null)
       } finally {
         setLoading(false)
-      }
     }
+  }
 
     fetchOverview()
   }, [])
@@ -441,13 +449,13 @@ export default function Reports() {
                       {ticketChart.labels.map((label, idx) => (
                         <span key={idx}>{label}</span>
                       ))}
+                            </div>
                     </div>
-                  </div>
-                ) : (
+                  ) : (
                   <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
-                    Không có dữ liệu
-                  </div>
-                )}
+                      Không có dữ liệu
+                    </div>
+                  )}
               </Card>
             </Col>
 
@@ -505,7 +513,7 @@ export default function Reports() {
                          const badgeRadius = 78
                          const cx = 100 + Math.cos(seg.midAngle) * badgeRadius
                          const cy = 100 + Math.sin(seg.midAngle) * badgeRadius
-                         return (
+                        return (
                            <div
                              key={`badge-${index}`}
                              style={{
@@ -525,9 +533,9 @@ export default function Reports() {
                              }}
                            >
                              {`${seg.percentage.toFixed(0)}%`}
-                           </div>
-                         )
-                       })}
+                          </div>
+                        )
+                      })}
                      </div>
 
                      {/* Legend bên dưới giống figma */}
@@ -570,12 +578,12 @@ export default function Reports() {
                          </div>
                        ))}
                      </div>
-                   </div>
-                 ) : (
+                    </div>
+                  ) : (
                    <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
-                     Không có dữ liệu
-                   </div>
-                 )}
+                      Không có dữ liệu
+                    </div>
+                  )}
               </Card>
             </Col>
           </Row>
@@ -602,7 +610,7 @@ export default function Reports() {
                  bodyStyle={{ display: 'flex', flexDirection: 'column' }}
               >
                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, flex: 1 }}>
-                    {potentialCustomers.map((customer, index) => (
+                    {topCustomers.map((customer, index) => (
                       <div
                         key={index}
                         style={{
@@ -610,7 +618,7 @@ export default function Reports() {
                           justifyContent: 'space-between',
                           padding: '8px 0',
                           borderBottom:
-                            index === potentialCustomers.length - 1
+                            index === topCustomers.length - 1
                               ? 'none'
                               : '1px dashed #e5e7eb'
                         }}
@@ -619,11 +627,11 @@ export default function Reports() {
                           {customer.name || customer.fullName || 'Khách hàng'}
                         </div>
                         <div style={{ color: '#6b7280', fontSize: 13 }}>
-                          {customer.phone || customer.mobile || ''}
+                          {customer.phone ? displayPhoneFrom84(customer.phone) : (customer.mobile || '')}
                         </div>
                       </div>
                     ))}
-                  </div>
+                </div>
               </Card>
             </Col>
           </Row>
