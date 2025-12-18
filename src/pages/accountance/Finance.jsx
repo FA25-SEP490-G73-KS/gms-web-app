@@ -99,7 +99,7 @@ const getStatusConfig = (status) => {
     'Hoàn tất': { label: 'Hoàn tất', color: '#10b981', bg: '#d1fae5' },
     'Chờ duyệt': { label: 'Chờ duyệt', color: '#3b82f6', bg: '#dbeafe' },
     'Từ chối': { label: 'Từ chối', color: '#ef4444', bg: '#fee2e2' },
-    'Đã duyệt': { label: 'Đã duyệt', color: '#10b981', bg: '#d1fae5' }
+    'Đã duyệt': { label: 'Đã duyệt', color: '#3b82f6', bg: '#dbeafe' }
   }
   return configs[status] || { label: status, color: '#666', bg: '#f3f4f6' }
 }
@@ -325,13 +325,15 @@ export function AccountanceFinanceContent({ isManager = false }) {
   }
 
   const handleFilterReset = () => {
-    setFilterForm({
+    const resetForm = {
       statuses: [],
       types: [],
       dateRange: null,
       supplierId: null,
       employeeId: null
-    })
+    }
+    setFilterForm(resetForm)
+    fetchVouchers(resetForm)
   }
 
   const handleStatusChange = (statusVal, checked) => {
@@ -469,14 +471,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
     try {
       setLoadingDetail(true)
       
-      // Prepare payment payload
-      const payload = {
-        method: "Tiền mặt", // Default payment method
-        price: detailData.amount,
-        type: "Chi tiền" // Payment type
-      }
-      
-      const { data: response, error } = await invoiceAPI.pay(detailData.id, payload)
+      const { data: response, error } = await ledgerVoucherAPI.pay(detailData.id)
       
       if (error) {
         message.error('Không thể chi tiền')
@@ -654,7 +649,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
               current: page,
               pageSize: pageSize,
               total: total,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total) => `${total} phiếu thu chi`,
               showSizeChanger: true,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (newPage, newPageSize) => {
@@ -1005,15 +1000,22 @@ export function AccountanceFinanceContent({ isManager = false }) {
         width={450}
         styles={{
           header: {
-            borderBottom: '1px solid #f0f0f0',
-            marginBottom: '20px'
+            borderBottom: 'none',
+            marginBottom: '0px'
           }
         }}
       >
-        <div style={{ padding: '20px 0' }}>
+        <div style={{ padding: '8px 0' }}>
           {/* Status Filter */}
           <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ marginBottom: '12px', fontWeight: 600 }}>Trạng thái phiếu</h4>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Trạng thái phiếu
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Checkbox
                 checked={filterForm.statuses.includes('Chờ duyệt')}
@@ -1022,10 +1024,16 @@ export function AccountanceFinanceContent({ isManager = false }) {
                 Chờ duyệt
               </Checkbox>
               <Checkbox
+                checked={filterForm.statuses.includes('Đã duyệt')}
+                onChange={(e) => handleStatusChange('Đã duyệt', e.target.checked)}
+              >
+                Đã duyệt
+              </Checkbox>
+              <Checkbox
                 checked={filterForm.statuses.includes('Hoàn tất')}
                 onChange={(e) => handleStatusChange('Hoàn tất', e.target.checked)}
               >
-                Đã duyệt
+                Hoàn tất
               </Checkbox>
               <Checkbox
                 checked={filterForm.statuses.includes('Từ chối')}
@@ -1038,7 +1046,14 @@ export function AccountanceFinanceContent({ isManager = false }) {
 
           {/* Type Filter */}
           <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ marginBottom: '12px', fontWeight: 600 }}>Loại phiếu</h4>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Loại phiếu
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <Checkbox
                 checked={filterForm.types.includes('Phí linh kiện')}
@@ -1069,12 +1084,19 @@ export function AccountanceFinanceContent({ isManager = false }) {
 
           {/* Date Range Filter */}
           <div style={{ marginBottom: '24px' }}>
-            <h4 style={{ marginBottom: '12px', fontWeight: 600 }}>Khoảng ngày tạo</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Khoảng ngày tạo
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
                   Từ ngày
-                </label>
+                </div>
                 <DatePicker
                   value={filterForm.dateRange?.[0]}
                   onChange={(date) => setFilterForm(prev => ({
@@ -1082,14 +1104,14 @@ export function AccountanceFinanceContent({ isManager = false }) {
                     dateRange: [date, prev.dateRange?.[1] || null]
                   }))}
                   format="DD/MM/YYYY"
-                  placeholder="Chọn ngày"
+                  placeholder="dd/mm/yyyy"
                   style={{ width: '100%' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '4px', fontSize: '12px', color: '#666' }}>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
                   Đến ngày
-                </label>
+                </div>
                 <DatePicker
                   value={filterForm.dateRange?.[1]}
                   onChange={(date) => setFilterForm(prev => ({
@@ -1097,7 +1119,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
                     dateRange: [prev.dateRange?.[0] || null, date]
                   }))}
                   format="DD/MM/YYYY"
-                  placeholder="Chọn ngày"
+                  placeholder="dd/mm/yyyy"
                   style={{ width: '100%' }}
                 />
               </div>
@@ -1107,18 +1129,15 @@ export function AccountanceFinanceContent({ isManager = false }) {
           {/* Action Buttons */}
           <div style={{ 
             display: 'flex', 
-            justifyContent: 'flex-end',
+            justifyContent: 'flex-end', 
             gap: '12px',
-            paddingTop: '20px',
-            borderTop: '1px solid #f0f0f0'
+            paddingTop: '16px',
+            borderTop: '1px solid #e5e7eb'
           }}>
             <Button
               onClick={handleFilterReset}
               style={{
-                minWidth: 100,
-                height: 40,
-                borderRadius: 6,
-                fontWeight: 600
+                borderRadius: '6px'
               }}
             >
               Đặt lại
@@ -1126,15 +1145,13 @@ export function AccountanceFinanceContent({ isManager = false }) {
             <Button
               type="primary"
               onClick={handleFilterApply}
-              style={{ 
-                minWidth: 120,
-                background: '#1890ff',
-                height: 40,
-                borderRadius: 6,
-                fontWeight: 600
+              style={{
+                background: '#1677ff',
+                borderColor: '#1677ff',
+                borderRadius: '6px'
               }}
             >
-              Tìm kiếm
+              Áp dụng
             </Button>
           </div>
         </div>
@@ -1193,7 +1210,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
                   Duyệt
                 </Button>
               ] : null)
-            : (detailData?.status === 'Hoàn tất' ? [
+            : (detailData?.status === 'Đã duyệt' ? [
                 <Button
                   key="payment"
                   type="primary"

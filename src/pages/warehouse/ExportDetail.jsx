@@ -22,6 +22,23 @@ export default function ExportDetail() {
   const [employees, setEmployees] = useState([])
   const [loadingEmployees, setLoadingEmployees] = useState(false)
 
+  const formatDisplayDate = (value) => {
+    if (!value) return '--'
+    const str = String(value).trim()
+
+    // Nếu là ISO string, dùng Date để format
+    if (str.includes('T')) {
+      const d = new Date(str)
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString('vi-VN')
+      }
+    }
+
+    // Trường hợp backend trả "DD/MM/YYYY HH:mm" → lấy phần ngày phía trước
+    const [datePart] = str.split(' ')
+    return datePart || str
+  }
+
   const breadcrumbItems = [
     { label: 'Xuất kho', path: '/warehouse' },
     { label: 'Danh sách xuất', path: '/warehouse/export/list' },
@@ -98,6 +115,8 @@ export default function ExportDetail() {
       const historyData = {
         sku: result.sku || result.partCode || 'N/A',
         name: result.name || result.partName || 'N/A',
+        quantityInStock: result.quantityInStock ?? 0,
+        expectedStockAfterExport: result.expectedStockAfterExport ?? 0,
         requiredQuantity: result.required || result.requiredQuantity || result.quantityRequired || 0,
         exportedQuantity: result.exported || result.exportedQuantity || result.quantityExported || 0,
         history: (result.history || []).map(item => ({
@@ -117,60 +136,50 @@ export default function ExportDetail() {
   }
 
   const fetchExportItemDetail = async (itemId) => {
+    // Mở modal và hiển thị trạng thái loading
     setExportModal({ visible: true, data: null, loading: true, quantity: '', technician: '' })
-    
-    // Mock data for testing
-    const mockExportData = {
-      id: itemId,
-      sku: 'LOC-GIO-TOYOTA-CAMRY-2019',
-      name: 'Lọc gió động cơ 30W',
-      required: 20,
-      exported: 10,
-      remaining: 10,
-      status: 'EXPORTING',
-      history: [
-        { 
-          id: 1, 
-          quantity: 1, 
-          exportedAt: '2025-10-20T10:30:00',
-          exportedById: 1,
-          exportedByName: 'Nguyễn Văn A' 
-        },
-        { 
-          id: 2, 
-          quantity: 2, 
-          exportedAt: '2025-10-25T14:20:00',
-          exportedById: 2,
-          exportedByName: 'Phạm Văn B' 
-        }
-      ]
-    }
 
-    // Simulate API delay
-    setTimeout(() => {
-      setExportModal({ 
-        visible: true, 
-        data: mockExportData, 
-        loading: false,
-        quantity: '',
-        technician: ''
-      })
-    }, 500)
-
-    /* Real API call - uncomment when API is ready
     try {
+      // Dùng API chi tiết item xuất kho
       const { data, error } = await stockExportAPI.getExportItemDetail(itemId)
-      
+
       if (error) {
         message.error('Không thể tải thông tin xuất kho')
         setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '' })
         return
       }
 
-      const itemData = data?.result || data
-      setExportModal({ 
-        visible: true, 
-        data: itemData, 
+      const result = data?.result || data || {}
+
+      // Chuẩn hóa data để UI dùng thống nhất
+      const exportData = {
+        id: result.id,
+        sku: result.sku || result.partCode || '',
+        name: result.name || result.partName || '',
+        required:
+          result.required ??
+          result.requiredQuantity ??
+          result.quantityRequired ??
+          0,
+        exported:
+          result.exported ??
+          result.exportedQuantity ??
+          result.quantityExported ??
+          0,
+        remaining:
+          result.remaining ??
+          Math.max(
+            0,
+            (result.required ?? result.requiredQuantity ?? result.quantityRequired ?? 0) -
+              (result.exported ?? result.exportedQuantity ?? result.quantityExported ?? 0)
+          ),
+        status: result.status || '',
+        history: result.history || []
+      }
+
+      setExportModal({
+        visible: true,
+        data: exportData,
         loading: false,
         quantity: '',
         technician: ''
@@ -180,7 +189,6 @@ export default function ExportDetail() {
       message.error('Đã xảy ra lỗi khi tải thông tin')
       setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '' })
     }
-    */
   }
 
   const handleExportSubmit = async () => {
@@ -256,13 +264,6 @@ export default function ExportDetail() {
         borderColor: '#d9d9d9'
       }
     }
-    if (status === 'Chờ nhập kho') {
-      return { 
-        color: '#666', 
-        bgColor: '#fafafa',
-        borderColor: '#d9d9d9'
-      }
-    }
     if (status === 'Chờ xử lý') {
       return { 
         color: '#f59e0b', 
@@ -279,16 +280,11 @@ export default function ExportDetail() {
 
   const getItemStatusText = (status) => {
     const statusMap = {
-      'WAITING_TO_RECEIPT': 'Chờ nhập kho',
-      'EXPORTING': 'Đang xuất hàng',
-      'FINISHED': 'Hoàn thành',
-      // // Legacy mappings for backward compatibility
-      // 'COMPLETED': 'Hoàn thành',
-      // 'PENDING': 'Chờ nhập kho',
-      // 'WAITING_PURCHASE': 'Chờ nhập kho',
-      // 'APPROVED': 'Đang xuất hàng'
+      EXPORTING: 'Đang xuất hàng',
+      FINISHED: 'Hoàn thành',
+      WAITING_TO_RECEIPT: 'Chờ xử lý'
     }
-    return statusMap[status] || 'Chờ nhập kho'
+    return statusMap[status] || 'Chờ xử lý'
   }
 
   // Use items from API response
@@ -392,27 +388,36 @@ export default function ExportDetail() {
       width: 80,
       align: 'center',
       render: (_, record) => {
+        const isItemFinished =
+          record.status === 'FINISHED' || record.status === 'COMPLETED'
+        const isExportFinished =
+          exportDetail?.status === 'COMPLETED' || exportDetail?.status === 'FINISHED'
+
+        const canExport = !isItemFinished && !isExportFinished
+
         const menuItems = [
           {
             key: 'detail',
             label: (
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <i className="bi bi-eye" />
                 Xem chi tiết
               </span>
             ),
             onClick: () => fetchItemHistory(record.id)
           },
-          {
-            key: 'export',
-            label: (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <i className="bi bi-box-arrow-up" />
-                Xuất kho
-              </span>
-            ),
-            onClick: () => fetchExportItemDetail(record.id)
-          }
+          ...(canExport
+            ? [
+                {
+                  key: 'export',
+                  label: (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Xuất kho
+                    </span>
+                  ),
+                  onClick: () => fetchExportItemDetail(record.id)
+                }
+              ]
+            : [])
         ]
 
         return (
@@ -463,6 +468,20 @@ export default function ExportDetail() {
 
   const displayStatus = mapExportStatus(exportDetail.status)
   const statusConfig = getStatusConfig(displayStatus)
+
+  // Validate quantity in export modal
+  const modalRequired = exportModal.data?.required ?? 0
+  const modalExported = exportModal.data?.exported ?? 0
+  const modalRemaining =
+    exportModal.data?.remaining ?? Math.max(0, modalRequired - modalExported)
+  const modalQuantityNumber =
+    typeof exportModal.quantity === 'number'
+      ? exportModal.quantity
+      : parseFloat(exportModal.quantity || 0)
+  const isQuantityInvalid =
+    exportModal.visible &&
+    modalRemaining > 0 &&
+    modalQuantityNumber > modalRemaining
 
   return (
     <WarehouseLayout breadcrumbItems={breadcrumbItems}>
@@ -543,13 +562,11 @@ export default function ExportDetail() {
                 Ngày tạo
               </div>
               <div style={{ fontSize: '15px', fontWeight: 500, color: '#111' }}>
-                {exportDetail.createdAt 
-                  ? new Date(exportDetail.createdAt).toLocaleDateString('vi-VN')
-                  : '11/11/25'}
+                {formatDisplayDate(exportDetail.createdAt) || '11/11/25'}
               </div>
             </div>
 
-            <div style={{ marginBottom: '20px' }}>
+            {/* <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Ngày duyệt
               </div>
@@ -558,27 +575,25 @@ export default function ExportDetail() {
                   ? new Date(exportDetail.approvedAt).toLocaleDateString('vi-VN')
                   : '12/11/25'}
               </div>
-            </div>
+            </div> */}
 
             <div style={{ marginBottom: '20px' }}>
               <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Ngày xuất
               </div>
               <div style={{ fontSize: '15px', fontWeight: 500, color: '#111' }}>
-                {exportDetail.exportedAt 
-                  ? new Date(exportDetail.exportedAt).toLocaleDateString('vi-VN')
-                  : '--'}
+                {formatDisplayDate(exportDetail.exportedAt)}
               </div>
             </div>
 
-            <div>
+            {/* <div>
               <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
                 Người duyệt
               </div>
               <div style={{ fontSize: '15px', fontWeight: 500, color: '#111' }}>
                 {exportDetail.approvedBy || 'Trần Văn C'}
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -597,20 +612,6 @@ export default function ExportDetail() {
             }}
           >
             Tất cả
-          </Button>
-          <Button
-            type={statusFilter === 'Chờ nhập kho' ? 'primary' : 'default'}
-            onClick={() => setStatusFilter('Chờ nhập kho')}
-            style={{
-              background: statusFilter === 'Chờ nhập kho' ? '#CBB081' : '#fff',
-              borderColor: statusFilter === 'Chờ nhập kho' ? '#CBB081' : '#e6e6e6',
-              color: statusFilter === 'Chờ nhập kho' ? '#111' : '#666',
-              fontWeight: 600,
-              height: '36px',
-              minWidth: '140px'
-            }}
-          >
-            Chờ nhập kho
           </Button>
           <Button
             type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
@@ -734,6 +735,11 @@ export default function ExportDetail() {
                   <div style={{ fontWeight: 500, fontSize: '14px' }}>
                     : {historyModal.data.name || 'N/A'}
                   </div>
+                  
+                  <div style={{ color: '#666', fontSize: '14px' }}>Tồn kho</div>
+                  <div style={{ fontWeight: 500, fontSize: '14px' }}>
+                    : {historyModal.data.quantityInStock ?? 0}
+                  </div>
                 </div>
               </div>
 
@@ -839,6 +845,7 @@ export default function ExportDetail() {
               height: '40px',
               minWidth: '120px'
             }}
+            disabled={isQuantityInvalid || exportModal.loading}
             onClick={handleExportSubmit}
           >
             Xác nhận
@@ -877,12 +884,12 @@ export default function ExportDetail() {
                 <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '8px' }}>
                   <div style={{ color: '#666', fontSize: '14px' }}>Số lượng cần xuất</div>
                   <div style={{ fontWeight: 500, fontSize: '14px' }}>
-                    : {exportModal.data.required || '20'}
+                    : {exportModal.data?.required ?? 0}
                   </div>
                   
                   <div style={{ color: '#666', fontSize: '14px' }}>Số lượng đã xuất</div>
                   <div style={{ fontWeight: 500, fontSize: '14px' }}>
-                    : {exportModal.data.exported || '10'}
+                    : {exportModal.data?.exported ?? 0}
                   </div>
                 </div>
               </div>
@@ -891,16 +898,25 @@ export default function ExportDetail() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px' }}>
-                    Số lượng muốn xuất
+                    Số lượng xuất kho
                   </label>
                   <InputNumber
                     placeholder="Nhập số lượng muốn xuất"
                     value={exportModal.quantity}
                     onChange={(value) => setExportModal({ ...exportModal, quantity: value })}
                     min={1}
-                    max={exportModal.data?.requestedQty || 999999}
-                    style={{ width: '100%', height: '40px' }}
+                    max={exportModal.data?.remaining ?? exportModal.data?.required ?? 999999}
+                    status={isQuantityInvalid ? 'error' : ''}
+                    style={{
+                      width: '100%',
+                      height: '40px'
+                    }}
                   />
+                  {isQuantityInvalid && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      Số lượng xuất kho không được lớn hơn {modalRemaining}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label style={{ display: 'block', marginBottom: '8px', fontWeight: 500, fontSize: '14px' }}>

@@ -598,6 +598,7 @@ export const ledgerVoucherAPI = {
     post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
   reject: (id, rejectedByEmployeeId = 0) =>
     post(`/ledger-vouchers/${id}/reject`, { rejectedByEmployeeId }),
+  pay: (id) => post(`/ledger-vouchers/${id}/pay`),
 };
 
 export const attendanceAPI = {
@@ -710,4 +711,6 @@ export const purchaseRequestAPI = {
   update: (id, payload) => put(`/purchase-requests/${id}`, payload),
   delete: (id) => del(`/purchase-requests/${id}`),
   approve: (id) => put(`/purchase-requests/${id}/approve`, {}),
+  getSuggestedItems: () => get("/purchase-requests/suggested-items"),
+  createManual: (payload) => post("/purchase-requests/manual", payload),
 };

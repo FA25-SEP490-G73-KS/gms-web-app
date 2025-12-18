@@ -90,6 +90,18 @@ export default function InvoiceDetailPage() {
     fetchInvoiceDetail();
   }, [id]);
 
+  // Helper function để kiểm tra có phải trạng thái "Thanh toán" không
+  const isPaymentStatus = (status) => {
+    if (!status) return false
+    const statusUpper = status.toString().toUpperCase()
+    return (
+      statusUpper === 'WAITING_FOR_DELIVERY' ||
+      statusUpper === 'COMPLETED' ||
+      status === 'Hoàn thành' ||
+      status === 'Chờ bàn giao xe'
+    )
+  }
+
   const fetchInvoiceDetail = async () => {
     if (!id) return;
 
@@ -268,7 +280,7 @@ export default function InvoiceDetailPage() {
 
     setPaymentLoading(true);
     try {
-      const isPayment = invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY";
+      const isPayment = isPaymentStatus(invoiceData?.serviceTicket?.status);
       
       const payload = {
         method: paymentTab === "CASH" ? "CASH" : "BANK_TRANSFER",
@@ -330,7 +342,7 @@ export default function InvoiceDetailPage() {
 
     setPaymentLoading(true);
     try {
-      const isPayment = invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY";
+      const isPayment = isPaymentStatus(invoiceData?.serviceTicket?.status);
       
       const payload = {
         method: type === "QR" ? "BANK_TRANSFER" : "CASH",
@@ -607,7 +619,7 @@ export default function InvoiceDetailPage() {
                     fontSize: "16px",
                   }}
                 >
-                  {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" ? "Thanh toán" : "Đặt cọc"}
+                  {isPaymentStatus(invoiceData?.serviceTicket?.status) ? "Thanh toán" : "Đặt cọc"}
                 </Button>
               </div>
             )}
@@ -625,7 +637,7 @@ export default function InvoiceDetailPage() {
                 }}
               >
                 {/* Hiển thị tab Tiền mặt/QR khi WAITING_FOR_DELIVERY */}
-                {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" ? (
+                {isPaymentStatus(invoiceData?.serviceTicket?.status) ? (
                   <div style={{ padding: "12px 0" }}>
                     {/* Step 1: Show transaction table first */}
                     {!showPaymentTabs ? (
@@ -1497,7 +1509,7 @@ export default function InvoiceDetailPage() {
                     </div>
 
                     {/* Chỉ hiển thị bảng giao dịch khi WAITING_FOR_DELIVERY (thanh toán) */}
-                    {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" && (
+                    {isPaymentStatus(invoiceData?.serviceTicket?.status) && (
                       <>
                         {/* Bảng giao dịch */}
                         <div>
@@ -1724,7 +1736,7 @@ export default function InvoiceDetailPage() {
                           color: "#374151",
                         }}
                       >
-                        {invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY" ? "Số tiền thanh toán" : "Số tiền đặt cọc"}
+                        {isPaymentStatus(invoiceData?.serviceTicket?.status) ? "Số tiền thanh toán" : "Số tiền đặt cọc"}
                       </label>
                       <Input
                         value={
@@ -2155,7 +2167,7 @@ export default function InvoiceDetailPage() {
                                     onClick={async () => {
                                       setPaymentLoading(true);
                                       try {
-                                        const isPayment = invoiceData?.serviceTicket?.status === "WAITING_FOR_DELIVERY";
+                                        const isPayment = isPaymentStatus(invoiceData?.serviceTicket?.status);
                                         
                                         const payload = {
                                           method: "CASH",

@@ -22,44 +22,74 @@ const SERVICES = [
 
 
 const STATUS_MAP = {
-  'CREATED': 'Đã tạo',
-  'WAITING_FOR_QUOTATION': 'Chờ báo giá',
-  'WAITING_FOR_DELIVERY': 'Chờ bàn giao xe',
-  'COMPLETED': 'Hoàn thành',
-  'CANCELED': 'Hủy'
+  CREATED: 'Đã tạo',
+  QUOTING: 'Đang báo giá',
+  QUOTE_CONFIRMED: 'Khách đã xác nhận báo giá',
+  UNDER_REPAIR: 'Đang sửa chữa',
+  WAITING_FOR_DELIVERY: 'Chờ bàn giao xe',
+  COMPLETED: 'Hoàn thành',
+  CANCELED: 'Hủy'
+}
+
+export const STATUS_COLORS = {
+  // Service Ticket
+  CREATED: '#9CA3AF',
+  QUOTING: '#3B82F6',
+  QUOTE_CONFIRMED: '#22C55E',
+  UNDER_REPAIR: '#F97316',
+  WAITING_FOR_DELIVERY: '#8B5CF6',
+  COMPLETED: '#16A34A',
+  CANCELED: '#EF4444'
+}
+
+const STATUS_LABELS = {
+  CREATED: 'Đã tạo',
+  QUOTING: 'Đang báo giá',
+  QUOTE_CONFIRMED: 'Khách đã xác nhận báo giá',
+  UNDER_REPAIR: 'Đang sửa chữa',
+  WAITING_FOR_DELIVERY: 'Chờ bàn giao xe',
+  COMPLETED: 'Hoàn thành',
+  CANCELED: 'Hủy'
+}
+
+const normalizeStatusKey = (status) => {
+  const key = (status || '').toString().trim().toUpperCase()
+  const map = {
+    'HỦY': 'CANCELED',
+    'CANCELLED': 'CANCELED',
+    'CANCELED': 'CANCELED',
+    'WAITING_FOR_QUOTATION': 'QUOTING',
+    'WAITING_QUOTE': 'QUOTING',
+    'ĐANG BÁO GIÁ': 'QUOTING',
+    'WAITING_FOR_DELIVERY': 'WAITING_FOR_DELIVERY',
+    'CHỜ BÀN GIAO XE': 'WAITING_FOR_DELIVERY',
+    'HOÀN THÀNH': 'COMPLETED',
+    'COMPLETED': 'COMPLETED',
+    'ĐÃ TẠO': 'CREATED',
+    'CREATED': 'CREATED',
+    'QUOTE_CONFIRMED': 'QUOTE_CONFIRMED',
+    'KHÁCH ĐÃ XÁC NHẬN BÁO GIÁ': 'QUOTE_CONFIRMED',
+    'UNDER_REPAIR': 'UNDER_REPAIR',
+    'ĐANG SỬA CHỮA': 'UNDER_REPAIR'
+  }
+  return map[key] || key || 'CREATED'
 }
 
 const STATUS_FILTERS = [
   { key: 'CREATED', label: 'Đã tạo' },
-  { key: 'WAITING_FOR_QUOTATION', label: 'Chờ báo giá' },
+  { key: 'QUOTING', label: 'Đang báo giá' },
+  { key: 'QUOTE_CONFIRMED', label: 'Khách đã xác nhận báo giá' },
+  { key: 'UNDER_REPAIR', label: 'Đang sửa chữa' },
   { key: 'WAITING_FOR_DELIVERY', label: 'Chờ bàn giao xe' },
   { key: 'COMPLETED', label: 'Hoàn thành' },
-  { key: 'CANCELED', label: 'Hủy' },
+  { key: 'CANCELED', label: 'Hủy' }
 ]
 
 const getStatusConfig = (status) => {
-  switch (status) {
-    case 'Hủy':
-    case 'CANCELED':
-    case 'CANCELLED':
-      return { color: '#ef4444', text: 'Hủy' }
-    case 'Chờ báo giá':
-    case 'WAITING_FOR_QUOTATION':
-    case 'WAITING_QUOTE':
-      return { color: '#ffd65a', text: 'Chờ báo giá' }
-    case 'Chờ bàn giao xe':
-    case 'WAITING_FOR_DELIVERY':
-    case 'WAITING_HANDOVER':
-      return { color: '#3b82f6', text: 'Chờ bàn giao xe' }
-    case 'Hoàn thành':
-    case 'COMPLETED':
-      return { color: '#22c55e', text: 'Hoàn thành' }
-    case 'Đã tạo':
-    case 'CREATED':
-      return { color: '#666', text: 'Đã tạo' }
-    default:
-      return { color: '#666', text: status }
-  }
+  const normalizedKey = normalizeStatusKey(status)
+  const color = STATUS_COLORS[normalizedKey] || '#666'
+  const text = STATUS_LABELS[normalizedKey] || status || 'Đã tạo'
+  return { color, text }
 }
 
 export default function TicketService() {
@@ -317,82 +347,70 @@ export default function TicketService() {
       return
     }
     
-    const transformed = resultArray.map(item => ({
-      id: item.serviceTicketId,
-      code: item.serviceTicketCode || item.code || `DV-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
-      customer: item.customer?.fullName || 'N/A',
-      license: item.vehicle?.licensePlate || 'N/A',
-      status: item.status || 'CREATED',
-      statusKey: item.status || 'CREATED',
-      createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
-      total: item.total || 0,
-      rawData: item
-    }))
+    const transformed = resultArray.map(item => {
+      const normalizedStatus = normalizeStatusKey(item.status || 'CREATED')
+      return {
+        id: item.serviceTicketId,
+        code: item.serviceTicketCode || item.code || `DV-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
+        customer: item.customer?.fullName || 'N/A',
+        license: item.vehicle?.licensePlate || 'N/A',
+        status: item.status || normalizedStatus,
+        statusKey: normalizedStatus,
+        createdAt: item.createdAt || '',
+        total: item.total || 0,
+        rawData: item
+      }
+    })
     setData(transformed)
   }
 
   const filtered = useMemo(() => {
     let result = data
-    
-   
+
     if (isHistoryPage) {
       result = result.filter((r) => {
-        const statusKey = r.statusKey || r.status
-      
-        return statusKey === 'WAITING_HANDOVER' || 
-               statusKey === 'Chờ bàn giao xe' ||
-               statusKey === 'CANCELLED' ||
-               statusKey === 'Hủy' ||
-               statusKey === 'COMPLETED' ||
-               statusKey === 'Hoàn thành'
+        const statusKey = normalizeStatusKey(r.statusKey || r.status)
+        return (
+          statusKey === 'WAITING_FOR_DELIVERY' ||
+          statusKey === 'CANCELED' ||
+          statusKey === 'COMPLETED'
+        )
       })
     }
-    
-    
+
     if (query) {
       const q = query.toLowerCase()
       result = result.filter(
         (r) => r.license.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q)
       )
     }
-    
-  
+
     // Filter by multiple statuses if applied
     if (!isHistoryPage && appliedStatuses.length > 0) {
       result = result.filter((r) => {
-        const statusKey = r.statusKey || r.status
-        return appliedStatuses.some(selectedStatus => {
-          return statusKey === selectedStatus || 
-                 (selectedStatus === 'CREATED' && (statusKey === 'CREATED' || statusKey === 'Đã tạo')) ||
-                 (selectedStatus === 'WAITING_FOR_QUOTATION' && (statusKey === 'WAITING_FOR_QUOTATION' || statusKey === 'WAITING_QUOTE' || statusKey === 'Chờ báo giá')) ||
-                 (selectedStatus === 'WAITING_FOR_DELIVERY' && (statusKey === 'WAITING_FOR_DELIVERY' || statusKey === 'WAITING_HANDOVER' || statusKey === 'Chờ bàn giao xe')) ||
-                 (selectedStatus === 'COMPLETED' && (statusKey === 'COMPLETED' || statusKey === 'Hoàn thành')) ||
-                 (selectedStatus === 'CANCELED' && (statusKey === 'CANCELED' || statusKey === 'CANCELLED' || statusKey === 'Hủy'))
-        })
+        const statusKey = normalizeStatusKey(r.statusKey || r.status)
+        return appliedStatuses.some((selectedStatus) => statusKey === normalizeStatusKey(selectedStatus))
       })
     } else if (!isHistoryPage && statusFilter) {
       // Fallback to single status filter for backward compatibility
       result = result.filter((r) => {
-        const statusKey = r.statusKey || r.status
-        return statusKey === statusFilter || 
-               (statusFilter === 'CREATED' && (statusKey === 'CREATED' || statusKey === 'Đã tạo')) ||
-               (statusFilter === 'WAITING_QUOTE' && (statusKey === 'WAITING_QUOTE' || statusKey === 'Chờ báo giá')) ||
-               (statusFilter === 'WAITING_HANDOVER' && (statusKey === 'WAITING_HANDOVER' || statusKey === 'Chờ bàn giao xe')) ||
-               (statusFilter === 'CANCELLED' && (statusKey === 'CANCELLED' || statusKey === 'Hủy'))
+        const statusKey = normalizeStatusKey(r.statusKey || r.status)
+        return statusKey === normalizeStatusKey(statusFilter)
       })
     }
-    
-    
+
     // Filter by date range if applied
     if (appliedDateRange[0] || appliedDateRange[1]) {
       result = result.filter((r) => {
         if (!r.createdAt) return false
         const recordDate = dayjs(r.createdAt, 'DD/MM/YYYY')
         if (!recordDate.isValid()) return false
-        
+
         if (appliedDateRange[0] && appliedDateRange[1]) {
-          return recordDate.isAfter(appliedDateRange[0].subtract(1, 'day')) && 
-                 recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+          return (
+            recordDate.isAfter(appliedDateRange[0].subtract(1, 'day')) &&
+            recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+          )
         } else if (appliedDateRange[0]) {
           return recordDate.isAfter(appliedDateRange[0].subtract(1, 'day'))
         } else if (appliedDateRange[1]) {
@@ -405,9 +423,9 @@ export default function TicketService() {
       const filterDate = dateFilter.format('DD/MM/YYYY')
       result = result.filter((r) => r.createdAt === filterDate)
     }
-    
+
     return result
-  }, [query, data, statusFilter, dateFilter, isHistoryPage])
+  }, [query, data, statusFilter, dateFilter, isHistoryPage, appliedStatuses, appliedDateRange])
 
   const handleUpdate = (record) => {
     setUpdateTicketId(record.id)
@@ -622,67 +640,11 @@ export default function TicketService() {
       render: (status, record) => {
         const currentStatus = record.statusKey || status
         const config = getStatusConfig(currentStatus)
-        const isUpdating = updatingStatusId === record.id
-        const isCancelled = currentStatus === 'CANCELED' || currentStatus === 'CANCELLED' || currentStatus === 'Hủy'
-        const isCompleted = currentStatus === 'COMPLETED' || currentStatus === 'Hoàn thành'
-        const isDisabled = isUpdating || isCancelled || isCompleted
-        
-        if (isHistoryPage) {
-        return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
-        }
-        
-          return (
-            <select
-              value={currentStatus}
-              onChange={(e) => {
-                e.stopPropagation()
-                handleStatusChange(record.id, e.target.value, currentStatus)
-              }}
-              onClick={(e) => e.stopPropagation()}
-              disabled={isDisabled}
-              style={{
-                border: '1px solid #d0d7de',
-                borderRadius: '6px',
-                padding: '6px 10px',
-                fontSize: '13px',
-                outline: 'none',
-                cursor: isDisabled ? 'not-allowed' : 'pointer',
-                background: isDisabled ? '#f5f5f5' : '#fff',
-                minWidth: '160px',
-                color: config.color,
-                fontWeight: 600,
-                opacity: isDisabled ? 0.6 : 1
-              }}
-            >
-              {currentStatus === 'CREATED' || currentStatus === 'Đã tạo' ? (
-                <>
-                  <option value="CREATED" style={{ color: '#3b82f6' }}>Đã tạo</option>
-                  <option value="CANCELED" style={{ color: '#ef4444' }}>Hủy</option>
-                </>
-              ) : currentStatus === 'WAITING_FOR_QUOTATION' || currentStatus === 'WAITING_QUOTE' || currentStatus === 'Chờ báo giá' ? (
-                <>
-                  <option value="WAITING_FOR_QUOTATION" style={{ color: '#ffd65a' }}>Chờ báo giá</option>
-                  <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
-                  <option value="CANCELED" style={{ color: '#ef4444' }}>Hủy</option>
-                </>
-              ) : currentStatus === 'WAITING_FOR_DELIVERY' || currentStatus === 'WAITING_HANDOVER' || currentStatus === 'Chờ bàn giao xe' ? (
-                <>
-                  <option value="WAITING_FOR_DELIVERY" style={{ color: '#3b82f6' }}>Chờ bàn giao xe</option>
-                  <option value="COMPLETED" style={{ color: '#22c55e' }}>Hoàn thành</option>
-                  <option value="CANCELED" style={{ color: '#ef4444' }}>Hủy</option>
-                </>
-              ) : (
-                Object.keys(STATUS_MAP).map((key) => {
-                  const optConfig = getStatusConfig(key)
-                  return (
-                    <option key={key} value={key} style={{ color: optConfig.color }}>
-                      {STATUS_MAP[key]}
-                    </option>
-                  )
-                })
-              )}
-            </select>
-          )
+        return (
+          <span style={{ color: config.color, fontWeight: 600 }}>
+            {config.text}
+          </span>
+        )
       }
     },
     {
@@ -794,7 +756,7 @@ export default function TicketService() {
               pageSize: pageSize,
               total: filtered.length,
               showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total, range) => `${total} phiếu dịch vụ`,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (page, pageSize) => {
                 setPage(page)

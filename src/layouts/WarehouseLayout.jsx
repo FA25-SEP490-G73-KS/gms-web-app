@@ -149,7 +149,7 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button 
-                  className={`submenu-item ${isActive('/warehouse/import/list') ? 'active' : ''}`}
+                  className={`submenu-item ${location.pathname.startsWith('/warehouse/import/list') || location.pathname.startsWith('/warehouse/import-list') ? 'active' : ''}`}
                   onClick={() => navigate('/warehouse/import/list')}
                 >
                   Danh sách nhập
@@ -171,7 +171,7 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button 
-                  className={`submenu-item ${isActive('/warehouse/export/list') ? 'active' : ''}`}
+                  className={`submenu-item ${location.pathname.startsWith('/warehouse/export/list') ? 'active' : ''}`}
                   onClick={() => navigate('/warehouse/export/list')}
                 >
                   Danh sách xuất

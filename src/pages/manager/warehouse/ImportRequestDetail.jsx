@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Button, Table, Tag, message, Spin } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { purchaseRequestAPI } from '../../../services/api'
 import { goldTableHeader } from '../../../utils/tableComponents'
@@ -163,13 +162,6 @@ export default function ManagerImportRequestDetail() {
       <div style={{ padding: '24px', background: '#fff', minHeight: '100vh' }}>
         {/* Header */}
         <div style={{ marginBottom: '24px' }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/manager/warehouse/import-request')}
-            style={{ marginBottom: '16px' }}
-          >
-            Quay lại
-          </Button>
           <h1 style={{ margin: 0 }}>Thông tin chi tiết</h1>
         </div>
 
@@ -234,45 +226,47 @@ export default function ManagerImportRequestDetail() {
         </div>
 
         {/* Action Buttons */}
-        <div style={{ 
-          marginTop: '24px', 
-          display: 'flex', 
-          justifyContent: 'flex-end', 
-          gap: '12px' 
-        }}>
-          <Button
-            size="large"
-            onClick={handleReject}
-            style={{
-              background: '#ef4444',
-              borderColor: '#ef4444',
-              color: '#fff',
-              fontWeight: 500,
-              height: '44px',
-              paddingLeft: '24px',
-              paddingRight: '24px',
-              borderRadius: '8px'
-            }}
-          >
-            Từ chối yêu cầu
-          </Button>
-          <Button
-            type="primary"
-            size="large"
-            onClick={handleApprove}
-            style={{
-              background: '#22c55e',
-              borderColor: '#22c55e',
-              fontWeight: 500,
-              height: '44px',
-              paddingLeft: '24px',
-              paddingRight: '24px',
-              borderRadius: '8px'
-            }}
-          >
-            Duyệt yêu cầu
-          </Button>
-        </div>
+        {detailData.reviewStatus !== 'Đã duyệt' && (
+          <div style={{ 
+            marginTop: '24px', 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: '12px' 
+          }}>
+            <Button
+              size="large"
+              onClick={handleReject}
+              style={{
+                background: '#ef4444',
+                borderColor: '#ef4444',
+                color: '#fff',
+                fontWeight: 500,
+                height: '44px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                borderRadius: '8px'
+              }}
+            >
+              Từ chối yêu cầu
+            </Button>
+            <Button
+              type="primary"
+              size="large"
+              onClick={handleApprove}
+              style={{
+                background: '#22c55e',
+                borderColor: '#22c55e',
+                fontWeight: 500,
+                height: '44px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                borderRadius: '8px'
+              }}
+            >
+              Duyệt yêu cầu
+            </Button>
+          </div>
+        )}
       </div>
     </ManagerLayout>
   )

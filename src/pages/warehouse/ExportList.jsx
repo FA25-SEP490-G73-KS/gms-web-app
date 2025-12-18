@@ -55,6 +55,23 @@ export default function ExportList() {
     fetchExportList()
   }, [page, pageSize, searchTerm, statusFilter, dateRange])
 
+  const formatDisplayDate = (value) => {
+    if (!value) return '--'
+    const str = String(value).trim()
+
+    // Nếu là ISO string, dùng Date để format
+    if (str.includes('T')) {
+      const d = new Date(str)
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString('vi-VN')
+      }
+    }
+
+    // Trường hợp backend trả "DD/MM/YYYY HH:mm" → lấy phần ngày phía trước
+    const [datePart] = str.split(' ')
+    return datePart || str
+  }
+
   const getStatusParam = (filter) => {
     const statusMap = {
       'Đang xuất hàng': 'EXPORTING',
@@ -95,7 +112,7 @@ export default function ExportList() {
         id: item.id,
         exportCode: item.code || 'XK-000001',
         exportType: item.reason || 'Theo báo giá',
-        createDate: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : 'N/A',
+        createDate: formatDisplayDate(item.createdAt),
         quotationCode: item.quotationCode || 'BG-000001',
         requester: item.createdBy || 'Nguyễn Văn A',
         status: mapExportStatus(item.status),
@@ -271,7 +288,6 @@ export default function ExportList() {
             key: 'detail',
             label: (
               <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <i className="bi bi-eye" />
                 Xem chi tiết
               </span>
             ),
@@ -367,7 +383,7 @@ export default function ExportList() {
               pageSize: pageSize,
               total: total,
               showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total) => `Tổng ${total} phiếu xuất kho`,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (page, pageSize) => {
                 setPage(page)
