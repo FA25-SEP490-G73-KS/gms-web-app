@@ -1033,7 +1033,6 @@ export default function CreateTicketNewCustomer() {
                         }
                         const cleanValue = value.toString().replace(/\s/g, '').replace(/[^0-9]/g, '')
                         
-                        // Validate: phải bắt đầu bằng 0 và có 10 số
                         if (!/^0\d{9}$/.test(cleanValue)) {
                           return Promise.reject(new Error('Số điện thoại phải có 10 số và bắt đầu bằng 0'))
                         }
@@ -1058,7 +1057,6 @@ export default function CreateTicketNewCustomer() {
                         isLoading={customerLookupLoading}
                         components={{ DropdownIndicator: null }}
                         formatOptionLabel={({ label, fullName, phone }) => {
-                          // Hiển thị tên và số điện thoại trong dropdown (2 dòng)
                           if (fullName) {
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', padding: '4px 0' }}>
@@ -1071,17 +1069,13 @@ export default function CreateTicketNewCustomer() {
                               </div>
                             )
                           }
-                          // Nếu không có tên, chỉ hiển thị số điện thoại
                           return <div style={{ fontSize: '14px', color: '#1a1a1a' }}>{label}</div>
                         }}
                         getOptionValue={(option) => option.value || option.label}
                         getOptionLabel={(option) => {
-                          // Chỉ trả về số điện thoại (label) để hiển thị trong input
-                          // Không dùng formatOptionLabel cho input value
                           return option.label || option.value || ''
                         }}
                         onInputChange={(inputValue = '', action) => {
-                          // Chỉ xử lý khi người dùng gõ (tránh reset khi react-select gửi rỗng tạm thời)
                           if (action.action !== 'input-change') return
 
                           const trimmed = inputValue.trim()
@@ -1093,18 +1087,15 @@ export default function CreateTicketNewCustomer() {
                           setPhoneOptions(filtered.length ? filtered : [{ label: trimmed, value: trimmed }])
 
                           if (trimmed) {
-                            // Cập nhật form value khi đang nhập
                             form.setFieldsValue({ phone: trimmed })
                             setCurrentPhone(trimmed)
                             const phoneOnlyOption = { label: trimmed, value: trimmed }
-                            // Đảm bảo option đang gõ luôn tồn tại trong options source để hiển thị trong input
                             setPhoneOptionsSource((prev) => {
                               const exists = prev.some((opt) => opt.value === trimmed || opt.label === trimmed)
                               return exists ? prev : [...prev, phoneOnlyOption]
                             })
                             setPhoneSelectValue(phoneOnlyOption)
                           } else {
-                            // Chỉ clear giá trị nhập, không reset toàn bộ state khách hàng/xe
                             form.setFieldsValue({ phone: '' })
                             setCurrentPhone('')
                             setPhoneSelectValue(null)
@@ -1112,10 +1103,8 @@ export default function CreateTicketNewCustomer() {
                         }}
                         onChange={(option) => {
                           if (!option) {
-                            // Nếu xóa số điện thoại (click nút x), xóa TẤT CẢ thông tin khách hàng và xe
                             setPhoneSelectValue(null)
                             setCurrentPhone('')
-                            // Xóa ngay lập tức các trường thông tin khách hàng
                             form.setFieldsValue({ 
                               phone: '',
                               name: '',
@@ -1125,7 +1114,6 @@ export default function CreateTicketNewCustomer() {
                             return
                           }
                           
-                          // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
                           const phoneOnlyOption = {
                             label: option.label || option.value,
                             value: option.value || option.label
@@ -1138,7 +1126,6 @@ export default function CreateTicketNewCustomer() {
                           if (isKnown) {
                             fetchCustomerByPhone(selectedValue)
                           } else {
-                            // Số điện thoại mới: giữ giá trị, không reset toàn bộ state
                             form.setFieldsValue({ phone: selectedValue })
                             setPhoneSelectValue(phoneOnlyOption)
                             setCurrentPhone(selectedValue)
@@ -1159,7 +1146,6 @@ export default function CreateTicketNewCustomer() {
                             return existsInOptions ? prev : [...prev, newOption]
                           })
                           
-                          // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
                           setPhoneSelectValue({
                             label: trimmed,
                             value: trimmed
@@ -1168,16 +1154,13 @@ export default function CreateTicketNewCustomer() {
                           setCurrentPhone(trimmed)
                         }}
                         onKeyDown={(e) => {
-                          // Khi nhấn Enter, ngăn form submit và giữ giá trị
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            // Lấy giá trị hiện tại từ form
                             const currentPhone = form.getFieldValue('phone')
                             if (currentPhone && currentPhone.trim()) {
                               const trimmed = currentPhone.trim()
                               const exists = phoneOptionsSource.some((opt) => opt.value === trimmed)
                               if (!exists) {
-                                // Tạo option mới nếu chưa tồn tại
                                 const newOption = { 
                                   label: trimmed, 
                                   value: trimmed,
@@ -1189,7 +1172,6 @@ export default function CreateTicketNewCustomer() {
                                   const existsInOptions = prev.some((opt) => opt.value === trimmed)
                                   return existsInOptions ? prev : [...prev, newOption]
                                 })
-                                // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
                                 setPhoneSelectValue({
                                   label: trimmed,
                                   value: trimmed
@@ -1197,7 +1179,6 @@ export default function CreateTicketNewCustomer() {
                                 form.setFieldsValue({ phone: trimmed })
                                 setCurrentPhone(trimmed)
                               } else {
-                                // Nếu đã tồn tại, fetch customer data
                                 fetchCustomerByPhone(trimmed)
                               }
                             }
@@ -1249,7 +1230,6 @@ export default function CreateTicketNewCustomer() {
                         
                         const trimmedValue = value.trim()
                         
-                        // Chỉ kiểm tra độ dài tối đa
                         if (trimmedValue.length > 50) {
                           return Promise.reject(new Error('Họ tên không được vượt quá 50 ký tự'))
                         }
@@ -1258,7 +1238,6 @@ export default function CreateTicketNewCustomer() {
                       }
                     }
                   ]}
-                  // Cho phép nhập khoảng trắng tự do, chỉ kiểm tra ở validator
                   normalize={(value) => value}
                   style={formItemStyle}
                 >
@@ -1283,19 +1262,16 @@ export default function CreateTicketNewCustomer() {
                   rules={[
                     {
                       validator: (_, value) => {
-                        // Không bắt buộc
                         if (!value || value.trim() === '') {
                           return Promise.resolve()
                         }
                         
                         const trimmedValue = value.trim()
                         
-                        // Kiểm tra độ dài tối đa
                         if (trimmedValue.length > 100) {
                           return Promise.reject(new Error('Địa chỉ không được vượt quá 100 ký tự'))
                         }
                         
-                        // Kiểm tra chỉ chứa chữ, số, dấu phẩy, gạch ngang và khoảng trắng
                         if (!/^[a-zA-Z0-9ÀÁÂÃÈÉÊÌÍÒÓÔÕÙÚĂĐĨŨƠàáâãèéêìíòóôõùúăđĩũơƯĂẠẢẤẦẨẪẬẮẰẲẴẶẸẺẼỀỀỂưăạảấầẩẫậắằẳẵặẹẻẽềềểỄỆỈỊỌỎỐỒỔỖỘỚỜỞỠỢỤỦỨỪễệỉịọỏốồổỗộớờởỡợụủứừỬỮỰỲỴÝỶỸửữựỳỵýỷỹ\s,/-]*$/.test(trimmedValue)) {
                           return Promise.reject(new Error('Địa chỉ chỉ được chứa chữ, số, dấu phẩy, gạch ngang và khoảng trắng'))
                         }
@@ -1304,7 +1280,6 @@ export default function CreateTicketNewCustomer() {
                       }
                     }
                   ]}
-                  // Cho phép khoảng trắng tự do, chỉ kiểm tra bằng validator
                   normalize={(value) => value}
                   style={formItemStyle}
                 >
@@ -1416,7 +1391,6 @@ export default function CreateTicketNewCustomer() {
                             validator: (_, value) => {
                               if (!value) return Promise.resolve()
                               
-                              // Convert value to string (handles both string and object from CreatableSelect)
                               const plateValue = typeof value === 'string' 
                                 ? value 
                                 : (value?.value || value?.label || String(value))
@@ -1449,7 +1423,6 @@ export default function CreateTicketNewCustomer() {
                         ]}
                         style={formItemStyle}
                       >
-                      {/* Wrap giống phần SĐT để tránh Form.Item inject value/onChange vào react-select */}
                       <div style={{ width: '100%' }}>
                         <CreatableSelect
                           isClearable
@@ -1463,11 +1436,9 @@ export default function CreateTicketNewCustomer() {
                           components={{ DropdownIndicator: null }}
                           getOptionValue={(option) => option.value || option.label}
                           getOptionLabel={(option) => {
-                            // Chỉ trả về biển số (label) để hiển thị trong input
                             return option.label || option.value || ''
                           }}
                           onInputChange={(inputValue = '', action) => {
-                            // Chỉ xử lý khi người dùng gõ (tránh reset khi react-select gửi rỗng tạm thời)
                             if (action.action !== 'input-change') return
 
                             const trimmed = inputValue.trim()
@@ -1479,24 +1450,20 @@ export default function CreateTicketNewCustomer() {
                             setPlateOptions(filtered.length ? filtered : [{ label: trimmed, value: trimmed }])
 
                             if (trimmed) {
-                              // Cập nhật form value khi đang nhập
                               form.setFieldsValue({ plate: trimmed })
                               const plateOnlyOption = { label: trimmed, value: trimmed }
-                              // Đảm bảo option đang gõ luôn tồn tại trong options source để hiển thị trong input
                               setPlateOptionsSource((prev) => {
                                 const exists = prev.some((opt) => opt.value === trimmed || opt.label === trimmed)
                                 return exists ? prev : [...prev, plateOnlyOption]
                               })
                               setPlateSelectValue(plateOnlyOption)
                             } else {
-                              // Chỉ clear giá trị nhập, không reset toàn bộ state khách hàng/xe
                               form.setFieldsValue({ plate: '' })
                               setPlateSelectValue(null)
                             }
                           }}
                           onChange={(option) => {
                             if (!option) {
-                              // Nếu xóa biển số xe (click nút x), chỉ xóa thông tin xe (giữ lại thông tin khách hàng nếu số điện thoại không null)
                               setPlateSelectValue(null)
                               form.setFieldsValue({ plate: '' })
                               const currentPhone = form.getFieldValue('phone')
@@ -1508,7 +1475,6 @@ export default function CreateTicketNewCustomer() {
                               return
                             }
                             
-                            // Chỉ lưu label và value (biển số) để hiển thị trong input
                             const plateOnlyOption = {
                               label: option.label || option.value,
                               value: option.value || option.label
@@ -1518,7 +1484,6 @@ export default function CreateTicketNewCustomer() {
                             const formattedPlate = selectedValue ? formatLicensePlate(selectedValue) : selectedValue
                             form.setFieldsValue({ plate: formattedPlate })
                             
-                            // Kiểm tra xem biển số có trong danh sách không
                             const isKnown = plateOptionsSource.some((opt) => {
                               const optValue = opt.value || opt.label || ''
                               const formattedOpt = formatLicensePlate(optValue)
@@ -1526,7 +1491,6 @@ export default function CreateTicketNewCustomer() {
                             })
                             
                             if (isKnown) {
-                              // Biển số có trong danh sách, fill thông tin xe
                               const vehicleFromOption = option?.vehicle
                               const vehiclesPool =
                                 (Array.isArray(customerVehicles) && customerVehicles.length > 0
@@ -1552,7 +1516,6 @@ export default function CreateTicketNewCustomer() {
                                 }
                               }
                             } else {
-                              // Biển số mới, reset vehicle info nhưng giữ biển số
                               setIsNewVehicle(true)
                               setSelectedVehicle(null)
                               form.setFieldsValue({
@@ -1581,11 +1544,9 @@ export default function CreateTicketNewCustomer() {
                               return existsInOptions ? prev : [...prev, newOption]
                             })
                             
-                            // Chỉ lưu label và value (biển số) để hiển thị trong input
                             setPlateSelectValue(newOption)
                             form.setFieldsValue({ plate: formatted })
                             
-                            // Biển số mới, reset vehicle info nhưng giữ biển số
                             setIsNewVehicle(true)
                             setSelectedVehicle(null)
                             form.setFieldsValue({
@@ -1600,10 +1561,8 @@ export default function CreateTicketNewCustomer() {
                             setModels([])
                           }}
                           onKeyDown={(e) => {
-                            // Khi nhấn Enter, ngăn form submit và giữ giá trị
                             if (e.key === 'Enter') {
                               e.preventDefault()
-                              // Lấy giá trị hiện tại từ form
                               const currentPlate = form.getFieldValue('plate')
                               if (currentPlate && currentPlate.trim()) {
                                 const trimmed = currentPlate.trim()
@@ -1613,7 +1572,6 @@ export default function CreateTicketNewCustomer() {
                                   return formatLicensePlate(optValue) === formatted
                                 })
                                 if (!exists) {
-                                  // Tạo option mới nếu chưa tồn tại
                                   const newOption = { 
                                     label: formatted, 
                                     value: formatted
@@ -1621,14 +1579,12 @@ export default function CreateTicketNewCustomer() {
                                   setPlateOptionsSource((prev) => [...prev, newOption])
                                   setPlateOptions((prev) => {
                                     const existsInOptions = prev.some((opt) => opt.value === formatted)
-                                    return existsInOptions ? prev : [...prev, newOption]
-                                  })
-                                  // Chỉ lưu label và value (biển số) để hiển thị trong input
-                                  setPlateSelectValue(newOption)
-                                  form.setFieldsValue({ plate: formatted })
-                                  
-                                  // Biển số mới, reset vehicle info nhưng giữ biển số
-                                  setIsNewVehicle(true)
+                                  return existsInOptions ? prev : [...prev, newOption]
+                                })
+                                setPlateSelectValue(newOption)
+                                form.setFieldsValue({ plate: formatted })
+                                
+                                setIsNewVehicle(true)
                                   setSelectedVehicle(null)
                                   form.setFieldsValue({
                                     brand: undefined,
@@ -1641,7 +1597,6 @@ export default function CreateTicketNewCustomer() {
                                   setSelectedModelId(null)
                                   setModels([])
                                 } else {
-                                  // Nếu đã tồn tại, tìm và set option đó
                                   const existingOption = plateOptionsSource.find((opt) => {
                                     const optValue = opt.value || opt.label || ''
                                     return formatLicensePlate(optValue) === formatted
@@ -1651,11 +1606,10 @@ export default function CreateTicketNewCustomer() {
                                       label: existingOption.label || existingOption.value,
                                       value: existingOption.value || existingOption.label
                                     }
-                                    setPlateSelectValue(plateOnlyOption)
-                                    form.setFieldsValue({ plate: formatted })
-                                    
-                                    // Fill vehicle info nếu có
-                                    const vehiclesPool =
+                                  setPlateSelectValue(plateOnlyOption)
+                                  form.setFieldsValue({ plate: formatted })
+                                  
+                                  const vehiclesPool =
                                       (Array.isArray(customerVehicles) && customerVehicles.length > 0
                                         ? customerVehicles
                                         : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
@@ -1751,14 +1705,12 @@ export default function CreateTicketNewCustomer() {
                         rules={[
                           {
                             validator: (_, value) => {
-                              // Không bắt buộc
                               if (!value || value.toString().trim() === '') {
                                 return Promise.resolve()
                               }
                               
                         const cleanValue = value.toString().replace(/\s/g, '')
                               
-                              // Kiểm tra độ dài tối đa
                               if (cleanValue.length > 20) {
                                 return Promise.reject(new Error('Số khung không được vượt quá 20 ký tự'))
                               }
@@ -1767,7 +1719,6 @@ export default function CreateTicketNewCustomer() {
                             }
                           }
                         ]}
-                        // Giữ khoảng trắng, chỉ chuyển hoa (validator kiểm tra độ dài)
                         normalize={(value) => value?.toUpperCase()}
                         style={formItemStyle}
                       >
@@ -1792,14 +1743,12 @@ export default function CreateTicketNewCustomer() {
                         rules={[
                           {
                             validator: (_, value) => {
-                              // Không bắt buộc
                               if (!value || value.toString().trim() === '') {
                                 return Promise.resolve()
                               }
                               
                               const trimmedValue = value.toString().trim()
                               
-                              // Kiểm tra độ dài tối đa
                               if (trimmedValue.length > 200) {
                                 return Promise.reject(new Error('Ghi chú không được vượt quá 200 ký tự'))
                               }
@@ -1946,7 +1895,6 @@ export default function CreateTicketNewCustomer() {
                   fullName: created.fullName || newCustomer.fullName || '',
                   phone: phoneDisplay
                 }
-                // Thêm vào options source
                 setPhoneOptionsSource((prev) => {
                   const exists = prev.some((opt) => opt.value === phoneDisplay)
                   return exists ? prev : [...prev, phoneOption]
@@ -1955,7 +1903,6 @@ export default function CreateTicketNewCustomer() {
                   const exists = prev.some((opt) => opt.value === phoneDisplay)
                   return exists ? prev : [...prev, phoneOption]
                 })
-                // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
                 setPhoneSelectValue({
                   label: phoneDisplay,
                   value: phoneDisplay
