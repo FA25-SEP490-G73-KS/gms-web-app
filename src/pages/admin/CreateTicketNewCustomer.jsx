@@ -59,13 +59,13 @@ export default function CreateTicketNewCustomer() {
   
   const [plateConflict, setPlateConflict] = useState(null)
   
-  // State cho danh sách xe của khách hàng
+  
   const [customerVehicles, setCustomerVehicles] = useState([])
   const [vehicleOptions, setVehicleOptions] = useState([])
-  const [plateOptionsSource, setPlateOptionsSource] = useState([]) // Danh sách đầy đủ các biển số
-  const [plateOptions, setPlateOptions] = useState([]) // Danh sách đã filter để hiển thị
-  const [plateSelectValue, setPlateSelectValue] = useState(null) // Giá trị đã chọn trong CreatableSelect
-  const [plateOption, setPlateOption] = useState(null) // Option đang chọn cho CreatableSelect
+  const [plateOptionsSource, setPlateOptionsSource] = useState([]) 
+  const [plateOptions, setPlateOptions] = useState([]) 
+  const [plateSelectValue, setPlateSelectValue] = useState(null) 
+  const [plateOption, setPlateOption] = useState(null) 
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [isNewVehicle, setIsNewVehicle] = useState(false)
 
@@ -91,7 +91,7 @@ export default function CreateTicketNewCustomer() {
 
   const inputHeight = 40
 
-  // Luôn theo dõi giá trị plate trong form để sync với plateSelectValue
+  
   const watchedPlate = Form.useWatch('plate', form)
 
   const multiSelectStyles = {
@@ -124,7 +124,7 @@ export default function CreateTicketNewCustomer() {
     multiValue: undefined,
     multiValueLabel: undefined,
     multiValueRemove: undefined,
-    // Đảm bảo input chỉ hiển thị label (số điện thoại)
+  
     singleValue: (base) => ({ 
       ...base, 
       color: '#1a1a1a',
@@ -177,7 +177,7 @@ export default function CreateTicketNewCustomer() {
     form.setFieldsValue({ techs: ids })
   }
 
-  // Hàm để xóa chỉ thông tin xe (giữ lại thông tin khách hàng và biển số xe)
+  
   const resetVehicleInfo = () => {
     setIsNewVehicle(true)
     setSelectedVehicle(null)
@@ -187,7 +187,7 @@ export default function CreateTicketNewCustomer() {
       model: undefined,
       vin: '',
       year: 2020
-      // NOTE: plate is NOT reset here - it's controlled by plateSelectValue
+    
     })
   
     setSelectedBrandId(null)
@@ -200,10 +200,10 @@ export default function CreateTicketNewCustomer() {
     setCustomerDiscountPolicyId(0)
     setCustomerVehicles([])
     setVehicleOptions([])
-    setPlateOptionsSource([]) // Xóa dropdown biển số xe
-    setPlateOptions([]) // Xóa dropdown biển số xe
+    setPlateOptionsSource([]) 
+    setPlateOptions([]) 
     setSelectedVehicle(null)
-    // Reset filled fields
+    
     setFilledFields({
       name: false,
       address: false,
@@ -212,7 +212,7 @@ export default function CreateTicketNewCustomer() {
     setIsNewVehicle(true)
     setPlateSelectValue(null)
     setPlateOption(null)
-    // Xóa TẤT CẢ các trường thông tin khách hàng và xe
+   
     form.setFieldsValue({ 
       customerType: 'DOANH_NGHIEP',
       phone: '',
@@ -226,15 +226,13 @@ export default function CreateTicketNewCustomer() {
     })
     setSelectedBrandId(null)
     setSelectedModelId(null)
-    // KHÔNG xóa models array, chỉ xóa selectedModelId để dropdown vẫn hiện tất cả
-    // setModels([]) - BỎ DÒNG NÀY
     setPhoneSelectValue(null)
     setCurrentPhone('')
   }
 
-  // Đồng bộ plateSelectValue với giá trị plate trong form
+ 
   useEffect(() => {
-    // Khi không có biển số -> clear select
+   
     if (!watchedPlate || typeof watchedPlate !== 'string' || !watchedPlate.trim()) {
       if (plateSelectValue !== null) {
         setPlateSelectValue(null)
@@ -245,7 +243,7 @@ export default function CreateTicketNewCustomer() {
 
     const formatted = formatLicensePlate(watchedPlate.trim())
 
-    // Tìm trong source options để giữ lại vehicle nếu có
+    
     const existing = plateOptionsSource.find((opt) => {
       const optValue = opt.value || opt.label || ''
       return formatLicensePlate(optValue) === formatted
@@ -258,7 +256,7 @@ export default function CreateTicketNewCustomer() {
         }
       : { label: formatted, value: formatted }
 
-    // Nếu đã cùng giá trị thì không cần set lại để tránh re-render không cần thiết
+    
     if (
       !plateSelectValue ||
       plateSelectValue.value !== syncedOption.value ||
@@ -267,9 +265,8 @@ export default function CreateTicketNewCustomer() {
       setPlateSelectValue(syncedOption)
       setPlateOption(existing || syncedOption)
     }
-  }, [watchedPlate, plateOptionsSource]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Bảo vệ hiển thị: nếu state plateSelectValue bị mất, fallback từ giá trị trong form
+  }, [watchedPlate, plateOptionsSource]) 
+  
   const plateSelectDisplayValue = useMemo(() => {
     if (plateSelectValue && plateSelectValue.value) return plateSelectValue
     if (watchedPlate && typeof watchedPlate === 'string' && watchedPlate.trim()) {
@@ -279,7 +276,7 @@ export default function CreateTicketNewCustomer() {
     return null
   }, [plateSelectValue, watchedPlate])
   
-  // Fetch vehicles của khách hàng
+ 
   const fetchCustomerVehicles = async (customerId) => {
     if (!customerId) {
       setCustomerVehicles([])
@@ -288,7 +285,7 @@ export default function CreateTicketNewCustomer() {
     }
     
     try {
-      // Lấy thông tin customer đầy đủ để có danh sách vehicles
+      
       const { data, error } = await customersAPI.getById(customerId)
       if (error || !data || !data.result) {
         console.warn('Error fetching customer vehicles:', error)
@@ -296,19 +293,19 @@ export default function CreateTicketNewCustomer() {
       }
       
       const customer = data.result
-      // Lấy danh sách vehicles từ customer
+     
       const vehicles = customer.vehicles || []
       const licensePlates = customer.licensePlates || []
       
-      // Tạo options từ vehicles hoặc licensePlates
+    
       const vehicleOptionsList = []
       
       if (Array.isArray(vehicles) && vehicles.length > 0) {
-        // Nếu có vehicles array với đầy đủ thông tin
+       
         vehicles.forEach(vehicle => {
           const plate = vehicle.licensePlate || vehicle.plate || ''
           if (plate) {
-            // Format plate để đảm bảo consistency
+            
             const formattedPlate = formatLicensePlate(plate)
             vehicleOptionsList.push({
               value: formattedPlate,
@@ -318,7 +315,7 @@ export default function CreateTicketNewCustomer() {
           }
         })
       } else if (Array.isArray(licensePlates) && licensePlates.length > 0) {
-        // Nếu chỉ có licensePlates array (strings)
+        
         licensePlates.forEach(plate => {
           if (plate) {
             vehicleOptionsList.push({
@@ -330,8 +327,8 @@ export default function CreateTicketNewCustomer() {
       }
       
       setVehicleOptions(vehicleOptionsList)
-      setPlateOptionsSource(vehicleOptionsList) // Lưu danh sách đầy đủ
-      setPlateOptions(vehicleOptionsList) // Khởi tạo với danh sách đầy đủ
+      setPlateOptionsSource(vehicleOptionsList) 
+      setPlateOptions(vehicleOptionsList) 
       setCustomerVehicles(vehicles.length > 0 ? vehicles : licensePlates)
     } catch (err) {
       console.error('Error fetching customer vehicles:', err)
@@ -340,9 +337,7 @@ export default function CreateTicketNewCustomer() {
     }
   }
   
-  // Xử lý khi chọn biển số xe
-  // NOTE: This function should NOT set plateSelectValue or form.plate
-  // Those are controlled by onChange (single source of truth)
+  
   const handlePlateSelect = async (plateValue, vehiclesList = []) => {
     if (!plateValue) {
       setIsNewVehicle(false)
@@ -352,7 +347,7 @@ export default function CreateTicketNewCustomer() {
         model: undefined,
         vin: '',
         year: 2020
-        // NOTE: plate is NOT set here - it's controlled by onChange
+       
       })
       setSelectedBrandId(null)
       setSelectedModelId(null)
@@ -1516,22 +1511,24 @@ export default function CreateTicketNewCustomer() {
                         ]}
                         style={formItemStyle}
                       >
-                      <CreatableSelect
-                        isClearable
-                        isMulti={false}
-                        placeholder="VD: 30A-12345"
-                        options={plateOptions}
-                        value={plateSelectValue}
-                        styles={singleSelectStyles}
-                        classNamePrefix="react-select"
-                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                        components={{ DropdownIndicator: null }}
-                        getOptionValue={(option) => option.value || option.label}
-                        getOptionLabel={(option) => {
-                          // Chỉ trả về biển số (label) để hiển thị trong input
-                          return option.label || option.value || ''
-                        }}
-                        onInputChange={(inputValue, action) => {
+                      {/* Wrap giống phần SĐT để tránh Form.Item inject value/onChange vào react-select */}
+                      <div style={{ width: '100%' }}>
+                        <CreatableSelect
+                          isClearable
+                          isMulti={false}
+                          placeholder="VD: 30A-12345"
+                          options={plateOptions}
+                          value={plateSelectDisplayValue}
+                          styles={singleSelectStyles}
+                          classNamePrefix="react-select"
+                          menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                          components={{ DropdownIndicator: null }}
+                          getOptionValue={(option) => option.value || option.label}
+                          getOptionLabel={(option) => {
+                            // Chỉ trả về biển số (label) để hiển thị trong input
+                            return option.label || option.value || ''
+                          }}
+                          onInputChange={(inputValue, action) => {
                           console.log('[PlateSelect] onInputChange called with inputValue:', inputValue, 'action:', action)
                           // CHỈ xử lý khi action là 'input-change' (người dùng đang nhập)
                           // Bỏ qua các action khác như 'set-value', 'menu-close' (khi chọn từ dropdown)
@@ -1572,8 +1569,8 @@ export default function CreateTicketNewCustomer() {
                             // Bỏ qua các action khác (set-value, menu-close, etc.) - để onChange xử lý
                             console.log('[PlateSelect] onInputChange - Ignoring action:', action.action)
                           }
-                        }}
-                        onChange={(option) => {
+                          }}
+                          onChange={(option) => {
                           console.log('[PlateSelect] onChange called with option:', option)
                           if (!option) {
                             // Nếu xóa biển số xe (click nút x), chỉ xóa thông tin xe (giữ lại thông tin khách hàng nếu số điện thoại không null)
@@ -1654,8 +1651,8 @@ export default function CreateTicketNewCustomer() {
                             setPlateSelectValue(plateOnlyOption)
                             setPlateOption(plateOnlyOption)
                           }
-                        }}
-                        onCreateOption={(inputValue) => {
+                          }}
+                          onCreateOption={(inputValue) => {
                           const trimmed = inputValue.trim()
                           const formatted = formatLicensePlate(trimmed)
                           const newOption = { 
@@ -1694,8 +1691,8 @@ export default function CreateTicketNewCustomer() {
                           // Đảm bảo plateSelectValue vẫn được giữ
                           setPlateSelectValue(newOption)
                           setPlateOption(newOption)
-                        }}
-                        onKeyDown={(e) => {
+                          }}
+                          onKeyDown={(e) => {
                           // Khi nhấn Enter, ngăn form submit và giữ giá trị
                           if (e.key === 'Enter') {
                             e.preventDefault()
@@ -1777,8 +1774,9 @@ export default function CreateTicketNewCustomer() {
                               }
                             }
                           }
-                        }}
-                      />
+                          }}
+                        />
+                      </div>
 
                       </Form.Item>
 
