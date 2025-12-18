@@ -46,7 +46,6 @@ export default function CreateTicketNewCustomer() {
   const [phoneOptionsSource, setPhoneOptionsSource] = useState([])
   const [phoneOptions, setPhoneOptions] = useState([])
   const [phoneSelectValue, setPhoneSelectValue] = useState(null)
-  // State để track các field đã được fill từ customer data
   const [filledFields, setFilledFields] = useState({
     name: false,
     address: false,
@@ -62,11 +61,10 @@ export default function CreateTicketNewCustomer() {
   
   const [customerVehicles, setCustomerVehicles] = useState([])
   const [vehicleOptions, setVehicleOptions] = useState([])
-  const [plateOptionsSource, setPlateOptionsSource] = useState([]) // Danh sách đầy đủ các biển số
-  const [plateOptions, setPlateOptions] = useState([]) // Danh sách đã filter để hiển thị
-  const [plateSelectValue, setPlateSelectValue] = useState(null) // Giá trị đã chọn trong CreatableSelect
-  const [plateOption, setPlateOption] = useState(null) // Option đang chọn cho CreatableSelect
-  const [plateInputValue, setPlateInputValue] = useState('') // Giá trị hiển thị trong ô input biển số
+  const [plateOptionsSource, setPlateOptionsSource] = useState([])
+  const [plateOptions, setPlateOptions] = useState([])
+  const [plateSelectValue, setPlateSelectValue] = useState(null)
+  const [plateOption, setPlateOption] = useState(null)
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [isNewVehicle, setIsNewVehicle] = useState(false)
 
@@ -238,7 +236,6 @@ export default function CreateTicketNewCustomer() {
       if (plateSelectValue !== null) {
         setPlateSelectValue(null)
         setPlateOption(null)
-        setPlateInputValue('')
       }
       return
     }
@@ -266,7 +263,6 @@ export default function CreateTicketNewCustomer() {
     ) {
       setPlateSelectValue(syncedOption)
       setPlateOption(existing || syncedOption)
-      setPlateInputValue(syncedOption.label || syncedOption.value || '')
     }
   }, [watchedPlate, plateOptionsSource]) 
   
@@ -349,7 +345,6 @@ export default function CreateTicketNewCustomer() {
     }
   
     const formattedPlate = formatLicensePlate(plateValue)
-    // NOTE: Do NOT set form.plate here - onChange already handles it
   
     let existingVehicle = null
   
@@ -375,7 +370,6 @@ export default function CreateTicketNewCustomer() {
       } catch {}
     }
   
-    // ================= XE ĐÃ TỒN TẠI =================
     if (existingVehicle) {
       setIsNewVehicle(false)
       setSelectedVehicle(existingVehicle)
@@ -418,11 +412,9 @@ export default function CreateTicketNewCustomer() {
 
       console.log('handlePlateSelect - extracted data:', { brandId, modelId, vin, year })
 
-      // ✅ set trước
       form.setFieldsValue({ vin, year })
 
       if (brandId && !isNaN(brandId)) {
-        // ✅ Đảm bảo brands đã được load trước khi set selectedBrandId
         if (brands.length === 0) {
           try {
             const { data, error } = await vehiclesAPI.getBrands()
@@ -440,24 +432,18 @@ export default function CreateTicketNewCustomer() {
           }
         }
 
-        // ✅ Set brandId vào form và state sau khi brands đã được load
         setSelectedBrandId(brandId)
         form.setFieldsValue({ brand: brandId })
         console.log('Set selectedBrandId:', brandId, 'Available brands:', brands)
 
-        // ✅ Set modelId vào form TRƯỚC khi load models để handleBrandChange có thể đọc được
         if (modelId && !isNaN(modelId)) {
           form.setFieldsValue({ model: modelId })
           console.log('Set modelId in form BEFORE handleBrandChange:', modelId)
         }
 
-        // load model theo hãng - handleBrandChange sẽ tự động set selectedModelId nếu có currentModelId
         await handleBrandChange(brandId)
 
-        // ✅ Đảm bảo selectedModelId được set sau khi handleBrandChange xong
-        // Đợi một chút để models state được cập nhật hoàn toàn
         if (modelId && !isNaN(modelId)) {
-          // Sử dụng setTimeout để đảm bảo models state đã được cập nhật
           setTimeout(() => {
             setSelectedModelId(modelId)
             form.setFieldsValue({ model: modelId })
@@ -465,12 +451,10 @@ export default function CreateTicketNewCustomer() {
           }, 100)
         }
       } else if (modelId && !isNaN(modelId)) {
-        // Nếu không có brandId nhưng có modelId, set luôn
         setSelectedModelId(modelId)
         form.setFieldsValue({ model: modelId })
         console.log('Set modelId without brandId:', modelId)
       } else if (brandNameRaw) {
-        // Fallback: match brand theo tên nếu không có brandId
         const matchedBrand = brands.find((b) => {
           const bName = (b.name || '').toLowerCase().trim()
           return bName === (brandNameRaw || '').toLowerCase().trim()
@@ -480,7 +464,6 @@ export default function CreateTicketNewCustomer() {
           setSelectedBrandId(bId)
           form.setFieldsValue({ brand: bId })
           await handleBrandChange(bId)
-          // Nếu có modelName và chưa có modelId, thử match theo tên
           if (modelNameRaw && models.length > 0) {
             const matchedModel = models.find((m) => {
               const mName = (m.name || m.vehicleModelName || '').toLowerCase().trim()
@@ -492,7 +475,6 @@ export default function CreateTicketNewCustomer() {
             }
           }
         } else if (modelNameRaw && models.length > 0) {
-          // Nếu không match được brand nhưng có modelName, thử match model theo tên
           const matchedModel = models.find((m) => {
             const mName = (m.name || m.vehicleModelName || '').toLowerCase().trim()
             return mName === modelNameRaw.toLowerCase().trim()
@@ -516,7 +498,6 @@ export default function CreateTicketNewCustomer() {
       return
     }
   
-    // ================= XE MỚI =================
     setIsNewVehicle(true)
     setSelectedVehicle(null)
     form.setFieldsValue({
@@ -527,7 +508,6 @@ export default function CreateTicketNewCustomer() {
     })
     setSelectedBrandId(null)
     setSelectedModelId(null)
-    // ❌ KHÔNG setModels([])
   }
   
 
@@ -590,31 +570,26 @@ export default function CreateTicketNewCustomer() {
 
       const phoneValue = displayPhoneFrom84(customer.phone || normalizedPhone)
       setCurrentPhone(phoneValue || phone)
-      // Chỉ set số điện thoại, không có fullName
       setPhoneSelectValue({
         label: phoneValue || phone,
         value: phoneValue || phone
       })
 
-      // Fetch danh sách xe của khách hàng
       let vehiclesList = []
       if (fetchedCustomerId) {
         await fetchCustomerVehicles(fetchedCustomerId)
-        // Lấy vehicles từ customer response
         vehiclesList = customer.vehicles || []
       }
 
-      // Track các field đã được fill từ customer data
       const customerName = customer.fullName || customer.name
       const customerAddress = customer.address
       
       setFilledFields({
         name: !!customerName,
         address: !!customerAddress,
-        phone: true // Phone luôn được fill khi select
+        phone: true
       })
       
-      // Chỉ fill thông tin khách hàng, KHÔNG fill biển số xe và thông tin xe
       form.setFieldsValue({
         phone: phoneValue || phone,
         name: customerName || form.getFieldValue('name'),
@@ -622,8 +597,6 @@ export default function CreateTicketNewCustomer() {
         customerType: customer.customerType || 'DOANH_NGHIEP'
       })
       
-      // Reset các trường thông tin xe - người dùng sẽ chọn biển số xe sau
-      // NOTE: KHÔNG reset plateSelectValue khi fetch customer - giữ nguyên giá trị đã nhập
       setIsNewVehicle(true)
       setSelectedVehicle(null)
       form.setFieldsValue({
@@ -631,7 +604,6 @@ export default function CreateTicketNewCustomer() {
         model: undefined,
         vin: '',
         year: 2020
-        // NOTE: KHÔNG reset plate ở đây - giữ nguyên giá trị đã nhập
       })
       setSelectedBrandId(null)
       setSelectedModelId(null)
@@ -654,12 +626,11 @@ export default function CreateTicketNewCustomer() {
         const phoneRaw = c.phone || c.customerPhone || ''
         const phoneLocal = displayPhoneFrom84(phoneRaw) || phoneRaw
         const fullName = c.fullName || c.name || ''
-        // Lưu cả tên và số điện thoại để hiển thị trong dropdown
         return { 
-          label: phoneLocal, // Label để hiển thị trong input (chỉ số điện thoại)
-          value: phoneLocal, // Value để lưu vào form
-          fullName: fullName, // Tên để hiển thị trong dropdown
-          phone: phoneLocal // Số điện thoại để hiển thị trong dropdown
+          label: phoneLocal,
+          value: phoneLocal,
+          fullName: fullName,
+          phone: phoneLocal
         }
       }).filter((opt) => opt.value)
       setPhoneOptionsSource(mapped)
@@ -678,10 +649,9 @@ export default function CreateTicketNewCustomer() {
     let opt = phoneOptionsSource.find((o) => o.value === normalized)
     if (!opt) {
       opt = { label: normalized, value: normalized, fullName: '', phone: normalized }
-      setPhoneOptionsSource((prev) => [...prev, opt])
-      setPhoneOptions((prev) => [...prev, opt])
+        setPhoneOptionsSource((prev) => [...prev, opt])
+        setPhoneOptions((prev) => [...prev, opt])
     }
-    // Chỉ lưu label và value (số điện thoại) để hiển thị trong input
     setPhoneSelectValue({
       label: opt.label || opt.value,
       value: opt.value || opt.label
@@ -692,7 +662,6 @@ export default function CreateTicketNewCustomer() {
     fetchAllCustomers()
   }, [])
 
-  // Sync brandId khi brands được load
   useEffect(() => {
     const brandIdFromForm = form.getFieldValue('brand')
     if (brandIdFromForm && brands.length > 0) {
@@ -702,7 +671,6 @@ export default function CreateTicketNewCustomer() {
         return bId === brandIdNum || bId === brandIdFromForm || Number(bId) === brandIdNum
       })
       if (brandExists) {
-        // Luôn sync nếu brand tồn tại, không cần check selectedBrandId !== brandIdNum
         if (selectedBrandId !== brandIdNum) {
           console.log('Syncing brandId from form:', brandIdNum, 'Available brands:', brands, 'Found:', brandExists)
           setSelectedBrandId(brandIdNum)
@@ -711,13 +679,11 @@ export default function CreateTicketNewCustomer() {
         console.warn('Brand not found in list:', brandIdNum, 'Available brands:', brands)
       }
     } else if (!brandIdFromForm && selectedBrandId) {
-      // Nếu form không có brandId nhưng selectedBrandId vẫn có, clear nó
       console.log('Clearing selectedBrandId because form has no brandId')
       setSelectedBrandId(null)
     }
   }, [brands, form, selectedBrandId])
 
-  // Sync modelId khi models được load
   useEffect(() => {
     const modelIdFromForm = form.getFieldValue('model')
     if (modelIdFromForm && models.length > 0) {
@@ -727,7 +693,6 @@ export default function CreateTicketNewCustomer() {
         return mId === modelIdNum || mId === modelIdFromForm || Number(mId) === modelIdNum
       })
       if (modelExists) {
-        // Luôn sync nếu model tồn tại, không cần check selectedModelId !== modelIdNum
         if (selectedModelId !== modelIdNum) {
           console.log('Syncing modelId from form:', modelIdNum, 'Available models:', models, 'Found:', modelExists)
           setSelectedModelId(modelIdNum)
@@ -736,7 +701,6 @@ export default function CreateTicketNewCustomer() {
         console.warn('Model not found in list:', modelIdNum, 'Available models:', models)
       }
     } else if (!modelIdFromForm && selectedModelId) {
-      // Nếu form không có modelId nhưng selectedModelId vẫn có, clear nó
       console.log('Clearing selectedModelId because form has no modelId')
       setSelectedModelId(null)
     }
@@ -814,7 +778,6 @@ export default function CreateTicketNewCustomer() {
   }, [])
 
   const handleBrandChange = async (brandId) => {
-    // Không reset model nếu đang fill từ vehicle data
     const currentModelId = form.getFieldValue('model')
     
     if (!brandId) {
@@ -826,7 +789,6 @@ export default function CreateTicketNewCustomer() {
       return
     }
 
-    // Chỉ reset model nếu không có currentModelId
     if (!currentModelId) {
       setSelectedModelId(null)
     }
@@ -847,7 +809,6 @@ export default function CreateTicketNewCustomer() {
         }))
       setModels(mappedModels)
       
-      // Nếu có currentModelId và nó tồn tại trong danh sách mới, set selectedModelId ngay
       if (currentModelId) {
         const currentModelIdNum = Number(currentModelId)
         const foundModel = mappedModels.find(m => {
@@ -860,7 +821,6 @@ export default function CreateTicketNewCustomer() {
           console.log('Found model in new list and set selectedModelId:', foundModel, 'for modelId:', currentModelIdNum)
         } else {
           console.warn('Model not found in new list:', currentModelIdNum, 'Available:', mappedModels)
-          // Vẫn set để đảm bảo giá trị được lưu
           setSelectedModelId(currentModelIdNum)
           form.setFieldsValue({ model: currentModelIdNum })
         }
@@ -921,9 +881,7 @@ export default function CreateTicketNewCustomer() {
     
  
     const selectedBrand = brands.find(b => b.id === Number(finalBrandId))
-    const selectedModel = models.find(m => m.id === Number(finalModelId))
-
-    // Lấy vehicleId từ selectedVehicle nếu có
+    const selectedModel = models.find(m => m.id === Number(finalModelId))    
     const vehicleId = selectedVehicle?.vehicleId || selectedVehicle?.id || null
     
     const payload = {
@@ -945,13 +903,12 @@ export default function CreateTicketNewCustomer() {
         licensePlate: plateUpper,
         modelId: finalModelId ? Number(finalModelId) : null,
         modelName: selectedModel?.name || '',
-        vehicleId: vehicleId ? Number(vehicleId) : null, // Truyền vehicleId nếu có
+        vehicleId: vehicleId ? Number(vehicleId) : null,
         vin: values.vin ? String(values.vin).trim() : null,
         year: values.year ? Number(values.year) : 2020
       }
     }
 
-   
     const plate = plateUpper || form.getFieldValue('plate')
     if (plate) {
       try {
@@ -980,12 +937,8 @@ export default function CreateTicketNewCustomer() {
       }
     }
 
-    // Nếu là xe mới và có đầy đủ thông tin, tạo xe mới cho khách hàng
     if (isNewVehicle && customerId && plate && finalBrandId && finalModelId) {
       try {
-        // Tạo vehicle mới cho khách hàng
-        // Note: Nếu API có endpoint tạo vehicle, gọi ở đây
-        // Hiện tại vehicle sẽ được tạo tự động khi tạo service ticket với forceAssignVehicle: true
         console.log('Creating new vehicle for customer:', {
           customerId,
           licensePlate: plate,
@@ -996,7 +949,6 @@ export default function CreateTicketNewCustomer() {
         })
       } catch (err) {
         console.warn('Error creating vehicle:', err)
-        // Vẫn tiếp tục tạo ticket, vehicle sẽ được tạo tự động
       }
     }
     
@@ -1500,22 +1452,10 @@ export default function CreateTicketNewCustomer() {
                       {/* Wrap giống phần SĐT để tránh Form.Item inject value/onChange vào react-select */}
                       <div style={{ width: '100%' }}>
                         <CreatableSelect
-                          inputValue={plateInputValue}
                           isClearable
                           isMulti={false}
                           placeholder="VD: 30A-12345"
-                          options={[
-                            ...plateOptions,
-                            ...(plateSelectValue
-                              ? plateOptions.some(
-                                  (opt) =>
-                                    (opt.value || opt.label) ===
-                                    (plateSelectValue.value || plateSelectValue.label)
-                                )
-                                ? []
-                                : [plateSelectValue]
-                              : [])
-                          ]}
+                          options={plateOptions}
                           value={plateSelectValue}
                           styles={singleSelectStyles}
                           classNamePrefix="react-select"
@@ -1526,117 +1466,126 @@ export default function CreateTicketNewCustomer() {
                             // Chỉ trả về biển số (label) để hiển thị trong input
                             return option.label || option.value || ''
                           }}
-                          onInputChange={(inputValue, action) => {
-                          console.log('[PlateSelect] onInputChange called with inputValue:', inputValue, 'action:', action)
-                          // CHỈ xử lý khi action là 'input-change' (người dùng đang nhập)
-                          // Bỏ qua các action khác như 'set-value', 'menu-close' (khi chọn từ dropdown)
-                          if (action.action === 'input-change') {
-                            setPlateInputValue(inputValue)
-                            const lower = inputValue.toLowerCase()
+                          onInputChange={(inputValue = '', action) => {
+                            // Chỉ xử lý khi người dùng gõ (tránh reset khi react-select gửi rỗng tạm thời)
+                            if (action.action !== 'input-change') return
+
+                            const trimmed = inputValue.trim()
+                            const lower = trimmed.toLowerCase()
                             const filtered = plateOptionsSource.filter((opt) =>
                               (opt.value || '').toLowerCase().includes(lower) ||
                               (opt.label || '').toLowerCase().includes(lower)
                             )
-                            setPlateOptions(filtered.length ? filtered : [{ label: inputValue, value: inputValue }])
-                          
-                            if (inputValue && inputValue.trim()) {
+                            setPlateOptions(filtered.length ? filtered : [{ label: trimmed, value: trimmed }])
+
+                            if (trimmed) {
                               // Cập nhật form value khi đang nhập
-                              const trimmed = inputValue.trim()
                               form.setFieldsValue({ plate: trimmed })
-                              // Chỉ lưu label và value (biển số) để hiển thị trong input
-                              const plateOnlyOption = {
-                                label: trimmed,
-                                value: trimmed
-                              }
-                              console.log('[PlateSelect] onInputChange setting plateSelectValue (typing):', plateOnlyOption)
+                              const plateOnlyOption = { label: trimmed, value: trimmed }
+                              // Đảm bảo option đang gõ luôn tồn tại trong options source để hiển thị trong input
+                              setPlateOptionsSource((prev) => {
+                                const exists = prev.some((opt) => opt.value === trimmed || opt.label === trimmed)
+                                return exists ? prev : [...prev, plateOnlyOption]
+                              })
                               setPlateSelectValue(plateOnlyOption)
-                              setPlateOption(plateOnlyOption)
-                            } else if (!inputValue) {
-                              // Nếu xóa hết biển số xe, chỉ xóa thông tin xe (giữ lại thông tin khách hàng nếu số điện thoại không null)
-                              console.log('[PlateSelect] onInputChange - clearing plateSelectValue')
+                            } else {
+                              // Chỉ clear giá trị nhập, không reset toàn bộ state khách hàng/xe
                               form.setFieldsValue({ plate: '' })
                               setPlateSelectValue(null)
-                              setPlateOption(null)
-                              setPlateInputValue('')
+                            }
+                          }}
+                          onChange={(option) => {
+                            if (!option) {
+                              // Nếu xóa biển số xe (click nút x), chỉ xóa thông tin xe (giữ lại thông tin khách hàng nếu số điện thoại không null)
+                              setPlateSelectValue(null)
+                              form.setFieldsValue({ plate: '' })
                               const currentPhone = form.getFieldValue('phone')
                               if (currentPhone) {
                                 resetVehicleInfo()
                               } else {
                                 resetCustomerSelection()
                               }
+                              return
                             }
-                          } else {
-                            // Bỏ qua các action khác (set-value, menu-close, etc.) - để onChange xử lý
-                            console.log('[PlateSelect] onInputChange - Ignoring action:', action.action)
-                          }
-                          }}
-                          onChange={(option) => {
-                          console.log('[PlateSelect] onChange called with option:', option)
-                          if (!option) {
-                            // Nếu xóa biển số xe (click nút x), chỉ xóa thông tin xe (giữ lại thông tin khách hàng nếu số điện thoại không null)
-                            setPlateSelectValue(null)
-                            setPlateOption(null)
-                            setPlateInputValue('')
-                            form.setFieldsValue({ plate: '' })
-                            const currentPhone = form.getFieldValue('phone')
-                            if (currentPhone) {
-                              resetVehicleInfo()
-                            } else {
-                              resetCustomerSelection()
-                            }
-                            return
-                          }
-                          
-                          // Chỉ lưu label và value (biển số) để hiển thị trong input - GIỐNG SỐ ĐIỆN THOẠI
-                          const plateOnlyOption = {
-                            label: option.label || option.value,
-                            value: option.value || option.label
-                          }
-                          
-                          // Set trực tiếp - KHÔNG so sánh, KHÔNG reset
-                          setPlateSelectValue(plateOnlyOption)
-                          setPlateOption(plateOnlyOption)
-                          setPlateInputValue(plateOnlyOption.label || plateOnlyOption.value || '')
-                          const selectedValue = option.value || option.label
-                          const formattedPlate = selectedValue ? formatLicensePlate(selectedValue) : selectedValue
-                          form.setFieldsValue({ plate: formattedPlate })
-                          
-                          // Kiểm tra xem biển số có trong danh sách không
-                          const isKnown = plateOptionsSource.some((opt) => {
-                            const optValue = opt.value || opt.label || ''
-                            const formattedOpt = formatLicensePlate(optValue)
-                            return formattedOpt === formattedPlate
-                          })
-                          
-                          if (isKnown) {
-                            // Biển số có trong danh sách, fill thông tin xe
-                            const vehicleFromOption = option?.vehicle
-                            const vehiclesPool =
-                              (Array.isArray(customerVehicles) && customerVehicles.length > 0
-                                ? customerVehicles
-                                : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
                             
-                            if (vehicleFromOption) {
-                              const vehicleToPass =
-                                vehiclesPool.find((v) => {
-                                  const vPlate = v.licensePlate || v.plate || ''
-                                  return formatLicensePlate(vPlate) === formattedPlate
-                                }) || vehicleFromOption
-                              handlePlateSelect(formattedPlate, [vehicleToPass])
-                            } else {
-                              const vehicleFromPool = vehiclesPool.find((v) => {
-                                const vPlate = v?.licensePlate || v?.plate || ''
-                                return formatLicensePlate(vPlate) === formattedPlate
-                              })
-                              if (vehicleFromPool) {
-                                handlePlateSelect(formattedPlate, [vehicleFromPool])
-                              } else {
-                                handlePlateSelect(formattedPlate, customerVehicles)
-                              }
+                            // Chỉ lưu label và value (biển số) để hiển thị trong input
+                            const plateOnlyOption = {
+                              label: option.label || option.value,
+                              value: option.value || option.label
                             }
-                          } else {
+                            const selectedValue = plateOnlyOption.value
+                            setPlateSelectValue(plateOnlyOption)
+                            const formattedPlate = selectedValue ? formatLicensePlate(selectedValue) : selectedValue
+                            form.setFieldsValue({ plate: formattedPlate })
+                            
+                            // Kiểm tra xem biển số có trong danh sách không
+                            const isKnown = plateOptionsSource.some((opt) => {
+                              const optValue = opt.value || opt.label || ''
+                              const formattedOpt = formatLicensePlate(optValue)
+                              return formattedOpt === formattedPlate
+                            })
+                            
+                            if (isKnown) {
+                              // Biển số có trong danh sách, fill thông tin xe
+                              const vehicleFromOption = option?.vehicle
+                              const vehiclesPool =
+                                (Array.isArray(customerVehicles) && customerVehicles.length > 0
+                                  ? customerVehicles
+                                  : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
+                              
+                              if (vehicleFromOption) {
+                                const vehicleToPass =
+                                  vehiclesPool.find((v) => {
+                                    const vPlate = v.licensePlate || v.plate || ''
+                                    return formatLicensePlate(vPlate) === formattedPlate
+                                  }) || vehicleFromOption
+                                handlePlateSelect(formattedPlate, [vehicleToPass])
+                              } else {
+                                const vehicleFromPool = vehiclesPool.find((v) => {
+                                  const vPlate = v?.licensePlate || v?.plate || ''
+                                  return formatLicensePlate(vPlate) === formattedPlate
+                                })
+                                if (vehicleFromPool) {
+                                  handlePlateSelect(formattedPlate, [vehicleFromPool])
+                                } else {
+                                  handlePlateSelect(formattedPlate, customerVehicles)
+                                }
+                              }
+                            } else {
+                              // Biển số mới, reset vehicle info nhưng giữ biển số
+                              setIsNewVehicle(true)
+                              setSelectedVehicle(null)
+                              form.setFieldsValue({
+                                brand: undefined,
+                                model: undefined,
+                                vin: '',
+                                year: 2020,
+                                plate: formattedPlate
+                              })
+                              setSelectedBrandId(null)
+                              setSelectedModelId(null)
+                              setModels([])
+                            }
+                          }}
+                          onCreateOption={(inputValue) => {
+                            const trimmed = inputValue.trim()
+                            const formatted = formatLicensePlate(trimmed)
+                            const newOption = { 
+                              label: formatted, 
+                              value: formatted
+                            }
+                            
+                            setPlateOptionsSource((prev) => [...prev, newOption])
+                            setPlateOptions((prev) => {
+                              const existsInOptions = prev.some((opt) => opt.value === formatted)
+                              return existsInOptions ? prev : [...prev, newOption]
+                            })
+                            
+                            // Chỉ lưu label và value (biển số) để hiển thị trong input
+                            setPlateSelectValue(newOption)
+                            form.setFieldsValue({ plate: formatted })
+                            
                             // Biển số mới, reset vehicle info nhưng giữ biển số
-                            // KHÔNG gọi resetCustomerSelection() vì nó sẽ reset plateSelectValue
                             setIsNewVehicle(true)
                             setSelectedVehicle(null)
                             form.setFieldsValue({
@@ -1644,141 +1593,85 @@ export default function CreateTicketNewCustomer() {
                               model: undefined,
                               vin: '',
                               year: 2020,
-                              plate: formattedPlate
+                              plate: formatted
                             })
                             setSelectedBrandId(null)
                             setSelectedModelId(null)
                             setModels([])
-                            // Đảm bảo plateSelectValue vẫn được giữ
-                            setPlateSelectValue(plateOnlyOption)
-                            setPlateOption(plateOnlyOption)
-                          }
-                          }}
-                          onCreateOption={(inputValue) => {
-                          const trimmed = inputValue.trim()
-                          const formatted = formatLicensePlate(trimmed)
-                          const newOption = { 
-                            label: formatted, 
-                            value: formatted
-                          }
-                          
-                          setPlateOptionsSource((prev) => [...prev, newOption])
-                          setPlateOptions((prev) => {
-                            const existsInOptions = prev.some((opt) => {
-                              const optValue = formatLicensePlate(opt.value || opt.label || '')
-                              return optValue === formatted
-                            })
-                            return existsInOptions ? prev : [...prev, newOption]
-                          })
-                          
-                          // Chỉ lưu label và value (biển số) để hiển thị trong input
-                          setPlateSelectValue(newOption)
-                          setPlateOption(newOption)
-                          setPlateInputValue(formatted)
-                          form.setFieldsValue({ plate: formatted })
-                          
-                          // Biển số mới, reset vehicle info nhưng giữ biển số
-                          // KHÔNG gọi resetCustomerSelection() vì nó sẽ reset plateSelectValue
-                          setIsNewVehicle(true)
-                          setSelectedVehicle(null)
-                          form.setFieldsValue({
-                            brand: undefined,
-                            model: undefined,
-                            vin: '',
-                            year: 2020,
-                            plate: formatted
-                          })
-                          setSelectedBrandId(null)
-                          setSelectedModelId(null)
-                          setModels([])
-                          // Đảm bảo plateSelectValue vẫn được giữ
-                          setPlateSelectValue(newOption)
-                          setPlateOption(newOption)
                           }}
                           onKeyDown={(e) => {
-                          // Khi nhấn Enter, ngăn form submit và giữ giá trị
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            // Lấy giá trị hiện tại từ form
-                            const currentPlate = form.getFieldValue('plate')
-                            if (currentPlate && currentPlate.trim()) {
-                              const trimmed = currentPlate.trim()
-                              const formatted = formatLicensePlate(trimmed)
-                              const exists = plateOptionsSource.some((opt) => {
-                                const optValue = formatLicensePlate(opt.value || opt.label || '')
-                                return optValue === formatted
-                              })
-                              if (!exists) {
-                                // Tạo option mới nếu chưa tồn tại
-                          const newOption = { 
-                                  label: formatted, 
-                                  value: formatted
-                                }
-                                setPlateOptionsSource((prev) => [...prev, newOption])
-                                setPlateOptions((prev) => {
-                                  const existsInOptions = prev.some((opt) => {
-                                    const optValue = formatLicensePlate(opt.value || opt.label || '')
-                                    return optValue === formatted
-                                  })
-                                  return existsInOptions ? prev : [...prev, newOption]
+                            // Khi nhấn Enter, ngăn form submit và giữ giá trị
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              // Lấy giá trị hiện tại từ form
+                              const currentPlate = form.getFieldValue('plate')
+                              if (currentPlate && currentPlate.trim()) {
+                                const trimmed = currentPlate.trim()
+                                const formatted = formatLicensePlate(trimmed)
+                                const exists = plateOptionsSource.some((opt) => {
+                                  const optValue = opt.value || opt.label || ''
+                                  return formatLicensePlate(optValue) === formatted
                                 })
-                                // Chỉ lưu label và value (biển số) để hiển thị trong input
-                                setPlateSelectValue(newOption)
-                                setPlateOption(newOption)
-                                setPlateInputValue(formatted)
-                                form.setFieldsValue({ plate: formatted })
-                                
-                                // Biển số mới, reset vehicle info nhưng giữ biển số
-                                // KHÔNG gọi resetCustomerSelection() vì nó sẽ reset plateSelectValue
-                                setIsNewVehicle(true)
-                                setSelectedVehicle(null)
-                                form.setFieldsValue({
-                                  brand: undefined,
-                                  model: undefined,
-                                  vin: '',
-                                  year: 2020,
-                                  plate: formatted
-                                })
-                                setSelectedBrandId(null)
-                                setSelectedModelId(null)
-                                setModels([])
-                                // Đảm bảo plateSelectValue vẫn được giữ
-                                setPlateSelectValue(newOption)
-                                setPlateOption(newOption)
-                              } else {
-                                // Nếu đã tồn tại, tìm và set option đó
-                                const existingOption = plateOptionsSource.find((opt) => {
-                                  const optValue = formatLicensePlate(opt.value || opt.label || '')
-                                  return optValue === formatted
-                                })
-                                if (existingOption) {
-                                  const plateOnlyOption = {
-                                    label: existingOption.label || existingOption.value,
-                                    value: existingOption.value || existingOption.label
+                                if (!exists) {
+                                  // Tạo option mới nếu chưa tồn tại
+                                  const newOption = { 
+                                    label: formatted, 
+                                    value: formatted
                                   }
-                                  setPlateSelectValue(plateOnlyOption)
-                                  setPlateOption(plateOnlyOption)
-                                  setPlateInputValue(formatted)
+                                  setPlateOptionsSource((prev) => [...prev, newOption])
+                                  setPlateOptions((prev) => {
+                                    const existsInOptions = prev.some((opt) => opt.value === formatted)
+                                    return existsInOptions ? prev : [...prev, newOption]
+                                  })
+                                  // Chỉ lưu label và value (biển số) để hiển thị trong input
+                                  setPlateSelectValue(newOption)
                                   form.setFieldsValue({ plate: formatted })
                                   
-                                  // Fill vehicle info nếu có
-                                  const vehiclesPool =
-                                    (Array.isArray(customerVehicles) && customerVehicles.length > 0
-                                      ? customerVehicles
-                                      : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
-                                  const vehicleFromPool = vehiclesPool.find((v) => {
-                                    const vPlate = v?.licensePlate || v?.plate || ''
-                                    return formatLicensePlate(vPlate) === formatted
+                                  // Biển số mới, reset vehicle info nhưng giữ biển số
+                                  setIsNewVehicle(true)
+                                  setSelectedVehicle(null)
+                                  form.setFieldsValue({
+                                    brand: undefined,
+                                    model: undefined,
+                                    vin: '',
+                                    year: 2020,
+                                    plate: formatted
                                   })
-                                  if (vehicleFromPool) {
-                                    handlePlateSelect(formatted, [vehicleFromPool])
-                                  } else {
-                                    handlePlateSelect(formatted, customerVehicles)
+                                  setSelectedBrandId(null)
+                                  setSelectedModelId(null)
+                                  setModels([])
+                                } else {
+                                  // Nếu đã tồn tại, tìm và set option đó
+                                  const existingOption = plateOptionsSource.find((opt) => {
+                                    const optValue = opt.value || opt.label || ''
+                                    return formatLicensePlate(optValue) === formatted
+                                  })
+                                  if (existingOption) {
+                                    const plateOnlyOption = {
+                                      label: existingOption.label || existingOption.value,
+                                      value: existingOption.value || existingOption.label
+                                    }
+                                    setPlateSelectValue(plateOnlyOption)
+                                    form.setFieldsValue({ plate: formatted })
+                                    
+                                    // Fill vehicle info nếu có
+                                    const vehiclesPool =
+                                      (Array.isArray(customerVehicles) && customerVehicles.length > 0
+                                        ? customerVehicles
+                                        : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
+                                    const vehicleFromPool = vehiclesPool.find((v) => {
+                                      const vPlate = v?.licensePlate || v?.plate || ''
+                                      return formatLicensePlate(vPlate) === formatted
+                                    })
+                                    if (vehicleFromPool) {
+                                      handlePlateSelect(formatted, [vehicleFromPool])
+                                    } else {
+                                      handlePlateSelect(formatted, customerVehicles)
+                                    }
                                   }
                                 }
                               }
                             }
-                          }
                           }}
                         />
                       </div>
