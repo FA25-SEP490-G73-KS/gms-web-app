@@ -47,6 +47,20 @@ export default function Materials() {
   }
 
   const handleRowClick = (record) => {
+    // Nếu đã thanh toán đủ thì không mở modal
+    const paymentStatus = (record.paymentStatus || '').toString().trim()
+    const paymentStatusUpper = paymentStatus.toUpperCase()
+    
+    // Kiểm tra cả giá trị tiếng Việt và tiếng Anh
+    if (
+      paymentStatusUpper === 'PAID' || 
+      paymentStatusUpper === 'COMPLETED' ||
+      paymentStatus === 'Đã thanh toán đủ' ||
+      paymentStatusUpper === 'ĐÃ THANH TOÁN ĐỦ'
+    ) {
+      return
+    }
+    
     setSelectedRecord(record)
     setShowPaymentModal(true)
     fetchPaymentDetail(record.id)
@@ -264,7 +278,7 @@ export default function Materials() {
       key: 'receivedAt',
       width: 150,
       align: 'center',
-      render: (date) => formatDate(date)
+      render: (date) => date || 'N/A'
     },
     {
       title: 'Trạng thái',

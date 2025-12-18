@@ -702,36 +702,23 @@ export default function AdminAppointments() {
       width: 150,
       render: (status, record) => {
         const config = getStatusConfig(status)
-        const statusKey = record.statusKey || 'CONFIRMED'
-        const isUpdating = updatingStatusId === record.id
-        const isCancelled = statusKey === 'CANCELLED'
-
         return (
-          <select
-            onChange={(e) => {
-              const newStatus = 'CANCELLED'
-              if (statusKey !== 'CANCELLED') {
-                handleStatusChange(record.id, newStatus)
-              }
-            }}
-            disabled={isUpdating || isCancelled}
-            className="status-select-dropdown modern"
-            value={statusKey}
+          <span
             style={{
-              color: config.color,
-              opacity: isCancelled ? 0.6 : isUpdating ? 0.6 : 1,
-              pointerEvents: isCancelled ? 'none' : 'auto',
-              cursor: isCancelled ? 'not-allowed' : 'pointer'
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 80,
+              padding: '4px 10px',
+              borderRadius: 999,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#fff',
+              backgroundColor: config.color
             }}
           >
-            {/* Hiển thị trạng thái hiện tại nhưng không cho chọn, ẩn khỏi dropdown để giữ chỉ một lựa chọn chuyển đổi */}
-            <option value={statusKey} disabled hidden={statusKey !== 'CANCELLED'}>
               {config.text}
-            </option>
-            <option value="CANCELLED" style={{ color: '#ef4444' }}>
-              Hủy
-            </option>
-          </select>
+          </span>
         )
       }
     },

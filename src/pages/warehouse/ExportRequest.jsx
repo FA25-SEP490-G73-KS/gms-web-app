@@ -35,6 +35,7 @@ export default function ExportRequest() {
   const [suppliers, setSuppliers] = useState([]) // Danh sách nhà cung cấp
   const [units, setUnits] = useState([]) // Danh sách đơn vị
   const [errors, setErrors] = useState({}) // Lưu lỗi validation cho từng field
+  const [partStock, setPartStock] = useState(0) // Tồn kho thực tế
   
   // Form state
   const [formData, setFormData] = useState({
@@ -471,6 +472,7 @@ export default function ExportRequest() {
     setSelectedPart(partRecord)
     setIsModalOpen(true)
     setModalLoading(true)
+    setPartStock(partRecord?.part?.quantity || 0)
     
     try {
       // Fetch part categories, markets, brands, suppliers, and units when opening modal
@@ -508,6 +510,7 @@ export default function ExportRequest() {
         // Có part - fill form từ part object
         const partData = itemDetail.part
         console.log('Part data:', partData)
+        setPartStock(partData.quantity || partRecord?.part?.quantity || 0)
         
         setHasExistingPart(true) // Đánh dấu là có part tồn tại
         
@@ -545,6 +548,7 @@ export default function ExportRequest() {
         // Không có part - form rỗng
         console.log('No part found, empty form')
         setHasExistingPart(false) // Đánh dấu là không có part
+        setPartStock(partRecord?.part?.quantity || 0)
         
         setFormData({
           partName: itemDetail.itemName || partRecord.name || '',
@@ -578,6 +582,7 @@ export default function ExportRequest() {
     setSelectedPart(null)
     setCarModels([]) // Reset danh sách dòng xe khi đóng modal
     setErrors({}) // Reset errors khi đóng modal
+    setPartStock(0)
   }
 
   const handleFormChange = (field, value) => {
@@ -684,11 +689,6 @@ export default function ExportRequest() {
       }
     }
 
-    // Validate ghi chú cho tất cả các case
-    if (!formData.note || formData.note.trim() === '') {
-      newErrors.note = 'Vui lòng nhập ghi chú/lý do'
-    }
-
     // Nếu có lỗi, set errors và return
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -784,14 +784,6 @@ export default function ExportRequest() {
   }
 
   const handleReject = async () => {
-    if (!formData.note || formData.note.trim() === '') {
-      setErrors(prev => ({
-        ...prev,
-        note: 'Vui lòng nhập ghi chú/lý do từ chối'
-      }))
-      return
-    }
-    
     if (!selectedItemId) {
       message.error('Không tìm thấy ID của item')
       return
@@ -800,7 +792,7 @@ export default function ExportRequest() {
     setModalLoading(true)
     
     try {
-      const reason = formData.note.trim()
+      const reason = (formData.note || '').trim()
       
       // PATCH /api/quotation-items/{itemId}/reject
       console.log('Rejecting quotation item:', selectedItemId, 'Reason:', reason)
@@ -1143,7 +1135,7 @@ export default function ExportRequest() {
             margin: 0
           }}>
             <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#000' }}>
-              PHIẾU MUA HÀNG
+              THÔNG TIN CHI TIẾT
             </h2>
             <Button 
               type="text" 
@@ -1158,7 +1150,7 @@ export default function ExportRequest() {
               {/* Status và Quantity */}
             <div style={{ 
               display: 'grid', 
-              gridTemplateColumns: '1fr 1fr', 
+              gridTemplateColumns: '1fr 1fr 1fr', 
               gap: 16, 
               marginBottom: 20,
               padding: '12px 16px',
@@ -1172,8 +1164,12 @@ export default function ExportRequest() {
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Số lượng</div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Số lượng yêu cầu</div>
                 <div style={{ fontWeight: 600, color: '#000' }}>{formData.quantity || 0}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Tồn kho</div>
+                <div style={{ fontWeight: 600, color: '#000' }}>{partStock || 0}</div>
               </div>
             </div>
 
@@ -1514,26 +1510,20 @@ export default function ExportRequest() {
 
             {/* Ghi chú - Full width */}
             <div style={{ marginTop: 16 }}>
-              <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
-                Ghi chú/Lý do <span style={{ color: 'red' }}>*</span>
+    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+      Ghi chú/Lý do
               </label>
               <Input.TextArea
                 value={formData.note}
                 onChange={(e) => handleFormChange('note', e.target.value)}
-                placeholder="Nhập nội dung"
+                placeholder="Nhập nội dung (không bắt buộc)"
                 rows={3}
                 disabled={(hasExistingPart && formData.specialPart === true) || formData.isReviewed}
                 style={{ 
                   borderRadius: 8,
-                  backgroundColor: ((hasExistingPart && formData.specialPart === true) || formData.isReviewed) ? '#f5f5f5' : 'white',
-                  borderColor: errors.note ? '#ff4d4f' : undefined
+                  backgroundColor: ((hasExistingPart && formData.specialPart === true) || formData.isReviewed) ? '#f5f5f5' : 'white'
                 }}
               />
-              {errors.note && (
-                <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
-                  {errors.note}
-                </div>
-              )}
               <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
                 Linh kiện đặc biệt kiểm tra thông tin
               </div>

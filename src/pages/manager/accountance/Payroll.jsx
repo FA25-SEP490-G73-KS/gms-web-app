@@ -453,7 +453,8 @@ export default function PayrollForManager() {
   }
 
   const formatCurrency = (amount) => {
-    return (amount || 0).toLocaleString('vi-VN')
+    const rounded = Math.round(amount || 0)
+    return rounded.toLocaleString('vi-VN')
   }
 
   // Calculate filtered data directly (no useMemo)
@@ -510,7 +511,14 @@ export default function PayrollForManager() {
       dataIndex: 'netSalary',
       key: 'netSalary',
       width: 150,
-      render: (value) => <span style={{ fontWeight: 600 }}>{value.toLocaleString('vi-VN')}</span>
+      render: (value) => {
+        const rounded = Math.round(value || 0)
+        return (
+          <span style={{ fontWeight: 600 }}>
+            {rounded.toLocaleString('vi-VN')}
+          </span>
+        )
+      }
     },
     {
       title: 'Trạng thái',

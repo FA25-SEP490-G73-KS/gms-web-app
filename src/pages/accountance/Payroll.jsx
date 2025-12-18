@@ -313,34 +313,39 @@ export function AccountancePayrollContent() {
       )
     },
     {
-      title: 'Tiền công',
+      title: 'Lương cơ bản (vnd)',
       dataIndex: 'baseSalary',
       key: 'baseSalary',
       width: 150,
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
-      title: 'Phụ cấp',
+      title: 'Phụ cấp (vnd)',
       dataIndex: 'allowance',
       key: 'allowance',
       width: 120,
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
-      title: 'Khấu trừ',
+      title: 'Khấu trừ (vnd)',
       dataIndex: 'deduction',
       key: 'deduction',
       width: 120,
       render: (value) => value.toLocaleString('vi-VN')
     },
     {
-      title: 'Lương ròng',
+      title: 'Lương ròng (vnd)',
       dataIndex: 'netSalary',
       key: 'netSalary',
       width: 150,
-      render: (value) => (
-        <span style={{ fontWeight: 600 }}>{value.toLocaleString('vi-VN')}</span>
-      )
+      render: (value) => {
+        const rounded = Math.round(value || 0)
+        return (
+          <span style={{ fontWeight: 600 }}>
+            {rounded.toLocaleString('vi-VN')}
+          </span>
+        )
+      }
     },
     {
       title: 'Trạng thái',
@@ -465,7 +470,10 @@ export function AccountancePayrollContent() {
           <div className="payroll-total">
             <span className="payroll-total-label">Tổng:</span>
             <span className="payroll-total-amount">
-              {filtered.reduce((sum, item) => sum + (item.netSalary || 0), 0).toLocaleString('vi-VN')}
+              {filtered
+                .reduce((sum, item) => sum + Math.round(item.netSalary || 0), 0)
+                .toLocaleString('vi-VN')}{' '}
+              vnđ
             </span>
           </div>
           <Button

@@ -33,7 +33,7 @@ import AccountanceDebtDetail from './pages/accountance/DebtDetail';
 import AccountanceDebtTicketDetail from './pages/accountance/DebtTicketDetail';
 import AccountanceFinance from './pages/accountance/Finance';
 import AccountanceCreateForm from './pages/accountance/CreateForm';
-import AccountanceMaterials from './pages/accountance/Materials';
+import AccountanceMaterials from './pages/accountance/Materials';   
 import AccountancePayments from './pages/accountance/Payments';
 import InvoiceDetailPage from './pages/accountance/InvoiceDetailPage';
 

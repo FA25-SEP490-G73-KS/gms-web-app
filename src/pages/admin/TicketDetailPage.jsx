@@ -21,48 +21,161 @@ const DEFAULT_UNITS = [
 ]
 const PARTS_PAGE_SIZE = 100
 
+export const STATUS_COLORS = {
+  // Service Ticket
+  CREATED: '#9CA3AF',
+  QUOTING: '#3B82F6',
+  QUOTE_CONFIRMED: '#22C55E',
+  UNDER_REPAIR: '#F97316',
+  WAITING_FOR_DELIVERY: '#1677ff',
+  COMPLETED: '#16A34A',
+  CANCELED: '#EF4444',
+  // Quotation
+  DRAFT: '#9CA3AF',
+  WAITING_WAREHOUSE_CONFIRM: '#FACC15',
+  WAREHOUSE_CONFIRMED: '#06B6D4',
+  WAITING_CUSTOMER_CONFIRM: '#FB923C',
+  CUSTOMER_CONFIRMED: '#22C55E',
+  CUSTOMER_REJECTED: '#EF4444'
+}
+
+const getInventoryStatusConfig = (status) => {
+  const normalized = (status || '').toString().trim().toLowerCase()
+  if (!normalized) {
+    return { color: '#9ca3af', text: 'Không rõ' }
+  }
+  if (normalized.includes('có sẵn') || normalized.includes('available')) {
+    return { color: '#16a34a', text: 'Có sẵn' }
+  }
+  if (normalized.includes('hết') || normalized.includes('out')) {
+    return { color: '#ef4444', text: 'Hết hàng' }
+  }
+  return { color: '#9ca3af', text: status }
+}
+
 const QUOTATION_STATUS_CONFIG = {
   DRAFT: {
     label: 'Nháp',
-    badgeBg: '#f3f4f6',
-    badgeColor: '#6b7280',
+    badgeBg: STATUS_COLORS.DRAFT,
+    badgeColor: '#ffffff',
     canEdit: true
   },
   WAITING_WAREHOUSE_CONFIRM: {
-    label: 'Chờ kho duyệt',
-    badgeBg: '#fef3c7',
-    badgeColor: '#92400e',
+    label: 'Chờ kho xác nhận',
+    badgeBg: STATUS_COLORS.WAITING_WAREHOUSE_CONFIRM,
+    badgeColor: '#ffffff',
     canEdit: false
   },
   WAREHOUSE_CONFIRMED: {
-    label: 'Kho đã duyệt',
-    badgeBg: '#dcfce7',
-    badgeColor: '#15803d',
+    label: 'Kho đã xác nhận',
+    badgeBg: STATUS_COLORS.WAREHOUSE_CONFIRMED,
+    badgeColor: '#ffffff',
     canEdit: true
   },
   WAITING_CUSTOMER_CONFIRM: {
-    label: 'Chờ khách xác nhận',
-    badgeBg: '#e0e7ff',
-    badgeColor: '#3730a3',
+    label: 'Chờ khách hàng xác nhận',
+    badgeBg: STATUS_COLORS.WAITING_CUSTOMER_CONFIRM,
+    badgeColor: '#ffffff',
     canEdit: false
   },
   CUSTOMER_CONFIRMED: {
-    label: 'Khách đã xác nhận',
-    badgeBg: '#d1fae5',
-    badgeColor: '#065f46',
+    label: 'Khách hàng đã xác nhận',
+    badgeBg: STATUS_COLORS.CUSTOMER_CONFIRMED,
+    badgeColor: '#ffffff',
     canEdit: true
   },
   CUSTOMER_REJECTED: {
-    label: 'Khách từ chối',
-    badgeBg: '#fee2e2',
-    badgeColor: '#991b1b',
+    label: 'Khách hàng từ chối',
+    badgeBg: STATUS_COLORS.CUSTOMER_REJECTED,
+    badgeColor: '#ffffff',
     canEdit: true
   },
   COMPLETED: {
     label: 'Hoàn thành',
-    badgeBg: '#dbeafe',
-    badgeColor: '#1e40af',
+    badgeBg: STATUS_COLORS.COMPLETED,
+    badgeColor: '#ffffff',
     canEdit: false
+  }
+}
+
+const getTicketStatusConfig = (rawStatus) => {
+  if (!rawStatus) {
+    return {
+      key: null,
+      label: '',
+      bg: '#e5e7eb',
+      color: '#4b5563'
+    }
+  }
+
+  const SERVICE_TICKET_LABELS = {
+    CREATED: 'Đã tạo',
+    QUOTING: 'Đang báo giá',
+    QUOTE_CONFIRMED: 'Khách đã xác nhận báo giá',
+    UNDER_REPAIR: 'Đang sửa chữa',
+    WAITING_FOR_DELIVERY: 'Chờ bàn giao xe',
+    COMPLETED: 'Hoàn thành',
+    CANCELED: 'Hủy'
+  }
+
+  const normalizeKey = (status) => {
+    const upper = String(status).trim().toUpperCase()
+    if (STATUS_COLORS[upper]) return upper
+
+    switch (upper) {
+      case 'ĐÃ TẠO':
+        return 'CREATED'
+      case 'ĐANG BÁO GIÁ':
+        return 'QUOTING'
+      case 'KHÁCH ĐÃ XÁC NHẬN BÁO GIÁ':
+        return 'QUOTE_CONFIRMED'
+      case 'ĐANG SỬA CHỮA':
+        return 'UNDER_REPAIR'
+      case 'CHỜ BÀN GIAO XE':
+        return 'WAITING_FOR_DELIVERY'
+      case 'HOÀN THÀNH':
+        return 'COMPLETED'
+      case 'HỦY':
+        return 'CANCELED'
+      default:
+        return upper
+    }
+  }
+
+  const key = normalizeKey(rawStatus)
+  const bg = STATUS_COLORS[key] || '#e5e7eb'
+  const label = SERVICE_TICKET_LABELS[key] || rawStatus
+
+  return {
+    key,
+    label,
+    bg,
+    color: '#fff'
+  }
+}
+
+const normalizeQuotationStatusKey = (raw) => {
+  if (!raw) return null
+  const upper = String(raw).trim().toUpperCase()
+  if (STATUS_COLORS[upper]) return upper
+
+  switch (upper) {
+    case 'NHÁP':
+      return 'DRAFT'
+    case 'CHỜ KHO XÁC NHẬN':
+      return 'WAITING_WAREHOUSE_CONFIRM'
+    case 'KHO ĐÃ XÁC NHẬN':
+      return 'WAREHOUSE_CONFIRMED'
+    case 'CHỜ KHÁCH HÀNG XÁC NHẬN':
+      return 'WAITING_CUSTOMER_CONFIRM'
+    case 'KHÁCH HÀNG ĐÃ XÁC NHẬN':
+      return 'CUSTOMER_CONFIRMED'
+    case 'KHÁCH HÀNG TỪ CHỐI':
+      return 'CUSTOMER_REJECTED'
+    case 'HOÀN THÀNH':
+      return 'COMPLETED'
+    default:
+      return upper
   }
 }
 
@@ -91,9 +204,11 @@ export default function TicketDetailPage() {
   const [deliveryPickerVisible, setDeliveryPickerVisible] = useState(false)
   const [deliveryPickerValue, setDeliveryPickerValue] = useState(null)
   const [sendToCustomerLoading, setSendToCustomerLoading] = useState(false)
+  const [startRepairLoading, setStartRepairLoading] = useState(false)
   const [noteModalOpen, setNoteModalOpen] = useState(false)
   const [noteModalContent, setNoteModalContent] = useState('')
   const [exportPDFLoading, setExportPDFLoading] = useState(false)
+  const [handoverLoading, setHandoverLoading] = useState(false)
   const [rejectModalOpen, setRejectModalOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [isEditMode, setIsEditMode] = useState(false)
@@ -170,10 +285,10 @@ export default function TicketDetailPage() {
     ticketStatusNormalized === 'HỦY' ||
     ticketStatusNormalized.includes('HỦY')
 
-  const isWaitingWarehouse = quotationStatusConfig.label === 'Chờ kho duyệt'
-  const isWaitingCustomerConfirm = quotationStatusConfig.label === 'Chờ khách xác nhận'
-  const isWarehouseConfirmed = quotationStatusConfig.label === 'Kho đã duyệt'
-  const isCustomerConfirmed = quotationStatusConfig.label === 'Khách đã xác nhận'
+  const isWaitingWarehouse = normalizedQuotationStatus === 'WAITING_WAREHOUSE_CONFIRM'
+  const isWaitingCustomerConfirm = normalizedQuotationStatus === 'WAITING_CUSTOMER_CONFIRM'
+  const isWarehouseConfirmed = normalizedQuotationStatus === 'WAREHOUSE_CONFIRMED'
+  const isCustomerConfirmed = normalizedQuotationStatus === 'CUSTOMER_CONFIRMED'
   
   // Kiểm tra xem có item nào bị từ chối không
   const hasRejectedItem = replaceItems.some(item => {
@@ -203,13 +318,33 @@ export default function TicketDetailPage() {
         ? !isEditMode
         : !quotationStatusConfig.canEdit)
   
-  const actionButtonLabel = isWaitingWarehouse 
-    ? 'Cập nhật' 
-    : ((isWarehouseConfirmed || isCustomerConfirmed)
-        ? (isEditMode ? 'Lưu' : 'Cập nhật')
-        : 'Lưu')
+  const ticketStatusKey = getTicketStatusConfig(ticketData?.status).key
   
+  const actionButtonLabel = ticketStatusKey === 'WAITING_FOR_DELIVERY'
+    ? 'Hoàn thành'
+    : (isWaitingWarehouse 
+      ? 'Cập nhật' 
+      : ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm)
+          ? (isEditMode ? 'Lưu' : 'Cập nhật')
+          : 'Lưu'))
+  const canExportPdf = isWarehouseConfirmed || isCustomerConfirmed
   const canSendToCustomer = isWarehouseConfirmed
+  const canStartRepair =
+    isCustomerConfirmed &&
+    !isHistoryPage &&
+    !isTicketCancelled &&
+    ticketStatusKey !== 'UNDER_REPAIR' &&
+    ticketStatusKey !== 'WAITING_FOR_DELIVERY' &&
+    ticketStatusKey !== 'COMPLETED' &&
+    ticketStatusKey !== 'CANCELED'
+  const canHandover =
+    !isHistoryPage &&
+    !isTicketCancelled &&
+    // Chỉ cho phép bàn giao khi xe đang trong trạng thái sửa chữa
+    ticketStatusKey === 'UNDER_REPAIR' &&
+    ticketStatusKey !== 'WAITING_FOR_DELIVERY' &&
+    ticketStatusKey !== 'COMPLETED' &&
+    ticketStatusKey !== 'CANCELED'
 
   const disabledDeliveryDate = (current) => {
     if (!current) return false
@@ -1073,8 +1208,47 @@ export default function TicketDetailPage() {
   const handleSendQuote = async () => {
     if (actionLoading) return
     
+    // Tính lại ticketStatusKey để đảm bảo có giá trị đúng
+    const currentTicketStatusKey = getTicketStatusConfig(ticketData?.status).key
+    console.log('handleSendQuote - currentTicketStatusKey:', currentTicketStatusKey)
+    console.log('handleSendQuote - ticketData?.status:', ticketData?.status)
     
-    if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
+    // Nếu trạng thái là "Chờ bàn giao xe", cập nhật thành "Hoàn thành"
+    if (currentTicketStatusKey === 'WAITING_FOR_DELIVERY') {
+      console.log('Handling WAITING_FOR_DELIVERY status - updating to COMPLETED')
+      if (!id && !ticketData?.serviceTicketId) {
+        message.error('Không tìm thấy ID phiếu dịch vụ.')
+        return
+      }
+
+      setActionLoading(true)
+      try {
+        const serviceTicketId = id || ticketData.serviceTicketId
+        console.log('Calling updateStatus API - ticketId:', serviceTicketId, 'status: COMPLETED')
+        const { data, error } = await serviceTicketAPI.updateStatus(serviceTicketId, 'COMPLETED')
+        
+        if (error) {
+          console.error('API error:', error)
+          message.error(error || 'Không thể cập nhật trạng thái hoàn thành')
+          setActionLoading(false)
+          return
+        }
+        
+        console.log('API success:', data)
+        message.success('Đã cập nhật trạng thái hoàn thành thành công')
+        await fetchTicketDetail()
+      } catch (err) {
+        console.error('Error updating to completed status:', err)
+        message.error('Đã xảy ra lỗi khi cập nhật trạng thái')
+      } finally {
+        setActionLoading(false)
+      }
+      return
+    }
+    
+    console.log('Not WAITING_FOR_DELIVERY, continuing with normal flow')
+    
+    if ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm) && !isEditMode) {
       await setQuotationDraft()
       setIsEditMode(true)
       return
@@ -1129,15 +1303,16 @@ export default function TicketDetailPage() {
     try {
       setSendToCustomerLoading(true)
       const quotationId = ticketData.priceQuotation.priceQuotationId
-      const { error: sendError } = await priceQuotationAPI.sendToCustomer(quotationId)
-      if (sendError) {
-        throw new Error(sendError)
-      }
-      // Tạm thời tắt phần gửi Zalo
+      // Gửi qua ZNS
       // const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
       // if (znsError) {
       //   throw new Error(znsError)
       // }
+      // Gửi thêm API send-to-customer
+      const { error: sendApiError } = await priceQuotationAPI.sendToCustomer(quotationId)
+      if (sendApiError) {
+        throw new Error(sendApiError)
+      }
       message.success('Đã gửi báo giá cho khách hàng')
       await fetchTicketDetail()
     } catch (error) {
@@ -1145,6 +1320,61 @@ export default function TicketDetailPage() {
       message.error(error?.message || 'Gửi báo giá thất bại. Vui lòng thử lại.')
     } finally {
       setSendToCustomerLoading(false)
+    }
+  }
+
+  const handleStartRepair = async () => {
+    if (!id) return
+    try {
+      setStartRepairLoading(true)
+      // Một số trạng thái không cho phép nhảy thẳng sang UNDER_REPAIR.
+      // Nếu chưa ở trạng thái QUOTE_CONFIRMED thì đưa về QUOTE_CONFIRMED trước.
+      if (
+        ticketStatusKey !== 'QUOTE_CONFIRMED' &&
+        ticketStatusKey !== 'UNDER_REPAIR' &&
+        ticketStatusKey !== 'WAITING_FOR_DELIVERY' &&
+        ticketStatusKey !== 'COMPLETED' &&
+        ticketStatusKey !== 'CANCELED'
+      ) {
+        const { error: preError } = await serviceTicketAPI.updateStatus(id, 'QUOTE_CONFIRMED')
+        if (preError) throw new Error(preError)
+      }
+
+      const { error } = await serviceTicketAPI.updateStatus(id, 'UNDER_REPAIR')
+      if (error) throw new Error(error)
+      message.success('Đã chuyển trạng thái sang Đang sửa chữa')
+      await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error starting repair:', err)
+      message.error(err?.message || 'Không thể chuyển trạng thái sang Đang sửa chữa')
+    } finally {
+      setStartRepairLoading(false)
+    }
+  }
+
+  const handleHandover = async () => {
+    if (!id && !ticketData?.serviceTicketId) {
+      message.error('Không tìm thấy ID phiếu dịch vụ.')
+      return
+    }
+
+    setHandoverLoading(true)
+    try {
+      const serviceTicketId = id || ticketData.serviceTicketId
+      const { data, error } = await serviceTicketAPI.updateStatus(serviceTicketId, 'WAITING_FOR_DELIVERY')
+      
+      if (error) {
+        message.error(error || 'Không thể cập nhật trạng thái bàn giao xe')
+        return
+      }
+      
+      message.success('Đã cập nhật trạng thái bàn giao xe thành công')
+      await fetchTicketDetail()
+    } catch (err) {
+      console.error('Error updating handover status:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật trạng thái')
+    } finally {
+      setHandoverLoading(false)
     }
   }
 
@@ -1544,9 +1774,7 @@ export default function TicketDetailPage() {
               })
             }
               style={{
-                ...baseInputStyle,
-                borderColor: isOutOfStock ? '#ef4444' : baseInputStyle.borderColor,
-                borderWidth: isOutOfStock ? '2px' : baseInputStyle.borderWidth || '1px'
+                ...baseInputStyle
               }}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
@@ -1623,7 +1851,7 @@ export default function TicketDetailPage() {
       )
     },
     {
-      title: 'Đơn giá (vnd)',
+      title: 'Đơn giá',
       key: 'unitPrice',
       width: 150,
       align: 'center',
@@ -1661,17 +1889,35 @@ export default function TicketDetailPage() {
       )
     },
     {
-      title: 'Thành tiền (vnd)',
+      title: 'Thành tiền',
       key: 'total',
       width: 150,
       align: 'center',
-      render: (_, record) => (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
-            {record.total ? record.total.toLocaleString('vi-VN') : '--'}
+      render: (_, record) => {
+        const value = record.total ?? 0
+        const text = value ? value.toLocaleString('vi-VN') + ' đ' : '--'
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
+              {text}
+            </span>
+          </div>
+        )
+      }
+    },
+    {
+      title: 'Kho',
+      key: 'inventoryStatus',
+      width: 140,
+      align: 'center',
+      render: (_, record) => {
+        const { color, text } = getInventoryStatusConfig(record.inventoryStatus)
+        return (
+          <span style={{ color, fontWeight: 600 }}>
+            {text}
           </span>
-        </div>
-      )
+        )
+      }
     },
     {
       title: '',
@@ -1769,7 +2015,7 @@ export default function TicketDetailPage() {
       )
     },
     {
-      title: 'Đơn giá (vnd)',
+      title: 'Đơn giá',
       key: 'unitPrice',
       width: 150,
       align: 'center',
@@ -1806,17 +2052,21 @@ export default function TicketDetailPage() {
       )
     },
     {
-      title: 'Thành tiền (vnd)',
+      title: 'Thành tiền',
       key: 'total',
       width: 150,
       align: 'center',
-      render: (_, record) => (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
-            {record.total ? record.total.toLocaleString('vi-VN') : '--'}
-          </span>
-        </div>
-      )
+      render: (_, record) => {
+        const value = record.total ?? 0
+        const text = value ? value.toLocaleString('vi-VN') + ' đ' : '--'
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
+              {text}
+            </span>
+          </div>
+        )
+      }
     },
     {
       title: '',
@@ -1892,9 +2142,7 @@ export default function TicketDetailPage() {
     }
     return 'Chưa chọn dịch vụ'
   })()
-  const createdDate = ticketData?.createdAt
-    ? new Date(ticketData.createdAt).toLocaleDateString('vi-VN')
-    : null
+  const quoteCreatedDate = ticketData?.createdAt || ''
 
   const totalReplacement = replaceItems.reduce((sum, item) => sum + (item.total || 0), 0)
   const totalService = serviceItems.reduce((sum, item) => sum + (item.total || 0), 0)
@@ -1912,6 +2160,13 @@ export default function TicketDetailPage() {
   return (
     <AdminLayout>
       <style>{`
+        .badge {
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-weight: 500;
+          font-size: 12px;
+          color: #fff;
+        }
         .quotation-action-select {
           padding: 6px 32px 6px 12px;
           border-radius: 8px;
@@ -1950,9 +2205,20 @@ export default function TicketDetailPage() {
       `}</style>
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
-            {ticketData?.serviceTicketCode || ticketData?.code || `STK-2025-${String(id || 0).padStart(6, '0')}`}
-          </h1>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+            <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0 }}>
+              {ticketData?.serviceTicketCode || ticketData?.code || `STK-2025-${String(id || 0).padStart(6, '0')}`}
+            </h1>
+            {ticketData?.status && (() => {
+              const cfg = getTicketStatusConfig(ticketData.status)
+              if (!cfg.label) return null
+              return (
+                <span className="badge" style={{ backgroundColor: cfg.bg }}>
+                  {cfg.label}
+                </span>
+              )
+            })()}
+          </div>
         </div>
 
         <Row gutter={16} style={{ marginBottom: '24px' }}>
@@ -1996,7 +2262,7 @@ export default function TicketDetailPage() {
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Ngày tạo báo giá:</strong>{' '}
-                <span>{getDisplayValue(createdDate)}</span>
+                <span>{quoteCreatedDate || '--'}</span>
               </div>
               <div style={{ marginBottom: '12px' }}>
                 <strong>Thợ sửa chữa:</strong>{' '}
@@ -2188,12 +2454,17 @@ export default function TicketDetailPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
               {!isHistoryPage ? (
                 <Space size="middle">
-                  {normalizedQuotationStatus !== 'WAITING_CUSTOMER_CONFIRM' && (
-                    <Button 
+                  {ticketStatusKey !== 'COMPLETED' && (
+                  <Button 
                             onClick={handleSendQuote}
                     disabled={(() => {
                       // Nếu đang loading thì disable
                       if (actionLoading || isTicketCancelled) return true
+                      
+                      // Nếu trạng thái là "Chờ bàn giao xe", luôn enable nút "Hoàn thành"
+                      if (ticketStatusKey === 'WAITING_FOR_DELIVERY') {
+                        return false
+                      }
                       
                       // Nếu đang chờ kho duyệt
                       if (isWaitingWarehouse) {
@@ -2201,12 +2472,12 @@ export default function TicketDetailPage() {
                         return !hasRejectedItem
                       }
                       
-                      // Các trường hợp khác
-                      if ((isWarehouseConfirmed || isCustomerConfirmed) && !isEditMode) {
+                      // Các trạng thái đã duyệt / chờ khách
+                      if ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm) && !isEditMode) {
                         return false
                       }
                       
-                      if ((isWarehouseConfirmed || isCustomerConfirmed) && isEditMode) {
+                      if ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm) && isEditMode) {
                         return replaceItems.length === 0 && serviceItems.length === 0
                       }
                       
@@ -2238,40 +2509,72 @@ export default function TicketDetailPage() {
                       {isTicketCancelled ? 'Phiếu đã hủy' : actionButtonLabel}
                     </Button>
                   )}
+                  {canExportPdf && (
+                    <Button
+                      onClick={handleExportPDF}
+                      loading={exportPDFLoading}
+                      disabled={exportPDFLoading}
+                      icon={<FilePdfOutlined />}
+                      style={{
+                        background: '#ef4444',
+                        borderColor: '#ef4444',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '0 24px',
+                        height: '40px'
+                      }}
+                    >
+                      Xuất PDF
+                    </Button>
+                  )}
+                  {canHandover && (
+                    <Button
+                      type="primary"
+                      onClick={handleHandover}
+                      loading={handoverLoading}
+                      disabled={handoverLoading}
+                      style={{
+                        fontWeight: 600,
+                        padding: '0 24px',
+                        height: '40px'
+                      }}
+                    >
+                      Tiến hành bàn giao xe
+                    </Button>
+                  )}
+                  {canStartRepair && (
+                    <Button
+                      onClick={handleStartRepair}
+                      loading={startRepairLoading}
+                      disabled={startRepairLoading}
+                      style={{
+                        background: '#F97316',
+                        borderColor: '#F97316',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '0 24px',
+                        height: '40px'
+                      }}
+                    >
+                      Tiến hành sửa chữa
+                    </Button>
+                  )}
                   {canSendToCustomer && (
-                    <>
-                      <Button
-                        onClick={handleExportPDF}
-                        loading={exportPDFLoading}
-                        disabled={exportPDFLoading}
-                        icon={<FilePdfOutlined />}
-                        style={{
-                          background: '#ef4444',
-                          borderColor: '#ef4444',
-                          color: '#fff',
-                          fontWeight: 600,
-                          padding: '0 24px',
-                          height: '40px'
-                        }}
-                      >
-                        Xuất PDF
-                      </Button>
-                      <Button
-                        onClick={handleSendToCustomer}
-                        loading={sendToCustomerLoading}
-                        disabled={sendToCustomerLoading}
-                        style={{
-                          background: '#2563eb',
-                          borderColor: '#2563eb',
-                          color: '#fff',
-                          fontWeight: 600,
-                          padding: '0 24px',
-                          height: '40px'
-                        }}
-                      >
-                        Gửi báo giá
-                      </Button>
-                    </>
+                    <Button
+                      onClick={handleSendToCustomer}
+                      loading={sendToCustomerLoading}
+                      disabled={sendToCustomerLoading}
+                      style={{
+                        background: '#2563eb',
+                        borderColor: '#2563eb',
+                        color: '#fff',
+                        fontWeight: 600,
+                        padding: '0 24px',
+                        height: '40px'
+                      }}
+                    >
+                      Gửi báo giá
+                    </Button>
                   )}
                         </Space>
               ) : (

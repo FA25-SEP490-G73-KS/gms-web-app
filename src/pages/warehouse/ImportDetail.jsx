@@ -15,6 +15,12 @@ export default function ImportDetail() {
   const navigate = useNavigate()
   const [detailData, setDetailData] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  const breadcrumbItems = [
+    { label: 'Nhập kho', path: '/warehouse' },
+    { label: 'Danh sách nhập', path: '/warehouse/import/list' },
+    { label: 'Chi tiết phiếu nhập', path: null }
+  ]
   const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
@@ -147,10 +153,16 @@ export default function ImportDetail() {
 
       const result = data?.result
       if (result) {
+        // Ensure quantityInStock is properly parsed
+        const quantityInStock = result.quantityInStock !== undefined && result.quantityInStock !== null 
+          ? Number(result.quantityInStock) 
+          : 0
+        
         const mappedData = {
           partInfo: {
             sku: result.partCode || 'N/A',
-            partName: result.partName || 'N/A'
+            partName: result.partName || 'N/A',
+            quantityInStock: quantityInStock
           },
           importInfo: {
             requestedQty: result.requestedQty || 0,
@@ -437,7 +449,7 @@ export default function ImportDetail() {
 
   if (loading) {
     return (
-      <WarehouseLayout>
+      <WarehouseLayout breadcrumbItems={breadcrumbItems}>
         <div style={{ textAlign: 'center', padding: '100px' }}>Đang tải...</div>
       </WarehouseLayout>
     )
@@ -445,14 +457,14 @@ export default function ImportDetail() {
 
   if (!detailData) {
     return (
-      <WarehouseLayout>
+      <WarehouseLayout breadcrumbItems={breadcrumbItems}>
         <div style={{ textAlign: 'center', padding: '100px' }}>Không tìm thấy dữ liệu</div>
       </WarehouseLayout>
     )
   }
 
   return (
-    <WarehouseLayout>
+    <WarehouseLayout breadcrumbItems={breadcrumbItems}>
       <div style={{ padding: '24px', background: '#fff', borderRadius: '8px' }}>
         {/* Header */}
         <h2 style={{ fontSize: '24px', fontWeight: 600, marginBottom: 24 }}>
@@ -462,12 +474,12 @@ export default function ImportDetail() {
         {/* Info Section */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Nhà cung cấp</span>
-            <span>: {detailData.supplierName || 'N/A'}</span>
+            <span style={{ width: 150, fontWeight: 500 }}>Nhà cung cấp:</span>
+            <span>{detailData.supplierName || 'N/A'}</span>
           </div>
           <div style={{ display: 'flex', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Ngày tạo</span>
-            <span>: {(() => {
+            <span style={{ width: 150, fontWeight: 500 }}>Ngày tạo:</span>
+            <span>{(() => {
               if (!detailData.createdAt) return 'N/A'
               // Kiểm tra xem có phải là format DD/MM/YYYY HH:mm không (đã được format sẵn từ backend)
               const datePattern = /^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/
@@ -482,16 +494,16 @@ export default function ImportDetail() {
             })()}</span>
           </div>
           <div style={{ display: 'flex', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua</span>
-            <span>: {detailData.purchaseRequestCode || 'N/A'}</span>
+            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua:</span>
+            <span>{detailData.purchaseRequestCode || 'N/A'}</span>
           </div>
           <div style={{ display: 'flex', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua</span>
-            <span>: {detailData.purchaseRequestCode || 'N/A'}</span>
+            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua:</span>
+            <span>{detailData.purchaseRequestCode || 'N/A'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Trạng thái</span>
-            <span>: </span>
+            <span style={{ width: 150, fontWeight: 500 }}>Trạng thái:</span>
+            <span></span>
             {(() => {
               const status = detailData.status || 'Chờ nhập kho'
               const config = getStatusTagConfig(status)
@@ -575,6 +587,12 @@ export default function ImportDetail() {
               <div style={{ display: 'flex', marginBottom: 12 }}>
                 <span style={{ width: 150, fontWeight: 500 }}>Tên linh kiện:</span>
                 <span>{historyData.partInfo?.partName || selectedItem?.partName || 'N/A'}</span>
+              </div>
+              <div style={{ display: 'flex', marginBottom: 12 }}>
+                <span style={{ width: 150, fontWeight: 500 }}>Số lượng tồn kho:</span>
+                <span>{historyData.partInfo?.quantityInStock !== undefined && historyData.partInfo?.quantityInStock !== null 
+                  ? historyData.partInfo.quantityInStock 
+                  : 0}</span>
               </div>
             </div>
 

@@ -6,7 +6,51 @@ import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { invoiceAPI } from '../../services/api'
 import dayjs from 'dayjs'
+import { STATUS_COLORS } from '../admin/TicketService'
 import '../../styles/pages/accountance/payments.css'
+
+const STATUS_LABELS = {
+  CREATED: 'Đã tạo',
+  QUOTING: 'Đang báo giá',
+  QUOTE_CONFIRMED: 'Khách đã xác nhận báo giá',
+  UNDER_REPAIR: 'Đang sửa chữa',
+  WAITING_FOR_DELIVERY: 'Chờ bàn giao xe',
+  COMPLETED: 'Hoàn thành',
+  CANCELED: 'Hủy'
+}
+
+const normalizeStatusKey = (status) => {
+  const key = (status || '').toString().trim().toUpperCase()
+  const map = {
+    'HỦY': 'CANCELED',
+    'CANCELLED': 'CANCELED',
+    'CANCELED': 'CANCELED',
+    'WAITING_FOR_QUOTATION': 'QUOTING',
+    'WAITING_QUOTE': 'QUOTING',
+    'ĐANG BÁO GIÁ': 'QUOTING',
+    'CHỜ BÁO GIÁ': 'QUOTING',
+    'WAITING_FOR_DELIVERY': 'WAITING_FOR_DELIVERY',
+    'WAITING_HANDOVER': 'WAITING_FOR_DELIVERY',
+    'CHỜ BÀN GIAO XE': 'WAITING_FOR_DELIVERY',
+    'CHỜ GIAO XE': 'WAITING_FOR_DELIVERY',
+    'HOÀN THÀNH': 'COMPLETED',
+    'COMPLETED': 'COMPLETED',
+    'ĐÃ TẠO': 'CREATED',
+    'CREATED': 'CREATED',
+    'QUOTE_CONFIRMED': 'QUOTE_CONFIRMED',
+    'KHÁCH ĐÃ XÁC NHẬN BÁO GIÁ': 'QUOTE_CONFIRMED',
+    'UNDER_REPAIR': 'UNDER_REPAIR',
+    'ĐANG SỬA CHỮA': 'UNDER_REPAIR'
+  }
+  return map[key] || key || 'CREATED'
+}
+
+const getStatusConfig = (status) => {
+  const normalizedKey = normalizeStatusKey(status)
+  const color = STATUS_COLORS[normalizedKey] || '#666'
+  const text = STATUS_LABELS[normalizedKey] || status || 'Đã tạo'
+  return { color, text }
+}
 
 const STATUS_FILTERS = [
   { key: 'all', label: 'Tất cả' },
@@ -145,27 +189,16 @@ export function AccountancePaymentsContent() {
       title: <div style={{ textAlign: 'center' }}>Trạng thái DV</div>,
       dataIndex: 'serviceStatus',
       key: 'serviceStatus',
-      width: 150,
+      width: 200,
       align: 'center',
-      render: (status) => {
-        if (!status) return ''
-        const getStatusColor = (statusText) => {
-          switch (statusText) {
-            case 'Chờ báo giá':
-              return '#16a34a'
-            case 'Đã tạo':
-              return '#6b7280'
-            case 'Chờ giao xe':
-              return '#f59e0b'
-            case 'Hoàn thành':
-              return '#22c55e'
-            case 'Hủy':
-              return '#ef4444'
-            default:
-              return '#666'
-          }
-        }
-        return <span style={{ color: getStatusColor(status) }}>{status}</span>
+      render: (status, record) => {
+        const currentStatus = record.rawStatus || status
+        const config = getStatusConfig(currentStatus)
+        return (
+          <span style={{ color: config.color, fontWeight: 600 }}>
+            {config.text}
+          </span>
+        )
       }
     },
     {
