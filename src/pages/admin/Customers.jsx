@@ -617,7 +617,7 @@ export default function AdminCustomers() {
                     brandName:
                       vehicle.brandName || vehicle.brand?.name || '—',
                     modelName:
-                      vehicle.modelName || vehicle.model?.name || '—',
+                      vehicle.vehicleModelName || vehicle.modelName || vehicle.model?.name || vehicle.model?.vehicleModelName || '—',
                     year: vehicle.year || '—',
                     vin: vehicle.vin || '—'
                   }))}

@@ -494,11 +494,7 @@ export default function ImportDetail() {
             })()}</span>
           </div>
           <div style={{ display: 'flex', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua:</span>
-            <span>{detailData.purchaseRequestCode || 'N/A'}</span>
-          </div>
-          <div style={{ display: 'flex', marginBottom: 12 }}>
-            <span style={{ width: 150, fontWeight: 500 }}>Yêu cầu mua:</span>
+            <span style={{ width: 150, fontWeight: 500 }}>Mã mua hàng:</span>
             <span>{detailData.purchaseRequestCode || 'N/A'}</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
@@ -636,16 +632,8 @@ export default function ImportDetail() {
                   width: 150,
                   render: (date) => {
                     if (!date) return 'N/A'
-                    // Kiểm tra xem có phải là format DD/MM/YYYY hoặc DD/MM/YYYY HH:mm không
-                    const datePattern = /^\d{2}\/\d{2}\/\d{4}(\s+\d{2}:\d{2})?$/
-                    if (datePattern.test(date)) {
-                      // Đã format sẵn, lấy phần ngày (bỏ phần giờ nếu có)
-                      return date.split(' ')[0]
-                    } else {
-                      // Parse bằng dayjs (cho ISO string hoặc timestamp)
-                      const parsed = dayjs(date)
-                      return parsed.isValid() ? parsed.format('DD/MM/YYYY') : date
-                    }
+                    // Lấy trực tiếp từ response, không format lại
+                    return date
                   }
                 },
                 {

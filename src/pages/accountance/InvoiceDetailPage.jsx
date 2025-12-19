@@ -595,34 +595,41 @@ export default function InvoiceDetailPage() {
               </div>
             </Card>
 
-            {!showDepositForm && (
-              <div
-                style={{
-                  marginTop: "24px",
-                  display: "flex",
-                  justifyContent: "flex-end",
-                }}
-              >
-                <Button
-                  type="primary"
-                  size="large"
-                  onClick={() => {
-                    setShowDepositForm(true);
-                    setShowPaymentTabs(false); // Reset tabs state
-                  }}
+            {!showDepositForm && (() => {
+              const status = invoiceData?.serviceTicket?.priceQuotation?.status || invoiceData?.serviceTicket?.status || ''
+              const isCompleted = status === 'Hoàn thành' || status === 'COMPLETED' || status?.toUpperCase() === 'COMPLETED'
+              
+              if (isCompleted) return null
+              
+              return (
+                <div
                   style={{
-                    background: "#22c55e",
-                    borderColor: "#22c55e",
-                    height: "45px",
-                    padding: "0 40px",
-                    fontWeight: 600,
-                    fontSize: "16px",
+                    marginTop: "24px",
+                    display: "flex",
+                    justifyContent: "flex-end",
                   }}
                 >
-                  {isPaymentStatus(invoiceData?.serviceTicket?.status) ? "Thanh toán" : "Đặt cọc"}
-                </Button>
-              </div>
-            )}
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={() => {
+                      setShowDepositForm(true);
+                      setShowPaymentTabs(false); // Reset tabs state
+                    }}
+                    style={{
+                      background: "#22c55e",
+                      borderColor: "#22c55e",
+                      height: "45px",
+                      padding: "0 40px",
+                      fontWeight: 600,
+                      fontSize: "16px",
+                    }}
+                  >
+                    {isPaymentStatus(invoiceData?.serviceTicket?.status) ? "Thanh toán" : "Đặt cọc"}
+                  </Button>
+                </div>
+              )
+            })()}
           </Col>
 
           {showDepositForm && (
@@ -2251,13 +2258,13 @@ export default function InvoiceDetailPage() {
       >
         <div style={{ padding: '20px 0' }}>
           <div style={{ marginBottom: '16px', fontSize: '15px' }}>
-            <strong>Tên khách hàng:</strong> {invoiceData?.customer?.fullName || invoiceData?.customer?.name || 'N/A'}
+            <strong>Tên khách hàng:</strong> {invoiceData?.serviceTicket?.customer?.fullName || invoiceData?.serviceTicket?.customer?.name || invoiceData?.customer?.fullName || invoiceData?.customer?.name || 'N/A'}
           </div>
           <div style={{ marginBottom: '16px', fontSize: '15px' }}>
             <strong>Mã phiếu:</strong> {invoiceData?.serviceTicket?.serviceTicketCode || 'N/A'}
           </div>
           <div style={{ marginBottom: '16px', fontSize: '15px' }}>
-            <strong>Số điện thoại:</strong> {invoiceData?.customer?.phone || 'N/A'}
+            <strong>Số điện thoại:</strong> {invoiceData?.serviceTicket?.customer?.phone || invoiceData?.customer?.phone || 'N/A'}
           </div>
           <div style={{ marginBottom: '24px', fontSize: '15px', color: '#dc2626', fontWeight: 600 }}>
             <strong>Còn lại:</strong> {remainingAmount?.toLocaleString('vi-VN')} đ

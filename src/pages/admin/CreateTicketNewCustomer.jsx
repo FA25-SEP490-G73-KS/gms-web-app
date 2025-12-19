@@ -46,6 +46,7 @@ export default function CreateTicketNewCustomer() {
   const [phoneOptionsSource, setPhoneOptionsSource] = useState([])
   const [phoneOptions, setPhoneOptions] = useState([])
   const [phoneSelectValue, setPhoneSelectValue] = useState(null)
+  const [phoneInputValue, setPhoneInputValue] = useState('')
   const [filledFields, setFilledFields] = useState({
     name: false,
     address: false,
@@ -64,6 +65,7 @@ export default function CreateTicketNewCustomer() {
   const [plateOptionsSource, setPlateOptionsSource] = useState([])
   const [plateOptions, setPlateOptions] = useState([])
   const [plateSelectValue, setPlateSelectValue] = useState(null)
+  const [plateInputValue, setPlateInputValue] = useState('')
   const [plateOption, setPlateOption] = useState(null)
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [isNewVehicle, setIsNewVehicle] = useState(false)
@@ -210,6 +212,7 @@ export default function CreateTicketNewCustomer() {
     })
     setIsNewVehicle(true)
     setPlateSelectValue(null)
+    setPlateInputValue('')
     setPlateOption(null)
    
     form.setFieldsValue({ 
@@ -226,6 +229,7 @@ export default function CreateTicketNewCustomer() {
     setSelectedBrandId(null)
     setSelectedModelId(null)
     setPhoneSelectValue(null)
+    setPhoneInputValue('')
     setCurrentPhone('')
   }
 
@@ -235,6 +239,7 @@ export default function CreateTicketNewCustomer() {
     if (!watchedPlate || typeof watchedPlate !== 'string' || !watchedPlate.trim()) {
       if (plateSelectValue !== null) {
         setPlateSelectValue(null)
+        setPlateInputValue('')
         setPlateOption(null)
       }
       return
@@ -262,6 +267,7 @@ export default function CreateTicketNewCustomer() {
       plateSelectValue.label !== syncedOption.label
     ) {
       setPlateSelectValue(syncedOption)
+      setPlateInputValue(formatted)
       setPlateOption(existing || syncedOption)
     }
   }, [watchedPlate, plateOptionsSource]) 
@@ -360,14 +366,12 @@ export default function CreateTicketNewCustomer() {
         const { data } = await vehiclesAPI.getByLicensePlate(formattedPlate)
         if (data?.result) {
           const v = Array.isArray(data.result) ? data.result[0] : data.result
-          if (
-            v.customerId === customerId ||
-            v.customer?.customerId === customerId
-          ) {
+          // Lấy thông tin từ API response, không cần kiểm tra customerId
             existingVehicle = v
           }
+      } catch (err) {
+        console.warn('Error fetching vehicle by license plate:', err)
         }
-      } catch {}
     }
   
     if (existingVehicle) {
@@ -569,11 +573,14 @@ export default function CreateTicketNewCustomer() {
       setCustomerDiscountPolicyId(customer.discountPolicyId ?? 0)
 
       const phoneValue = displayPhoneFrom84(customer.phone || normalizedPhone)
-      setCurrentPhone(phoneValue || phone)
-      setPhoneSelectValue({
-        label: phoneValue || phone,
-        value: phoneValue || phone
-      })
+      const finalPhoneValue = phoneValue || phone
+      setCurrentPhone(finalPhoneValue)
+      const phoneOption = {
+        label: finalPhoneValue,
+        value: finalPhoneValue
+      }
+      setPhoneSelectValue(phoneOption)
+      setPhoneInputValue(finalPhoneValue)
 
       let vehiclesList = []
       if (fetchedCustomerId) {
@@ -643,19 +650,22 @@ export default function CreateTicketNewCustomer() {
   const setPhoneSelectByValue = (value) => {
     if (!value) {
       setPhoneSelectValue(null)
+      setPhoneInputValue('')
       return
     }
     const normalized = displayPhoneFrom84(value) || value
+    // Chỉ tìm trong phoneOptionsSource, không thêm mới
     let opt = phoneOptionsSource.find((o) => o.value === normalized)
     if (!opt) {
-      opt = { label: normalized, value: normalized, fullName: '', phone: normalized }
-        setPhoneOptionsSource((prev) => [...prev, opt])
-        setPhoneOptions((prev) => [...prev, opt])
+      // Nếu không tìm thấy, chỉ tạo option tạm để hiển thị, không thêm vào source
+      opt = { label: normalized, value: normalized }
     }
-    setPhoneSelectValue({
+    const phoneOption = {
       label: opt.label || opt.value,
       value: opt.value || opt.label
-    })
+    }
+    setPhoneSelectValue(phoneOption)
+    setPhoneInputValue(phoneOption.value)
   }
 
   useEffect(() => {
@@ -992,7 +1002,7 @@ export default function CreateTicketNewCustomer() {
   return (
     <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
-        <Card title={cardTitle} style={{ borderRadius: '12px' }}>
+        <Card title={cardTitle} style={{ borderRadius: '12px', border: 'none' }} bordered={false}>
           <Form
             form={form}
             layout="vertical"
@@ -1027,6 +1037,10 @@ export default function CreateTicketNewCustomer() {
                   name="phone"
                   rules={[
                     {
+                      required: true,
+                      message: 'Vui lòng nhập số điện thoại'
+                    },
+                    {
                       validator: (_, value) => {
                         if (!value || value.toString().trim() === '') {
                           return Promise.reject(new Error('Vui lòng nhập số điện thoại'))
@@ -1043,8 +1057,6 @@ export default function CreateTicketNewCustomer() {
                   ]}
                   style={formItemStyle}
                 >
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <div style={{ flex: 1 }}>
                       <CreatableSelect
                         isClearable
                         isMulti={false}
@@ -1075,41 +1087,26 @@ export default function CreateTicketNewCustomer() {
                         getOptionLabel={(option) => {
                           return option.label || option.value || ''
                         }}
+                        inputValue={phoneInputValue}
                         onInputChange={(inputValue = '', action) => {
                           if (action.action !== 'input-change') return
 
+                          setPhoneInputValue(inputValue)
                           const trimmed = inputValue.trim()
                           const lower = trimmed.toLowerCase()
+                          // Chỉ filter từ danh sách khách hàng có sẵn, không thêm option mới
                           const filtered = phoneOptionsSource.filter((opt) =>
                             (opt.value || '').toLowerCase().includes(lower) ||
                             (opt.fullName || '').toLowerCase().includes(lower)
                           )
-                          setPhoneOptions(filtered.length ? filtered : [{ label: trimmed, value: trimmed }])
-
-                          if (trimmed) {
-                            form.setFieldsValue({ phone: trimmed })
-                            setCurrentPhone(trimmed)
-                            const phoneOnlyOption = { label: trimmed, value: trimmed }
-                            setPhoneOptionsSource((prev) => {
-                              const exists = prev.some((opt) => opt.value === trimmed || opt.label === trimmed)
-                              return exists ? prev : [...prev, phoneOnlyOption]
-                            })
-                            setPhoneSelectValue(phoneOnlyOption)
-                          } else {
-                            form.setFieldsValue({ phone: '' })
-                            setCurrentPhone('')
-                            setPhoneSelectValue(null)
-                          }
+                          setPhoneOptions(filtered)
                         }}
                         onChange={(option) => {
                           if (!option) {
                             setPhoneSelectValue(null)
+                            setPhoneInputValue('')
                             setCurrentPhone('')
-                            form.setFieldsValue({ 
-                              phone: '',
-                              name: '',
-                              address: ''
-                            })
+                            form.setFieldsValue({ phone: '' })
                             resetCustomerSelection()
                             return
                           }
@@ -1120,108 +1117,68 @@ export default function CreateTicketNewCustomer() {
                           }
                           const selectedValue = phoneOnlyOption.value
                           setPhoneSelectValue(phoneOnlyOption)
+                          setPhoneInputValue(selectedValue)
                           form.setFieldsValue({ phone: selectedValue })
                           setCurrentPhone(selectedValue)
                           const isKnown = phoneOptionsSource.some((opt) => opt.value === selectedValue)
                           if (isKnown) {
                             fetchCustomerByPhone(selectedValue)
-                          } else {
-                            form.setFieldsValue({ phone: selectedValue })
-                            setPhoneSelectValue(phoneOnlyOption)
-                            setCurrentPhone(selectedValue)
                           }
                         }}
                         onCreateOption={(inputValue) => {
                           const trimmed = inputValue.trim()
-                          const newOption = { 
-                            label: trimmed, 
-                            value: trimmed,
-                            fullName: '',
-                            phone: trimmed
-                          }
+                          if (!trimmed) return
                           
-                          setPhoneOptionsSource((prev) => [...prev, newOption])
-                          setPhoneOptions((prev) => {
-                            const existsInOptions = prev.some((opt) => opt.value === trimmed)
-                            return existsInOptions ? prev : [...prev, newOption]
-                          })
-                          
-                          setPhoneSelectValue({
+                          // Không thêm vào phoneOptionsSource, chỉ set giá trị vào form
+                          // phoneOptionsSource chỉ chứa khách hàng từ API
+                          const tempOption = { 
                             label: trimmed,
                             value: trimmed
-                          })
+                          }
+                          
+                          setPhoneSelectValue(tempOption)
+                          setPhoneInputValue(trimmed)
                           form.setFieldsValue({ phone: trimmed })
                           setCurrentPhone(trimmed)
+                          // Không gọi API khi tự nhập số điện thoại mới
                         }}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault()
-                            const currentPhone = form.getFieldValue('phone')
-                            if (currentPhone && currentPhone.trim()) {
-                              const trimmed = currentPhone.trim()
-                              const exists = phoneOptionsSource.some((opt) => opt.value === trimmed)
-                              if (!exists) {
-                                const newOption = { 
-                                  label: trimmed, 
-                                  value: trimmed,
-                                  fullName: '',
-                                  phone: trimmed
-                                }
-                                setPhoneOptionsSource((prev) => [...prev, newOption])
-                                setPhoneOptions((prev) => {
-                                  const existsInOptions = prev.some((opt) => opt.value === trimmed)
-                                  return existsInOptions ? prev : [...prev, newOption]
-                                })
-                                setPhoneSelectValue({
-                                  label: trimmed,
-                                  value: trimmed
-                                })
+                            const trimmed = phoneInputValue.trim()
+                            if (trimmed) {
+                              // Kiểm tra xem số điện thoại có trong danh sách khách hàng không
+                              const existingOption = phoneOptionsSource.find((opt) => opt.value === trimmed)
+                              if (existingOption) {
+                                // Nếu có trong danh sách, chọn option đó và gọi API
+                                setPhoneSelectValue(existingOption)
+                                setPhoneInputValue(trimmed)
                                 form.setFieldsValue({ phone: trimmed })
                                 setCurrentPhone(trimmed)
-                              } else {
                                 fetchCustomerByPhone(trimmed)
+                              } else {
+                                // Nếu không có trong danh sách, chỉ set giá trị, không thêm vào options và không gọi API
+                                const tempOption = { label: trimmed, value: trimmed }
+                                setPhoneSelectValue(tempOption)
+                                setPhoneInputValue(trimmed)
+                                form.setFieldsValue({ phone: trimmed })
+                                setCurrentPhone(trimmed)
+                                // Không gọi API khi tự nhập số điện thoại mới
                               }
                             }
                           }
                         }}
                       />
-                    </div>
-                    <Button
-                      type="primary"
-                      style={{ 
-                        whiteSpace: 'nowrap',
-                        height: '40px',
-                        borderRadius: '12px',
-                        fontWeight: 500,
-                        padding: '0 16px',
-                        background: '#2563eb',
-                        borderColor: '#2563eb',
-                        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)'
-                      }}
-                      loading={customerLookupLoading}
-                      onClick={() => {
-                        const phoneValue = form.getFieldValue('phone') || currentPhone
-                        if (!phoneValue) {
-                          message.warning('Vui lòng nhập số điện thoại trước')
-                          return
-                        }
-                        setNewCustomer({
-                          phone: phoneValue,
-                          fullName: form.getFieldValue('name') || '',
-                          address: form.getFieldValue('address') || ''
-                        })
-                        setShowCreateCustomerModal(true)
-                      }}
-                    >
-                      Tạo mới
-                    </Button>
-                  </div>
                 </Form.Item>
 
                 <Form.Item
                   label="Họ và tên"
                   name="name"
                   rules={[
+                    {
+                      required: true,
+                      message: 'Vui lòng nhập họ và tên'
+                    },
                     {
                       validator: (_, value) => {
                         if (!value || value.trim() === '') {
@@ -1246,8 +1203,6 @@ export default function CreateTicketNewCustomer() {
                     placeholder="VD: Đặng Thị Huyền"
                     maxLength={50}
                     showCount
-                    disabled={filledFields.name}
-                    readOnly={filledFields.name}
                     onInput={(e) => {
                       if (e.target.value.length > 50) {
                         e.target.value = e.target.value.slice(0, 50)
@@ -1438,40 +1393,26 @@ export default function CreateTicketNewCustomer() {
                           getOptionLabel={(option) => {
                             return option.label || option.value || ''
                           }}
+                          inputValue={plateInputValue}
                           onInputChange={(inputValue = '', action) => {
                             if (action.action !== 'input-change') return
 
+                            setPlateInputValue(inputValue)
                             const trimmed = inputValue.trim()
                             const lower = trimmed.toLowerCase()
+                            // Chỉ filter từ danh sách biển số xe có sẵn từ API, không thêm option mới
                             const filtered = plateOptionsSource.filter((opt) =>
                               (opt.value || '').toLowerCase().includes(lower) ||
                               (opt.label || '').toLowerCase().includes(lower)
                             )
-                            setPlateOptions(filtered.length ? filtered : [{ label: trimmed, value: trimmed }])
-
-                            if (trimmed) {
-                              form.setFieldsValue({ plate: trimmed })
-                              const plateOnlyOption = { label: trimmed, value: trimmed }
-                              setPlateOptionsSource((prev) => {
-                                const exists = prev.some((opt) => opt.value === trimmed || opt.label === trimmed)
-                                return exists ? prev : [...prev, plateOnlyOption]
-                              })
-                              setPlateSelectValue(plateOnlyOption)
-                            } else {
-                              form.setFieldsValue({ plate: '' })
-                              setPlateSelectValue(null)
-                            }
+                            setPlateOptions(filtered)
                           }}
                           onChange={(option) => {
                             if (!option) {
                               setPlateSelectValue(null)
+                              setPlateInputValue('')
                               form.setFieldsValue({ plate: '' })
-                              const currentPhone = form.getFieldValue('phone')
-                              if (currentPhone) {
                                 resetVehicleInfo()
-                              } else {
-                                resetCustomerSelection()
-                              }
                               return
                             }
                             
@@ -1480,8 +1421,9 @@ export default function CreateTicketNewCustomer() {
                               value: option.value || option.label
                             }
                             const selectedValue = plateOnlyOption.value
-                            setPlateSelectValue(plateOnlyOption)
                             const formattedPlate = selectedValue ? formatLicensePlate(selectedValue) : selectedValue
+                            setPlateSelectValue(plateOnlyOption)
+                            setPlateInputValue(formattedPlate)
                             form.setFieldsValue({ plate: formattedPlate })
                             
                             const isKnown = plateOptionsSource.some((opt) => {
@@ -1491,30 +1433,8 @@ export default function CreateTicketNewCustomer() {
                             })
                             
                             if (isKnown) {
-                              const vehicleFromOption = option?.vehicle
-                              const vehiclesPool =
-                                (Array.isArray(customerVehicles) && customerVehicles.length > 0
-                                  ? customerVehicles
-                                  : plateOptionsSource.map((opt) => opt.vehicle).filter(Boolean)) || []
-                              
-                              if (vehicleFromOption) {
-                                const vehicleToPass =
-                                  vehiclesPool.find((v) => {
-                                    const vPlate = v.licensePlate || v.plate || ''
-                                    return formatLicensePlate(vPlate) === formattedPlate
-                                  }) || vehicleFromOption
-                                handlePlateSelect(formattedPlate, [vehicleToPass])
-                              } else {
-                                const vehicleFromPool = vehiclesPool.find((v) => {
-                                  const vPlate = v?.licensePlate || v?.plate || ''
-                                  return formatLicensePlate(vPlate) === formattedPlate
-                                })
-                                if (vehicleFromPool) {
-                                  handlePlateSelect(formattedPlate, [vehicleFromPool])
-                                } else {
-                                  handlePlateSelect(formattedPlate, customerVehicles)
-                                }
-                              }
+                              // Khi chọn từ dropdown, luôn gọi API để lấy thông tin mới nhất
+                              handlePlateSelect(formattedPlate, [])
                             } else {
                               setIsNewVehicle(true)
                               setSelectedVehicle(null)
@@ -1533,18 +1453,16 @@ export default function CreateTicketNewCustomer() {
                           onCreateOption={(inputValue) => {
                             const trimmed = inputValue.trim()
                             const formatted = formatLicensePlate(trimmed)
-                            const newOption = { 
+                            
+                            // Không thêm vào plateOptionsSource, chỉ set giá trị vào form
+                            // plateOptionsSource chỉ chứa biển số xe từ API
+                            const tempOption = { 
                               label: formatted, 
                               value: formatted
                             }
                             
-                            setPlateOptionsSource((prev) => [...prev, newOption])
-                            setPlateOptions((prev) => {
-                              const existsInOptions = prev.some((opt) => opt.value === formatted)
-                              return existsInOptions ? prev : [...prev, newOption]
-                            })
-                            
-                            setPlateSelectValue(newOption)
+                            setPlateSelectValue(tempOption)
+                            setPlateInputValue(formatted)
                             form.setFieldsValue({ plate: formatted })
                             
                             setIsNewVehicle(true)
@@ -1563,50 +1481,22 @@ export default function CreateTicketNewCustomer() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault()
-                              const currentPlate = form.getFieldValue('plate')
-                              if (currentPlate && currentPlate.trim()) {
-                                const trimmed = currentPlate.trim()
+                              const trimmed = plateInputValue.trim()
+                              if (trimmed) {
                                 const formatted = formatLicensePlate(trimmed)
-                                const exists = plateOptionsSource.some((opt) => {
-                                  const optValue = opt.value || opt.label || ''
-                                  return formatLicensePlate(optValue) === formatted
-                                })
-                                if (!exists) {
-                                  const newOption = { 
-                                    label: formatted, 
-                                    value: formatted
-                                  }
-                                  setPlateOptionsSource((prev) => [...prev, newOption])
-                                  setPlateOptions((prev) => {
-                                    const existsInOptions = prev.some((opt) => opt.value === formatted)
-                                  return existsInOptions ? prev : [...prev, newOption]
-                                })
-                                setPlateSelectValue(newOption)
-                                form.setFieldsValue({ plate: formatted })
-                                
-                                setIsNewVehicle(true)
-                                  setSelectedVehicle(null)
-                                  form.setFieldsValue({
-                                    brand: undefined,
-                                    model: undefined,
-                                    vin: '',
-                                    year: 2020,
-                                    plate: formatted
-                                  })
-                                  setSelectedBrandId(null)
-                                  setSelectedModelId(null)
-                                  setModels([])
-                                } else {
+                                // Kiểm tra xem biển số có trong danh sách từ API không
                                   const existingOption = plateOptionsSource.find((opt) => {
                                     const optValue = opt.value || opt.label || ''
                                     return formatLicensePlate(optValue) === formatted
                                   })
                                   if (existingOption) {
+                                  // Nếu có trong danh sách, chọn option đó và load thông tin xe
                                     const plateOnlyOption = {
                                       label: existingOption.label || existingOption.value,
                                       value: existingOption.value || existingOption.label
                                     }
                                   setPlateSelectValue(plateOnlyOption)
+                                  setPlateInputValue(formatted)
                                   form.setFieldsValue({ plate: formatted })
                                   
                                   const vehiclesPool =
@@ -1622,7 +1512,25 @@ export default function CreateTicketNewCustomer() {
                                     } else {
                                       handlePlateSelect(formatted, customerVehicles)
                                     }
-                                  }
+                                } else {
+                                  // Nếu không có trong danh sách, chỉ set giá trị, không thêm vào options
+                                  const tempOption = { label: formatted, value: formatted }
+                                  setPlateSelectValue(tempOption)
+                                  setPlateInputValue(formatted)
+                                  form.setFieldsValue({ plate: formatted })
+                                  
+                                  setIsNewVehicle(true)
+                                  setSelectedVehicle(null)
+                                  form.setFieldsValue({
+                                    brand: undefined,
+                                    model: undefined,
+                                    vin: '',
+                                    year: 2020,
+                                    plate: formatted
+                                  })
+                                  setSelectedBrandId(null)
+                                  setSelectedModelId(null)
+                                  setModels([])
                                 }
                               }
                             }

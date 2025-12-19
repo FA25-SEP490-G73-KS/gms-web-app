@@ -41,7 +41,8 @@ const isQuotationPublicEndpoint = (url) => {
   // /service-tickets/{id}/status?status=Hủy - hủy service ticket
   return (
     (url.includes("/service-tickets/") && url.includes("/quotation")) ||
-    (url.includes("/price-quotations/") && (url.includes("/confirm") || url.includes("/reject"))) ||
+    (url.includes("/price-quotations/") &&
+      (url.includes("/confirm") || url.includes("/reject"))) ||
     (url.includes("/service-tickets/") && url.includes("/status"))
   );
 };
@@ -170,8 +171,7 @@ axiosClient.interceptors.response.use(
         isRefreshing = false;
 
         // Clear auth state
-        const isLogoutRequest =
-          originalRequest.url?.includes("/auth/logout");
+        const isLogoutRequest = originalRequest.url?.includes("/auth/logout");
         const isOnLoginPage =
           typeof window !== "undefined" &&
           window.location.pathname.includes("/login");
@@ -188,9 +188,7 @@ axiosClient.interceptors.response.use(
         }
 
         return Promise.reject(
-          new Error(
-            "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
-          )
+          new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.")
         );
       }
     }
@@ -211,15 +209,12 @@ axiosClient.interceptors.response.use(
     }
 
     if (error.request) {
-      return Promise.reject(
-        new Error("Không thể kết nối đến server")
-      );
+      return Promise.reject(new Error("Không thể kết nối đến server"));
     }
 
     return Promise.reject(error);
   }
 );
-
 
 async function request(method, path, body, init = {}) {
   try {
@@ -437,7 +432,8 @@ export const priceQuotationAPI = {
   rejectItem: (itemId, reason) =>
     patch(`/quotation-items/${itemId}/reject`, reason),
   deleteItem: (itemId) => del(`/quotation-items/${itemId}`),
-  confirmQuotation: (id, options = {}) => post(`/price-quotations/${id}/confirm`, null, options),
+  confirmQuotation: (id, options = {}) =>
+    post(`/price-quotations/${id}/confirm`, null, options),
   rejectQuotation: (id, reason, options = {}) =>
     post(`/price-quotations/${id}/reject`, reason, options),
   exportPDF: (id) =>
@@ -730,9 +726,7 @@ export const dashboardAPI = {
     return get(`/dashboard/warehouse/overview?${params.toString()}`);
   },
 
-  
   getServiceAdvisorOverview: () => {
-    
     return get("/dashboard/service-advisor/overview");
   },
 };
