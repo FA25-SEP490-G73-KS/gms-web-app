@@ -28,6 +28,7 @@ import AccountancePayroll from './pages/accountance/Payroll';
 import PayrollDetailPage from './pages/accountance/PayrollDetailPage';
 import AccountanceAttendance from './pages/accountance/Attendance';
 import AccountancePlaceholder from './pages/accountance/Placeholder';
+import AccountanceStatistics from './pages/accountance/Statistics';
 import AccountanceDebts from './pages/accountance/Debts';
 import AccountanceDebtDetail from './pages/accountance/DebtDetail';
 import AccountanceDebtTicketDetail from './pages/accountance/DebtTicketDetail';
@@ -59,6 +60,7 @@ import ManagerImportRequestDetail from './pages/manager/warehouse/ImportRequestD
 import Inventory from './pages/admin/Inventory';
 import AdminCustomers from './pages/admin/Customers';
 import ManagerHome from './pages/manager/ManagerHome';
+import ManagerStatistics from './pages/manager/Statistics';
 
 import WarehouseHome from './pages/warehouse/WarehouseHome';
 import WarehouseReport from './pages/warehouse/WarehouseReport';
@@ -271,7 +273,7 @@ function App() {
         {/* Accountant Routes - Protected */}
         <Route path="/accountance" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.ACCOUNTANT]}>
-            <AccountancePlaceholder title="Thống kê" />
+            <AccountanceStatistics />
           </ProtectedRoute>
         } />
         <Route path="/accountance/finance" element={
@@ -343,7 +345,7 @@ function App() {
         {/* Manager Routes - Protected */}
         <Route path="/manager" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
-            <ManagerHome />
+            <ManagerStatistics />
           </ProtectedRoute>
         } />
         
