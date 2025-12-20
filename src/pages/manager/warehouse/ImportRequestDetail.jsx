@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Button, Table, Tag, message, Spin } from 'antd'
+import { Button, Table, Tag, message, Spin, Modal, Input } from 'antd'
+import { ExclamationCircleOutlined } from '@ant-design/icons'
 import ManagerLayout from '../../../layouts/ManagerLayout'
 import { purchaseRequestAPI } from '../../../services/api'
 import { goldTableHeader } from '../../../utils/tableComponents'
+
+const { TextArea } = Input
 
 export default function ManagerImportRequestDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [detailData, setDetailData] = useState(null)
+  const [rejectModalVisible, setRejectModalVisible] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
 
   useEffect(() => {
     fetchDetail()
@@ -39,7 +44,7 @@ export default function ManagerImportRequestDetail() {
       const mappedData = {
         code: result.code || 'N/A',
         type: result.reason || 'Từ báo giá',
-        quotationCode: result.quotationCode || 'N/A',
+        createdAt: result.createdAt || 'N/A',
         createdBy: result.createdBy || 'N/A',
         reviewStatus: result.reviewStatus || 'Chờ duyệt',
         customerName: result.customerName || 'N/A',
@@ -73,7 +78,40 @@ export default function ManagerImportRequestDetail() {
   }
 
   const handleReject = () => {
-    message.info('Từ chối yêu cầu')
+    setRejectModalVisible(true)
+  }
+
+  const handleCancelReject = () => {
+    setRejectModalVisible(false)
+    setRejectReason('')
+  }
+
+  const handleConfirmReject = async () => {
+    if (!rejectReason.trim()) {
+      message.warning('Vui lòng nhập lý do từ chối')
+      return
+    }
+
+    try {
+      setLoading(true)
+      const { data: response, error } = await purchaseRequestAPI.reject(id, rejectReason)
+      
+      if (error) {
+        message.error(error || 'Có lỗi xảy ra khi từ chối yêu cầu')
+        return
+      }
+      
+      message.success('Từ chối yêu cầu thành công')
+      setRejectModalVisible(false)
+      setRejectReason('')
+      // Refresh data after rejection
+      fetchDetail()
+    } catch (err) {
+      console.error('Failed to reject:', err)
+      message.error('Có lỗi xảy ra khi từ chối yêu cầu')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleApprove = async () => {
@@ -181,11 +219,11 @@ export default function ManagerImportRequestDetail() {
             <div style={{ fontWeight: 500 }}>Mã YCMH:</div>
             <div>{detailData.code}</div>
 
-            <div style={{ fontWeight: 500 }}>Loại yêu cầu:</div>
+            <div style={{ fontWeight: 500 }}>Lý do: </div>
             <div>{detailData.type}</div>
 
-            <div style={{ fontWeight: 500 }}>Liên quan báo giá:</div>
-            <div>{detailData.quotationCode}</div>
+            <div style={{ fontWeight: 500 }}>Ngày tạo:</div>
+            <div>{detailData.createdAt}</div>
 
             <div style={{ fontWeight: 500 }}>Người tạo:</div>
             <div>{detailData.createdBy}</div>
@@ -226,7 +264,7 @@ export default function ManagerImportRequestDetail() {
         </div>
 
         {/* Action Buttons */}
-        {detailData.reviewStatus !== 'Đã duyệt' && (
+        {detailData.reviewStatus !== 'Đã duyệt' && detailData.reviewStatus !== 'Từ chối' && (
           <div style={{ 
             marginTop: '24px', 
             display: 'flex', 
@@ -267,6 +305,161 @@ export default function ManagerImportRequestDetail() {
             </Button>
           </div>
         )}
+
+        {/* Reject Modal */}
+        <Modal
+          title={
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px',
+              fontSize: '20px',
+              fontWeight: 600,
+              color: '#1f2937'
+            }}>
+              <ExclamationCircleOutlined style={{ 
+                color: '#ef4444', 
+                fontSize: '24px' 
+              }} />
+              <span>Từ chối yêu cầu mua hàng</span>
+            </div>
+          }
+          open={rejectModalVisible}
+          onCancel={handleCancelReject}
+          footer={[
+            <Button 
+              key="cancel" 
+              onClick={handleCancelReject}
+              size="large"
+              style={{
+                height: '44px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                borderColor: '#d1d5db',
+                color: '#6b7280'
+              }}
+            >
+              Hủy
+            </Button>,
+            <Button
+              key="confirm"
+              type="primary"
+              danger
+              onClick={handleConfirmReject}
+              loading={loading}
+              size="large"
+              style={{
+                height: '44px',
+                paddingLeft: '24px',
+                paddingRight: '24px',
+                borderRadius: '8px',
+                fontWeight: 500,
+                background: '#ef4444',
+                borderColor: '#ef4444',
+                boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+              }}
+            >
+              Xác nhận
+            </Button>
+          ]}
+          width={600}
+          style={{
+            top: 100
+          }}
+          styles={{
+            content: {
+              borderRadius: '12px',
+              padding: '24px'
+            },
+            header: {
+              borderBottom: '1px solid #f0f0f0',
+              paddingBottom: '16px',
+              marginBottom: '20px'
+            },
+            footer: {
+              borderTop: '1px solid #f0f0f0',
+              paddingTop: '16px',
+              marginTop: '24px'
+            }
+          }}
+        >
+          <div style={{ 
+            marginBottom: '20px',
+            padding: '16px',
+            background: '#fef2f2',
+            borderRadius: '8px',
+            border: '1px solid #fecaca'
+          }}>
+            <div style={{ 
+              marginBottom: '12px', 
+              fontWeight: 600,
+              fontSize: '14px',
+              color: '#991b1b',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <ExclamationCircleOutlined style={{ fontSize: '16px' }} />
+              <span>Vui lòng nhập lý do từ chối để tiếp tục</span>
+            </div>
+            <div style={{ 
+              fontSize: '13px',
+              color: '#7f1d1d',
+              lineHeight: '1.5'
+            }}>
+              Lý do từ chối sẽ được ghi nhận và hiển thị cho người tạo yêu cầu.
+            </div>
+          </div>
+
+          <div>
+            <div style={{ 
+              marginBottom: '10px', 
+              fontWeight: 600,
+              fontSize: '15px',
+              color: '#374151',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              <span>Lý do từ chối</span>
+              <span style={{ color: '#ef4444', fontSize: '16px' }}>*</span>
+            </div>
+            <TextArea
+              rows={5}
+              placeholder="Ví dụ: Hàng hóa không còn cần thiết, Ngân sách không đủ, Đã có nguồn cung cấp khác..."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              maxLength={500}
+              showCount
+              style={{
+                borderRadius: '8px',
+                fontSize: '14px',
+                padding: '12px',
+                borderColor: rejectReason.trim() ? '#d1d5db' : '#fca5a5',
+                transition: 'all 0.2s'
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#ef4444'
+                e.target.style.boxShadow = '0 0 0 2px rgba(239, 68, 68, 0.1)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = rejectReason.trim() ? '#d1d5db' : '#fca5a5'
+                e.target.style.boxShadow = 'none'
+              }}
+            />
+            {!rejectReason.trim() && (
+              <div style={{ 
+                marginTop: '6px',
+                fontSize: '12px',
+                color: '#ef4444'
+              }}>
+                Vui lòng nhập lý do từ chối
+              </div>
+            )}
+          </div>
+        </Modal>
       </div>
     </ManagerLayout>
   )

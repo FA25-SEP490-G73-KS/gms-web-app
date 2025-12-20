@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
-import { getUserNameFromToken, getUserPhoneFromToken } from '../utils/helpers'
+import { getUserNameFromToken, getUserPhoneFromToken, getShortName } from '../utils/helpers'
 import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/admin-layout.css'
 
@@ -52,9 +52,10 @@ export default function AdminLayout({ children }) {
     const path = location.pathname
     if (path.startsWith('/service-advisor/orders')) {
       const isDetailPage = /^\/service-advisor\/orders\/\d+/.test(path)
+      const isCreatePage = path === '/service-advisor/orders/create' || path === '/service-advisor/orders/new-customer'
       return {
         parent: 'Phiếu dịch vụ',
-        current: 'Danh sách phiếu',
+        current: isDetailPage ? 'Tạo phiếu dịch vụ' : isCreatePage ? 'Tạo phiếu dịch vụ' : 'Danh sách phiếu',
         child: isDetailPage ? 'Chi tiết phiếu' : null
       }
     }
@@ -164,7 +165,10 @@ export default function AdminLayout({ children }) {
                   Danh sách phiếu
                 </button>
                 <button 
-                  className={`submenu-item ${location.pathname === '/service-advisor/orders/new-customer' ? 'active' : ''}`}
+                  className={`submenu-item ${
+                    location.pathname === '/service-advisor/orders/create' || 
+                    location.pathname === '/service-advisor/orders/new-customer' ? 'active' : ''
+                  }`}
                   onClick={() => navigate('/service-advisor/orders/new-customer')}
                 >
                   Tạo phiếu dịch vụ
@@ -195,7 +199,7 @@ export default function AdminLayout({ children }) {
             </div>
             <div className="admin-user-text">
               <div className="admin-user-name">
-                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+                {getShortName(getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A')}
               </div>
               <div className="admin-user-role">
                 {getUserPhoneFromToken() || user?.phone || ''}

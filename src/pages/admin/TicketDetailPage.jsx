@@ -289,6 +289,7 @@ export default function TicketDetailPage() {
   const isWaitingCustomerConfirm = normalizedQuotationStatus === 'WAITING_CUSTOMER_CONFIRM'
   const isWarehouseConfirmed = normalizedQuotationStatus === 'WAREHOUSE_CONFIRMED'
   const isCustomerConfirmed = normalizedQuotationStatus === 'CUSTOMER_CONFIRMED'
+  const isCustomerRejected = normalizedQuotationStatus === 'CUSTOMER_REJECTED'
   
   // Kiểm tra xem có item nào bị từ chối không
   const hasRejectedItem = replaceItems.some(item => {
@@ -322,11 +323,13 @@ export default function TicketDetailPage() {
   
   const actionButtonLabel = ticketStatusKey === 'WAITING_FOR_DELIVERY'
     ? 'Hoàn thành'
-    : (isWaitingWarehouse 
-      ? 'Cập nhật' 
-      : ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm)
-          ? (isEditMode ? 'Lưu' : 'Cập nhật')
-          : 'Lưu'))
+    : (isCustomerRejected && ticketStatusKey === 'QUOTING')
+      ? 'Cập nhật'
+      : (isWaitingWarehouse 
+        ? 'Cập nhật' 
+        : ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm)
+            ? (isEditMode ? 'Lưu' : 'Cập nhật')
+            : 'Lưu'))
   const canExportPdf = isWarehouseConfirmed || isCustomerConfirmed
   const canSendToCustomer = isWarehouseConfirmed
   const canStartRepair =
@@ -1248,6 +1251,24 @@ export default function TicketDetailPage() {
     
     console.log('Not WAITING_FOR_DELIVERY, continuing with normal flow')
     
+    // Nếu quotation status là CUSTOMER_REJECTED và ticket status là QUOTING, chuyển báo giá về DRAFT
+    if (isCustomerRejected && currentTicketStatusKey === 'QUOTING') {
+      console.log('Calling setQuotationDraft API - CUSTOMER_REJECTED and QUOTING')
+      setActionLoading(true)
+      try {
+        const result = await setQuotationDraft()
+        console.log('setQuotationDraft result:', result)
+        message.success('Đã chuyển báo giá về nháp')
+        await fetchTicketDetail() // Refresh data để cập nhật UI
+      } catch (err) {
+        console.error('Error in setQuotationDraft:', err)
+        message.error(err?.message || 'Không thể chuyển báo giá về nháp')
+      } finally {
+        setActionLoading(false)
+      }
+      return
+    }
+    
     if ((isWarehouseConfirmed || isCustomerConfirmed || isWaitingCustomerConfirm) && !isEditMode) {
       await setQuotationDraft()
       setIsEditMode(true)
@@ -1304,10 +1325,10 @@ export default function TicketDetailPage() {
       setSendToCustomerLoading(true)
       const quotationId = ticketData.priceQuotation.priceQuotationId
       // Gửi qua ZNS
-      // const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
-      // if (znsError) {
-      //   throw new Error(znsError)
-      // }
+      const { error: znsError } = await znsNotificationsAPI.sendQuotation(quotationId)
+      if (znsError) {
+        throw new Error(znsError)
+      }
       // Gửi thêm API send-to-customer
       const { error: sendApiError } = await priceQuotationAPI.sendToCustomer(quotationId)
       if (sendApiError) {
@@ -1361,11 +1382,25 @@ export default function TicketDetailPage() {
     setHandoverLoading(true)
     try {
       const serviceTicketId = id || ticketData.serviceTicketId
+      
+      // Cập nhật trạng thái
       const { data, error } = await serviceTicketAPI.updateStatus(serviceTicketId, 'WAITING_FOR_DELIVERY')
       
       if (error) {
         message.error(error || 'Không thể cập nhật trạng thái bàn giao xe')
         return
+      }
+      
+      // Gửi thông báo nhận xe qua ZNS
+      try {
+        const { error: znsError } = await znsNotificationsAPI.sendVehicleReceipt(serviceTicketId)
+        if (znsError) {
+          console.error('Error sending vehicle receipt notification:', znsError)
+          // Không hiển thị lỗi cho người dùng vì cập nhật trạng thái đã thành công
+        }
+      } catch (znsErr) {
+        console.error('Error sending vehicle receipt notification:', znsErr)
+        // Không hiển thị lỗi cho người dùng vì cập nhật trạng thái đã thành công
       }
       
       message.success('Đã cập nhật trạng thái bàn giao xe thành công')
@@ -1536,12 +1571,34 @@ export default function TicketDetailPage() {
     setRejectReason('')
   }
 
-  const handleQuotationActionChange = (e) => {
+  const handleQuotationActionChange = async (e) => {
     const value = e.target.value
     if (value === 'confirm') {
       handleConfirmQuotation()
     } else if (value === 'reject') {
-      handleOpenRejectModal()
+      // Khi chọn "Khách từ chối", gọi API để cập nhật trạng thái service ticket thành CANCELED
+      if (!id && !ticketData?.serviceTicketId) {
+        message.error('Không tìm thấy ID phiếu dịch vụ.')
+        e.target.value = ''
+        return
+      }
+      
+      try {
+        const serviceTicketId = id || ticketData.serviceTicketId
+        const { data, error } = await serviceTicketAPI.updateStatus(serviceTicketId, 'CANCELED')
+        
+        if (error) {
+          message.error(error || 'Không thể hủy phiếu dịch vụ')
+          e.target.value = ''
+          return
+        }
+        
+        message.success('Đã hủy phiếu dịch vụ thành công')
+        await fetchTicketDetail()
+      } catch (err) {
+        console.error('Error canceling service ticket:', err)
+        message.error('Đã xảy ra lỗi khi hủy phiếu dịch vụ')
+      }
     }
     e.target.value = ''
   }
@@ -2327,8 +2384,8 @@ export default function TicketDetailPage() {
                         defaultValue=""
                       >
                         <option value="" disabled>Chọn hành động</option>
-                        <option value="confirm">Khách đã xác nhận</option>
-                        <option value="reject">Khách từ chối</option>
+                        <option value="confirm">Xác nhận báo giá</option>
+                        <option value="reject">Hủy phiếu dịch vụ</option>
                       </select>
                     )}
                   </>
@@ -2454,7 +2511,8 @@ export default function TicketDetailPage() {
               <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: '16px', borderTop: '1px solid #e5e7eb' }}>
               {!isHistoryPage ? (
                 <Space size="middle">
-                  {ticketStatusKey !== 'COMPLETED' && (
+                  {/* Ẩn nút nếu quotation status là CUSTOMER_REJECTED và ticket status là CANCELED */}
+                  {!(isCustomerRejected && ticketStatusKey === 'CANCELED') && ticketStatusKey !== 'COMPLETED' && (
                   <Button 
                             onClick={handleSendQuote}
                     disabled={(() => {
@@ -2463,6 +2521,11 @@ export default function TicketDetailPage() {
                       
                       // Nếu trạng thái là "Chờ bàn giao xe", luôn enable nút "Hoàn thành"
                       if (ticketStatusKey === 'WAITING_FOR_DELIVERY') {
+                        return false
+                      }
+                      
+                      // Nếu quotation status là CUSTOMER_REJECTED và ticket status là QUOTING, enable nút "Cập nhật"
+                      if (isCustomerRejected && ticketStatusKey === 'QUOTING') {
                         return false
                       }
                       
@@ -2489,16 +2552,20 @@ export default function TicketDetailPage() {
                           ? '#9ca3af'
                           : (isWaitingWarehouse && !hasRejectedItem)
                           ? '#9ca3af'
-                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                            ? '#CBB081'
-                            : '#22c55e',
+                          : (actionButtonLabel === 'Hoàn thành')
+                            ? '#22c55e'
+                            : (actionButtonLabel === 'Cập nhật')
+                              ? '#CBB081'
+                              : '#22c55e',
                         borderColor: isTicketCancelled
                           ? '#9ca3af'
                           : (isWaitingWarehouse && !hasRejectedItem)
                           ? '#9ca3af'
-                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                            ? '#CBB081'
-                            : '#22c55e',
+                          : (actionButtonLabel === 'Hoàn thành')
+                            ? '#22c55e'
+                            : (actionButtonLabel === 'Cập nhật')
+                              ? '#CBB081'
+                              : '#22c55e',
                       color: '#fff',
                       fontWeight: 600,
                       padding: '0 24px',

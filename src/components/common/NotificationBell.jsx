@@ -303,18 +303,33 @@ function NotificationBell() {
   useEffect(() => {
     if (visible) {
       updateDropdownPosition();
-      const handleScroll = () => {
-        // Đóng dropdown khi lăn chuột để tránh lỗi position
+      const handleScroll = (e) => {
+        // Kiểm tra xem scroll có phải từ dropdown không
+        const scrollElement = e.target;
+        
+        // Nếu scroll từ dropdown hoặc element con của dropdown, không đóng
+        if (dropdownRef.current && dropdownRef.current.contains(scrollElement)) {
+          return;
+        }
+        
+        // Kiểm tra xem scroll có phải từ element có class notification-dropdown-content không
+        const isScrollInDropdown = scrollElement.closest && scrollElement.closest('.notification-dropdown-content');
+        if (isScrollInDropdown) {
+          return;
+        }
+        
+        // Chỉ đóng khi scroll ở main page (window/body), không phải trong dropdown
         setVisible(false);
         visibleRef.current = false;
       };
       const handleResize = () => updateDropdownPosition();
       
-      window.addEventListener('scroll', handleScroll, true);
+      // Lắng nghe scroll ở document level với capture để bắt tất cả scroll events
+      document.addEventListener('scroll', handleScroll, true);
       window.addEventListener('resize', handleResize);
       
       return () => {
-        window.removeEventListener('scroll', handleScroll, true);
+        document.removeEventListener('scroll', handleScroll, true);
         window.removeEventListener('resize', handleResize);
       };
     }
@@ -358,7 +373,13 @@ function NotificationBell() {
             )}
           </div>
           
-          <div className="notification-dropdown-content">
+          <div 
+            className="notification-dropdown-content"
+            onScroll={(e) => {
+              // Ngăn scroll event lan ra ngoài để không đóng dropdown
+              e.stopPropagation();
+            }}
+          >
             {loading && allNotifications.length === 0 ? (
               <div className="notification-loading">
                 <div className="notification-spinner"></div>

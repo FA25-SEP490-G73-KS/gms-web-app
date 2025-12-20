@@ -18,6 +18,8 @@ import AccountanceLayout from "../../layouts/AccountanceLayout";
 import { invoiceAPI, transactionsAPI } from "../../services/api";
 import { goldTableHeader } from "../../utils/tableComponents";
 import dayjs from "dayjs";
+import Lottie from "lottie-react";
+import successAnim from "../../assets/animations/Success.json";
 
 export default function InvoiceDetailPage() {
   const { id } = useParams();
@@ -36,10 +38,16 @@ export default function InvoiceDetailPage() {
   const [paymentTab, setPaymentTab] = useState("CASH");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [cashReceived, setCashReceived] = useState(""); // Số tiền khách trả
+  const [paymentAmountError, setPaymentAmountError] = useState(false); // Lỗi validation cho paymentAmount
   
   // State for debt modal
   const [showDebtModal, setShowDebtModal] = useState(false);
   const [debtDueDate, setDebtDueDate] = useState(dayjs().add(7, 'day').format('YYYY-MM-DD'));
+  
+  // State for success div
+  const [showSuccessDiv, setShowSuccessDiv] = useState(false);
+  const [successTransactionData, setSuccessTransactionData] = useState(null);
+  const [lastPaymentPrice, setLastPaymentPrice] = useState(null); // Lưu giá trị paymentPrice đã truyền vào payload
 
   const [payOSInitialized, setPayOSInitialized] = useState(false);
 
@@ -50,14 +58,40 @@ export default function InvoiceDetailPage() {
     embedded: true, // Nếu dùng giao diện nhúng
     onSuccess: async (event) => {
       console.log("Payment successful:", event);
-      message.success("Thanh toán thành công!");
+      await transactionsAPI.callback(event.id);
+      await fetchInvoiceDetail();
+      
+      // Lấy lại dữ liệu invoice để có thông tin giao dịch mới nhất
+      const { data: invoiceResponse } = await invoiceAPI.getById(id);
+      const latestInvoice = invoiceResponse?.result;
+      const latestTransactions = latestInvoice?.transactions || [];
+      const latestTransaction = latestTransactions.length > 0 ? latestTransactions[latestTransactions.length - 1] : null;
+      
+      // Lấy thông tin khách hàng
+      const customer = latestInvoice?.serviceTicket?.customer;
+      const customerName = customer?.fullName || customer?.name || "N/A";
+      const customerPhone = customer?.phone || "N/A";
+      
+      // Lấy số tiền đã truyền vào payload từ transaction
+      // Với QR, số tiền đã truyền vào payload là finalAmount
+      const paymentAmount = latestTransaction?.amount || event.amount || finalAmount || 0;
+      
+      // Hiển thị success div - sử dụng số tiền đã truyền vào payload
+      setSuccessTransactionData({
+        customerName: customerName,
+        customerPhone: customerPhone,
+        transactionCode: latestTransaction?.transactionCode || latestTransaction?.code || event.id || 'N/A',
+        totalAmount: paymentAmount, // Sử dụng số tiền đã truyền vào payload
+        serviceTicketCode: latestInvoice?.serviceTicket?.serviceTicketCode || "N/A"
+      });
+      console.log("QR Payment successful - Setting showSuccessDiv to true");
+      setShowSuccessDiv(true);
+      setShowDepositForm(true); // Đảm bảo sidebar hiển thị
+      setShowPaymentTabs(false); // Ẩn form thanh toán
       setPaymentData(null);
       setDepositAmount("");
       setPayOSInitialized(false);
-      setShowDepositForm(true); // Giữ sidebar hiển thị
-      setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
-      await transactionsAPI.callback(event.id);
-      await fetchInvoiceDetail();
+      console.log("Success div should be visible now");
 
       try {
         if (window.opener && !window.opener.closed) {
@@ -93,12 +127,22 @@ export default function InvoiceDetailPage() {
   // Helper function để kiểm tra có phải trạng thái "Thanh toán" không
   const isPaymentStatus = (status) => {
     if (!status) return false
-    const statusUpper = status.toString().toUpperCase()
+    const statusStr = status.toString().trim()
+    const statusUpper = statusStr.toUpperCase()
     return (
       statusUpper === 'WAITING_FOR_DELIVERY' ||
-      statusUpper === 'COMPLETED' ||
-      status === 'Hoàn thành' ||
-      status === 'Chờ bàn giao xe'
+      statusStr.includes('Chờ bàn giao')
+    )
+  }
+  
+  // Helper function để kiểm tra có phải trạng thái "Hoàn thành" không
+  const isCompletedStatus = (status) => {
+    if (!status) return false
+    const statusStr = status.toString().trim()
+    const statusUpper = statusStr.toUpperCase()
+    return (
+      statusStr === 'Hoàn thành' ||
+      statusUpper === 'COMPLETED'
     )
   }
 
@@ -267,24 +311,38 @@ export default function InvoiceDetailPage() {
 
   // Handle payment for modal (WAITING_FOR_DELIVERY)
   const handleModalPayment = async () => {
-    if (!paymentAmount || Number(paymentAmount) <= 0) {
-      message.warning("Vui lòng nhập số tiền thanh toán");
-      return;
+    if (paymentTab === "CASH") {
+      if (!cashReceived || Number(cashReceived) <= 0) {
+        message.warning("Vui lòng nhập số tiền nhận của khách");
+        return;
+      }
+    } else if (paymentTab === "QR") {
+      // Validation cho QR: yêu cầu nhập số tiền cần thanh toán
+      if (!paymentAmount || paymentAmount.trim() === "" || Number(paymentAmount) <= 0) {
+        setPaymentAmountError(true);
+        message.warning("Vui lòng nhập số tiền cần thanh toán");
+        return;
+      }
+      setPaymentAmountError(false);
     }
 
     const finalAmount = invoiceData?.finalAmount || 0;
-    if (Number(paymentAmount) > finalAmount) {
-      message.error("Số tiền thanh toán không được vượt quá tổng tiền cần thu");
-      return;
-    }
 
     setPaymentLoading(true);
     try {
       const isPayment = isPaymentStatus(invoiceData?.serviceTicket?.status);
       
+      // Nếu số tiền nhận của khách lớn hơn số tiền cần thanh toán, thì chỉ thanh toán số tiền cần thanh toán
+      // Với QR, sử dụng paymentAmount nếu có và > 0, nếu không thì dùng finalAmount
+      const paymentPrice = paymentTab === "CASH" 
+        ? Math.min(Number(cashReceived), finalAmount)
+        : (paymentAmount && paymentAmount.trim() !== "" && Number(paymentAmount) > 0 
+            ? Number(paymentAmount) 
+            : finalAmount);
+      
       const payload = {
         method: paymentTab === "CASH" ? "CASH" : "BANK_TRANSFER",
-        price: Number(paymentAmount),
+        price: paymentPrice,
         type: isPayment ? "PAYMENT" : "DEPOSIT",
       };
 
@@ -293,6 +351,10 @@ export default function InvoiceDetailPage() {
       console.log("Status:", invoiceData?.serviceTicket?.status);
       console.log("Type:", isPayment ? "PAYMENT" : "DEPOSIT");
       console.log("Payload:", JSON.stringify(payload, null, 2));
+      console.log("Payment Price (will be used in success div):", paymentPrice);
+      
+      // Lưu paymentPrice để sử dụng trong success div
+      setLastPaymentPrice(paymentPrice);
 
       const { data: response, error } = await invoiceAPI.pay(id, payload);
 
@@ -306,11 +368,34 @@ export default function InvoiceDetailPage() {
       console.log("Payment response:", result);
 
       if (paymentTab === "CASH") {
-        message.success("Thanh toán thành công");
-        setPaymentAmount("");
-        setShowDepositForm(true); // Giữ sidebar hiển thị
-        setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
+        // Fetch lại invoice để lấy thông tin giao dịch mới nhất
         await fetchInvoiceDetail();
+        
+        // Lấy lại dữ liệu invoice để có thông tin giao dịch mới nhất
+        const { data: invoiceResponse } = await invoiceAPI.getById(id);
+        const latestInvoice = invoiceResponse?.result;
+        const latestTransactions = latestInvoice?.transactions || [];
+        const latestTransaction = latestTransactions.length > 0 ? latestTransactions[latestTransactions.length - 1] : null;
+        
+        // Lấy thông tin khách hàng
+        const customer = latestInvoice?.serviceTicket?.customer;
+        const customerName = customer?.fullName || customer?.name || "N/A";
+        const customerPhone = customer?.phone || "N/A";
+        
+        // Hiển thị success div - sử dụng paymentPrice đã truyền vào payload
+        setSuccessTransactionData({
+          customerName: customerName,
+          customerPhone: customerPhone,
+          transactionCode: latestTransaction?.transactionCode || latestTransaction?.code || result?.transactionCode || result?.code || result?.transactionId || 'N/A',
+          totalAmount: lastPaymentPrice || paymentPrice, // Sử dụng giá trị đã truyền vào payload
+          serviceTicketCode: latestInvoice?.serviceTicket?.serviceTicketCode || "N/A"
+        });
+        console.log("Setting showSuccessDiv to true");
+        setShowSuccessDiv(true);
+        setShowDepositForm(true); // Đảm bảo sidebar hiển thị
+        setShowPaymentTabs(false); // Ẩn form thanh toán
+        setPaymentAmount("");
+        console.log("Success div should be visible now");
       } else {
         // QR - show QR code
         if (result?.paymentUrl) {
@@ -485,7 +570,7 @@ export default function InvoiceDetailPage() {
                   >
                     <span style={{ color: "#374151" }}>Chiết khấu</span>
                     <span style={{ fontWeight: 500 }}>
-                      {formatCurrency(invoiceData?.serviceTicket?.priceQuotation?.discount || 0)}
+                      {formatCurrency(invoiceData?.serviceTicket?.priceQuotation?.discount || 0)}%
                     </span>
                   </div>
 
@@ -595,7 +680,7 @@ export default function InvoiceDetailPage() {
               </div>
             </Card>
 
-            {!showDepositForm && (
+            {!showDepositForm && !showSuccessDiv && !isCompletedStatus(invoiceData?.serviceTicket?.status) && (
               <div
                 style={{
                   marginTop: "24px",
@@ -603,29 +688,38 @@ export default function InvoiceDetailPage() {
                   justifyContent: "flex-end",
                 }}
               >
-                <Button
-                  type="primary"
-                  size="large"
-                  onClick={() => {
-                    setShowDepositForm(true);
-                    setShowPaymentTabs(false); // Reset tabs state
-                  }}
-                  style={{
-                    background: "#22c55e",
-                    borderColor: "#22c55e",
-                    height: "45px",
-                    padding: "0 40px",
-                    fontWeight: 600,
-                    fontSize: "16px",
-                  }}
-                >
-                  {isPaymentStatus(invoiceData?.serviceTicket?.status) ? "Thanh toán" : "Đặt cọc"}
-                </Button>
+                {/* Ẩn nút "Thanh toán" nếu finalAmount === 0 */}
+                {!(isPaymentStatus(invoiceData?.serviceTicket?.status) && finalAmount === 0) && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={() => {
+                      setShowDepositForm(true);
+                      setShowPaymentTabs(false); // Reset tabs state
+                    }}
+                    style={{
+                      background: "#22c55e",
+                      borderColor: "#22c55e",
+                      height: "45px",
+                      padding: "0 40px",
+                      fontWeight: 600,
+                      fontSize: "16px",
+                    }}
+                  >
+                    {isPaymentStatus(invoiceData?.serviceTicket?.status) ? "Thanh toán" : "Đặt cọc"}
+                  </Button>
+                )}
+                {/* Hiển thị thông báo nếu finalAmount === 0 và đang ở trạng thái thanh toán */}
+                {isPaymentStatus(invoiceData?.serviceTicket?.status) && finalAmount === 0 && (
+                  <div style={{ textAlign: "center", padding: "20px", color: "#6b7280", width: "100%" }}>
+                    Không có số tiền cần thanh toán
+                  </div>
+                )}
               </div>
             )}
           </Col>
 
-          {showDepositForm && (
+          {(showDepositForm || showSuccessDiv) && (
             <Col span={8}>
               <Card
                 style={{
@@ -636,8 +730,189 @@ export default function InvoiceDetailPage() {
                   border: "1px solid #e5e7eb",
                 }}
               >
-                {/* Hiển thị tab Tiền mặt/QR khi WAITING_FOR_DELIVERY */}
-                {isPaymentStatus(invoiceData?.serviceTicket?.status) ? (
+                {/* Success Div */}
+                {showSuccessDiv ? (
+                  <div style={{ padding: "12px 0" }}>
+                    {/* Header */}
+                    <div
+                      style={{
+                        background: "#CBB081",
+                        color: "#fff",
+                        padding: "16px 20px",
+                        borderRadius: "8px 8px 0 0",
+                        margin: "-12px -12px 24px -12px",
+                        fontWeight: 700,
+                        fontSize: "16px",
+                        textAlign: "center",
+                      }}
+                    >
+                      THANH TOÁN
+                    </div>
+
+                    {/* Success Animation */}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginBottom: "24px",
+                      }}
+                    >
+                      <Lottie
+                        animationData={successAnim}
+                        loop={false}
+                        style={{ width: 200, height: 200 }}
+                      />
+                    </div>
+
+                    {/* Transaction Info */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                      {/* Mã giao dịch */}
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "8px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            color: "#374151",
+                          }}
+                        >
+                          Mã giao dịch
+                        </label>
+                        <Input
+                          value={successTransactionData?.transactionCode || "N/A"}
+                          disabled
+                          style={{
+                            height: "40px",
+                            borderRadius: "8px",
+                            backgroundColor: "#f9fafb",
+                            borderColor: "#d1d5db",
+                          }}
+                        />
+                      </div>
+
+                      {/* Tên khách hàng */}
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "8px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            color: "#374151",
+                          }}
+                        >
+                          Tên khách hàng
+                        </label>
+                        <Input
+                          value={successTransactionData?.customerName || "N/A"}
+                          disabled
+                          style={{
+                            height: "40px",
+                            borderRadius: "8px",
+                            backgroundColor: "#f9fafb",
+                            borderColor: "#d1d5db",
+                          }}
+                        />
+                      </div>
+
+                      {/* Số điện thoại */}
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "8px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            color: "#374151",
+                          }}
+                        >
+                          Số điện thoại
+                        </label>
+                        <Input
+                          value={successTransactionData?.customerPhone || "N/A"}
+                          disabled
+                          style={{
+                            height: "40px",
+                            borderRadius: "8px",
+                            backgroundColor: "#f9fafb",
+                            borderColor: "#d1d5db",
+                          }}
+                        />
+                      </div>
+
+                      {/* Tổng tiền */}
+                      <div>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: "8px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            color: "#374151",
+                          }}
+                        >
+                          Tổng tiền
+                        </label>
+                        <Input
+                          value={
+                            successTransactionData?.totalAmount
+                              ? Number(successTransactionData.totalAmount).toLocaleString("vi-VN")
+                              : "0"
+                          }
+                          disabled
+                          style={{
+                            height: "40px",
+                            borderRadius: "8px",
+                            backgroundColor: "#f9fafb",
+                            borderColor: "#d1d5db",
+                          }}
+                        />
+                      </div>
+
+                      {/* Buttons */}
+                      <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                        <Button
+                          onClick={() => {
+                            setShowSuccessDiv(false);
+                            setShowDepositForm(false);
+                          }}
+                          style={{
+                            flex: 1,
+                            height: "45px",
+                            borderRadius: "8px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                          }}
+                        >
+                          Hủy
+                        </Button>
+                        <Button
+                          type="primary"
+                          onClick={() => {
+                            setShowSuccessDiv(false);
+                            setShowDepositForm(true);
+                            setShowPaymentTabs(false);
+                            setPaymentAmount("");
+                            setCashReceived("");
+                          }}
+                          style={{
+                            flex: 1,
+                            background: "#22c55e",
+                            borderColor: "#22c55e",
+                            height: "45px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          Tiếp tục
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ) : isPaymentStatus(invoiceData?.serviceTicket?.status) ? (
                   <div style={{ padding: "12px 0" }}>
                     {/* Step 1: Show transaction table first */}
                     {!showPaymentTabs ? (
@@ -1019,6 +1294,7 @@ export default function InvoiceDetailPage() {
                             onClick={() => {
                               setPaymentTab("CASH");
                               setPaymentData(null);
+                              setPaymentAmount(""); // Reset paymentAmount khi chuyển sang CASH
                             }}
                           >
                             Tiền mặt
@@ -1036,6 +1312,10 @@ export default function InvoiceDetailPage() {
                             onClick={() => {
                               setPaymentTab("QR");
                               setPaymentData(null);
+                              // Tự động fill finalAmount vào paymentAmount khi chuyển sang tab QR
+                              const finalAmount = invoiceData?.finalAmount || 0;
+                              setPaymentAmount(finalAmount.toString());
+                              setPaymentAmountError(false); // Reset lỗi khi chuyển tab
                             }}
                           >
                             QR
@@ -1095,7 +1375,7 @@ export default function InvoiceDetailPage() {
                           />
                         </div>
 
-                        {/* Số tiền thanh toán */}
+                        {/* Số tiền cần thanh toán */}
                         <div>
                           <label
                             style={{
@@ -1106,23 +1386,33 @@ export default function InvoiceDetailPage() {
                               color: "#374151",
                             }}
                           >
-                            Số tiền thanh toán
+                            Số tiền cần thanh toán
                           </label>
                           <Input
                             value={
-                              paymentAmount
-                                ? Number(paymentAmount).toLocaleString("vi-VN")
-                                : ""
+                              paymentTab === "QR"
+                                ? paymentAmount
+                                  ? Number(paymentAmount).toLocaleString("vi-VN")
+                                  : ""
+                                : formatCurrency(finalAmount)
                             }
+                            disabled={paymentTab === "CASH"}
                             onChange={(e) => {
-                              const value = e.target.value.replace(/[^\d]/g, "");
-                              setPaymentAmount(value);
+                              if (paymentTab === "QR") {
+                                const value = e.target.value.replace(/[^\d]/g, "");
+                                setPaymentAmount(value); // Cho phép xóa hết (value = "")
+                                // Xóa lỗi khi người dùng bắt đầu nhập
+                                if (paymentAmountError && value.trim() !== "") {
+                                  setPaymentAmountError(false);
+                                }
+                              }
                             }}
-                            placeholder="Nhập số tiền"
                             style={{
                               height: "40px",
                               borderRadius: "8px",
-                              fontSize: "14px",
+                              backgroundColor: paymentTab === "QR" ? "#ffffff" : "#f9fafb",
+                              borderColor: paymentAmountError ? "#ef4444" : "#d1d5db",
+                              borderWidth: paymentAmountError ? "2px" : "1px",
                             }}
                           />
                         </div>
@@ -1144,16 +1434,19 @@ export default function InvoiceDetailPage() {
                               </label>
                               <Input
                                 value={
-                                  paymentAmount
-                                    ? Number(paymentAmount).toLocaleString("vi-VN")
+                                  cashReceived
+                                    ? Number(cashReceived).toLocaleString("vi-VN")
                                     : ""
                                 }
-                                disabled
+                                onChange={(e) => {
+                                  const value = e.target.value.replace(/[^\d]/g, "");
+                                  setCashReceived(value);
+                                }}
+                                placeholder="Nhập số tiền"
                                 style={{
                                   height: "40px",
                                   borderRadius: "8px",
-                                  backgroundColor: "#f9fafb",
-                                  borderColor: "#d1d5db",
+                                  fontSize: "14px",
                                 }}
                               />
                             </div>
@@ -1172,7 +1465,11 @@ export default function InvoiceDetailPage() {
                                 Số tiền trả khách
                               </label>
                               <Input
-                                value="0"
+                                value={
+                                  cashReceived && Number(cashReceived) > finalAmount
+                                    ? (Number(cashReceived) - finalAmount).toLocaleString("vi-VN")
+                                    : "0"
+                                }
                                 disabled
                                 style={{
                                   height: "40px",
@@ -1207,7 +1504,7 @@ export default function InvoiceDetailPage() {
                             type="primary"
                             onClick={handleModalPayment}
                             loading={paymentLoading}
-                            disabled={!paymentAmount || Number(paymentAmount) <= 0}
+                            disabled={paymentTab === "CASH" ? (!cashReceived || Number(cashReceived) <= 0) : false}
                             style={{
                               flex: 1,
                               background: "#22c55e",
@@ -1815,28 +2112,31 @@ export default function InvoiceDetailPage() {
                       >
                         Hủy
                       </Button>
-                      <Button
-                        type="primary"
-                        onClick={() => handlePayment("QR")}
-                        loading={paymentLoading}
-                        disabled={
-                          paymentLoading ||
-                          !depositAmount ||
-                          Number(depositAmount) <= 0 ||
-                          Number(depositAmount) > finalAmount
-                        }
-                        style={{
-                          flex: 1,
-                          background: "#22c55e",
-                          borderColor: "#22c55e",
-                          height: "45px",
-                          fontWeight: 600,
-                          fontSize: "14px",
-                          borderRadius: "8px",
-                        }}
-                      >
-                        Thanh toán
-                      </Button>
+                      {/* Ẩn nút "Thanh toán" nếu finalAmount === 0 */}
+                      {finalAmount > 0 && (
+                        <Button
+                          type="primary"
+                          onClick={() => handlePayment("QR")}
+                          loading={paymentLoading}
+                          disabled={
+                            paymentLoading ||
+                            !depositAmount ||
+                            Number(depositAmount) <= 0 ||
+                            Number(depositAmount) > finalAmount
+                          }
+                          style={{
+                            flex: 1,
+                            background: "#22c55e",
+                            borderColor: "#22c55e",
+                            height: "45px",
+                            fontWeight: 600,
+                            fontSize: "14px",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          Thanh toán
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1931,28 +2231,171 @@ export default function InvoiceDetailPage() {
                             </span>
                           ),
                           children: paymentData?.paymentUrl ? (
-                            <div
-                              style={{
-                                border: "2px solid #CBB081",
-                                borderRadius: "12px",
-                                padding: "24px",
-                                background: "#fafafa",
-                                minHeight: "400px",
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                boxShadow: "0 2px 8px rgba(203, 176, 129, 0.15)",
-                              }}
-                            >
+                            <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                              {/* QR Code */}
                               <div
-                                id="payos-checkout-container"
+                                style={{
+                                  border: "2px solid #CBB081",
+                                  borderRadius: "12px",
+                                  padding: "24px",
+                                  background: "#fafafa",
+                                  minHeight: "400px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  boxShadow: "0 2px 8px rgba(203, 176, 129, 0.15)",
+                                }}
+                              >
+                                <div
+                                  id="payos-checkout-container"
+                                  style={{
+                                    width: "100%",
+                                    maxWidth: "350px",
+                                    height: "350px",
+                                  }}
+                                ></div>
+                              </div>
+
+                              {/* Payment Info */}
+                              <div>
+                                <label
+                                  style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontWeight: 600,
+                                    fontSize: "14px",
+                                    color: "#374151",
+                                  }}
+                                >
+                                  Ngân hàng
+                                </label>
+                                <Input
+                                  value="VietinBank"
+                                  disabled
+                                  style={{
+                                    height: "40px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#f9fafb",
+                                    borderColor: "#d1d5db",
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontWeight: 600,
+                                    fontSize: "14px",
+                                    color: "#374151",
+                                  }}
+                                >
+                                  Thu hưởng
+                                </label>
+                                <Input
+                                  value={paymentData?.bankAccountName || "HOANG ANH TUAN"}
+                                  disabled
+                                  style={{
+                                    height: "40px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#f9fafb",
+                                    borderColor: "#d1d5db",
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontWeight: 600,
+                                    fontSize: "14px",
+                                    color: "#374151",
+                                  }}
+                                >
+                                  Số tài khoản
+                                </label>
+                                <Input
+                                  value={paymentData?.bankAccountNumber || "0010263503"}
+                                  disabled
+                                  style={{
+                                    height: "40px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#f9fafb",
+                                    borderColor: "#d1d5db",
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontWeight: 600,
+                                    fontSize: "14px",
+                                    color: "#374151",
+                                  }}
+                                >
+                                  Số tiền
+                                </label>
+                                <Input
+                                  value={formatCurrency(paymentData?.amount || Number(depositAmount))}
+                                  disabled
+                                  style={{
+                                    height: "40px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#f9fafb",
+                                    borderColor: "#d1d5db",
+                                  }}
+                                />
+                              </div>
+
+                              <div>
+                                <label
+                                  style={{
+                                    display: "block",
+                                    marginBottom: "8px",
+                                    fontWeight: 600,
+                                    fontSize: "14px",
+                                    color: "#374151",
+                                  }}
+                                >
+                                  Nội dung
+                                </label>
+                                <Input
+                                  value={paymentData?.description || `Đặt cọc - ${serviceTicketCode}`}
+                                  disabled
+                                  style={{
+                                    height: "40px",
+                                    borderRadius: "8px",
+                                    backgroundColor: "#f9fafb",
+                                    borderColor: "#d1d5db",
+                                  }}
+                                />
+                              </div>
+
+                              {/* Close Button */}
+                              <Button
+                                onClick={() => {
+                                  setShowDepositForm(false);
+                                  setDepositAmount("");
+                                  setPaymentData(null);
+                                  fetchInvoiceDetail();
+                                }}
                                 style={{
                                   width: "100%",
-                                  maxWidth: "350px",
-                                  height: "350px",
+                                  height: "45px",
+                                  borderRadius: "8px",
+                                  fontWeight: 600,
+                                  fontSize: "14px",
                                 }}
-                              ></div>
+                              >
+                                Gửi
+                              </Button>
                             </div>
                           ) : (
                             <div
@@ -2169,9 +2612,12 @@ export default function InvoiceDetailPage() {
                                       try {
                                         const isPayment = isPaymentStatus(invoiceData?.serviceTicket?.status);
                                         
+                                        // Tính paymentPrice giống như trong handleModalPayment
+                                        const paymentPriceForTabs = Math.min(Number(depositAmount), finalAmount);
+                                        
                                         const payload = {
                                           method: "CASH",
-                                          price: Number(depositAmount),
+                                          price: paymentPriceForTabs,
                                           type: isPayment ? "PAYMENT" : "DEPOSIT",
                                         };
                                         
@@ -2179,20 +2625,49 @@ export default function InvoiceDetailPage() {
                                         console.log("Status:", invoiceData?.serviceTicket?.status);
                                         console.log("Type:", isPayment ? "PAYMENT" : "DEPOSIT");
                                         console.log("Payload:", JSON.stringify(payload, null, 2));
+                                        console.log("Payment Price (will be used in success div):", paymentPriceForTabs);
+                                        
+                                        // Lưu paymentPrice để sử dụng trong success div
+                                        setLastPaymentPrice(paymentPriceForTabs);
                                         
                                         const { data: response, error } = await invoiceAPI.pay(id, payload);
                                         
                                         if (error) {
                                           message.error(error || "Tạo giao dịch thanh toán thất bại");
+                                          setPaymentLoading(false);
                                           return;
                                         }
                                         
-                                        message.success("Thanh toán tiền mặt thành công");
+                                        const result = response?.result || null;
+                                        
+                                        // Fetch lại invoice để lấy thông tin giao dịch mới nhất
+                                        await fetchInvoiceDetail();
+                                        
+                                        // Lấy lại dữ liệu invoice để có thông tin giao dịch mới nhất
+                                        const { data: invoiceResponse } = await invoiceAPI.getById(id);
+                                        const latestInvoice = invoiceResponse?.result;
+                                        const latestTransactions = latestInvoice?.transactions || [];
+                                        const latestTransaction = latestTransactions.length > 0 ? latestTransactions[latestTransactions.length - 1] : null;
+                                        
+                                        // Lấy thông tin khách hàng
+                                        const customer = latestInvoice?.serviceTicket?.customer;
+                                        const customerName = customer?.fullName || customer?.name || "N/A";
+                                        const customerPhone = customer?.phone || "N/A";
+                                        
+                                        // Hiển thị success div - sử dụng số tiền đã truyền vào payload
+                                        setSuccessTransactionData({
+                                          customerName: customerName,
+                                          customerPhone: customerPhone,
+                                          transactionCode: latestTransaction?.transactionCode || latestTransaction?.code || result?.transactionCode || result?.code || result?.transactionId || 'N/A',
+                                          totalAmount: paymentPriceForTabs, // Sử dụng số tiền đã truyền vào payload
+                                          serviceTicketCode: latestInvoice?.serviceTicket?.serviceTicketCode || "N/A"
+                                        });
+                                        console.log("Setting showSuccessDiv to true");
+                                        setShowSuccessDiv(true);
+                                        setShowDepositForm(true); // Đảm bảo sidebar hiển thị
+                                        setShowPaymentTabs(false); // Ẩn form thanh toán
                                         setPaymentData(null);
                                         setDepositAmount("");
-                                        setShowDepositForm(true); // Giữ sidebar hiển thị
-                                        setShowPaymentTabs(false); // Quay về hiển thị bảng giao dịch
-                                        await fetchInvoiceDetail();
                                       } catch (err) {
                                         console.error("Error creating payment:", err);
                                         message.error("Đã xảy ra lỗi khi tạo giao dịch thanh toán");
@@ -2251,13 +2726,13 @@ export default function InvoiceDetailPage() {
       >
         <div style={{ padding: '20px 0' }}>
           <div style={{ marginBottom: '16px', fontSize: '15px' }}>
-            <strong>Tên khách hàng:</strong> {invoiceData?.customer?.fullName || invoiceData?.customer?.name || 'N/A'}
+            <strong>Tên khách hàng:</strong> {invoiceData?.serviceTicket?.customer?.fullName || invoiceData?.serviceTicket?.customer?.name || invoiceData?.customer?.fullName || invoiceData?.customer?.name || 'N/A'}
           </div>
           <div style={{ marginBottom: '16px', fontSize: '15px' }}>
             <strong>Mã phiếu:</strong> {invoiceData?.serviceTicket?.serviceTicketCode || 'N/A'}
           </div>
           <div style={{ marginBottom: '16px', fontSize: '15px' }}>
-            <strong>Số điện thoại:</strong> {invoiceData?.customer?.phone || 'N/A'}
+            <strong>Số điện thoại:</strong> {invoiceData?.serviceTicket?.customer?.phone || invoiceData?.customer?.phone || 'N/A'}
           </div>
           <div style={{ marginBottom: '24px', fontSize: '15px', color: '#dc2626', fontWeight: 600 }}>
             <strong>Còn lại:</strong> {remainingAmount?.toLocaleString('vi-VN')} đ

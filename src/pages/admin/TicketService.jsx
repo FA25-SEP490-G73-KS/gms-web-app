@@ -350,15 +350,15 @@ export default function TicketService() {
     const transformed = resultArray.map(item => {
       const normalizedStatus = normalizeStatusKey(item.status || 'CREATED')
       return {
-        id: item.serviceTicketId,
-        code: item.serviceTicketCode || item.code || `DV-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
-        customer: item.customer?.fullName || 'N/A',
-        license: item.vehicle?.licensePlate || 'N/A',
+      id: item.serviceTicketId,
+      code: item.serviceTicketCode || item.code || `DV-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
+      customer: item.customer?.fullName || 'N/A',
+      license: item.vehicle?.licensePlate || 'N/A',
         status: item.status || normalizedStatus,
         statusKey: normalizedStatus,
         createdAt: item.createdAt || '',
-        total: item.total || 0,
-        rawData: item
+      total: item.total || 0,
+      rawData: item
       }
     })
     setData(transformed)
@@ -366,7 +366,7 @@ export default function TicketService() {
 
   const filtered = useMemo(() => {
     let result = data
-
+   
     if (isHistoryPage) {
       result = result.filter((r) => {
         const statusKey = normalizeStatusKey(r.statusKey || r.status)
@@ -377,14 +377,14 @@ export default function TicketService() {
         )
       })
     }
-
+    
     if (query) {
       const q = query.toLowerCase()
       result = result.filter(
         (r) => r.license.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q)
       )
     }
-
+  
     // Filter by multiple statuses if applied
     if (!isHistoryPage && appliedStatuses.length > 0) {
       result = result.filter((r) => {
@@ -398,18 +398,18 @@ export default function TicketService() {
         return statusKey === normalizeStatusKey(statusFilter)
       })
     }
-
+    
     // Filter by date range if applied
     if (appliedDateRange[0] || appliedDateRange[1]) {
       result = result.filter((r) => {
         if (!r.createdAt) return false
         const recordDate = dayjs(r.createdAt, 'DD/MM/YYYY')
         if (!recordDate.isValid()) return false
-
+        
         if (appliedDateRange[0] && appliedDateRange[1]) {
           return (
             recordDate.isAfter(appliedDateRange[0].subtract(1, 'day')) &&
-            recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+                 recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
           )
         } else if (appliedDateRange[0]) {
           return recordDate.isAfter(appliedDateRange[0].subtract(1, 'day'))
@@ -423,7 +423,7 @@ export default function TicketService() {
       const filterDate = dateFilter.format('DD/MM/YYYY')
       result = result.filter((r) => r.createdAt === filterDate)
     }
-
+    
     return result
   }, [query, data, statusFilter, dateFilter, isHistoryPage, appliedStatuses, appliedDateRange])
 

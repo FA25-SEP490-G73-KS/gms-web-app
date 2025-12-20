@@ -469,6 +469,62 @@ export default function Materials() {
                 </span>
               </div>
 
+              {/* Chứng từ kho */}
+              {paymentDetail.attachmentUrl && paymentDetail.historyId && (
+                <div style={{ 
+                  marginBottom: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <span style={{ fontWeight: 600, fontSize: '14px' }}>
+                    Chứng từ kho:
+                  </span>
+                  <a
+                    onClick={async (e) => {
+                      e.preventDefault()
+                      try {
+                        const response = await stockReceiptAPI.getReceiptHistoryAttachment(paymentDetail.historyId)
+                        // Xác định filename và MIME type
+                        const fileName = paymentDetail.attachmentUrl.split('/').pop()
+                        const extension = fileName.split('.').pop().toLowerCase()
+                        const mimeTypes = {
+                          'jpg': 'image/jpeg',
+                          'jpeg': 'image/jpeg',
+                          'png': 'image/png',
+                          'gif': 'image/gif',
+                          'pdf': 'application/pdf',
+                          'fig': 'application/octet-stream'
+                        }
+                        const mimeType = mimeTypes[extension] || 'application/octet-stream'
+                        
+                        // Create blob với đúng MIME type
+                        const blob = new Blob([response.data], { type: mimeType })
+                        const blobUrl = window.URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = blobUrl
+                        link.download = fileName
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        window.URL.revokeObjectURL(blobUrl)
+                      } catch (err) {
+                        console.error('Download attachment error:', err)
+                        message.error('Không thể tải xuống file đính kèm')
+                      }
+                    }}
+                    style={{ 
+                      fontSize: '14px', 
+                      color: '#1677ff',
+                      textDecoration: 'underline',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {paymentDetail.attachmentUrl.split('/').pop()}
+                  </a>
+                </div>
+              )}
+
               {/* File đính kèm */}
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ marginBottom: '8px', fontWeight: 600, fontSize: '14px' }}>

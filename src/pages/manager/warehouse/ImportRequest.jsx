@@ -72,10 +72,7 @@ export default function ManagerImportRequest() {
       const mappedData = content.map(item => ({
         id: item.id || 0,
         code: item.code || 'N/A',
-        type: 'Từ báo giá', // Default type since API doesn't provide this
-        customerName: 'N/A', // API doesn't provide customer info
-        customerPhone: 'N/A', // API doesn't provide customer info
-        quoteCode: item.quotationCode || 'N/A',
+        reason: item.reason || 'N/A',
         totalAmount: item.totalEstimatedAmount || 0,
         createdAt: item.createdAt || new Date().toISOString(),
         status: item.reviewStatus || 'Chờ duyệt'
@@ -137,9 +134,7 @@ export default function ManagerImportRequest() {
   const filteredData = data.filter((item) => {
     const matchesSearch = !searchTerm || 
       item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.customerPhone.includes(searchTerm) ||
-      item.quoteCode.toLowerCase().includes(searchTerm.toLowerCase())
+      (item.reason && item.reason.toLowerCase().includes(searchTerm.toLowerCase()))
     
     return matchesSearch
   })
@@ -153,30 +148,12 @@ export default function ManagerImportRequest() {
       render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
     },
     {
-      title: <div style={{ textAlign: 'center' }}>Loại</div>,
-      dataIndex: 'type',
-      key: 'type',
-      width: 150,
-      align: 'center'
-    },
-    {
-      title: <div style={{ textAlign: 'center' }}>Khách hàng</div>,
-      dataIndex: 'customerName',
-      key: 'customerName',
+      title: <div style={{ textAlign: 'center' }}>Lý do</div>,
+      dataIndex: 'reason',
+      key: 'reason',
       width: 200,
-      render: (text, record) => (
-        <div>
-          <div style={{ fontWeight: 500 }}>{text}</div>
-          <div style={{ fontSize: '12px', color: '#999' }}>{record.customerPhone}</div>
-        </div>
-      )
-    },
-    {
-      title: <div style={{ textAlign: 'center' }}>Mã báo giá</div>,
-      dataIndex: 'quoteCode',
-      key: 'quoteCode',
-      width: 150,
-      align: 'center'
+      align: 'center',
+      ellipsis: true
     },
     {
       title: <div style={{ textAlign: 'center' }}>Tổng</div>,

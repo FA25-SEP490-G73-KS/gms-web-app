@@ -150,6 +150,16 @@ export function getUserNameFromToken() {
   }
 }
 
+export function getShortName(fullName) {
+  if (!fullName) return '';
+  const nameParts = fullName.trim().split(/\s+/);
+  // Nếu tên có nhiều hơn 2 từ, chỉ lấy 2 từ cuối cùng
+  if (nameParts.length > 2) {
+    return nameParts.slice(-2).join(' ');
+  }
+  return fullName;
+}
+
 export function getUserIdFromToken() {
   try {
     const token = getToken();

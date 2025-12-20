@@ -138,11 +138,11 @@ export default function ExportDetail() {
   const fetchExportItemDetail = async (itemId) => {
     // Mở modal và hiển thị trạng thái loading
     setExportModal({ visible: true, data: null, loading: true, quantity: '', technician: '' })
-
+    
     try {
       // Dùng API chi tiết item xuất kho
       const { data, error } = await stockExportAPI.getExportItemDetail(itemId)
-
+      
       if (error) {
         message.error('Không thể tải thông tin xuất kho')
         setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '' })
@@ -177,8 +177,8 @@ export default function ExportDetail() {
         history: result.history || []
       }
 
-      setExportModal({
-        visible: true,
+      setExportModal({ 
+        visible: true, 
         data: exportData,
         loading: false,
         quantity: '',
@@ -407,15 +407,15 @@ export default function ExportDetail() {
           },
           ...(canExport
             ? [
-                {
-                  key: 'export',
-                  label: (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Xuất kho
-                    </span>
-                  ),
-                  onClick: () => fetchExportItemDetail(record.id)
-                }
+          {
+            key: 'export',
+            label: (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Xuất kho
+              </span>
+            ),
+            onClick: () => fetchExportItemDetail(record.id)
+          }
               ]
             : [])
         ]
@@ -562,7 +562,7 @@ export default function ExportDetail() {
                 Ngày tạo
               </div>
               <div style={{ fontSize: '15px', fontWeight: 500, color: '#111' }}>
-                {formatDisplayDate(exportDetail.createdAt) || '11/11/25'}
+                {exportDetail.createdAt || '--'}
               </div>
             </div>
 
@@ -582,7 +582,7 @@ export default function ExportDetail() {
                 Ngày xuất
               </div>
               <div style={{ fontSize: '15px', fontWeight: 500, color: '#111' }}>
-                {formatDisplayDate(exportDetail.exportedAt)}
+                {exportDetail.exportedAt || '--'}
               </div>
             </div>
 

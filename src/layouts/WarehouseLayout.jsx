@@ -1,14 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
-import { getUserNameFromToken, getUserPhoneFromToken } from '../utils/helpers'
+import { getUserNameFromToken, getUserPhoneFromToken, getShortName } from '../utils/helpers'
 import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/warehouse-layout.css'
 
 export default function WarehouseLayout({ children, breadcrumbItems }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [openImport, setOpenImport] = useState(location.pathname.startsWith('/warehouse/import'))
+  const [openImport, setOpenImport] = useState(
+    location.pathname.startsWith('/warehouse/import') ||
+    location.pathname.startsWith('/warehouse/purchase-requests')
+  )
   const [openExport, setOpenExport] = useState(location.pathname.startsWith('/warehouse/export'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -19,7 +22,10 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
   const isActiveParent = (path) => location.pathname.startsWith(path)
 
   useEffect(() => {
-    if (location.pathname.startsWith('/warehouse/import')) {
+    if (
+      location.pathname.startsWith('/warehouse/import') ||
+      location.pathname.startsWith('/warehouse/purchase-requests')
+    ) {
       setOpenImport(true)
     }
     if (location.pathname.startsWith('/warehouse/export')) {
@@ -52,6 +58,11 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
       return { parent: 'Xuất kho', current: 'Xác nhận báo giá' }
     } else if (path.startsWith('/warehouse/export/list')) {
       return { parent: 'Xuất kho', current: 'Danh sách xuất' }
+    } else if (path.match(/^\/warehouse\/purchase-requests\/\d+$/)) {
+      // Detail page: /warehouse/purchase-requests/:id
+      return { parent: 'Nhập kho', current: 'Yêu cầu mua hàng > Chi tiết' }
+    } else if (path.startsWith('/warehouse/purchase-requests')) {
+      return { parent: 'Nhập kho', current: 'Yêu cầu mua hàng' }
     } else if (path.startsWith('/warehouse/import/request')) {
       return { parent: 'Nhập kho', current: 'Yêu cầu nhập hàng' }
     } else if (path.startsWith('/warehouse/import/list')) {
@@ -102,7 +113,26 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
               <div className="breadcrumb">
                 <span className="breadcrumb-item">{breadcrumb.parent}</span>
                 <span className="breadcrumb-separator">&gt;</span>
-                <span className="breadcrumb-current">{breadcrumb.current}</span>
+                {breadcrumb.current.includes(' > ') ? (
+                  breadcrumb.current.split(' > ').map((item, index, array) => (
+                    <React.Fragment key={index}>
+                      {index > 0 && <span className="breadcrumb-separator">&gt;</span>}
+                      {index === array.length - 1 ? (
+                        <span className="breadcrumb-current">{item}</span>
+                      ) : (
+                        <span 
+                          className="breadcrumb-item breadcrumb-link"
+                          onClick={() => navigate('/warehouse/purchase-requests')}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {item}
+                        </span>
+                      )}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <span className="breadcrumb-current">{breadcrumb.current}</span>
+                )}
               </div>
             ) : (
               <span className="breadcrumb-current">{breadcrumb.current}</span>
@@ -153,6 +183,12 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
                   onClick={() => navigate('/warehouse/import/list')}
                 >
                   Danh sách nhập
+                </button>
+                <button 
+                  className={`submenu-item ${location.pathname.startsWith('/warehouse/purchase-requests') ? 'active' : ''}`}
+                  onClick={() => navigate('/warehouse/purchase-requests')}
+                >
+                  Yêu cầu mua hàng
                 </button>
               </div>
             )}
@@ -208,7 +244,7 @@ export default function WarehouseLayout({ children, breadcrumbItems }) {
             </div>
             <div className="warehouse-user-text">
               <div className="warehouse-user-name">
-                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+                {getShortName(getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A')}
               </div>
               <div className="warehouse-user-role">
                 {getUserPhoneFromToken() || user?.phone || ''}

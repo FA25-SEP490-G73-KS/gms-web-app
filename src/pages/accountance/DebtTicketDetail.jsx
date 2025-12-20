@@ -8,6 +8,8 @@ import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { debtsAPI, invoiceAPI } from '../../services/api'
 import '../../styles/pages/accountance/debts.css'
+import Lottie from 'lottie-react'
+import successAnim from '../../assets/animations/Success.json'
 
 // Mock data for debt ticket detail
 
@@ -114,9 +116,12 @@ export function AccountanceDebtTicketDetailContent() {
         const serviceTicket = invoice.serviceTicket || {}
         const priceQuotation = serviceTicket.priceQuotation || {}
         const transactions = payload.transactionResponseDto || payload.transactions || []
-        const fetchedDebtId = payload.debtId || 1
         
-        // Store debtId in state
+        // Lấy thông tin từ customerDebt - id này sẽ được dùng cho API pay
+        const customerDebt = payload.customerDebt || {}
+        const fetchedDebtId = customerDebt.id || payload.debtId || 1
+        
+        // Store debtId in state (using customerDebt.id from response)
         setDebtId(fetchedDebtId)
         
         // Calculate totals from quotation items
@@ -138,9 +143,6 @@ export function AccountanceDebtTicketDetailContent() {
         
         // Tổng cộng = estimateAmount
         const estimateAmount = safeNumber(priceQuotation.estimateAmount)
-        
-        // Lấy thông tin từ customerDebt
-        const customerDebt = payload.customerDebt || {}
         const totalAmount = safeNumber(customerDebt.totalAmount || 0)
         const paidAmount = safeNumber(customerDebt.paidAmount || 0)
         
@@ -382,20 +384,24 @@ export function AccountanceDebtTicketDetailContent() {
     }
   ]
 
-  return (
-    <div className="debts-page">
-      {/* Breadcrumb */}
-      <div style={{ marginBottom: '24px' }}>
-        <Button
-          type="text"
-          icon={<ArrowLeftOutlined />}
-          onClick={() => navigate(-1)}
-          style={{ padding: 0, marginBottom: '16px' }}
-        >
-          Khách hàng
-        </Button>
-        <h1 style={{ margin: 0 }}>Phiếu công nợ chi tiết</h1>
-      </div>
+  const paymentSummary = debtDetail?.paymentSummary
+  const totalMerchandise = paymentSummary ? safeNumber(paymentSummary.totalMerchandise) : 0
+  const discountPercent = paymentSummary ? safeNumber(paymentSummary.discount) : 0
+  // Áp dụng giảm giá theo % trên tổng tiền hàng
+  const totalAfterDiscount = Math.max(
+    Math.round((totalMerchandise * (100 - discountPercent)) / 100),
+    0
+  )
+  const remainingAmount = paymentSummary ? safeNumber(paymentSummary.remainingAmount) : 0
+  const paidAmount =
+    remainingAmount > 0 ? Math.max(totalAfterDiscount - remainingAmount, 0) : safeNumber(paymentSummary?.totalPaid)
+
+    return (
+      <div className="debts-page">
+        {/* Page Title */}
+        <div style={{ marginBottom: '24px' }}>
+          <h1 style={{ margin: 0 }}>Phiếu công nợ chi tiết</h1>
+        </div>
 
       {/* Main Content - Two Column Layout when payment form is visible */}
       <div style={{ display: 'flex', gap: '24px' }}>
@@ -428,7 +434,7 @@ export function AccountanceDebtTicketDetailContent() {
           </div>
 
           {/* Payment Summary */}
-          {debtDetail?.paymentSummary && (
+          {paymentSummary && (
             <div style={{ marginBottom: '24px' }}>
               <h3
                 style={{
@@ -451,25 +457,25 @@ export function AccountanceDebtTicketDetailContent() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ color: '#374151' }}>Tổng tiền hàng</span>
                   <span style={{ fontWeight: 600 }}>
-                    {debtDetail.paymentSummary.totalMerchandise.toLocaleString('vi-VN')}
+                    {totalMerchandise.toLocaleString('vi-VN')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ color: '#374151' }}>Giảm giá</span>
-                  <span style={{ fontWeight: 600, color: '#ef4444' }}>
-                    -{debtDetail.paymentSummary.discount.toLocaleString('vi-VN')}
+                  <span style={{ fontWeight: 600, color: '#111827' }}>
+                    {discountPercent.toLocaleString('vi-VN')}%
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ color: '#374151' }}>Tổng cộng</span>
                   <span style={{ fontWeight: 600 }}>
-                    {debtDetail.paymentSummary.estimateAmount.toLocaleString('vi-VN')}
+                    {totalAfterDiscount.toLocaleString('vi-VN')}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
                   <span style={{ color: '#374151' }}>Đã thanh toán</span>
                   <span style={{ fontWeight: 600, color: '#22c55e' }}>
-                    {debtDetail.paymentSummary.totalPaid.toLocaleString('vi-VN')}
+                    {paidAmount.toLocaleString('vi-VN')}
                   </span>
                 </div>
                 <div
@@ -653,7 +659,7 @@ export function AccountanceDebtTicketDetailContent() {
                         Số tiền khách trả
                       </div>
                       <Input
-                        value={paymentAmount}
+                        value={paymentAmount ? Number(paymentAmount).toLocaleString('vi-VN') : ''}
                         onChange={(e) => {
                           const value = e.target.value.replace(/[^0-9]/g, '')
                           setPaymentAmount(value)
@@ -840,25 +846,125 @@ export function AccountanceDebtTicketDetailContent() {
                               {/* Bank Info */}
                               {paymentData && (
                                 <>
-                                  <div style={{ marginBottom: '24px' }}>
-                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  <div style={{ marginBottom: "20px" }}>
+                                    <label
+                                      style={{
+                                        display: "block",
+                                        marginBottom: "8px",
+                                        fontWeight: 600,
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                      }}
+                                    >
                                       Ngân hàng
-                                    </div>
-                                    <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
-                                      {paymentData.bankName || 'MBBank'}
-                                    </div>
+                                    </label>
+                                    <Input
+                                      value={paymentData?.bankName || "VietinBank"}
+                                      disabled
+                                      style={{
+                                        height: "40px",
+                                        borderRadius: "8px",
+                                        backgroundColor: "#f9fafb",
+                                        borderColor: "#d1d5db",
+                                      }}
+                                    />
                                   </div>
 
-                                  <div style={{ marginBottom: '24px' }}>
-                                    <div style={{ fontSize: '12px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>
+                                  <div style={{ marginBottom: "20px" }}>
+                                    <label
+                                      style={{
+                                        display: "block",
+                                        marginBottom: "8px",
+                                        fontWeight: 600,
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                      }}
+                                    >
+                                      Thu hưởng
+                                    </label>
+                                    <Input
+                                      value={paymentData?.bankAccountName || "HOANG ANH TUAN"}
+                                      disabled
+                                      style={{
+                                        height: "40px",
+                                        borderRadius: "8px",
+                                        backgroundColor: "#f9fafb",
+                                        borderColor: "#d1d5db",
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div style={{ marginBottom: "20px" }}>
+                                    <label
+                                      style={{
+                                        display: "block",
+                                        marginBottom: "8px",
+                                        fontWeight: 600,
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                      }}
+                                    >
+                                      Số tài khoản
+                                    </label>
+                                    <Input
+                                      value={paymentData?.bankAccountNumber || "0010263503"}
+                                      disabled
+                                      style={{
+                                        height: "40px",
+                                        borderRadius: "8px",
+                                        backgroundColor: "#f9fafb",
+                                        borderColor: "#d1d5db",
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div style={{ marginBottom: "20px" }}>
+                                    <label
+                                      style={{
+                                        display: "block",
+                                        marginBottom: "8px",
+                                        fontWeight: 600,
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                      }}
+                                    >
                                       Số tiền
-                                    </div>
-                                    <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '8px', fontSize: '14px', color: '#111827' }}>
-                                      {(debtDetail?.paymentSummary?.remainingAmount || 0).toLocaleString('vi-VN')}
-                                    </div>
+                                    </label>
+                                    <Input
+                                      value={(paymentData?.amount || debtDetail?.paymentSummary?.remainingAmount || 0).toLocaleString('vi-VN')}
+                                      disabled
+                                      style={{
+                                        height: "40px",
+                                        borderRadius: "8px",
+                                        backgroundColor: "#f9fafb",
+                                        borderColor: "#d1d5db",
+                                      }}
+                                    />
                                   </div>
 
-
+                                  <div style={{ marginBottom: "20px" }}>
+                                    <label
+                                      style={{
+                                        display: "block",
+                                        marginBottom: "8px",
+                                        fontWeight: 600,
+                                        fontSize: "14px",
+                                        color: "#374151",
+                                      }}
+                                    >
+                                      Nội dung
+                                    </label>
+                                    <Input
+                                      value={paymentData?.description || `Đặt cọc - ${debtDetail?.serviceTicket?.serviceTicketCode || ticketId || ''}`}
+                                      disabled
+                                      style={{
+                                        height: "40px",
+                                        borderRadius: "8px",
+                                        backgroundColor: "#f9fafb",
+                                        borderColor: "#d1d5db",
+                                      }}
+                                    />
+                                  </div>
                                 </>
                               )}
                             </>
@@ -922,7 +1028,7 @@ export function AccountanceDebtTicketDetailContent() {
                                   Số tiền nhận của khách
                                 </div>
                                 <Input
-                                  value={paymentAmount}
+                                  value={paymentAmount ? Number(paymentAmount).toLocaleString('vi-VN') : ''}
                                   onChange={(e) => {
                                     const value = e.target.value.replace(/[^0-9]/g, '')
                                     setPaymentAmount(value)
@@ -1010,16 +1116,14 @@ export function AccountanceDebtTicketDetailContent() {
               <>
                 <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                   <div style={{ 
-                    width: '80px', 
-                    height: '80px', 
-                    borderRadius: '50%', 
-                    background: '#22c55e',
+                    width: '200px', 
+                    height: '200px', 
+                    margin: '0 auto 24px',
                     display: 'flex',
                     alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 24px'
+                    justifyContent: 'center'
                   }}>
-                    <i className="bi bi-check" style={{ fontSize: '48px', color: '#ffffff' }} />
+                    <Lottie animationData={successAnim} loop={false} />
                   </div>
                   <h2 style={{ fontSize: '20px', fontWeight: 600, marginBottom: '32px', color: '#111827' }}>
                     Thanh toán thành công

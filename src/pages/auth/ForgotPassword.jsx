@@ -4,8 +4,6 @@ import { otpAPI } from '../../services/api'
 import '../../styles/pages/auth/forgot-password.css'
 import { normalizePhoneTo84 } from '../../utils/helpers'
 
-const imgImage15 = "http://localhost:3845/assets/e3f06dc74cc8cb44cf93eb05563cb8c82f9ac956.png"
-
 export default function ForgotPassword() {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
@@ -61,9 +59,9 @@ export default function ForgotPassword() {
 
     setLoading(true)
     try {
-      // Sử dụng số điện thoại đã được validate và cleaned
       const cleanedPhone = normalizePhoneTo84(validation.cleanedPhone)
       
+      // Gọi API với số điện thoại đã được format
       const { data, error: apiError } = await otpAPI.send(cleanedPhone, 'RESET_PASSWORD', { skipAuth: true })
       
       if (apiError) {
@@ -88,19 +86,6 @@ export default function ForgotPassword() {
 
   return (
     <div className="forgot-password">
-      <div className="forgot-password__logo-container">
-        <img 
-          alt="Logo" 
-          src={imgImage15}
-          className="forgot-password__logo-image"
-        />
-      </div>
-
-      <p className="forgot-password__title-text">
-        <span className="forgot-password__title-text--white">Garage</span>{' '}
-        <span className="forgot-password__title-text--black">Hoàng Tuấn</span>
-      </p>
-
       <div className="forgot-password__card" />
 
       <div className="forgot-password__form-container">
@@ -109,7 +94,7 @@ export default function ForgotPassword() {
         </p>
 
         <form onSubmit={handleSubmit} className="forgot-password__form">
-          <div className="forgot-password__input-group">
+          <div className="forgot-password__input-group" style={{ marginBottom: '10px' }}>
             <input
               type="tel"
               value={phone}
@@ -142,6 +127,34 @@ export default function ForgotPassword() {
             <div className="forgot-password__submit-text">
               {loading ? 'Đang gửi...' : 'Gửi'}
             </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate('/login')}
+            className="forgot-password__back-btn"
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'transparent',
+              border: '1px solid #CBB081',
+              borderRadius: '8px',
+              color: '#CBB081',
+              fontSize: '16px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = '#CBB081'
+              e.target.style.color = '#fff'
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'transparent'
+              e.target.style.color = '#CBB081'
+            }}
+          >
+            Quay lại
           </button>
 
           <div className="forgot-password__instruction">

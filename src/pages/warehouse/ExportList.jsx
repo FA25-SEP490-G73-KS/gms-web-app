@@ -112,7 +112,7 @@ export default function ExportList() {
         id: item.id,
         exportCode: item.code || 'XK-000001',
         exportType: item.reason || 'Theo báo giá',
-        createDate: formatDisplayDate(item.createdAt),
+        createDate: item.createdAt || '--',
         quotationCode: item.quotationCode || 'BG-000001',
         requester: item.createdBy || 'Nguyễn Văn A',
         status: mapExportStatus(item.status),

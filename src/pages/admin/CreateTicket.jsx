@@ -696,7 +696,7 @@ export default function CreateTicket() {
   return (
     <AdminLayout>
       <div style={{ padding: '24px', minHeight: '100vh' }}>
-        <Card title={cardTitle} style={{ borderRadius: '12px' }}>
+        <Card title={cardTitle} style={{ borderRadius: '12px', border: 'none' }} bordered={false}>
           <Form form={form} layout="vertical" onFinish={handleCreate}>
             <Row gutter={24} align="stretch">
               <Col span={12}>
