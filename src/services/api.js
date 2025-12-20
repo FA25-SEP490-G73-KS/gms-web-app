@@ -718,14 +718,31 @@ export const stockReceiptAPI = {
   getItemHistory: (itemId) =>
     get(`/stock-receipt/receipt-items/${itemId}/history`),
   getItemById: (itemId) => get(`/stock-receipt/receipt-items/${itemId}`),
-  receiveItem: (itemId, payload) =>
-    post(`/stock-receipt/receipt-items/${itemId}/receive`, payload),
+  receiveItem: (itemId, formData) => {
+    return axiosClient.post(
+      `/stock-receipt/receipt-items/${itemId}/receive`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+  },
   getReceiptHistory: (page = 0, size = 10) => {
     const params = new URLSearchParams({ page, size });
     return get(`/stock-receipt/receipt-history?${params.toString()}`);
   },
   getPaymentDetail: (id) =>
     get(`/stock-receipt/receipt-history/${id}/payment-detail`),
+  getReceiptHistoryAttachment: (historyId) => {
+    return axiosClient.get(
+      `/stock-receipt/receipt-history/${historyId}/attachment`,
+      {
+        responseType: "blob",
+      }
+    );
+  },
   createReceiptPayment: (id, formData) => {
     return axiosClient.post(
       `/ledger-vouchers/receipt-payment/${id}`,
@@ -780,6 +797,15 @@ export const purchaseRequestAPI = {
   update: (id, payload) => put(`/purchase-requests/${id}`, payload),
   delete: (id) => del(`/purchase-requests/${id}`),
   approve: (id) => put(`/purchase-requests/${id}/approve`, {}),
+  reject: (id, reason) => {
+    const params = new URLSearchParams();
+    if (reason) params.append("reason", reason);
+    const queryString = params.toString();
+    return put(
+      `/purchase-requests/${id}/reject${queryString ? `?${queryString}` : ""}`,
+      {}
+    );
+  },
   getSuggestedItems: () => get("/purchase-requests/suggested-items"),
   createManual: (payload) => post("/purchase-requests/manual", payload),
 };

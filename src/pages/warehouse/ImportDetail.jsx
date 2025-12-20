@@ -202,6 +202,31 @@ export default function ImportDetail() {
     }
   }
 
+  // Lấy đầy đủ filename với extension
+  const getFullFileName = (url) => {
+    if (!url) return 'attachment'
+    try {
+      const urlParts = url.split('/')
+      return urlParts[urlParts.length - 1] // Giữ nguyên filename với extension
+    } catch (err) {
+      return 'attachment'
+    }
+  }
+
+  // Xác định MIME type từ extension
+  const getMimeType = (filename) => {
+    const extension = filename.split('.').pop().toLowerCase()
+    const mimeTypes = {
+      'jpg': 'image/jpeg',
+      'jpeg': 'image/jpeg',
+      'png': 'image/png',
+      'gif': 'image/gif',
+      'pdf': 'application/pdf',
+      'fig': 'application/octet-stream'
+    }
+    return mimeTypes[extension] || 'application/octet-stream'
+  }
+
   const handleNumberKeyDown = (e) => {
     const allowedKeys = ['Backspace', 'Tab', 'ArrowLeft', 'ArrowRight', 'Delete', 'Home', 'End', 'Enter']
     if (allowedKeys.includes(e.key)) {
@@ -258,17 +283,6 @@ export default function ImportDetail() {
     })
   }
 
-  const uploadFile = async (file) => {
-    try {
-      // TODO: Implement file upload API if needed
-      // For now, return a placeholder URL
-      return 'https://example.com/uploads/' + file.name
-    } catch (err) {
-      console.error('File upload error:', err)
-      throw err
-    }
-  }
-
   const handleImportGoods = async () => {
     if (!importFormData.quantity || importFormData.quantity <= 0) {
       message.error('Vui lòng nhập số lượng thực nhận')
@@ -288,24 +302,44 @@ export default function ImportDetail() {
     try {
       setImportFormLoading(true)
       
-      // Upload file if exists
-      let attachmentUrl = ''
-      if (importFormData.fileList.length > 0) {
-        attachmentUrl = await uploadFile(importFormData.fileList[0].originFileObj || importFormData.fileList[0])
-      }
-
-      const payload = {
+      // Prepare data object as JSON string matching CreateReceiptItemHistoryRequest
+      const dataObject = {
         quantity: importFormData.quantity,
-        receivedBy: importFormData.receivedBy,
-        note: importFormData.note || '',
         unitPrice: importFormData.unitPrice || 0,
-        attachmentUrl: attachmentUrl
+        note: importFormData.note || '',
+        receivedBy: importFormData.receivedBy
       }
 
-      const { data, error } = await stockReceiptAPI.receiveItem(selectedItem.id, payload)
+      // Create FormData for multipart/form-data
+      const formData = new FormData()
+      formData.append('data', JSON.stringify(dataObject))
       
-      if (error) {
-        throw new Error(error)
+      // Add file if exists
+      if (importFormData.fileList && importFormData.fileList.length > 0) {
+        const file = importFormData.fileList[0].originFileObj || importFormData.fileList[0]
+        if (file) {
+          formData.append('file', file)
+        }
+      }
+
+      const response = await stockReceiptAPI.receiveItem(selectedItem.id, formData)
+      
+      // Handle response (axiosClient.post returns axios response)
+      if (response?.data) {
+        const result = response.data
+        // Check if response has error structure
+        if (result.error) {
+          throw new Error(result.error)
+        }
+        // Check status code in response data if exists
+        if (result.statusCode && result.statusCode !== 200 && result.statusCode !== 201) {
+          throw new Error(result.message || 'Có lỗi xảy ra khi nhập hàng')
+        }
+      }
+      
+      // Check HTTP status
+      if (response?.status && response.status !== 200 && response.status !== 201) {
+        throw new Error('Có lỗi xảy ra khi nhập hàng')
       }
 
       message.success('Nhập hàng thành công')
@@ -322,7 +356,8 @@ export default function ImportDetail() {
       fetchDetail()
     } catch (err) {
       console.error('Import goods error:', err)
-      message.error(err.message || 'Đã xảy ra lỗi khi nhập hàng')
+      const errorMessage = err.response?.data?.message || err.message || 'Đã xảy ra lỗi khi nhập hàng'
+      message.error(errorMessage)
     } finally {
       setImportFormLoading(false)
     }
@@ -647,15 +682,35 @@ export default function ImportDetail() {
                   dataIndex: 'attachmentUrl',
                   key: 'attachmentUrl',
                   width: 120,
-                  render: (url) => {
-                    if (!url) return 'N/A'
-                    const fileName = extractFileName(url)
+                  render: (url, record) => {
+                    if (!url || !record.id) return 'N/A'
+                    const fileName = extractFileName(url) // Giữ nguyên để hiển thị
+                    const fullFileName = getFullFileName(url) // Lấy đầy đủ filename với extension
+                    
                     return (
                       <a 
-                        href={url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        style={{ color: '#1677ff', textDecoration: 'underline' }}
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          try {
+                            const response = await stockReceiptAPI.getReceiptHistoryAttachment(record.id)
+                            // Xác định MIME type từ filename
+                            const mimeType = getMimeType(fullFileName)
+                            // Create blob với đúng MIME type
+                            const blob = new Blob([response.data], { type: mimeType })
+                            const blobUrl = window.URL.createObjectURL(blob)
+                            const link = document.createElement('a')
+                            link.href = blobUrl
+                            link.download = fullFileName // Sử dụng full filename với extension
+                            document.body.appendChild(link)
+                            link.click()
+                            document.body.removeChild(link)
+                            window.URL.revokeObjectURL(blobUrl)
+                          } catch (err) {
+                            console.error('Download attachment error:', err)
+                            message.error('Không thể tải xuống file đính kèm')
+                          }
+                        }}
+                        style={{ color: '#1677ff', textDecoration: 'underline', cursor: 'pointer' }}
                       >
                         {fileName}
                       </a>

@@ -70,6 +70,8 @@ import PartsList from './pages/warehouse/PartsList';
 import ImportList from './pages/warehouse/ImportList';
 import ImportDetail from './pages/warehouse/ImportDetail';
 import ImportRequest from './pages/warehouse/ImportRequest';
+import WarehousePurchaseRequest from './pages/warehouse/PurchaseRequest';
+import WarehousePurchaseRequestDetail from './pages/warehouse/PurchaseRequestDetail';
 import CreateImportForm from './pages/warehouse/CreateImportForm';
 import ExportList from './pages/warehouse/ExportList';
 import ExportParts from './pages/warehouse/ExportParts';
@@ -233,6 +235,16 @@ function App() {
         <Route path="/warehouse/import/list" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.WAREHOUSE]}>
             <ImportList />
+          </ProtectedRoute>
+        } />
+        <Route path="/warehouse/purchase-requests" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.WAREHOUSE]}>
+            <WarehousePurchaseRequest />
+          </ProtectedRoute>
+        } />
+        <Route path="/warehouse/purchase-requests/:id" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.WAREHOUSE]}>
+            <WarehousePurchaseRequestDetail />
           </ProtectedRoute>
         } />
         <Route path="/warehouse/import-list/:id" element={
