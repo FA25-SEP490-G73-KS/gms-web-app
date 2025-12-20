@@ -291,7 +291,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
         id: item.id || 0,
         code: item.code || 'N/A',
         type: (item.type || '').toLowerCase(),
-        subject: item.targetName || 'N/A',
+        subject: item.relatedEmployeeName || item.relatedSupplierName || 'N/A',
         amount: item.amount || 0,
         createdAt: item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY') : 'N/A',
         status: (item.status || '')
@@ -387,10 +387,11 @@ export function AccountanceFinanceContent({ isManager = false }) {
           code: result.code || 'N/A',
           type: typeLabels[result.type] || result.type || 'N/A',
           amount: result.amount || 0,
-          target: result.relatedSupplierId ? 'NCC' : (result.relatedEmployeeId ? 'Nhân viên' : 'N/A'),
-          createdAt: result.createdAt ? dayjs(result.createdAt).format('DD/MM/YYYY') : 'N/A',
-          creator: 'DT Huyền', // Default since API doesn't provide
-          approver: result.approvedByEmployeeId ? 'HTK Ly' : 'HTK Ly', // Default
+          target: result.relatedEmployeeName || result.relatedSupplierName || 'N/A',
+          createdAt: result.createdAt || 'N/A', // Lấy nguyên từ response, không format
+          creator: result.createdByEmployeeName || 'N/A',
+          approver: result.approvedByEmployeeName || '--',
+          approvedAt: result.approvedAt || null,
           status: statusLabels[result.status] || result.status || 'N/A',
           description: result.description || 'N/A',
           attachmentUrl: result.attachmentUrl || null
@@ -731,8 +732,15 @@ export function AccountanceFinanceContent({ isManager = false }) {
                   payload.targetName = values.category
                 }
                 
+                // Validate file is required
+                if (!uploadFile) {
+                  message.error('Vui lòng tải lên file đính kèm')
+                  return
+                }
+                
                 console.log('Create voucher payload:', payload)
-                const { data: response, error } = await ledgerVoucherAPI.create(payload)
+                console.log('Upload file:', uploadFile)
+                const { data: response, error } = await ledgerVoucherAPI.create(payload, uploadFile)
                 if (error) {
                   throw new Error(error)
                 }
@@ -1337,6 +1345,19 @@ export function AccountanceFinanceContent({ isManager = false }) {
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Ngày duyệt:</span>
+                <span style={{ 
+                  color: '#4b5563', 
+                  background: '#f3f4f6', 
+                  padding: '6px 16px', 
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}>
+                  {detailData.approvedAt || '--'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>Người duyệt:</span>
                 <span style={{ 
                   color: '#4b5563', 
@@ -1377,47 +1398,150 @@ export function AccountanceFinanceContent({ isManager = false }) {
                 </div>
               </div>
 
-              {detailData.attachmentUrl && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>File đính kèm:</span>
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    padding: '12px',
-                    background: '#fef2f2',
-                    borderRadius: '6px',
-                    border: '1px solid #fecaca'
-                  }}>
-                    <i className="bi bi-file-earmark-pdf" style={{ fontSize: '24px', color: '#ef4444' }}></i>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '14px', color: '#374151', fontWeight: 500 }}>File Title.pdf</div>
-                      <div style={{ fontSize: '12px', color: '#9ca3af' }}>
-                        51.1 kB · 31 Aug 2022
+              {detailData.attachmentUrl && (() => {
+                // Extract file name from URL (remove timestamp prefix)
+                const getFileNameFromUrl = (url) => {
+                  if (!url) return 'attachment'
+                  const fileName = url.split('/').pop() || 'attachment'
+                  // Remove timestamp prefix (format: timestamp_filename.ext)
+                  const parts = fileName.split('_')
+                  if (parts.length > 1 && /^\d+$/.test(parts[0])) {
+                    // First part is timestamp, remove it
+                    return parts.slice(1).join('_')
+                  }
+                  return fileName
+                }
+
+                // Get file extension
+                const getFileExtension = (url) => {
+                  if (!url) return ''
+                  const fileName = url.split('/').pop() || ''
+                  const extension = fileName.split('.').pop()?.toLowerCase() || ''
+                  return extension
+                }
+
+                // Get icon based on file extension
+                const getFileIcon = (extension) => {
+                  const iconMap = {
+                    pdf: 'bi-file-earmark-pdf',
+                    jpg: 'bi-file-earmark-image',
+                    jpeg: 'bi-file-earmark-image',
+                    png: 'bi-file-earmark-image',
+                    gif: 'bi-file-earmark-image',
+                    doc: 'bi-file-earmark-word',
+                    docx: 'bi-file-earmark-word',
+                    xls: 'bi-file-earmark-excel',
+                    xlsx: 'bi-file-earmark-excel',
+                    ppt: 'bi-file-earmark-ppt',
+                    pptx: 'bi-file-earmark-ppt',
+                    zip: 'bi-file-earmark-zip',
+                    rar: 'bi-file-earmark-zip',
+                    txt: 'bi-file-earmark-text',
+                    csv: 'bi-file-earmark-spreadsheet'
+                  }
+                  return iconMap[extension] || 'bi-file-earmark'
+                }
+
+                // Get icon color based on file extension
+                const getFileIconColor = (extension) => {
+                  const colorMap = {
+                    pdf: '#ef4444',
+                    jpg: '#3b82f6',
+                    jpeg: '#3b82f6',
+                    png: '#3b82f6',
+                    gif: '#3b82f6',
+                    doc: '#2563eb',
+                    docx: '#2563eb',
+                    xls: '#16a34a',
+                    xlsx: '#16a34a',
+                    ppt: '#f59e0b',
+                    pptx: '#f59e0b',
+                    zip: '#6b7280',
+                    rar: '#6b7280',
+                    txt: '#374151',
+                    csv: '#16a34a'
+                  }
+                  return colorMap[extension] || '#6b7280'
+                }
+
+                const fileName = getFileNameFromUrl(detailData.attachmentUrl)
+                const fileExtension = getFileExtension(detailData.attachmentUrl)
+                const fileIcon = getFileIcon(fileExtension)
+                const fileIconColor = getFileIconColor(fileExtension)
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontWeight: 500, color: '#1f2937', fontSize: '14px' }}>File đính kèm:</span>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      padding: '12px',
+                      background: '#fef2f2',
+                      borderRadius: '6px',
+                      border: '1px solid #fecaca'
+                    }}>
+                      <i className={`bi ${fileIcon}`} style={{ fontSize: '24px', color: fileIconColor }}></i>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '14px', color: '#374151', fontWeight: 500 }}>{fileName}</div>
+                        <div style={{ fontSize: '12px', color: '#9ca3af' }}>
+                          {detailData.createdAt || '--'}
+                        </div>
                       </div>
+                      <Button
+                        type="link"
+                        icon={<i className="bi bi-download"></i>}
+                        loading={downloadingFile}
+                        onClick={async () => {
+                          if (!detailData?.id) {
+                            message.warning('Không tìm thấy thông tin phiếu')
+                            return
+                          }
+                          
+                          setDownloadingFile(true)
+                          try {
+                            const response = await ledgerVoucherAPI.getAttachment(detailData.id)
+                            
+                            // Tạo blob từ response
+                            const blob = new Blob([response.data])
+                            const url = window.URL.createObjectURL(blob)
+                            const link = document.createElement('a')
+                            link.href = url
+                            
+                            // Lấy tên file từ Content-Disposition header hoặc dùng tên từ URL
+                            const contentDisposition = response.headers['content-disposition']
+                            let downloadFileName = fileName
+                            if (contentDisposition) {
+                              const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/)
+                              if (fileNameMatch && fileNameMatch[1]) {
+                                downloadFileName = fileNameMatch[1].replace(/['"]/g, '')
+                              }
+                            }
+                            
+                            link.download = downloadFileName
+                            link.style.display = 'none'
+                            document.body.appendChild(link)
+                            link.click()
+                            
+                            // Cleanup
+                            setTimeout(() => {
+                              document.body.removeChild(link)
+                              window.URL.revokeObjectURL(url)
+                            }, 100)
+                            
+                            message.success('Tải file thành công')
+                          } catch (err) {
+                            console.error('Download attachment failed:', err)
+                            message.error(err.response?.data?.message || 'Không thể tải file đính kèm')
+                          } finally {
+                            setDownloadingFile(false)
+                          }
+                        }}
+                      />
                     </div>
-                    <Button
-                      type="link"
-                      icon={<i className="bi bi-download"></i>}
-                      loading={downloadingFile}
-                      onClick={async () => {
-                        if (!detailData.attachmentUrl) {
-                          message.warning('Không có file đính kèm')
-                          return
-                        }
-                        
-                        setDownloadingFile(true)
-                        try {
-                          const fileName = detailData.attachmentUrl.split('/').pop() || 'file'
-                          await downloadFile(detailData.attachmentUrl, fileName)
-                        } finally {
-                          setDownloadingFile(false)
-                        }
-                      }}
-                    />
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           </div>
         ) : null}

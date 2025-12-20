@@ -448,6 +448,8 @@ export const partAPI = {
 export const znsNotificationsAPI = {
   sendQuotation: (quotationId) =>
     post(`/zns-notifications/quotation/${quotationId}/send`),
+  sendVehicleReceipt: (ticketId) =>
+    post(`/zns-notifications/vehicle-receipt/${ticketId}/send`),
 };
 
 export const notificationAPI = {
@@ -484,6 +486,16 @@ export const authAPI = {
     post("/auth/refresh", { refreshToken }, { skipAuth: true }),
   resetPassword: (phone) =>
     post("/auth/reset-password", { phone }, { skipAuth: true }),
+  resetPasswordWithConfirm: (phone, newPassword, confirmPassword) =>
+    post(
+      "/auth/reset-password",
+      {
+        phone: phone,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      },
+      { skipAuth: true }
+    ),
 
   updatePassword: (phone, otpCode, newPassword) =>
     post(
@@ -555,6 +567,9 @@ export const debtsAPI = {
   pay: (debtId, payload) => {
     return post(`/debts/${debtId}/pay`, payload);
   },
+  updateDueDate: (id, dueDate) => {
+    return patch(`/debts/${id}/due-date?dueDate=${dueDate}`);
+  },
 };
 
 export const employeesAPI = {
@@ -625,7 +640,24 @@ export const ledgerVoucherAPI = {
     return queryString ? get(`${baseUrl}&${queryString}`) : get(baseUrl);
   },
   getById: (id) => get(`/ledger-vouchers/${id}`),
-  create: (data) => post("/ledger-vouchers/manual", data),
+  getAttachment: (id) => {
+    return axiosClient.get(`/ledger-vouchers/${id}/attachment`, {
+      responseType: "blob",
+    });
+  },
+  create: (data, file) => {
+    const formData = new FormData();
+    formData.append("data", JSON.stringify(data));
+    if (file) {
+      formData.append("file", file);
+    }
+
+    return post("/ledger-vouchers/manual", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
   approve: (id, approvedByEmployeeId = 0) =>
     post(`/ledger-vouchers/${id}/approve`, { approvedByEmployeeId }),
   reject: (id, rejectedByEmployeeId = 0) =>
@@ -726,8 +758,15 @@ export const dashboardAPI = {
     return get(`/dashboard/warehouse/overview?${params.toString()}`);
   },
 
-  getServiceAdvisorOverview: () => {
-    return get("/dashboard/service-advisor/overview");
+  getServiceAdvisorOverview: (year) => {
+    const params = new URLSearchParams();
+    if (year) params.append("year", year);
+    const queryString = params.toString();
+    return get(
+      `/dashboard/service-advisor/overview${
+        queryString ? `?${queryString}` : ""
+      }`
+    );
   },
 };
 

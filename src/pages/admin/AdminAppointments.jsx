@@ -1129,50 +1129,55 @@ export default function AdminAppointments() {
                                    currentStatus === 'CANCELLED' || 
                                    currentStatus === 'Hủy' || 
                                    currentStatus === 'Đã hủy'
+                const isArrived = currentStatusKey === 'ARRIVED' || 
+                                  currentStatus === 'ARRIVED' || 
+                                  currentStatus === 'Đã đến'
+                
+                // Nếu đã đến hoặc đã hủy, không hiển thị nút nào
+                if (isArrived || isCancelled) {
+                  return null
+                }
+                
                 return (
                   <>
-                    {!isCancelled && (
-                      <Popconfirm
-                        title="Hủy lịch hẹn"
-                        description="Bạn có chắc chắn muốn hủy lịch hẹn này?"
-                        onConfirm={handleCancelAppointment}
-                        okText="Xác nhận"
-                        cancelText="Hủy"
-                        okButtonProps={{ danger: true }}
+                    <Popconfirm
+                      title="Hủy lịch hẹn"
+                      description="Bạn có chắc chắn muốn hủy lịch hẹn này?"
+                      onConfirm={handleCancelAppointment}
+                      okText="Xác nhận"
+                      cancelText="Hủy"
+                      okButtonProps={{ danger: true }}
+                    >
+                      <Button
+                        type="default"
+                        size="large"
+                        loading={updatingStatus}
+                        disabled={updatingStatus}
+                        style={{
+                          height: '45px',
+                          padding: '0 40px',
+                          fontWeight: 600,
+                          fontSize: '16px',
+                          borderColor: '#ef4444',
+                          color: '#ef4444'
+                        }}
                       >
-                        <Button
-                          type="default"
-                          size="large"
-                          loading={updatingStatus}
-                          disabled={updatingStatus}
-                          style={{
-                            height: '45px',
-                            padding: '0 40px',
-                            fontWeight: 600,
-                            fontSize: '16px',
-                            borderColor: '#ef4444',
-                            color: '#ef4444'
-                          }}
-                        >
-                          Hủy lịch hẹn
-                        </Button>
-                      </Popconfirm>
-                    )}
+                        Hủy lịch hẹn
+                      </Button>
+                    </Popconfirm>
                     <Button
                       type="primary"
                       size="large"
                       onClick={handleCreateTicket}
                       loading={updatingStatus}
-                      disabled={updatingStatus || isCancelled}
+                      disabled={updatingStatus}
                       style={{
-                        background: isCancelled ? '#9ca3af' : '#22c55e',
-                        borderColor: isCancelled ? '#9ca3af' : '#22c55e',
+                        background: '#22c55e',
+                        borderColor: '#22c55e',
                         height: '45px',
                         padding: '0 40px',
                         fontWeight: 600,
-                        fontSize: '16px',
-                        cursor: isCancelled ? 'not-allowed' : 'pointer',
-                        opacity: isCancelled ? 0.6 : 1
+                        fontSize: '16px'
                       }}
                     >
                       Tạo Phiếu Dịch Vụ

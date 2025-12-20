@@ -169,6 +169,7 @@ export function AccountanceDebtDetailContent() {
             return {
               key: item.id || item.debtId,
               id: item.id || item.debtId,
+              serviceTicketId: item.serviceTicketId, // Lưu serviceTicketId để dùng khi navigate
               code: item.serviceTicketCode || item.code || item.ticketCode || item.referenceCode || '—',
               createdAt: formatDate(item.createdAt || item.createdDate),
               total: totalAmount,
@@ -228,14 +229,14 @@ export function AccountanceDebtDetailContent() {
 
     setUpdatingDueDate(true)
     try {
-      // TODO: Call API to update due date
-      // const { error } = await debtsAPI.updateDueDate(selectedDebt.id, {
-      //   dueDate: newDueDate.format('YYYY-MM-DD')
-      // })
+      const { error } = await debtsAPI.updateDueDate(
+        selectedDebt.id,
+        newDueDate.format('YYYY-MM-DD')
+      )
       
-      // if (error) {
-      //   throw new Error(error)
-      // }
+      if (error) {
+        throw new Error(error)
+      }
 
       message.success('Cập nhật ngày hẹn trả thành công')
       setIsUpdateDueDateModalVisible(false)
@@ -377,11 +378,11 @@ export function AccountanceDebtDetailContent() {
           {
             key: 'view',
             label: 'Xem chi tiết',
-            icon: <i className="bi bi-eye" style={{ fontSize: '14px', marginRight: '8px' }} />,
             onClick: () => {
-              navigate(`/accountance/debts/ticket/${record.id}`, {
+              const serviceTicketId = record.serviceTicketId || record.id
+              navigate(`/accountance/debts/ticket/${serviceTicketId}`, {
                 state: { 
-                  ticketId: record.id,
+                  ticketId: serviceTicketId,
                   customerId: customerData?.id,
                   customer: {
                     name: customerInfo?.name || customerData?.customer,
@@ -396,7 +397,6 @@ export function AccountanceDebtDetailContent() {
           {
             key: 'updateDueDate',
             label: 'Cập nhật ngày hẹn trả',
-            icon: <i className="bi bi-calendar-check" style={{ fontSize: '14px', marginRight: '8px' }} />,
             onClick: () => {
               setSelectedDebt(record)
               setNewDueDate(record.dueDate && record.dueDate !== '—' ? dayjs(record.dueDate, 'DD/MM/YYYY') : null)
@@ -589,8 +589,8 @@ export function AccountanceDebtDetailContent() {
               placeholder="Chọn ngày hẹn trả"
               style={{ width: '100%' }}
               disabledDate={(current) => {
-                // Disable dates before today
-                return current && current < dayjs().startOf('day')
+                // Disable dates before today and today (not allowed to select past or current date)
+                return current && current <= dayjs().startOf('day')
               }}
             />
           </div>

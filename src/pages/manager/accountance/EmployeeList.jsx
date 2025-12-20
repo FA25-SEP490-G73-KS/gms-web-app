@@ -9,6 +9,7 @@ import dayjs from 'dayjs'
 
 const STATUS_CONFIG = {
   'Đang hoạt động': { color: '#1f8f4d', bg: '#eafff5', text: 'Đang hoạt động' },
+  'Ngưng hoạt động': { color: '#ef4444', bg: '#fef2f2', text: 'Ngưng hoạt động' },
   'Nghỉ phép': { color: '#b45309', bg: '#fff7ed', text: 'Nghỉ phép' },
   'Nghỉ làm': { color: '#ef4444', bg: '#fef2f2', text: 'Nghỉ làm' }
 }
@@ -82,18 +83,28 @@ const formatEmployee = (employee, index) => {
     return date.toLocaleDateString('vi-VN')
   })()
 
-  // Map status: true -> "Đang hoạt động", false -> "Nghỉ làm"
+  // Map status: true -> "Đang hoạt động", false -> "Ngưng hoạt động"
   const getStatusLabel = () => {
-    if (employee.active !== undefined) {
-      return employee.active ? 'Đang hoạt động' : 'Nghỉ làm'
-    }
+    // Priority: status field first (from API response)
     if (employee.status !== undefined) {
       // Handle boolean status
       if (typeof employee.status === 'boolean') {
-        return employee.status ? 'Đang hoạt động' : 'Nghỉ làm'
+        return employee.status ? 'Đang hoạt động' : 'Ngưng hoạt động'
+      }
+      // Handle number status: 1 -> "Đang hoạt động", 0 -> "Ngưng hoạt động"
+      if (typeof employee.status === 'number') {
+        return employee.status === 1 ? 'Đang hoạt động' : 'Ngưng hoạt động'
+      }
+      // Handle string status: "Active" -> "Đang hoạt động", "Inactive" -> "Ngưng hoạt động" (fallback)
+      if (typeof employee.status === 'string') {
+        return employee.status === 'Active' || employee.status === 'true' ? 'Đang hoạt động' : 'Ngưng hoạt động'
       }
       // Handle string status (fallback)
-      return employee.status === 'Đang hoạt động' || employee.status === 'Đang làm việc' ? 'Đang hoạt động' : 'Nghỉ làm'
+      return employee.status === 'Đang hoạt động' || employee.status === 'Đang làm việc' ? 'Đang hoạt động' : 'Ngưng hoạt động'
+    }
+    // Fallback to active field if status is not available
+    if (employee.active !== undefined) {
+      return employee.active ? 'Đang hoạt động' : 'Ngưng hoạt động'
     }
     return 'Đang hoạt động' // Default
   }
@@ -176,18 +187,21 @@ export default function EmployeeListForManager() {
       if (error) throw new Error(error)
       const employee = data?.result || data
       setSelectedEmployee(employee)
-      // Map status: true -> "true", false -> "false" for dropdown
-      let activeValue = true // Default
-      if (employee.active !== undefined) {
-        activeValue = employee.active
-      } else if (employee.status !== undefined) {
-        // Handle boolean status
+      // Map status to boolean for dropdown
+      let statusValue = true // Default (Active)
+      if (employee.status !== undefined) {
         if (typeof employee.status === 'boolean') {
-          activeValue = employee.status
-        } else {
-          // Handle string status (fallback)
-          activeValue = employee.status === 'Đang hoạt động' || employee.status === 'Đang làm việc'
+          statusValue = employee.status
+        } else if (typeof employee.status === 'string') {
+          // Handle string status: "Active" -> true, "Inactive" -> false
+          statusValue = employee.status === 'Active' || employee.status === 'true'
+        } else if (typeof employee.status === 'number') {
+          // Handle number status: 1 -> true, 0 -> false
+          statusValue = employee.status === 1
         }
+      } else if (employee.active !== undefined) {
+        // Fallback to active field
+        statusValue = employee.active
       }
       
       form.setFieldsValue({
@@ -197,7 +211,7 @@ export default function EmployeeListForManager() {
         dailySalary: employee.dailySalary,
         hireDate: employee.hireDate ? dayjs(employee.hireDate) : null,
         terminationDate: employee.terminationDate ? dayjs(employee.terminationDate) : null,
-        active: String(activeValue),
+        status: statusValue,
         province: employee.province,
         ward: employee.ward,
         addressDetail: employee.addressDetail
@@ -226,8 +240,9 @@ export default function EmployeeListForManager() {
       const values = await form.validateFields()
       
       // Prepare payload for API according to the API structure
+      // status is already boolean (true/false)
       const payload = {
-        active: values.active === 'true' || values.active === true,
+        status: values.status,
         addressDetail: values.addressDetail || '',
         dailySalary: Number(values.dailySalary) || 0,
         fullName: values.fullName,
@@ -582,10 +597,10 @@ export default function EmployeeListForManager() {
                 <Form.Item label="Địa chỉ chi tiết" name="addressDetail">
                   <Input placeholder="Trung tâm thạch thất" disabled={!isEditing} style={{ background: '#fff', borderRadius: 10, height: 48 }} />
                 </Form.Item>
-                <Form.Item label="Trạng thái" name="active" rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}>
-                  <Select placeholder="Đang làm việc" disabled={!isEditing} style={{ borderRadius: 10, height: 48 }}>
-                    <Select.Option value="true">Đang làm việc</Select.Option>
-                    <Select.Option value="false">Nghỉ làm</Select.Option>
+                <Form.Item label="Trạng thái" name="status" rules={[{ required: true, message: 'Vui lòng chọn trạng thái' }]}>
+                  <Select placeholder="Đang hoạt động" disabled={!isEditing} style={{ borderRadius: 10, height: 48 }}>
+                    <Select.Option value={true}>Đang hoạt động</Select.Option>
+                    <Select.Option value={false}>Ngưng hoạt động</Select.Option>
                   </Select>
             </Form.Item>
               </div>

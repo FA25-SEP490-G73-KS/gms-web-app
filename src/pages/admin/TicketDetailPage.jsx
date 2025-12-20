@@ -1382,11 +1382,25 @@ export default function TicketDetailPage() {
     setHandoverLoading(true)
     try {
       const serviceTicketId = id || ticketData.serviceTicketId
+      
+      // Cập nhật trạng thái
       const { data, error } = await serviceTicketAPI.updateStatus(serviceTicketId, 'WAITING_FOR_DELIVERY')
       
       if (error) {
         message.error(error || 'Không thể cập nhật trạng thái bàn giao xe')
         return
+      }
+      
+      // Gửi thông báo nhận xe qua ZNS
+      try {
+        const { error: znsError } = await znsNotificationsAPI.sendVehicleReceipt(serviceTicketId)
+        if (znsError) {
+          console.error('Error sending vehicle receipt notification:', znsError)
+          // Không hiển thị lỗi cho người dùng vì cập nhật trạng thái đã thành công
+        }
+      } catch (znsErr) {
+        console.error('Error sending vehicle receipt notification:', znsErr)
+        // Không hiển thị lỗi cho người dùng vì cập nhật trạng thái đã thành công
       }
       
       message.success('Đã cập nhật trạng thái bàn giao xe thành công')
@@ -2538,16 +2552,20 @@ export default function TicketDetailPage() {
                           ? '#9ca3af'
                           : (isWaitingWarehouse && !hasRejectedItem)
                           ? '#9ca3af'
-                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                            ? '#CBB081'
-                            : '#22c55e',
+                          : (actionButtonLabel === 'Hoàn thành')
+                            ? '#22c55e'
+                            : (actionButtonLabel === 'Cập nhật')
+                              ? '#CBB081'
+                              : '#22c55e',
                         borderColor: isTicketCancelled
                           ? '#9ca3af'
                           : (isWaitingWarehouse && !hasRejectedItem)
                           ? '#9ca3af'
-                          : (!isEditMode && (isWarehouseConfirmed || isCustomerConfirmed))
-                            ? '#CBB081'
-                            : '#22c55e',
+                          : (actionButtonLabel === 'Hoàn thành')
+                            ? '#22c55e'
+                            : (actionButtonLabel === 'Cập nhật')
+                              ? '#CBB081'
+                              : '#22c55e',
                       color: '#fff',
                       fontWeight: 600,
                       padding: '0 24px',

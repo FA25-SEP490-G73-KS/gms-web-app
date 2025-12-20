@@ -304,7 +304,7 @@ export default function AdminCustomers() {
       width: 150,
       align: 'right',
       render: (amount) => (
-        <span style={{ fontWeight: 500 }}>{formatCurrency(amount)}</span>
+        <span style={{ fontWeight: 500 }}>{formatCurrency(amount)} đ</span>
       )
     },
     {

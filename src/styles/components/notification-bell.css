@@ -99,8 +99,10 @@
 }
 
 .notification-dropdown-content {
-  max-height: 400px;
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
 }
 
 .notification-loading {

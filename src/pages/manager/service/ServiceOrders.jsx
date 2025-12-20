@@ -107,7 +107,7 @@ export default function ManagerServiceOrders() {
 
   const columns = [
     {
-      title: 'Code',
+      title: 'Mã dịch vụ',
       dataIndex: 'code',
       key: 'code',
       width: 160,

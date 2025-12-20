@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Card, Row, Col, Statistic, Spin, message } from 'antd'
+import { Card, Row, Col, Statistic, Spin, message, Select } from 'antd'
 import { CalendarOutlined } from '@ant-design/icons'
 import AdminLayout from '../../layouts/AdminLayout'
 import { dashboardAPI } from '../../services/api'
 import { displayPhoneFrom84 } from '../../utils/helpers'
 import '../../styles/pages/admin/reports.css'
+import dayjs from 'dayjs'
 
 export default function Reports() {
   const [loading, setLoading] = useState(false)
   const [overview, setOverview] = useState(null)
+  const [selectedYear, setSelectedYear] = useState(dayjs().year())
 
   // Dữ liệu mẫu dùng tạm khi backend chưa có dữ liệu
   const sampleSummary = {
@@ -59,14 +61,27 @@ export default function Reports() {
   const ratingRaw = overview?.rating || {}
   const topCustomersRaw = overview?.topCustomers || []
 
-  const ticketsByMonth = ticketsByMonthRaw.length 
-    ? ticketsByMonthRaw.map(item => ({
-        ...item,
-        monthName: item.year && item.month 
-          ? `Tháng ${item.month}/${item.year}` 
-          : item.monthName || item.month || `Tháng ${item.month || ''}`
-      }))
-    : sampleTicketsByMonth
+  // Tạo 12 tháng trong năm (từ tháng 1 đến 12)
+  const ticketsByMonth = useMemo(() => {
+    // Tạo map từ dữ liệu API: key là month (1-12), value là total
+    const dataMap = new Map()
+    ticketsByMonthRaw.forEach(item => {
+      const month = item.month || parseInt(item.monthName?.match(/\d+/)?.[0]) || null
+      if (month && month >= 1 && month <= 12) {
+        dataMap.set(month, item.total || item.count || 0)
+      }
+    })
+
+    // Tạo mảng 12 tháng, nếu không có dữ liệu thì total = 0
+    return Array.from({ length: 12 }, (_, index) => {
+      const month = index + 1
+      return {
+        month,
+        monthName: `Tháng ${month}`,
+        total: dataMap.get(month) || 0
+      }
+    })
+  }, [ticketsByMonthRaw])
   const serviceTypeDistribution = serviceTypeDistributionRaw.length
     ? serviceTypeDistributionRaw
     : sampleServiceTypeDistribution
@@ -86,15 +101,11 @@ export default function Reports() {
       return null
     }
 
-    // Chỉ lấy tối đa 9 mốc gần nhất để hiển thị theo figma
-    const lastItems =
-      ticketsByMonth.length > 9
-        ? ticketsByMonth.slice(ticketsByMonth.length - 9)
-        : ticketsByMonth
+    // Luôn hiển thị 12 tháng trong năm
+    const items = ticketsByMonth.slice(0, 12)
 
-    const values = lastItems.map((i) => i.total || i.count || 0)
-    const maxValue = Math.max(...values, 0)
-    if (!maxValue) return null
+    const values = items.map((i) => i.total || i.count || 0)
+    const maxValue = Math.max(...values, 1) // Tối thiểu là 1 để tránh chia cho 0
 
     const width = 640
     const height = 200
@@ -103,12 +114,12 @@ export default function Reports() {
     const innerWidth = width - paddingX * 2
     const innerHeight = height - paddingY * 2
 
-    const coords = lastItems.map((item, index) => {
+    const coords = items.map((item, index) => {
       const value = item.total || item.count || 0
       const x =
-        lastItems.length === 1
+        items.length === 1
           ? paddingX + innerWidth / 2
-          : paddingX + (index / (lastItems.length - 1)) * innerWidth
+          : paddingX + (index / (items.length - 1)) * innerWidth
       const y = paddingY + innerHeight * (1 - value / maxValue)
       return { x, y, value }
     })
@@ -121,8 +132,8 @@ export default function Reports() {
       coords.map((p) => `L ${p.x},${p.y}`).join(' ') +
       ` L ${coords[coords.length - 1].x},${baselineY} Z`
 
-    const labels = lastItems.map(
-      (item, index) => item.monthName || item.month || `Tháng ${index + 1}`
+    const labels = items.map(
+      (item) => item.monthName || `Tháng ${item.month || ''}`
     )
 
     // Tạo một vài vạch chia trục Y (0, 25, 50, 75, 100% của max)
@@ -224,7 +235,7 @@ export default function Reports() {
     const fetchOverview = async () => {
       setLoading(true)
     try {
-        const { data, error } = await dashboardAPI.getServiceAdvisorOverview()
+        const { data, error } = await dashboardAPI.getServiceAdvisorOverview(selectedYear)
       
       if (error) {
           console.error('Error fetching service advisor overview:', error)
@@ -248,7 +259,7 @@ export default function Reports() {
   }
 
     fetchOverview()
-  }, [])
+  }, [selectedYear])
 
   const renderRatingRows = () => {
     const starKeys = ['star5', 'star4', 'star3', 'star2', 'star1']
@@ -359,7 +370,17 @@ export default function Reports() {
             <Col xs={24} md={14}>
               <Card
                 title="Phiếu dịch vụ theo tháng"
-                extra="Tháng"
+                extra={
+                  <Select
+                    value={selectedYear}
+                    onChange={(value) => setSelectedYear(value)}
+                    style={{ width: 100 }}
+                    options={Array.from({ length: 10 }, (_, i) => {
+                      const year = dayjs().year() - i
+                      return { label: year, value: year }
+                    })}
+                  />
+                }
                 style={{ borderRadius: 12, height: '100%' }}
                 bodyStyle={{ display: 'flex', flexDirection: 'column', padding: 16 }}
               >

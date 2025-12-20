@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
-import { getUserNameFromToken, getUserPhoneFromToken } from '../utils/helpers'
+import { getUserNameFromToken, getUserPhoneFromToken, getShortName } from '../utils/helpers'
 import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/manager-layout.css'
 
@@ -402,7 +402,7 @@ export default function ManagerLayout({ children }) {
             </div>
             <div className="manager-user-text">
               <div className="manager-user-name">
-                {getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A'}
+                {getShortName(getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A')}
               </div>
               <div className="manager-user-role">
                 {getUserPhoneFromToken() || user?.phone || ''}
