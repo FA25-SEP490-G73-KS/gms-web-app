@@ -774,16 +774,21 @@ export const dashboardAPI = {
     if (month) params.append("month", month);
     return get(`/dashboard/warehouse/overview?${params.toString()}`);
   },
-
-  getServiceAdvisorOverview: (year) => {
+  getServiceAdvisorOverview: () => {
+    return get("/dashboard/service-advisor/overview");
+  },
+  getFinancialOverview: (year) => {
     const params = new URLSearchParams();
     if (year) params.append("year", year);
-    const queryString = params.toString();
-    return get(
-      `/dashboard/service-advisor/overview${
-        queryString ? `?${queryString}` : ""
-      }`
-    );
+    return get(`/dashboard/financial/overview?${params.toString()}`);
+  },
+  getStatistics: (fromYear, toYear, year, month) => {
+    const params = new URLSearchParams();
+    if (fromYear) params.append("fromYear", fromYear);
+    if (toYear) params.append("toYear", toYear);
+    if (year) params.append("year", year);
+    if (month) params.append("month", month);
+    return get(`/dashboard/statistics?${params.toString()}`);
   },
 };
 
