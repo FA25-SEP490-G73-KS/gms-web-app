@@ -1999,7 +1999,7 @@ export default function TicketDetailPage() {
       }
     },
     {
-      title: 'Kho',
+      title: 'Trạng thái kho',
       key: 'inventoryStatus',
       width: 140,
       align: 'center',

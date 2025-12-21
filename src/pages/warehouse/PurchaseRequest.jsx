@@ -616,7 +616,7 @@ export default function WarehousePurchaseRequest() {
     <WarehouseLayout>
       <div style={{ padding: '24px', background: '#ffffff', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ margin: 0, marginBottom: '20px' }}>Yêu cầu mua hàng</h1>
+          <h1 style={{ margin: 0, marginBottom: '20px', fontSize: '24px', fontWeight: 600 }}>Yêu cầu mua hàng</h1>
 
           <div style={{ 
             display: 'flex', 

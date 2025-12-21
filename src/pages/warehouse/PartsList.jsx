@@ -669,7 +669,7 @@ export default function PartsList() {
     <WarehouseLayout>
       <div style={{ padding: 24, minHeight: '100vh' }}>
         <Card
-          title={<span style={{ fontSize: 20, fontWeight: 600 }}>Danh sách linh kiện</span>}
+          title={<span style={{ fontSize: 24, fontWeight: 600 }}>Danh sách linh kiện</span>}
           styles={{ body: { padding: '16px 24px' } }}
         >
           {/* Search and Filter Row */}
