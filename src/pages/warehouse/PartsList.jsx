@@ -942,15 +942,64 @@ export default function PartsList() {
                       label="Giá nhập"
                       name="importPrice"
                       style={{ marginBottom: 16 }}
-                      rules={[{ required: true, message: 'Nhập giá nhập' }]}
+                      rules={[
+                        { required: true, message: 'Nhập giá nhập' },
+                        { 
+                          type: 'number', 
+                          max: 909090909, 
+                          message: 'Giá nhập phải nhỏ hơn hoặc bằng 909,090,909 để giá bán không vượt quá 1 tỷ' 
+                        },
+                        ({ getFieldValue }) => ({
+                          validator(_, value) {
+                            if (!value) {
+                              return Promise.resolve()
+                            }
+                            // Kiểm tra giá nhập không được vượt quá 1 tỷ
+                            if (value >= 1000000000) {
+                              return Promise.reject(new Error('Giá nhập không được lớn hơn hoặc bằng 1 tỷ'))
+                            }
+                            // Kiểm tra giá bán tính tự động có vượt quá 1 tỷ không
+                            const calculatedSellingPrice = Math.round(value * 1.1)
+                            if (calculatedSellingPrice > 1000000000) {
+                              return Promise.reject(new Error(`Giá nhập này sẽ tạo giá bán ${calculatedSellingPrice.toLocaleString('vi-VN')} vượt quá 1 tỷ. Vui lòng nhập giá nhập nhỏ hơn 909,090,909`))
+                            }
+                            // Kiểm tra giá nhập phải nhỏ hơn giá bán hiện tại
+                            const sellingPrice = getFieldValue('sellingPrice')
+                            if (sellingPrice && value >= sellingPrice) {
+                              return Promise.reject(new Error('Giá nhập phải nhỏ hơn giá bán'))
+                            }
+                            return Promise.resolve()
+                          }
+                        })
+                      ]}
                     >
                       <InputNumber 
                         min={0}
+                        max={909090909}
                         disabled={!isEditMode}
                         style={{ width: '100%' }}
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={value => value.replace(/\$\s?|(,*)/g, '')}
                         onKeyDown={handleNumberKeyDown}
+                        onChange={(value) => {
+                          if (value && isEditMode) {
+                            // Kiểm tra giá nhập không được >= 1 tỷ
+                            if (value >= 1000000000) {
+                              message.error('Giá nhập không được lớn hơn hoặc bằng 1 tỷ')
+                              return
+                            }
+                            // Tự động tính giá bán = giá nhập + 10%
+                            const calculatedSellingPrice = Math.round(value * 1.1)
+                            // Kiểm tra giá bán tính được có vượt quá 1 tỷ không
+                            if (calculatedSellingPrice > 1000000000) {
+                              message.error(`Giá nhập này sẽ tạo giá bán ${calculatedSellingPrice.toLocaleString('vi-VN')} vượt quá 1 tỷ. Vui lòng nhập giá nhập nhỏ hơn 909,090,909`)
+                              return
+                            }
+                            editForm.setFieldsValue({ sellingPrice: calculatedSellingPrice })
+                            // Trigger validation lại cho giá bán
+                            editForm.validateFields(['sellingPrice', 'importPrice'])
+                          }
+                        }}
                       />
                     </Form.Item>
                   </Col>
@@ -959,15 +1008,37 @@ export default function PartsList() {
                       label="Giá bán"
                       name="sellingPrice"
                       style={{ marginBottom: 16 }}
-                      rules={[{ required: true, message: 'Nhập giá bán' }]}
+                      dependencies={['importPrice']}
+                      rules={[
+                        { required: true, message: 'Nhập giá bán' },
+                        { 
+                          type: 'number', 
+                          max: 1000000000, 
+                          message: 'Giá bán phải nhỏ hơn hoặc bằng 1 tỷ' 
+                        },
+                        ({ getFieldValue }) => ({
+                          validator(_, value) {
+                            const importPrice = getFieldValue('importPrice')
+                            if (!value || !importPrice || importPrice < value) {
+                              return Promise.resolve()
+                            }
+                            return Promise.reject(new Error('Giá bán phải lớn hơn giá nhập'))
+                          }
+                        })
+                      ]}
                     >
                       <InputNumber 
                         min={0}
+                        max={1000000000}
                         disabled={!isEditMode}
                         style={{ width: '100%' }}
                         formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         parser={value => value.replace(/\$\s?|(,*)/g, '')}
                         onKeyDown={handleNumberKeyDown}
+                        onChange={() => {
+                          // Trigger validation lại cho giá nhập khi giá bán thay đổi
+                          editForm.validateFields(['importPrice'])
+                        }}
                       />
                     </Form.Item>
                   </Col>
@@ -1518,15 +1589,64 @@ export default function PartsList() {
                   name="importPrice"
                   required={false}
                   style={{ marginBottom: 16 }}
-                  rules={[{ required: true, message: 'Nhập giá nhập' }]}
+                  rules={[
+                    { required: true, message: 'Nhập giá nhập' },
+                    { 
+                      type: 'number', 
+                      max: 909090909, 
+                      message: 'Giá nhập phải nhỏ hơn hoặc bằng 909,090,909 để giá bán không vượt quá 1 tỷ' 
+                    },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        if (!value) {
+                          return Promise.resolve()
+                        }
+                        // Kiểm tra giá nhập không được vượt quá 1 tỷ
+                        if (value >= 1000000000) {
+                          return Promise.reject(new Error('Giá nhập không được lớn hơn hoặc bằng 1 tỷ'))
+                        }
+                        // Kiểm tra giá bán tính tự động có vượt quá 1 tỷ không
+                        const calculatedSellingPrice = Math.round(value * 1.1)
+                        if (calculatedSellingPrice > 1000000000) {
+                          return Promise.reject(new Error(`Giá nhập này sẽ tạo giá bán ${calculatedSellingPrice.toLocaleString('vi-VN')} vượt quá 1 tỷ. Vui lòng nhập giá nhập nhỏ hơn 909,090,909`))
+                        }
+                        // Kiểm tra giá nhập phải nhỏ hơn giá bán hiện tại
+                        const sellingPrice = getFieldValue('sellingPrice')
+                        if (sellingPrice && value >= sellingPrice) {
+                          return Promise.reject(new Error('Giá nhập phải nhỏ hơn giá bán'))
+                        }
+                        return Promise.resolve()
+                      }
+                    })
+                  ]}
                 >
                   <InputNumber 
-                    min={0} 
+                    min={0}
+                    max={909090909}
                     style={{ width: '100%' }}
                     placeholder="Nhập giá nhập"
                     formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={value => value.replace(/\$\s?|(,*)/g, '')}
                     onKeyDown={handleNumberKeyDown}
+                    onChange={(value) => {
+                      if (value) {
+                        // Kiểm tra giá nhập không được >= 1 tỷ
+                        if (value >= 1000000000) {
+                          message.error('Giá nhập không được lớn hơn hoặc bằng 1 tỷ')
+                          return
+                        }
+                        // Tự động tính giá bán = giá nhập + 10%
+                        const calculatedSellingPrice = Math.round(value * 1.1)
+                        // Kiểm tra giá bán tính được có vượt quá 1 tỷ không
+                        if (calculatedSellingPrice > 1000000000) {
+                          message.error(`Giá nhập này sẽ tạo giá bán ${calculatedSellingPrice.toLocaleString('vi-VN')} vượt quá 1 tỷ. Vui lòng nhập giá nhập nhỏ hơn 909,090,909`)
+                          return
+                        }
+                        newPartForm.setFieldsValue({ sellingPrice: calculatedSellingPrice })
+                        // Trigger validation lại cho giá bán
+                        newPartForm.validateFields(['sellingPrice', 'importPrice'])
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>
@@ -1536,15 +1656,37 @@ export default function PartsList() {
                   name="sellingPrice"
                   required={false}
                   style={{ marginBottom: 16 }}
-                  rules={[{ required: true, message: 'Nhập giá bán' }]}
+                  dependencies={['importPrice']}
+                  rules={[
+                    { required: true, message: 'Nhập giá bán' },
+                    { 
+                      type: 'number', 
+                      max: 1000000000, 
+                      message: 'Giá bán phải nhỏ hơn hoặc bằng 1 tỷ' 
+                    },
+                    ({ getFieldValue }) => ({
+                      validator(_, value) {
+                        const importPrice = getFieldValue('importPrice')
+                        if (!value || !importPrice || importPrice < value) {
+                          return Promise.resolve()
+                        }
+                        return Promise.reject(new Error('Giá bán phải lớn hơn giá nhập'))
+                      }
+                    })
+                  ]}
                 >
                   <InputNumber 
-                    min={0} 
+                    min={0}
+                    max={1000000000}
                     style={{ width: '100%' }}
                     placeholder="Nhập giá bán"
                     formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={value => value.replace(/\$\s?|(,*)/g, '')}
                     onKeyDown={handleNumberKeyDown}
+                    onChange={() => {
+                      // Trigger validation lại cho giá nhập khi giá bán thay đổi
+                      newPartForm.validateFields(['importPrice'])
+                    }}
                   />
                 </Form.Item>
               </Col>
