@@ -650,7 +650,7 @@ export function AccountanceFinanceContent({ isManager = false }) {
               current: page,
               pageSize: pageSize,
               total: total,
-              showTotal: (total) => `${total} phiếu thu chi`,
+              showTotal: (total) => `Tổng ${total} phiếu thu chi`,
               showSizeChanger: true,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (newPage, newPageSize) => {
@@ -1502,8 +1502,21 @@ export function AccountanceFinanceContent({ isManager = false }) {
                           try {
                             const response = await ledgerVoucherAPI.getAttachment(detailData.id)
                             
-                            // Tạo blob từ response
-                            const blob = new Blob([response.data])
+                            // Xác định MIME type từ extension
+                            const extension = fileExtension.toLowerCase()
+                            const mimeTypes = {
+                              'jpg': 'image/jpeg',
+                              'jpeg': 'image/jpeg',
+                              'png': 'image/png',
+                              'gif': 'image/gif',
+                              'pdf': 'application/pdf',
+                              'fig': 'application/octet-stream',
+                              'zip': 'application/zip'
+                            }
+                            const mimeType = mimeTypes[extension] || 'application/octet-stream'
+                            
+                            // Tạo blob với đúng MIME type
+                            const blob = new Blob([response.data], { type: mimeType })
                             const url = window.URL.createObjectURL(blob)
                             const link = document.createElement('a')
                             link.href = url
@@ -1516,6 +1529,11 @@ export function AccountanceFinanceContent({ isManager = false }) {
                               if (fileNameMatch && fileNameMatch[1]) {
                                 downloadFileName = fileNameMatch[1].replace(/['"]/g, '')
                               }
+                            }
+                            
+                            // Đảm bảo filename có extension
+                            if (!downloadFileName.includes('.')) {
+                              downloadFileName = `${downloadFileName}.${fileExtension}`
                             }
                             
                             link.download = downloadFileName

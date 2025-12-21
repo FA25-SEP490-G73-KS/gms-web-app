@@ -2544,6 +2544,11 @@ export default function TicketDetailPage() {
                         return replaceItems.length === 0 && serviceItems.length === 0
                       }
                       
+                      // Disable nút "Lưu" khi chưa có item nào trong cả hai bảng
+                      if (actionButtonLabel === 'Lưu' && replaceItems.length === 0 && serviceItems.length === 0) {
+                        return true
+                      }
+                      
                       return inputsDisabled
                     })()}
                     loading={actionLoading}
