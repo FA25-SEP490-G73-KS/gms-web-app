@@ -343,6 +343,8 @@ export default function TicketDetailPage() {
   const canHandover =
     !isHistoryPage &&
     !isTicketCancelled &&
+    // Chỉ cho phép bàn giao khi báo giá là khách đã xác nhận
+    normalizedQuotationStatus === 'CUSTOMER_CONFIRMED' &&
     // Chỉ cho phép bàn giao khi xe đang trong trạng thái sửa chữa
     ticketStatusKey === 'UNDER_REPAIR' &&
     ticketStatusKey !== 'WAITING_FOR_DELIVERY' &&
@@ -526,6 +528,7 @@ export default function TicketDetailPage() {
           inventoryStatus: item.inventoryStatus || '',
           warehouseReviewStatus: item.warehouseReviewStatus || '',
           warehouseNote: item.warehouseNote || null,
+          exportedQuantity: item.exportedQuantity ?? 0,
           unitLocked: false,
           unitPriceLocked: false
         })
@@ -566,7 +569,7 @@ export default function TicketDetailPage() {
     <CreatableSelect
       classNamePrefix="custom-select"
       menuPortalTarget={menuPortalTarget}
-      styles={selectStyles}
+      styles={props.styles || selectStyles}
       components={selectComponentsOverrides}
       {...props}
     />
@@ -1707,8 +1710,37 @@ export default function TicketDetailPage() {
             options={parts}
             isSearchable
             isClearable
-            isDisabled={inputsDisabled}
+            isDisabled={inputsDisabled || (record.exportedQuantity > 0)}
             isLoading={partsLoading}
+            styles={{
+              ...selectStyles,
+              control: (provided, state) => ({
+                ...provided,
+                minHeight: '42px',
+                borderRadius: '12px',
+                borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
+                boxShadow: state.isFocused ? '0 0 0 2px rgba(255, 255, 255, 0.15)' : 'none',
+                backgroundColor: (inputsDisabled || record.exportedQuantity > 0) ? '#f5f5f5' : '#fff',
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626',
+                cursor: (inputsDisabled || record.exportedQuantity > 0) ? 'not-allowed' : 'pointer',
+                ':hover': {
+                  borderColor: (inputsDisabled || record.exportedQuantity > 0) ? '#d0d7de' : '#3b82f6'
+                }
+              }),
+              valueContainer: (provided) => ({
+                ...provided,
+                padding: '0 12px',
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#9ca3af'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
+              })
+            }}
             noOptionsMessage={() => partsLoading ? 'Đang tải...' : 'Không có linh kiện'}
             onCreateOption={(inputValue) => {
               const trimmed = inputValue?.trim()
@@ -1819,6 +1851,7 @@ export default function TicketDetailPage() {
                              Number.isFinite(partQuantity) && 
                              currentQuantity > partQuantity
         
+        const isDisabled = inputsDisabled || (record.exportedQuantity > 0)
         return (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <input
@@ -1831,11 +1864,14 @@ export default function TicketDetailPage() {
               })
             }
               style={{
-                ...baseInputStyle
+                ...baseInputStyle,
+                background: isDisabled ? '#f5f5f5' : baseInputStyle.background,
+                color: isDisabled ? '#9ca3af' : baseInputStyle.color,
+                cursor: isDisabled ? 'not-allowed' : baseInputStyle.cursor
               }}
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
-            disabled={inputsDisabled}
+            disabled={isDisabled}
           />
         </div>
       )
@@ -1853,7 +1889,7 @@ export default function TicketDetailPage() {
           value={unitOptions.find(option => String(option.value) === String(record.unit)) || null}
           options={unitOptions}
           isClearable
-          isDisabled={inputsDisabled || record.unitLocked}
+          isDisabled={inputsDisabled || record.unitLocked || (record.exportedQuantity > 0)}
           onChange={(option) =>
             updateReplaceItem(record.id, { unit: option?.value || '' })
           }
@@ -1865,24 +1901,24 @@ export default function TicketDetailPage() {
                 borderRadius: '12px',
                 border: `1px solid ${errors[`replace_${record.id}_unit`] ? '#ef4444' : (state.isFocused ? '#4096ff' : '#d0d7de')}`,
                 fontSize: '14px',
-                background: inputsDisabled ? '#f5f5f5' : '#fff',
-                color: inputsDisabled ? '#9ca3af' : '#262626',
-                cursor: inputsDisabled ? 'not-allowed' : 'pointer',
+                background: (inputsDisabled || record.exportedQuantity > 0) ? '#f5f5f5' : '#fff',
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626',
+                cursor: (inputsDisabled || record.exportedQuantity > 0) ? 'not-allowed' : 'pointer',
                 padding: '0 4px',
                 boxShadow: 'none',
                 '&:hover': {
-                  borderColor: inputsDisabled ? '#d0d7de' : (state.isFocused ? '#4096ff' : '#d0d7de')
+                  borderColor: (inputsDisabled || record.exportedQuantity > 0) ? '#d0d7de' : (state.isFocused ? '#4096ff' : '#d0d7de')
                 }
               }),
               valueContainer: (base) => ({
                 ...base,
                 padding: '0 8px',
                 height: '38px',
-                color: inputsDisabled ? '#9ca3af' : '#262626'
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
               }),
               singleValue: (base) => ({
                 ...base,
-                color: inputsDisabled ? '#9ca3af' : '#262626'
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
               }),
               placeholder: (base) => ({
                 ...base,
@@ -2007,7 +2043,7 @@ export default function TicketDetailPage() {
                 return <FileTextOutlined style={{ fontSize: 16, color }} />
               })()}
             </span>
-            {!isHistoryPage && !inputsDisabled && (
+            {!isHistoryPage && !inputsDisabled && record.exportedQuantity === 0 && (
               record.priceQuotationItemId ? (
                 <Popconfirm
                   title="Xóa mục báo giá"

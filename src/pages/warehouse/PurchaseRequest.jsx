@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
-import { Table, Input, Button, Tag, Dropdown, message, Modal, Checkbox, DatePicker, InputNumber, Space } from 'antd'
-import { SearchOutlined, FilterOutlined, MoreOutlined, ShoppingCartOutlined, InfoCircleOutlined, CalendarOutlined } from '@ant-design/icons'
+import { Table, Input, Button, Tag, Dropdown, message, Modal, Checkbox, DatePicker, InputNumber, Space, Tabs } from 'antd'
+import { SearchOutlined, FilterOutlined, MoreOutlined, ShoppingCartOutlined, InfoCircleOutlined, CalendarOutlined, ShoppingOutlined, CheckCircleOutlined, FileTextOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -38,6 +38,23 @@ export default function WarehousePurchaseRequest() {
   const [purchaseReason, setPurchaseReason] = useState('')
   const [purchaseNote, setPurchaseNote] = useState('')
   const [createPurchaseLoading, setCreatePurchaseLoading] = useState(false)
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState('manual') // 'manual' | 'quotation'
+  
+  // Quotation tab states
+  const [quotations, setQuotations] = useState([])
+  const [quotationLoading, setQuotationLoading] = useState(false)
+  const [selectedQuotationIds, setSelectedQuotationIds] = useState([])
+  const [quotationItems, setQuotationItems] = useState([])
+  const [selectedQuotationItemIds, setSelectedQuotationItemIds] = useState([])
+  const [quotationItemQuantities, setQuotationItemQuantities] = useState({})
+  const [quotationFilters, setQuotationFilters] = useState({
+    searchTerm: '',
+    fromDate: null,
+    toDate: null,
+    customerId: null
+  })
 
   useEffect(() => {
     fetchData()
@@ -206,7 +223,7 @@ export default function WarehousePurchaseRequest() {
     {
       title: 'Mã SKU',
       key: 'nameSku',
-      width: 260,
+      width: 300,
       ellipsis: true,
       render: (record) => (
         <span title={`${record.partName} (${record.sku})`}>
@@ -219,7 +236,7 @@ export default function WarehousePurchaseRequest() {
       title: 'Tồn',
       dataIndex: 'quantityInStock',
       key: 'quantityInStock',
-      width: 80,
+      width: 100,
       align: 'right',
       render: (value) => (value != null ? value : 0),
     },
@@ -227,7 +244,7 @@ export default function WarehousePurchaseRequest() {
       title: 'SL giữ',
       dataIndex: 'reservedQuantity',
       key: 'reservedQuantity',
-      width: 90,
+      width: 100,
       align: 'right',
       render: (value) => (value != null ? value : 0),
     },
@@ -235,14 +252,14 @@ export default function WarehousePurchaseRequest() {
       title: 'SL tối thiểu',
       dataIndex: 'reorderLevel',
       key: 'reorderLevel',
-      width: 100,
+      width: 120,
       align: 'right',
       render: (value) => (value != null ? value : 0),
     },
     {
       title: 'SL cần mua',
       key: 'purchaseQuantity',
-      width: 110,
+      width: 130,
       align: 'right',
       render: (_, record) => {
         const value =
@@ -279,56 +296,221 @@ export default function WarehousePurchaseRequest() {
     })
   }, [purchaseItems, selectedPurchaseKeys, purchaseQuantities])
 
-  const handleCreatePurchaseRequest = async () => {
-    if (validPurchaseItems.length === 0) return
+  // ===== Quotation tab functions =====
+  const fetchAvailableQuotations = async () => {
+    setQuotationLoading(true)
+    try {
+      const params = {
+        page: 0,
+        size: 100
+      }
+      
+      if (quotationFilters.fromDate) {
+        params.fromDate = quotationFilters.fromDate.format('DDMMYYYY')
+      }
+      if (quotationFilters.toDate) {
+        params.toDate = quotationFilters.toDate.format('DDMMYYYY')
+      }
+      if (quotationFilters.customerId) {
+        params.customerId = quotationFilters.customerId
+      }
+      
+      const { data, error } = await purchaseRequestAPI.getAvailableQuotations(params)
+      if (error) {
+        throw new Error(error)
+      }
+      
+      const result = data?.result || data || {}
+      const content = Array.isArray(result) ? result : (result.content || [])
+      
+      const mapped = content.map((q) => ({
+        id: q.priceQuotationId || q.id,
+        code: q.code || 'N/A',
+        customerName: q.customerName || q.customer?.fullName || 'N/A',
+        createdAt: q.createdAt || new Date().toISOString(),
+        status: q.status || 'DRAFT',
+        totalAmount: q.estimateAmount || 0
+      }))
+      
+      setQuotations(mapped)
+    } catch (err) {
+      console.error('Failed to fetch quotations:', err)
+      message.error(err?.message || 'Không thể tải danh sách báo giá')
+      setQuotations([])
+    } finally {
+      setQuotationLoading(false)
+    }
+  }
 
+  const handleSelectQuotations = async (quotationIds) => {
+    setSelectedQuotationIds(quotationIds)
+    
+    if (quotationIds.length === 0) {
+      setQuotationItems([])
+      setSelectedQuotationItemIds([])
+      setQuotationItemQuantities({})
+      return
+    }
+    
+    // Load items từ các quotations đã chọn
+    try {
+      const allItems = []
+      for (const quotationId of quotationIds) {
+        const { data, error } = await purchaseRequestAPI.getQuotationItems(quotationId)
+        if (!error && data?.result) {
+          const items = Array.isArray(data.result) ? data.result : (data.result.items || [])
+          items.forEach(item => {
+            if (item.itemType === 'PART') { // Chỉ lấy part items
+              // Lấy SKU từ part object trong response
+              const sku = item.part?.sku || item.sku || item.partSku || 'N/A'
+              const partId = item.part?.partId || item.partId
+              const partName = item.itemName || item.part?.name || item.partName || 'N/A'
+              
+              allItems.push({
+                key: item.priceQuotationItemId || item.id,
+                priceQuotationItemId: item.priceQuotationItemId || item.id,
+                quotationId: quotationId,
+                quotationCode: quotations.find(q => q.id === quotationId)?.code || 'N/A',
+                partId: partId,
+                sku: sku,
+                partName: partName,
+                quantity: item.quantity || 0,
+                unitPrice: item.unitPrice || 0,
+                totalPrice: item.totalPrice || 0,
+                unit: item.unit || 'Cái',
+                quantityInStock: item.part?.quantity ?? null,
+                reservedQuantity: item.part?.reservedQuantity ?? 0,
+                reorderLevel: item.part?.reorderLevel ?? 0
+              })
+            }
+          })
+        }
+      }
+      
+      setQuotationItems(allItems)
+      
+      // Set initial quantities
+      const initialQuantities = {}
+      allItems.forEach(item => {
+        initialQuantities[item.priceQuotationItemId] = item.quantity
+      })
+      setQuotationItemQuantities(initialQuantities)
+      
+      // Auto select all items
+      setSelectedQuotationItemIds(allItems.map(item => item.priceQuotationItemId))
+    } catch (err) {
+      console.error('Failed to load quotation items:', err)
+      message.error('Không thể tải chi tiết báo giá')
+    }
+  }
+
+  const validQuotationItems = useMemo(() => {
+    return quotationItems.filter(item => {
+      if (!selectedQuotationItemIds.includes(item.priceQuotationItemId)) return false
+      const qty = quotationItemQuantities[item.priceQuotationItemId] || item.quantity || 0
+      return qty > 0
+    })
+  }, [quotationItems, selectedQuotationItemIds, quotationItemQuantities])
+
+  const handleCreatePurchaseRequest = async () => {
     const employeeId = getEmployeeIdFromToken()
     if (!employeeId) {
       message.error('Không tìm thấy thông tin nhân viên. Vui lòng đăng nhập lại.')
       return
     }
 
-    const items = validPurchaseItems.map((item) => {
-      const qty =
-        typeof purchaseQuantities[item.partId] === 'number'
-          ? purchaseQuantities[item.partId]
-          : item.suggestedQuantity || 0
-      return {
-        partId: item.partId,
-        quantity: qty,
-      }
-    })
-
     setCreatePurchaseLoading(true)
     try {
-      const payload = {
-        createdById: employeeId,
-        reason: purchaseReason?.trim() || null,
-        note: purchaseNote?.trim() || null,
-        items,
+      let payload
+      
+      if (activeTab === 'quotation') {
+        // Tạo từ quotation items
+        if (validQuotationItems.length === 0) {
+          message.error('Vui lòng chọn ít nhất một linh kiện từ báo giá')
+          return
+        }
+        
+        // Lấy tất cả unique quotationIds từ các items đã chọn
+        const uniqueQuotationIds = [...new Set(validQuotationItems.map(item => item.quotationId).filter(id => id != null))]
+        
+        if (uniqueQuotationIds.length === 0) {
+          message.error('Không tìm thấy thông tin báo giá')
+          return
+        }
+        
+        // Payload theo DTO CreatePurchaseRequestFromQuotationDto
+        payload = {
+          quotationIds: uniqueQuotationIds,
+          quotationItemIds: validQuotationItems.map(item => item.priceQuotationItemId),
+          reason: purchaseReason?.trim() || null,
+          note: purchaseNote?.trim() || null
+        }
+        
+        const { data, error } = await purchaseRequestAPI.createFromQuotation(payload)
+        if (error || !data || (data.statusCode && data.statusCode !== 200 && data.statusCode !== 201)) {
+          const msg = error || data?.message || 'Không thể tạo yêu cầu mua hàng. Vui lòng thử lại.'
+          message.error(msg)
+          return
+        }
+        
+        const result = data.result || data
+        const codeText = result?.code ? ` (Mã phiếu: ${result.code})` : ''
+        message.success(`Tạo yêu cầu mua hàng từ báo giá thành công${codeText}`)
+      } else {
+        // Tạo manual (logic cũ)
+        if (validPurchaseItems.length === 0) {
+          message.error('Vui lòng chọn ít nhất một linh kiện')
+          return
+        }
+
+        const items = validPurchaseItems.map((item) => {
+          const qty =
+            typeof purchaseQuantities[item.partId] === 'number'
+              ? purchaseQuantities[item.partId]
+              : item.suggestedQuantity || 0
+          return {
+            partId: item.partId,
+            quantity: qty,
+          }
+        })
+
+        payload = {
+          createdById: employeeId,
+          reason: purchaseReason?.trim() || null,
+          note: purchaseNote?.trim() || null,
+          items,
+        }
+
+        const { data, error } = await purchaseRequestAPI.createManual(payload)
+        if (error || !data || (data.statusCode && data.statusCode !== 200 && data.statusCode !== 201)) {
+          const msg =
+            error ||
+            data?.message ||
+            'Không thể tạo yêu cầu mua hàng. Vui lòng thử lại.'
+          message.error(msg)
+          return
+        }
+
+        const result = data.result || data
+        const codeText = result?.code ? ` (Mã phiếu: ${result.code})` : ''
+        message.success(`Tạo yêu cầu mua hàng thành công${codeText}`)
       }
 
-      const { data, error } = await purchaseRequestAPI.createManual(payload)
-      if (error || !data || (data.statusCode && data.statusCode !== 200 && data.statusCode !== 201)) {
-        const msg =
-          error ||
-          data?.message ||
-          'Không thể tạo yêu cầu mua hàng. Vui lòng thử lại.'
-        message.error(msg)
-        return
-      }
-
-      const result = data.result || data
-      const codeText = result?.code ? ` (Mã phiếu: ${result.code})` : ''
-      message.success(`Tạo yêu cầu mua hàng thành công${codeText}`)
-      setPurchaseModalVisible(false)
       // Reset form
+      setPurchaseModalVisible(false)
+      setActiveTab('manual')
       setPurchaseItems([])
       setPurchaseError(null)
       setSelectedPurchaseKeys([])
       setPurchaseQuantities({})
+      setQuotations([])
+      setSelectedQuotationIds([])
+      setQuotationItems([])
+      setSelectedQuotationItemIds([])
+      setQuotationItemQuantities({})
       setPurchaseReason('')
       setPurchaseNote('')
+      
       // Refresh list
       fetchData(filterForm)
     } catch (err) {
@@ -460,12 +642,18 @@ export default function WarehousePurchaseRequest() {
                 type="primary"
                 onClick={() => {
                   setPurchaseModalVisible(true)
+                  setActiveTab('manual')
                   setPurchaseItems([])
                   setPurchaseError(null)
                   setSelectedPurchaseKeys([])
                   setPurchaseQuantities({})
                   setPurchaseReason('')
                   setPurchaseNote('')
+                  setQuotations([])
+                  setSelectedQuotationIds([])
+                  setQuotationItems([])
+                  setSelectedQuotationItemIds([])
+                  setQuotationItemQuantities({})
                   fetchSuggestedItems()
                 }}
                 style={{ borderRadius: 6 }}
@@ -618,14 +806,14 @@ export default function WarehousePurchaseRequest() {
             <div style={{ 
               display: 'flex', 
               alignItems: 'center', 
-              gap: '12px',
-              fontSize: '20px',
+              gap: '10px',
+              fontSize: '18px',
               fontWeight: 600,
-              color: '#1f2937'
+              color: '#111827'
             }}>
               <ShoppingCartOutlined style={{ 
-                color: '#1890ff', 
-                fontSize: '24px' 
+                color: '#3b82f6', 
+                fontSize: '20px' 
               }} />
               <span>Tạo yêu cầu mua hàng</span>
             </div>
@@ -638,10 +826,10 @@ export default function WarehousePurchaseRequest() {
               onClick={() => setPurchaseModalVisible(false)}
               size="large"
               style={{
-                height: '44px',
-                paddingLeft: '24px',
-                paddingRight: '24px',
-                borderRadius: '8px',
+                height: '40px',
+                paddingLeft: '20px',
+                paddingRight: '20px',
+                borderRadius: '6px',
                 fontWeight: 500,
                 borderColor: '#d1d5db',
                 color: '#6b7280'
@@ -653,92 +841,112 @@ export default function WarehousePurchaseRequest() {
               key="submit"
               type="primary"
               onClick={handleCreatePurchaseRequest}
-              disabled={validPurchaseItems.length === 0 || createPurchaseLoading}
+              disabled={
+                (activeTab === 'manual' && validPurchaseItems.length === 0) ||
+                (activeTab === 'quotation' && validQuotationItems.length === 0) ||
+                createPurchaseLoading
+              }
               loading={createPurchaseLoading}
               size="large"
               style={{
-                height: '44px',
+                height: '40px',
                 paddingLeft: '24px',
                 paddingRight: '24px',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 fontWeight: 500,
-                background: '#1890ff',
-                borderColor: '#1890ff',
-                boxShadow: '0 2px 4px rgba(24, 144, 255, 0.2)'
+                background: '#3b82f6',
+                borderColor: '#3b82f6'
               }}
             >
               Tạo phiếu yêu cầu
             </Button>,
           ]}
-          width={1000}
-          style={{ top: 60 }}
+          width={1350}
+          style={{ top: 40 }}
           styles={{
             content: {
-              borderRadius: '12px',
-              padding: '24px'
+              borderRadius: '8px',
+              padding: '20px',
+              maxHeight: '92vh',
+              overflowY: 'auto'
             },
             header: {
-              borderBottom: '1px solid #f0f0f0',
-              paddingBottom: '16px',
-              marginBottom: '20px'
+              borderBottom: '1px solid #e5e7eb',
+              paddingBottom: '12px',
+              marginBottom: '16px',
+              paddingTop: '4px'
             },
             footer: {
-              borderTop: '1px solid #f0f0f0',
-              paddingTop: '16px',
-              marginTop: '24px'
+              borderTop: '1px solid #e5e7eb',
+              paddingTop: '12px',
+              marginTop: '20px',
+              paddingBottom: '0'
             }
           }}
         >
-          {/* Instruction Box */}
-          <div style={{ 
-            marginBottom: '20px',
-            padding: '14px 16px',
-            background: '#e6f4ff',
-            borderRadius: '8px',
-            border: '1px solid #bae0ff',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '10px'
-          }}>
-            <InfoCircleOutlined style={{ 
-              color: '#1890ff', 
-              fontSize: '18px',
-              marginTop: '2px'
-            }} />
-            <p style={{ 
-              margin: 0,
-              fontSize: '14px',
-              color: '#0958d9',
-              lineHeight: '1.6'
-            }}>
-              Chọn linh kiện cần mua, chỉnh sửa số lượng nếu cần rồi tạo phiếu yêu cầu mua hàng gửi quản lý duyệt.
-            </p>
-          </div>
+          <Tabs
+            activeKey={activeTab}
+            onChange={(key) => {
+              setActiveTab(key)
+              if (key === 'quotation' && quotations.length === 0) {
+                fetchAvailableQuotations()
+              }
+            }}
+            style={{ marginBottom: '16px' }}
+            items={[
+              {
+                key: 'manual',
+                label: (
+                  <span>
+                    <ShoppingOutlined /> Danh sách linh kiện đề xuất
+                  </span>
+                ),
+                children: (
+                  <>
+                    {/* Instruction Box */}
+                    <div style={{ 
+                      marginBottom: '16px',
+                      padding: '12px 14px',
+                      background: '#eff6ff',
+                      borderRadius: '6px',
+                      border: '1px solid #bfdbfe',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px'
+                    }}>
+                      <InfoCircleOutlined style={{ 
+                        color: '#3b82f6', 
+                        fontSize: '16px',
+                        marginTop: '1px',
+                        flexShrink: 0
+                      }} />
+                      <p style={{ 
+                        margin: 0,
+                        fontSize: '13px',
+                        color: '#1e40af',
+                        lineHeight: '1.5'
+                      }}>
+                        Chọn linh kiện cần mua, chỉnh sửa số lượng nếu cần rồi tạo phiếu yêu cầu mua hàng gửi quản lý duyệt.
+                      </p>
+                    </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '20px', marginBottom: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: '16px', marginBottom: '16px' }}>
             {/* Left side - Items Table */}
-            <div>
+            <div style={{ minWidth: 0 }}>
               <div style={{ 
-                marginBottom: '12px', 
+                marginBottom: '10px', 
                 fontWeight: 600,
-                fontSize: '15px',
-                color: '#374151',
+                fontSize: '14px',
+                color: '#1f2937',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                justifyContent: 'space-between'
               }}>
                 <span>Danh sách linh kiện đề xuất</span>
                 {selectedPurchaseKeys.length > 0 && (
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    color: '#1890ff',
-                    background: '#e6f4ff',
-                    padding: '2px 8px',
-                    borderRadius: '12px'
-                  }}>
-                    Đã chọn: {selectedPurchaseKeys.length}
-                  </span>
+                  <Tag color="blue" style={{ margin: 0, borderRadius: '12px', fontSize: '12px', padding: '2px 10px' }}>
+                    {selectedPurchaseKeys.length}
+                  </Tag>
                 )}
               </div>
               {purchaseError ? (
@@ -762,7 +970,8 @@ export default function WarehousePurchaseRequest() {
                 <div style={{
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  width: '100%'
                 }}>
                   <Table
                     rowSelection={{
@@ -774,7 +983,7 @@ export default function WarehousePurchaseRequest() {
                     loading={purchaseLoading}
                     pagination={false}
                     size="small"
-                    scroll={{ y: 320 }}
+                    scroll={{ y: 320, x: 'max-content' }}
                     components={goldTableHeader}
                     rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-even' : 'table-row-odd')}
                     locale={{
@@ -787,82 +996,424 @@ export default function WarehousePurchaseRequest() {
 
             {/* Right side - Form Fields */}
             <div style={{
-              padding: '20px',
+              padding: '16px',
               background: '#f9fafb',
               borderRadius: '8px',
               border: '1px solid #e5e7eb'
             }}>
-              <div style={{ marginBottom: '20px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <div style={{ 
                   fontWeight: 600, 
-                  marginBottom: '10px',
-                  fontSize: '14px',
+                  marginBottom: '8px',
+                  fontSize: '13px',
                   color: '#374151',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px'
                 }}>
                   <span>Lý do</span>
-                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>(tuỳ chọn)</span>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>(tuỳ chọn)</span>
                 </div>
                 <Input
-                  placeholder="Nhập lý do tạo yêu cầu mua hàng..."
+                  placeholder="Nhập lý do..."
                   value={purchaseReason}
                   onChange={(e) => setPurchaseReason(e.target.value)}
                   style={{
                     borderRadius: '6px',
-                    borderColor: '#d1d5db'
+                    borderColor: '#d1d5db',
+                    fontSize: '13px'
                   }}
                 />
               </div>
               <div>
                 <div style={{ 
                   fontWeight: 600, 
-                  marginBottom: '10px',
-                  fontSize: '14px',
+                  marginBottom: '8px',
+                  fontSize: '13px',
                   color: '#374151',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '4px'
                 }}>
                   <span>Ghi chú</span>
-                  <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 400 }}>(tuỳ chọn)</span>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>(tuỳ chọn)</span>
                 </div>
                 <TextArea
-                  rows={5}
-                  placeholder="Nhập ghi chú thêm (nếu có)..."
+                  rows={4}
+                  placeholder="Nhập ghi chú thêm..."
                   value={purchaseNote}
                   onChange={(e) => setPurchaseNote(e.target.value)}
                   style={{
                     borderRadius: '6px',
                     borderColor: '#d1d5db',
-                    resize: 'none'
+                    resize: 'none',
+                    fontSize: '13px'
                   }}
                   maxLength={500}
                   showCount
                 />
               </div>
               
-              {/* Summary */}
-              {validPurchaseItems.length > 0 && (
-                <div style={{
-                  marginTop: '20px',
-                  padding: '12px',
-                  background: '#f0f9ff',
-                  borderRadius: '6px',
-                  border: '1px solid #bae0ff'
-                }}>
-                  <div style={{ 
-                    fontSize: '13px',
-                    color: '#0958d9',
-                    fontWeight: 500
-                  }}>
-                    Đã chọn <strong>{validPurchaseItems.length}</strong> linh kiện để tạo yêu cầu
+                      {/* Summary */}
+                      {validPurchaseItems.length > 0 && (
+                        <div style={{
+                          marginTop: '16px',
+                          padding: '10px 12px',
+                          background: '#eff6ff',
+                          borderRadius: '6px',
+                          border: '1px solid #bfdbfe'
+                        }}>
+                          <div style={{ 
+                            fontSize: '12px',
+                            color: '#1e40af',
+                            fontWeight: 500,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <CheckCircleOutlined style={{ fontSize: '14px' }} />
+                            <span>
+                              Đã chọn <strong>{validPurchaseItems.length}</strong> linh kiện
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </div>
+                  </>
+                )
+              },
+              {
+                key: 'quotation',
+                label: (
+                  <span>
+                    <FileTextOutlined /> Chọn từ Báo giá
+                  </span>
+                ),
+                children: (
+                  <>
+                    {/* Instruction Box */}
+                    <div style={{ 
+                      marginBottom: '16px',
+                      padding: '12px 14px',
+                      background: '#eff6ff',
+                      borderRadius: '6px',
+                      border: '1px solid #bfdbfe',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px'
+                    }}>
+                      <InfoCircleOutlined style={{ 
+                        color: '#3b82f6', 
+                        fontSize: '16px',
+                        marginTop: '1px',
+                        flexShrink: 0
+                      }} />
+                      <p style={{ 
+                        margin: 0,
+                        fontSize: '13px',
+                        color: '#1e40af',
+                        lineHeight: '1.5'
+                      }}>
+                        Chọn báo giá đã được duyệt, sau đó chọn linh kiện từ báo giá để tạo yêu cầu mua hàng.
+                      </p>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '16px', marginBottom: '16px' }}>
+                      {/* Left side - Quotations Table */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ 
+                          marginBottom: '10px', 
+                          fontWeight: 600,
+                          fontSize: '14px',
+                          color: '#1f2937',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}>
+                          <span>Danh sách báo giá</span>
+                          {selectedQuotationIds.length > 0 && (
+                            <Tag color="blue" style={{ margin: 0, borderRadius: '12px', fontSize: '12px', padding: '2px 10px' }}>
+                              {selectedQuotationIds.length}
+                            </Tag>
+                          )}
+                        </div>
+                        <div style={{
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          width: '100%'
+                        }}>
+                          <Table
+                            rowSelection={{
+                              selectedRowKeys: selectedQuotationIds,
+                              onChange: handleSelectQuotations,
+                              type: 'checkbox'
+                            }}
+                            columns={[
+                              {
+                                title: 'Mã báo giá',
+                                dataIndex: 'code',
+                                key: 'code',
+                                width: 180,
+                                render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
+                              },
+                              {
+                                title: 'Khách hàng',
+                                dataIndex: 'customerName',
+                                key: 'customerName',
+                                ellipsis: true,
+                                width: 200
+                              },
+                              {
+                                title: 'Ngày tạo',
+                                dataIndex: 'createdAt',
+                                key: 'createdAt',
+                                width: 130,
+                                render: (date) => dayjs(date).format('DD/MM/YYYY')
+                              }
+                            ]}
+                            dataSource={quotations}
+                            loading={quotationLoading}
+                            pagination={false}
+                            size="small"
+                            scroll={{ y: 240 }}
+                            rowKey="id"
+                            locale={{
+                              emptyText: quotationLoading ? 'Đang tải...' : 'Không có báo giá nào',
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right side - Selected Items */}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ 
+                          marginBottom: '10px', 
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between'
+                        }}>
+                          <div style={{ 
+                            fontWeight: 600,
+                            fontSize: '14px',
+                            color: '#1f2937',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '6px'
+                          }}>
+                            <ShoppingOutlined style={{ color: '#3b82f6', fontSize: '16px' }} />
+                            <span>Linh kiện đã chọn</span>
+                          </div>
+                          {validQuotationItems.length > 0 && (
+                            <Tag color="blue" style={{ margin: 0, borderRadius: '12px', fontSize: '12px', padding: '2px 10px' }}>
+                              {validQuotationItems.length}
+                            </Tag>
+                          )}
+                        </div>
+                        <div style={{
+                          border: '1px solid #e5e7eb',
+                          borderRadius: '8px',
+                          overflow: 'hidden',
+                          background: '#fff'
+                        }}>
+                          <Table
+                            rowSelection={{
+                              selectedRowKeys: selectedQuotationItemIds,
+                              onChange: setSelectedQuotationItemIds,
+                              type: 'checkbox'
+                            }}
+                            columns={[
+                              {
+                                title: 'Mã SKU',
+                                key: 'nameSku',
+                                width: 280,
+                                ellipsis: true,
+                                render: (_, record) => (
+                                  <span style={{ fontWeight: 500, color: '#111', fontSize: '12px' }} title={`${record.partName} (${record.sku})`}>
+                                    {record.partName}{' '}
+                                    <span style={{ color: '#6b7280' }}>({record.sku})</span>
+                                  </span>
+                                )
+                              },
+                              {
+                                title: 'Tồn',
+                                dataIndex: 'quantityInStock',
+                                key: 'quantityInStock',
+                                width: 100,
+                                align: 'right',
+                                render: (value) => (
+                                  <span style={{ color: '#374151', fontSize: '12px' }}>
+                                    {value != null ? value : 0}
+                                  </span>
+                                )
+                              },
+                              {
+                                title: 'SL giữ',
+                                dataIndex: 'reservedQuantity',
+                                key: 'reservedQuantity',
+                                width: 100,
+                                align: 'right',
+                                render: (value) => (
+                                  <span style={{ color: '#374151', fontSize: '12px' }}>
+                                    {value != null ? value : 0}
+                                  </span>
+                                )
+                              },
+                              {
+                                title: 'SL tối thiểu',
+                                dataIndex: 'reorderLevel',
+                                key: 'reorderLevel',
+                                width: 120,
+                                align: 'right',
+                                render: (value) => (
+                                  <span style={{ color: '#374151', fontSize: '12px' }}>
+                                    {value != null ? value : 0}
+                                  </span>
+                                )
+                              },
+                              {
+                                title: 'SL cần mua',
+                                key: 'quantity',
+                                width: 130,
+                                align: 'right',
+                                render: (_, record) => (
+                                  <InputNumber
+                                    min={0}
+                                    value={quotationItemQuantities[record.priceQuotationItemId] ?? record.quantity}
+                                    onChange={(val) => {
+                                      const num = typeof val === 'number' ? val : 0
+                                      setQuotationItemQuantities(prev => ({
+                                        ...prev,
+                                        [record.priceQuotationItemId]: num
+                                      }))
+                                    }}
+                                    style={{ 
+                                      width: '100%',
+                                      borderRadius: '4px'
+                                    }}
+                                    size="small"
+                                    controls={false}
+                                  />
+                                )
+                              }
+                            ]}
+                            dataSource={quotationItems}
+                            pagination={false}
+                            size="small"
+                            scroll={{ y: 280 }}
+                            rowKey="priceQuotationItemId"
+                            rowClassName={(record, index) => 
+                              index % 2 === 0 ? 'table-row-even' : 'table-row-odd'
+                            }
+                            locale={{
+                              emptyText: (
+                                <div style={{ 
+                                  padding: '32px 16px',
+                                  textAlign: 'center',
+                                  color: '#9ca3af',
+                                  fontSize: '13px'
+                                }}>
+                                  Chưa chọn báo giá nào
+                                </div>
+                              ),
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Summary */}
+                        {validQuotationItems.length > 0 && (
+                          <div style={{
+                            marginTop: '10px',
+                            padding: '10px 12px',
+                            background: '#eff6ff',
+                            borderRadius: '6px',
+                            border: '1px solid #bfdbfe'
+                          }}>
+                            <div style={{ 
+                              fontSize: '12px',
+                              color: '#1e40af',
+                              fontWeight: 500,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}>
+                              <CheckCircleOutlined style={{ fontSize: '14px' }} />
+                              <span>
+                                Đã chọn <strong>{validQuotationItems.length}</strong> linh kiện
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Form Fields */}
+                    <div style={{
+                      padding: '16px',
+                      background: '#f9fafb',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                      marginTop: '16px'
+                    }}>
+                      <div style={{ marginBottom: '16px' }}>
+                        <div style={{ 
+                          fontWeight: 600, 
+                          marginBottom: '8px',
+                          fontSize: '13px',
+                          color: '#374151',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span>Lý do</span>
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>(tuỳ chọn)</span>
+                        </div>
+                        <Input
+                          placeholder="Nhập lý do..."
+                          value={purchaseReason}
+                          onChange={(e) => setPurchaseReason(e.target.value)}
+                          style={{
+                            borderRadius: '6px',
+                            borderColor: '#d1d5db',
+                            fontSize: '13px'
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <div style={{ 
+                          fontWeight: 600, 
+                          marginBottom: '8px',
+                          fontSize: '13px',
+                          color: '#374151',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <span>Ghi chú</span>
+                          <span style={{ fontSize: '11px', color: '#9ca3af', fontWeight: 400 }}>(tuỳ chọn)</span>
+                        </div>
+                        <TextArea
+                          rows={4}
+                          placeholder="Nhập ghi chú thêm..."
+                          value={purchaseNote}
+                          onChange={(e) => setPurchaseNote(e.target.value)}
+                          style={{
+                            borderRadius: '6px',
+                            borderColor: '#d1d5db',
+                            resize: 'none',
+                            fontSize: '13px'
+                          }}
+                          maxLength={500}
+                          showCount
+                        />
+                      </div>
+                    </div>
+                  </>
+                )
+              }
+            ]}
+          />
         </Modal>
       </div>
     </WarehouseLayout>

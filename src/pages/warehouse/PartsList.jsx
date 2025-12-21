@@ -512,22 +512,34 @@ export default function PartsList() {
         return
       }
 
-      // Build payload với các ID đã được validate (không null)
-      const payload = {
-        name: values.name,
-        marketId: marketId,  // Đã validate, chắc chắn là số
-        categoryId: categoryId,  // Đã validate, chắc chắn là số > 0
-        purchasePrice: values.importPrice ?? 0,
-        sellingPrice: values.sellingPrice ?? 0,
-        reorderLevel: values.alertThreshold ?? 0,
-        unitId: unitId,  // Đã validate, chắc chắn là số
-        supplierId: supplierId,  // Đã validate, chắc chắn là số
-        universal: values.useForAllModels || false,
-        specialPart: false,
-        discountRate: 0
+      // Validate giá nhập và giá bán phải > 0 (theo DTO validation)
+      const purchasePrice = values.importPrice ?? 0
+      const sellingPrice = values.sellingPrice ?? 0
+      if (purchasePrice <= 0) {
+        message.error('Giá nhập phải lớn hơn 0')
+        return
+      }
+      if (sellingPrice <= 0) {
+        message.error('Giá bán phải lớn hơn 0')
+        return
       }
 
-      // Chỉ thêm compatibleVehicleModelIds nếu không phải universal và có chọn model
+      // Build payload theo DTO PartUpdateReqDto
+      const payload = {
+        name: values.name,
+        marketId: marketId,
+        categoryId: categoryId,
+        purchasePrice: purchasePrice,
+        sellingPrice: sellingPrice,
+        reorderLevel: values.alertThreshold ?? null,
+        unitId: unitId,
+        supplierId: supplierId,
+        universal: values.useForAllModels || false,
+        specialPart: false,
+        note: values.note || null
+      }
+
+      // Chỉ thêm vehicleModelId nếu không phải universal và có chọn model
       if (!payload.universal) {
         if (!values.vehicleModel) {
           message.error('Vui lòng chọn dòng xe hoặc chọn "Dùng chung"')
@@ -538,9 +550,9 @@ export default function PartsList() {
           message.error('Vui lòng chọn dòng xe hợp lệ')
           return
         }
-        payload.compatibleVehicleModelIds = [vehicleModelId]
+        payload.vehicleModelId = vehicleModelId
       } else {
-        payload.compatibleVehicleModelIds = []
+        payload.vehicleModelId = null
       }
 
       console.log('=== Create Part Payload ===')
@@ -1518,10 +1530,13 @@ export default function PartsList() {
                   name="importPrice"
                   required={false}
                   style={{ marginBottom: 16 }}
-                  rules={[{ required: true, message: 'Nhập giá nhập' }]}
+                  rules={[
+                    { required: true, message: 'Nhập giá nhập' },
+                    { type: 'number', min: 0.01, message: 'Giá nhập phải lớn hơn 0' }
+                  ]}
                 >
                   <InputNumber 
-                    min={0} 
+                    min={0.01} 
                     style={{ width: '100%' }}
                     placeholder="Nhập giá nhập"
                     formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
@@ -1536,10 +1551,13 @@ export default function PartsList() {
                   name="sellingPrice"
                   required={false}
                   style={{ marginBottom: 16 }}
-                  rules={[{ required: true, message: 'Nhập giá bán' }]}
+                  rules={[
+                    { required: true, message: 'Nhập giá bán' },
+                    { type: 'number', min: 0.01, message: 'Giá bán phải lớn hơn 0' }
+                  ]}
                 >
                   <InputNumber 
-                    min={0} 
+                    min={0.01} 
                     style={{ width: '100%' }}
                     placeholder="Nhập giá bán"
                     formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
@@ -1549,6 +1567,10 @@ export default function PartsList() {
                 </Form.Item>
               </Col>
             </Row>
+
+            <Form.Item label="Ghi chú" name="note" style={{ marginBottom: 16 }}>
+              <Input.TextArea rows={3} placeholder="Nhập ghi chú (nếu có)" />
+            </Form.Item>
 
             <div style={{ display: 'flex', gap: 16, marginTop: 24, justifyContent: 'flex-end' }}>
               <Button 

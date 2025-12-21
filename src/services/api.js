@@ -813,4 +813,20 @@ export const purchaseRequestAPI = {
   },
   getSuggestedItems: () => get("/purchase-requests/suggested-items"),
   createManual: (payload) => post("/purchase-requests/manual", payload),
+  // Quotation mapping APIs
+  getAvailableQuotations: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.status) queryParams.append("status", params.status);
+    if (params.fromDate) queryParams.append("fromDate", params.fromDate);
+    if (params.toDate) queryParams.append("toDate", params.toDate);
+    if (params.customerId) queryParams.append("customerId", params.customerId);
+    if (params.page !== undefined) queryParams.append("page", params.page);
+    if (params.size !== undefined) queryParams.append("size", params.size);
+    const queryString = queryParams.toString();
+    return get(`/price-quotations/available-for-purchase-request${queryString ? `?${queryString}` : ""}`);
+  },
+  getQuotationItems: (quotationId) => get(`/price-quotations/${quotationId}/items`),
+  createFromQuotation: (payload) => post("/purchase-requests/from-quotation", payload),
+  getQuotationItemsByPurchaseRequest: (purchaseRequestId) => 
+    get(`/purchase-requests/${purchaseRequestId}/quotation-items`),
 };

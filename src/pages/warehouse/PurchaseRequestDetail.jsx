@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useParams } from 'react-router-dom'
-import { Table, Tag, message, Spin } from 'antd'
+import { Table, Tag, Spin } from 'antd'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { purchaseRequestAPI } from '../../services/api'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -42,6 +42,7 @@ export default function WarehousePurchaseRequestDetail() {
         createdBy: result.createdBy || 'N/A',
         reviewStatus: result.reviewStatus || 'Chờ duyệt',
         customerName: result.customerName || 'N/A',
+        quotationCode: result.quotationCode || null,
         items: (result.items || []).map((item, index) => ({
           id: index + 1,
           sku: item.sku || 'N/A',
@@ -49,7 +50,8 @@ export default function WarehousePurchaseRequestDetail() {
           quantity: item.quantity || 0,
           unitPrice: item.estimatedPurchasePrice || 0,
           totalPrice: item.total || 0,
-          unit: item.unit || 'Cái'
+          unit: item.unit || 'Cái',
+          quotationCode: item.quotationCode || result.quotationCode || null
         }))
       }
       setDetailData(mappedData)
@@ -76,7 +78,7 @@ export default function WarehousePurchaseRequestDetail() {
       title: <div style={{ textAlign: 'center', color: '#fff' }}>Mã SKU</div>,
       dataIndex: 'sku',
       key: 'sku',
-      width: 250
+      width: 200
     },
     {
       title: <div style={{ textAlign: 'center', color: '#fff' }}>Tên linh kiện</div>,
@@ -88,14 +90,14 @@ export default function WarehousePurchaseRequestDetail() {
       title: <div style={{ textAlign: 'center', color: '#fff' }}>SL cần</div>,
       dataIndex: 'quantity',
       key: 'quantity',
-      width: 120,
+      width: 100,
       align: 'center'
     },
     {
       title: <div style={{ textAlign: 'center', color: '#fff' }}>Đơn giá</div>,
       dataIndex: 'unitPrice',
       key: 'unitPrice',
-      width: 150,
+      width: 120,
       align: 'right',
       render: (value) => `${value.toLocaleString('vi-VN')} đ`
     },
@@ -103,9 +105,34 @@ export default function WarehousePurchaseRequestDetail() {
       title: <div style={{ textAlign: 'center', color: '#fff' }}>Tổng tiền</div>,
       dataIndex: 'totalPrice',
       key: 'totalPrice',
-      width: 150,
+      width: 120,
       align: 'right',
       render: (value) => `${value.toLocaleString('vi-VN')} đ`
+    },
+    {
+      title: <div style={{ textAlign: 'center', color: '#fff' }}>Nguồn báo giá</div>,
+      key: 'quotationSource',
+      width: 150,
+      align: 'center',
+      render: (_, record) => {
+        // Lấy quotationCode từ item trong response
+        const quotationCode = record.quotationCode
+        if (quotationCode) {
+          return (
+            <Tag 
+              color="blue" 
+              style={{ cursor: 'pointer' }}
+              onClick={() => {
+                // Navigate to quotation detail if available
+                // navigate(`/quotations/${quotationId}`)
+              }}
+            >
+              {quotationCode}
+            </Tag>
+          )
+        }
+        return <span style={{ color: '#9ca3af' }}>—</span>
+      }
     }
   ]
 
@@ -187,7 +214,8 @@ export default function WarehousePurchaseRequestDetail() {
         <div style={{
           background: '#fff',
           borderRadius: '8px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          marginBottom: '24px'
         }}>
           <Table
             columns={columns}
@@ -198,6 +226,7 @@ export default function WarehousePurchaseRequestDetail() {
             rowClassName={(_, index) => (index % 2 === 0 ? 'table-row-even' : 'table-row-odd')}
           />
         </div>
+
       </div>
     </WarehouseLayout>
   )
