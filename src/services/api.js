@@ -35,7 +35,7 @@ const PUBLIC_ENDPOINTS = [
 const isQuotationPublicEndpoint = (url) => {
   if (!url) return false;
   // Kiểm tra các endpoint quotation công khai
-  // /service-tickets/{code}/quotation - xem quotation theo code
+  // /service-tickets/{id}/quotation - xem quotation theo service ticket id
   // /price-quotations/{id}/confirm - xác nhận quotation
   // /price-quotations/{id}/reject - từ chối quotation
   // /service-tickets/{id}/status?status=Hủy - hủy service ticket
