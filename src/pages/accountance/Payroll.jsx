@@ -455,7 +455,7 @@ export function AccountancePayrollContent() {
               pageSize,
               total: total,
               showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total) => `Tổng ${total} nhân viên`,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (current, size) => {
                 setPage(current)

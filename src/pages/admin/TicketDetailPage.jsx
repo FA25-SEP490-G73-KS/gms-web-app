@@ -1246,6 +1246,34 @@ export default function TicketDetailPage() {
 
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
+    return { replacementItems, serviceItemsResult }
+  }
+
+  const CustomSelect = (props) => (
+    <Select
+      classNamePrefix="custom-select"
+      menuPortalTarget={menuPortalTarget}
+      styles={selectStyles}
+      components={selectComponentsOverrides}
+      {...props}
+    />
+  )
+
+  const CustomCreatableSelect = (props) => (
+    <CreatableSelect
+      classNamePrefix="custom-select"
+      menuPortalTarget={menuPortalTarget}
+      styles={props.styles || selectStyles}
+      components={selectComponentsOverrides}
+      {...props}
+    />
+  )
+
+  const parseNumericId = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string') {
+      const parsed = Number(value)
+      if (!Number.isNaN(parsed)) return parsed
     }
 
     const setQuotationDraft = async () => {
@@ -1787,6 +1815,71 @@ export default function TicketDetailPage() {
             if (error) {
                 throw new Error(error || 'Lưu báo giá không thành công. Vui lòng thử lại.')
             }
+            options={parts}
+            isSearchable
+            isClearable
+            isDisabled={inputsDisabled || (record.exportedQuantity > 0)}
+            isLoading={partsLoading}
+            styles={{
+              ...selectStyles,
+              control: (provided, state) => ({
+                ...provided,
+                minHeight: '42px',
+                borderRadius: '12px',
+                borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
+                boxShadow: state.isFocused ? '0 0 0 2px rgba(255, 255, 255, 0.15)' : 'none',
+                backgroundColor: (inputsDisabled || record.exportedQuantity > 0) ? '#f5f5f5' : '#fff',
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626',
+                cursor: (inputsDisabled || record.exportedQuantity > 0) ? 'not-allowed' : 'pointer',
+                ':hover': {
+                  borderColor: (inputsDisabled || record.exportedQuantity > 0) ? '#d0d7de' : '#3b82f6'
+                }
+              }),
+              valueContainer: (provided) => ({
+                ...provided,
+                padding: '0 12px',
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
+              }),
+              placeholder: (provided) => ({
+                ...provided,
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#9ca3af'
+              }),
+              singleValue: (provided) => ({
+                ...provided,
+                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
+              })
+            }}
+            noOptionsMessage={() => partsLoading ? 'Đang tải...' : 'Không có linh kiện'}
+            onCreateOption={(inputValue) => {
+              const trimmed = inputValue?.trim()
+              if (!trimmed) return
+              addCustomPartOption(trimmed, trimmed)
+              updateReplaceItem(record.id, {
+                category: trimmed,
+                categoryLabel: trimmed,
+                partId: null,
+                unit: '',
+                unitPrice: 0,
+                unitLocked: false,
+                unitPriceLocked: false
+              })
+            }}
+            onChange={(option) => {
+              const value = option?.value || ''
+              const selectedPart =
+                parts.find(p => String(p.value) === String(value)) ||
+                partsCache[value] ||
+                null
+
+              if (value) {
+                cachePartOption(
+                  value,
+                  option?.label ||
+                    selectedPart?.label ||
+                    selectedPart?.part?.name ||
+                    ''
+                )
+              }
 
             if (!response || (response.statusCode !== 200 && !response.result)) {
                 throw new Error('Lưu báo giá không thành công. Vui lòng thử lại.')
@@ -2183,117 +2276,117 @@ export default function TicketDetailPage() {
                   return <FileTextOutlined style={{ fontSize: 16, color }} />
               })()}
             </span>
-                        {!isHistoryPage && !inputsDisabled && (
-                            record.priceQuotationItemId ? (
-                                <Popconfirm
-                                    title="Xóa mục báo giá"
-                                    description="Bạn có chắc chắn muốn xóa mục này?"
-                                    onConfirm={() => deleteReplaceItem(record.id, record.priceQuotationItemId)}
-                                    okText="Xác nhận"
-                                    cancelText="Hủy"
-                                >
-                                    <DeleteOutlined
-                                        style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                                        title="Xóa dòng"
-                                    />
-                                </Popconfirm>
-                            ) : (
-                                <DeleteOutlined
-                                    style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                                    onClick={() => deleteReplaceItem(record.id, null)}
-                                    title="Xóa dòng"
-                                />
-                            )
-                        )}
-                    </div>
-                </div>
-            )
-        }
-    ]
+            {!isHistoryPage && !inputsDisabled && record.exportedQuantity === 0 && (
+              record.priceQuotationItemId ? (
+                <Popconfirm
+                  title="Xóa mục báo giá"
+                  description="Bạn có chắc chắn muốn xóa mục này?"
+                  onConfirm={() => deleteReplaceItem(record.id, record.priceQuotationItemId)}
+                  okText="Xác nhận"
+                  cancelText="Hủy"
+                >
+              <DeleteOutlined
+                style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                title="Xóa dòng"
+              />
+                </Popconfirm>
+              ) : (
+                <DeleteOutlined
+                  style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
+                  onClick={() => deleteReplaceItem(record.id, null)}
+                  title="Xóa dòng"
+                />
+              )
+            )}
+          </div>
+        </div>
+      )
+    }
+  ]
 
-    const serviceColumns = [
-        {
-            title: 'STT',
-            key: 'index',
-            width: 60,
-            align: 'center',
-            render: (_, __, index) => String(index + 1).padStart(2, '0')
-        },
-        {
-            title: 'Công việc',
-            key: 'task',
-            width: 580,
-            align: 'center',
-            render: (_, record) => (
-                <div>
-                    <input
-                        type="text"
-                        placeholder="Tên công việc..."
-                        value={record.task}
-                        onChange={(e) => updateServiceItem(record.id, 'task', e.target.value)}
-                        style={{
-                            ...baseInputStyle,
-                            borderColor: errors[`service_${record.id}_task`] ? '#ef4444' : baseInputStyle.borderColor
-                        }}
-                        onFocus={handleInputFocus}
-                        onBlur={handleInputBlur}
-                        disabled={inputsDisabled}
-                    />
-                    {errors[`service_${record.id}_task`] && (
-                        <div className="td-error-placeholder">
-                            {errors[`service_${record.id}_task`]}
-                        </div>
-                    )}
-                </div>
-            )
-        },
-        {
-            title: 'Đơn giá',
-            key: 'unitPrice',
-            width: 130,
-            align: 'center',
-            render: (_, record) => (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="Số tiền..."
-                        value={
-                            record.unitPrice !== null && record.unitPrice !== undefined
-                                ? record.unitPrice.toLocaleString('vi-VN')
-                                : ''
-                        }
-                        onChange={(e) => {
-                            const sanitized = e.target.value.replace(/[^\d]/g, '')
-                            const value = sanitized === '' ? 0 : parseInt(sanitized, 10)
-                            updateServiceItem(record.id, 'unitPrice', Number.isNaN(value) ? 0 : value)
-                        }}
-                        style={{
-                            ...baseInputStyle,
-                            borderColor: errors[`service_${record.id}_unitPrice`] ? '#ef4444' : baseInputStyle.borderColor
-                        }}
-                        onFocus={handleInputFocus}
-                        onBlur={handleInputBlur}
-                        disabled={inputsDisabled}
-                    />
-                    {errors[`service_${record.id}_unitPrice`] && (
-                        <div className="td-error-placeholder">
-                            {errors[`service_${record.id}_unitPrice`]}
-                        </div>
-                    )}
-                </div>
-            )
-        },
-        {
-            title: 'Thành tiền',
-            key: 'total',
-            width: 130,
-            align: 'center',
-            render: (_, record) => {
-                const value = record.total ?? 0
-                const text = value ? value.toLocaleString('vi-VN') + ' đ' : '--'
-                return (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+  const serviceColumns = [
+    {
+      title: 'STT',
+      key: 'index',
+      width: 60,
+      align: 'center',
+      render: (_, __, index) => String(index + 1).padStart(2, '0')
+    },
+    {
+      title: 'Công việc',
+      key: 'task',
+      width: 590,
+      align: 'center',
+      render: (_, record) => (
+        <div>
+          <input
+            type="text"
+            placeholder="Tên công việc..."
+            value={record.task}
+            onChange={(e) => updateServiceItem(record.id, 'task', e.target.value)}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`service_${record.id}_task`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
+          />
+          {errors[`service_${record.id}_task`] && (
+          <div className="td-error-placeholder">
+              {errors[`service_${record.id}_task`]}
+          </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Đơn giá',
+      key: 'unitPrice',
+      width: 150,
+      align: 'center',
+      render: (_, record) => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <input
+            type="text"
+            inputMode="numeric"
+            placeholder="Số tiền..."
+            value={
+              record.unitPrice !== null && record.unitPrice !== undefined
+                ? record.unitPrice.toLocaleString('vi-VN')
+                : ''
+            }
+            onChange={(e) => {
+              const sanitized = e.target.value.replace(/[^\d]/g, '')
+              const value = sanitized === '' ? 0 : parseInt(sanitized, 10)
+              updateServiceItem(record.id, 'unitPrice', Number.isNaN(value) ? 0 : value)
+            }}
+            style={{
+              ...baseInputStyle,
+              borderColor: errors[`service_${record.id}_unitPrice`] ? '#ef4444' : baseInputStyle.borderColor
+            }}
+            onFocus={handleInputFocus}
+            onBlur={handleInputBlur}
+            disabled={inputsDisabled}
+          />
+          {errors[`service_${record.id}_unitPrice`] && (
+          <div className="td-error-placeholder">
+              {errors[`service_${record.id}_unitPrice`]}
+          </div>
+          )}
+        </div>
+      )
+    },
+    {
+      title: 'Thành tiền',
+      key: 'total',
+      width: 150,
+      align: 'center',
+      render: (_, record) => {
+        const value = record.total ?? 0
+        const text = value ? value.toLocaleString('vi-VN') + ' đ' : '--'
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
               {text}
             </span>

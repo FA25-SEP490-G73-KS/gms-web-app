@@ -313,19 +313,12 @@ export function AccountanceDebtsContent() {
       )
     },
     {
-      title: <div style={{ textAlign: 'center' }}>Ngày hẹn trả</div>,
-      dataIndex: 'dueDate',
-      key: 'dueDate',
-      width: 140,
-      align: 'center'
-    },
-    {
       title: <div style={{ textAlign: 'center' }}>Tổng cộng</div>,
       dataIndex: 'totalAmount',
       key: 'totalAmount',
       align: 'center',
       width: 140,
-      render: (value) => value.toLocaleString('vi-VN')
+      render: (value) => `${value.toLocaleString('vi-VN')} đ`
     },
     {
       title: <div style={{ textAlign: 'center' }}>Đã thanh toán</div>,
@@ -333,7 +326,7 @@ export function AccountanceDebtsContent() {
       key: 'paidAmount',
       align: 'center',
       width: 150,
-      render: (value) => value.toLocaleString('vi-VN')
+      render: (value) => `${value.toLocaleString('vi-VN')} đ`
     },
     {
       title: <div style={{ textAlign: 'center' }}>Còn nợ</div>,
@@ -343,7 +336,7 @@ export function AccountanceDebtsContent() {
       width: 140,
       render: (value) => (
         <span style={{ fontWeight: 600 }}>
-          {value.toLocaleString('vi-VN')}
+          {value.toLocaleString('vi-VN')} đ
         </span>
       )
     },

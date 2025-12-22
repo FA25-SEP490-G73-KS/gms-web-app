@@ -315,7 +315,7 @@ export function AccountanceDebtDetailContent() {
       key: 'total',
       width: 130,
       align: 'center',
-      render: (value) => value.toLocaleString('vi-VN')
+      render: (value) => `${value.toLocaleString('vi-VN')} đ`
     },
     {
       title: 'Đã thanh toán',
@@ -323,7 +323,7 @@ export function AccountanceDebtDetailContent() {
       key: 'paid',
       width: 140,
       align: 'center',
-      render: (value) => value.toLocaleString('vi-VN')
+      render: (value) => `${value.toLocaleString('vi-VN')} đ`
     },
     {
       title: 'Còn lại',
@@ -333,7 +333,7 @@ export function AccountanceDebtDetailContent() {
       align: 'center',
       render: (value) => (
         <span style={{ fontWeight: 600 }}>
-          {value.toLocaleString('vi-VN')}
+          {value.toLocaleString('vi-VN')} đ
         </span>
       )
     },
@@ -507,10 +507,10 @@ export function AccountanceDebtDetailContent() {
         }}
       >
         <span style={{ fontSize: '16px', fontWeight: 600, color: '#111827' }}>
-          Tổng công còn nợ:
+          Tổng nợ còn lại:
         </span>
         <span style={{ fontSize: '24px', fontWeight: 700, color: '#111827' }}>
-          {totalRemaining.toLocaleString('vi-VN')}
+          {totalRemaining.toLocaleString('vi-VN')} đ
         </span>
       </div>
 

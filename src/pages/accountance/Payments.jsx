@@ -183,7 +183,7 @@ export function AccountancePaymentsContent() {
       key: 'totalAmount',
       width: 150,
       align: 'right',
-      render: (value) => value ? value.toLocaleString('vi-VN') : '0'
+      render: (value) => value ? `${value.toLocaleString('vi-VN')} đ` : '0 đ'
     },
     {
       title: <div style={{ textAlign: 'center' }}>Trạng thái DV</div>,
@@ -285,7 +285,7 @@ export function AccountancePaymentsContent() {
               current: page,
               pageSize: pageSize,
               total: total,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total) => `Tổng ${total} hóa đơn`,
               showSizeChanger: true,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (p, ps) => {

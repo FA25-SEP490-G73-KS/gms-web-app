@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Table, Button, Tag, message, Dropdown, Spin, Modal, Input, InputNumber } from 'antd'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import { stockExportAPI, employeeAPI } from '../../services/api'
@@ -17,7 +18,8 @@ export default function ExportDetail() {
     data: null, 
     loading: false,
     quantity: '',
-    technician: ''
+    technician: '',
+    showStatusWarning: false
   })
   const [employees, setEmployees] = useState([])
   const [loadingEmployees, setLoadingEmployees] = useState(false)
@@ -137,7 +139,7 @@ export default function ExportDetail() {
 
   const fetchExportItemDetail = async (itemId) => {
     // Mở modal và hiển thị trạng thái loading
-    setExportModal({ visible: true, data: null, loading: true, quantity: '', technician: '' })
+    setExportModal({ visible: true, data: null, loading: true, quantity: '', technician: '', showStatusWarning: false })
     
     try {
       // Dùng API chi tiết item xuất kho
@@ -145,7 +147,7 @@ export default function ExportDetail() {
       
       if (error) {
         message.error('Không thể tải thông tin xuất kho')
-        setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '' })
+        setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '', showStatusWarning: false })
         return
       }
 
@@ -182,7 +184,8 @@ export default function ExportDetail() {
         data: exportData,
         loading: false,
         quantity: '',
-        technician: ''
+        technician: '',
+        showStatusWarning: false
       })
     } catch (err) {
       console.error('Error fetching export item detail:', err)
@@ -197,6 +200,12 @@ export default function ExportDetail() {
       return
     }
 
+    // Kiểm tra serviceTicketStatus trước khi xuất kho
+    if (exportDetail?.serviceTicketStatus !== 'UNDER_REPAIR') {
+      setExportModal({ ...exportModal, showStatusWarning: true })
+      return
+    }
+
     const itemId = exportModal.data?.id
     if (!itemId) {
       message.error('Không tìm thấy thông tin item')
@@ -204,7 +213,7 @@ export default function ExportDetail() {
     }
 
     try {
-      setExportModal({ ...exportModal, loading: true })
+      setExportModal({ ...exportModal, loading: true, showStatusWarning: false })
 
       const payload = {
         quantity: parseFloat(exportModal.quantity),
@@ -221,7 +230,7 @@ export default function ExportDetail() {
       }
 
       message.success('Xuất kho thành công!')
-      setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '' })
+      setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '', showStatusWarning: false })
       fetchExportDetail() // Refresh data
     } catch (err) {
       console.error('Error exporting item:', err)
@@ -797,7 +806,7 @@ export default function ExportDetail() {
                       )
                     },
                     {
-                      title: 'Người nhận',
+                      title: 'Người xuất hàng',
                       dataIndex: 'receiver',
                       key: 'receiver',
                       render: (value) => (
@@ -833,7 +842,7 @@ export default function ExportDetail() {
           </div>
         }
         open={exportModal.visible}
-        onCancel={() => setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '' })}
+        onCancel={() => setExportModal({ visible: false, data: null, loading: false, quantity: '', technician: '', showStatusWarning: false })}
         footer={[
           <Button
             key="submit"
@@ -858,6 +867,35 @@ export default function ExportDetail() {
         <Spin spinning={exportModal.loading}>
           {exportModal.data && (
             <>
+              {/* Thông báo khi chưa thể xuất kho */}
+              {exportModal.showStatusWarning && (
+                <div style={{ 
+                  marginBottom: '24px',
+                  padding: '14px 16px',
+                  background: '#e6f4ff',
+                  borderRadius: '8px',
+                  border: '1px solid #bae0ff',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}>
+                  <InfoCircleOutlined style={{ 
+                    color: '#1890ff', 
+                    fontSize: '18px',
+                    marginTop: '2px',
+                    flexShrink: 0
+                  }} />
+                  <p style={{ 
+                    margin: 0,
+                    fontSize: '14px',
+                    color: '#0958d9',
+                    lineHeight: '1.6'
+                  }}>
+                    Phiếu dịch vụ chưa tiến hành sửa chữa thì chưa thể xuất kho.
+                  </p>
+                </div>
+              )}
+
               {/* Thông tin linh kiện */}
               <div style={{ marginBottom: '24px' }}>
                 <h4 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>

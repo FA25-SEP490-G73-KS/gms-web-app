@@ -111,13 +111,13 @@ export default function ImportDetail() {
         }
 
         const mappedData = {
-          code: result.code || 'N/A',
-          supplierName: result.supplierName || 'N/A',
+          code: result.code || '--',
+          supplierName: result.supplierName || '--',
           createdAt: result.createdAt || null,
-          createdBy: result.createdBy || 'N/A',
+          createdBy: result.createdBy || '--',
           receivedAt: result.receivedAt || null,
-          receivedBy: result.receivedBy || 'N/A',
-          purchaseRequestCode: result.purchaseRequestCode || 'N/A',
+          receivedBy: result.receivedBy || '--',
+          purchaseRequestCode: result.purchaseRequestCode || '--',
           status: mapStatus(result.status),
           note: result.note || '',
           totalAmount: result.totalAmount || 0,
