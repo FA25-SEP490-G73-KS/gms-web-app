@@ -63,6 +63,13 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
 
   const inputHeight = 40
   
+  const RequiredLabel = ({ text }) => (
+    <span>
+      {text}
+      <span style={{ color: 'red', marginLeft: 4 }}>*</span>
+    </span>
+  )
+  
   const multiSelectStyles = {
     control: (base, state) => ({
       ...base,
@@ -74,10 +81,13 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       '&:hover': { borderColor: '#3b82f6' }
     }),
     indicatorsContainer: (base) => ({ ...base, paddingRight: 8, gap: 0 }),
-    valueContainer: (base) => ({ ...base, padding: '4px 8px', gap: 4, flexWrap: 'wrap', alignItems: 'center' }),
+    valueContainer: (base) => ({ ...base, padding: '4px 8px', gap: 4, flexWrap: 'wrap', alignItems: 'center', overflow: 'visible' }),
     placeholder: (base) => ({ ...base, color: '#9ca3af', fontWeight: 500 }),
-    multiValue: (base) => ({ ...base, borderRadius: 12, backgroundColor: '#e0f2ff', border: '1px solid #bae6fd' }),
-    multiValueLabel: (base) => ({ ...base, color: '#0f172a', fontWeight: 600, padding: '2px 8px', fontSize: 13 }),
+    multiValue: (base) => ({ ...base, borderRadius: 12, backgroundColor: '#e0f2ff', border: '1px solid #bae6fd',  maxWidth: '100%',
+      overflow: 'visible' }),
+    multiValueLabel: (base) => ({ ...base, color: '#0f172a', fontWeight: 600, padding: '2px 8px', fontSize: 13, whiteSpace: 'nowrap',
+      overflow: 'visible',
+      maxWidth: 'none' }),
     multiValueRemove: (base) => ({ ...base, color: '#0ea5e9', borderLeft: '1px solid #bae6fd', padding: '2px 6px', ':hover': { backgroundColor: '#bae6fd', color: '#0284c7' } }),
     menu: (base) => ({ ...base, zIndex: 9999, borderRadius: 12, overflow: 'hidden' }),
     menuPortal: (base) => ({ ...base, zIndex: 9999 }),
@@ -87,33 +97,15 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
   const techOptionsStable = useMemo(() => technicianOptions, [technicianOptions])
   const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
 
-  // Bổ sung options tạm thời từ selections để ReactSelect hiển thị chip ngay cả khi option chưa tải kịp
-  const techOptionsWithFallback = useMemo(() => {
-    const existingValues = new Set((technicianOptions || []).map((opt) => String(opt.value)))
-    const fallback = (selectedTechs || [])
-      .filter((opt) => opt && opt.value && !existingValues.has(String(opt.value)))
-      .map((opt) => ({ value: opt.value, label: opt.label || opt.value }))
-    return [...technicianOptions, ...fallback]
-  }, [technicianOptions, selectedTechs])
-
-  const serviceOptionsWithFallback = useMemo(() => {
-    const existingValues = new Set((serviceOptions || []).map((opt) => String(opt.value)))
-    const fallback = (selectedServices || [])
-      .filter((opt) => opt && opt.value && !existingValues.has(String(opt.value)))
-      .map((opt) => ({ value: opt.value, label: opt.label || opt.value }))
-    return [...serviceOptions, ...fallback]
-  }, [serviceOptions, selectedServices])
 
   const handleTechChange = (selected) => {
-    const arr = normalizeOptions(selected)
-    setSelectedTechs(arr)
-    form.setFieldsValue({ assignedTechnicianIds: arr.map((s) => s.value) })
+    setSelectedTechs(selected || [])
+    form.setFieldsValue({ assignedTechnicianIds: (selected || []).map((opt) => opt.value) })
   }
 
   const handleServiceChange = (selected) => {
-    const arr = normalizeOptions(selected)
-    setSelectedServices(arr)
-    form.setFieldsValue({ serviceTypes: arr.map((s) => s.value) })
+    setSelectedServices(selected || [])
+    form.setFieldsValue({ serviceTypes: (selected || []).map((opt) => opt.value) })
   }
 
   useEffect(() => {
@@ -254,7 +246,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       const { data, error } = await employeesAPI.getTechnicians()
       setTechnicianLoading(false)
       if (error) {
-        message.error('Không thể tải danh sách kỹ thuật viên')
+        message.error('Không thể tải danh sách thợ sửa chữachữa')
         return
       }
       const list = data?.result || data || []
@@ -395,72 +387,29 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     }
   }, [brands, form, selectedBrandId])
 
-  // Sync selectedTechs và selectedServices khi form values hoặc options thay đổi
+  // Sync selectedTechs khi options đã load
   useEffect(() => {
-    const techIds = form.getFieldValue('assignedTechnicianIds') || []
-    if (Array.isArray(techIds) && techIds.length > 0) {
-      if (technicianOptions.length > 0) {
-        const matched = technicianOptions.filter(opt => techIds.map(String).includes(String(opt.value)))
-        if (matched.length > 0) {
-          const currentValues = selectedTechs.map(s => String(s.value)).sort().join(',')
-          const newValues = matched.map(m => String(m.value)).sort().join(',')
-          if (currentValues !== newValues) {
-            console.log('Syncing selectedTechs:', matched, 'from IDs:', techIds)
-            setSelectedTechs(matched)
-          }
-        } else {
-          console.warn('No matched technicians found. IDs:', techIds, 'Available:', technicianOptions.map(o => o.value))
-        }
-      } else {
-        // Nếu options chưa được load, đợi một chút rồi thử lại
-        const timer = setTimeout(() => {
-          const currentTechIds = form.getFieldValue('assignedTechnicianIds') || []
-          if (Array.isArray(currentTechIds) && currentTechIds.length > 0 && technicianOptions.length > 0) {
-            const matched = technicianOptions.filter(opt => currentTechIds.map(String).includes(String(opt.value)))
-            if (matched.length > 0) {
-              setSelectedTechs(matched)
-            }
-          }
-        }, 500)
-        return () => clearTimeout(timer)
-      }
-    } else if (techIds.length === 0 && selectedTechs.length > 0) {
-      setSelectedTechs([])
-    }
-  }, [form, technicianOptions, selectedTechs])
+    const ids = form.getFieldValue('assignedTechnicianIds')
+    if (!ids || !technicianOptions.length) return
 
+    const matched = technicianOptions.filter(opt =>
+      ids.map(String).includes(String(opt.value))
+    )
+
+    setSelectedTechs(matched)
+  }, [technicianOptions])
+
+  // Sync selectedServices khi options đã load
   useEffect(() => {
-    const serviceIds = form.getFieldValue('serviceTypes') || []
-    if (Array.isArray(serviceIds) && serviceIds.length > 0) {
-      if (serviceOptions.length > 0) {
-        const matched = serviceOptions.filter(opt => serviceIds.map(String).includes(String(opt.value)))
-        if (matched.length > 0) {
-          const currentValues = selectedServices.map(s => String(s.value)).sort().join(',')
-          const newValues = matched.map(m => String(m.value)).sort().join(',')
-          if (currentValues !== newValues) {
-            console.log('Syncing selectedServices:', matched, 'from IDs:', serviceIds)
-            setSelectedServices(matched)
-          }
-        } else {
-          console.warn('No matched services found. IDs:', serviceIds, 'Available:', serviceOptions.map(o => o.value))
-        }
-      } else {
-        // Nếu options chưa được load, đợi một chút rồi thử lại
-        const timer = setTimeout(() => {
-          const currentServiceIds = form.getFieldValue('serviceTypes') || []
-          if (Array.isArray(currentServiceIds) && currentServiceIds.length > 0 && serviceOptions.length > 0) {
-            const matched = serviceOptions.filter(opt => currentServiceIds.map(String).includes(String(opt.value)))
-            if (matched.length > 0) {
-              setSelectedServices(matched)
-            }
-          }
-        }, 500)
-        return () => clearTimeout(timer)
-      }
-    } else if (serviceIds.length === 0 && selectedServices.length > 0) {
-      setSelectedServices([])
-    }
-  }, [form, serviceOptions, selectedServices])
+    const ids = form.getFieldValue('serviceTypes')
+    if (!ids || !serviceOptions.length) return
+
+    const matched = serviceOptions.filter(opt =>
+      ids.map(String).includes(String(opt.value))
+    )
+
+    setSelectedServices(matched)
+  }, [serviceOptions])
 
   const fetchTicketData = async () => {
     setLoading(true)
@@ -502,10 +451,19 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       if (serviceNames.length > 0) {
         serviceNameValues = serviceNames
         // Hiển thị ngay với label tạm, sẽ đồng bộ id khi options tải xong
-        setSelectedServices(serviceNames.map((name) => ({ label: name, value: name })))
-        setPendingServiceNames(serviceNames)
-        form.setFieldsValue({ serviceTypes: serviceNames })
-      }
+        if (!serviceTypeIds.length && Array.isArray(data.serviceType)) {
+          const serviceNames = data.serviceType
+            .map(item =>
+              typeof item === 'string'
+                ? item.trim()
+                : (item?.serviceTypeName || item?.name || '').trim()
+            )
+            .filter(Boolean)
+        
+          if (serviceNames.length) {
+            setPendingServiceNames(serviceNames)
+          }
+        }
     }
 
 
@@ -521,9 +479,19 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       if (technicianNames.length > 0) {
         technicianNameValues = technicianNames
         // Hiển thị ngay với label tạm, sẽ đồng bộ id khi options tải xong
-        setSelectedTechs(technicianNames.map((name) => ({ label: name, value: name })))
-        setPendingTechnicianNames(technicianNames)
-        form.setFieldsValue({ assignedTechnicianIds: technicianNames })
+        if (!assignedTechnicianIds.length && Array.isArray(data.technicians)) {
+          const technicianNames = data.technicians
+            .map(item =>
+              typeof item === 'string'
+                ? item.trim()
+                : (item?.fullName || item?.name || '').trim()
+            )
+            .filter(Boolean)
+        
+          if (technicianNames.length) {
+            setPendingTechnicianNames(technicianNames)
+          }
+        }
       }
     }
 
@@ -600,16 +568,46 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       year: year || 2020,
       quoteStaff: quoteStaffName,
       receiveDate: receiveDate,
-      serviceTypes: serviceTypesValue,
-      assignedTechnicianIds: technicianIdsValue
+      // serviceTypes: serviceTypesValue,
+      // assignedTechnicianIds: technicianIdsValue
     })
 
-    // Hiển thị ngay selection từ IDs (fallback label = id nếu chưa có option)
-    setSelectedServices(buildSelectionsFromIds(serviceTypesValue || [], serviceOptions))
-    setSelectedTechs(buildSelectionsFromIds(technicianIdsValue || [], technicianOptions))
+    // Map IDs sang options với label đầy đủ nếu options đã load
+    // Nếu chưa load, useEffect sẽ sync sau khi options được load
+    if (serviceOptions.length > 0 && Array.isArray(serviceTypesValue) && serviceTypesValue.length > 0) {
+      const mappedServices = serviceOptions.filter(opt => {
+        const optValue = String(opt.value)
+        return serviceTypesValue.map(String).includes(optValue)
+      })
+      if (mappedServices.length > 0) {
+        console.log('[fetchTicketData] Setting selectedServices with labels:', mappedServices)
+        setSelectedServices(mappedServices)
+      }
+    } else {
+      // Nếu options chưa load, set tạm với buildSelectionsFromIds (sẽ được sync bởi useEffect)
+      const tempServices = buildSelectionsFromIds(serviceTypesValue || [], serviceOptions)
+      if (tempServices.length > 0) {
+        setSelectedServices(tempServices)
+      }
+    }
 
-    // Sync selectedTechs và selectedServices sẽ được xử lý bởi useEffect khi options được load
-    // Không cần setTimeout ở đây vì useEffect sẽ tự động sync
+    if (technicianOptions.length > 0 && Array.isArray(technicianIdsValue) && technicianIdsValue.length > 0) {
+      const mappedTechs = technicianOptions.filter(opt => {
+        const optValue = String(opt.value)
+        return technicianIdsValue.map(String).includes(optValue)
+      })
+      if (mappedTechs.length > 0) {
+        console.log('[fetchTicketData] Setting selectedTechs with labels:', mappedTechs)
+        setSelectedTechs(mappedTechs)
+      }
+    } else {
+      // Nếu options chưa load, set tạm với buildSelectionsFromIds (sẽ được sync bởi useEffect)
+      const tempTechs = buildSelectionsFromIds(technicianIdsValue || [], technicianOptions)
+      if (tempTechs.length > 0) {
+        setSelectedTechs(tempTechs)
+      }
+    }
+  }
   }
 
   const handleSubmit = async () => {
@@ -626,8 +624,8 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       const finalModelName = modelOption?.name || (finalModelId ? 'string' : '')
       
       const payload = {
-        assignedTechnicianId: (values.assignedTechnicianIds || []).length
-          ? values.assignedTechnicianIds.map((id) => Number(id))
+        assignedTechnicianId: selectedTechs.length
+          ? selectedTechs.map((opt) => Number(opt.value))
           : [0],
         brandId: finalBrandId || 0,
         brandName: finalBrandName,
@@ -636,7 +634,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
         licensePlate: (values.licensePlate || '').toUpperCase(),
         modelId: finalModelId || 0,
         modelName: finalModelName,
-        serviceTypeIds: (values.serviceTypes || []).map((id) => Number(id)),
+        serviceTypeIds: selectedServices.map((opt) => Number(opt.value)),
         vehicleId: '',
         vin: values.chassisNumber ? String(values.chassisNumber).trim() : (vehicleInfo.vin || ''),
         year: values.year ? Number(values.year) : (vehicleInfo.year || 2020)
@@ -710,25 +708,26 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
       <Form
         form={form}
         layout="vertical"
+        requiredMark={false}
         style={{ marginTop: '20px' }}
       >
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              label="Tên khách hàng"
+              label={<RequiredLabel text="Tên khách hàng" />}
               name="customerName"
               rules={[{ required: true, message: 'Vui lòng nhập tên khách hàng' }]}
             >
-              <Input placeholder="Nhập tên khách hàng" />
+              <Input placeholder="Nhập tên khách hàng" readOnly style={{ background: '#fafafa', cursor: 'not-allowed' }} />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item
-              label="Số điện thoại"
+              label={<RequiredLabel text="Số điện thoại" />}
               name="phone"
               rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
             >
-              <Input placeholder="Nhập số điện thoại" />
+              <Input placeholder="Nhập số điện thoại" readOnly style={{ background: '#fafafa', cursor: 'not-allowed' }} />
             </Form.Item>
           </Col>
         </Row>
@@ -736,7 +735,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              label="Hãng xe"
+              label={<RequiredLabel text="Hãng xe" />}
               name="brandId"
               rules={[{ required: true, message: 'Vui lòng chọn hãng xe' }]}
             >
@@ -748,12 +747,12 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
                   border: '1px solid #d9d9d9',
                   padding: '0 12px',
                   fontSize: 14,
-                  background: '#fff',
-                  cursor: 'pointer'
+                  background: '#fafafa',
+                  cursor: 'not-allowed'
                 }}
                 value={selectedBrandId || form.getFieldValue('brandId') || ''}
                 onChange={handleBrandChange}
-                disabled={brandsLoading}
+                disabled={true}
               >
                 <option value="">{brandsLoading ? 'Đang tải...' : 'Chọn hãng xe'}</option>
                 {brands.map((brand) => (
@@ -766,7 +765,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
           </Col>
           <Col span={12}>
             <Form.Item
-              label="Loại xe"
+              label={<RequiredLabel text="Loại xe" />}
               name="modelId"
               rules={[{ required: true, message: 'Vui lòng chọn loại xe' }]}
             >
@@ -778,12 +777,12 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
                   border: '1px solid #d9d9d9',
                   padding: '0 12px',
                   fontSize: 14,
-                  background: models.length === 0 ? '#f5f5f5' : '#fff',
-                  cursor: models.length === 0 ? 'not-allowed' : 'pointer'
+                  background: '#fafafa',
+                  cursor: 'not-allowed'
                 }}
                 value={selectedModelId || form.getFieldValue('modelId') || ''}
                 onChange={handleModelChange}
-                disabled={modelsLoading || models.length === 0}
+                disabled={true}
               >
                 <option value="">
                   {modelsLoading
@@ -805,16 +804,14 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              label="Biển số xe"
+              label={<RequiredLabel text="Biển số xe" />}
               name="licensePlate"
               rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
             >
               <Input
                 placeholder="Nhập biển số xe"
-                onBlur={(e) => {
-                  const upper = e.target.value.toUpperCase()
-                  form.setFieldsValue({ licensePlate: upper })
-                }}
+                readOnly
+                style={{ background: '#fafafa', cursor: 'not-allowed' }}
               />
             </Form.Item>
           </Col>
@@ -823,7 +820,7 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
               label="Số khung"
               name="chassisNumber"
             >
-              <Input placeholder="Nhập số khung" />
+              <Input placeholder="Nhập số khung" readOnly style={{ background: '#fafafa', cursor: 'not-allowed' }} />
             </Form.Item>
           </Col>
         </Row>
@@ -861,21 +858,19 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
         <Row gutter={16}>
           <Col span={12}>
             <Form.Item
-              label="Kỹ thuật viên"
-              name="assignedTechnicianIds"
-              rules={[{ required: true, message: 'Vui lòng chọn kỹ thuật viên' }]}
-              extra={selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn kỹ thuật viên'}
+              label={<RequiredLabel text="Thợ sửa chữa" />}
+              extra={selectedTechs.length ? `Đã chọn ${selectedTechs.length}` : 'Chưa chọn thợ sửa chữa'}
             >
               <ReactSelect
                 isMulti
-                options={techOptionsWithFallback}
+                options={technicianOptions}
                 value={selectedTechs}
                 onChange={handleTechChange}
                 getOptionLabel={(opt) => opt?.label || String(opt?.value ?? '')}
                 getOptionValue={(opt) => String(opt?.value ?? '')}
                 styles={multiSelectStyles}
-                placeholder={technicianLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
-                isDisabled={technicianLoading || techOptionsWithFallback.length === 0}
+                placeholder={technicianLoading ? 'Đang tải...' : 'Chọn thợ sửa chữachữa'}
+                isDisabled={technicianLoading}
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                 classNamePrefix="react-select"
               />
@@ -883,21 +878,19 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
           </Col>
           <Col span={12}>
             <Form.Item
-              label="Loại dịch vụ"
-              name="serviceTypes"
-              rules={[{ required: true, message: 'Vui lòng chọn loại dịch vụ' }]}
+              label={<RequiredLabel text="Loại dịch vụ" />}
               extra={selectedServices.length ? `Đã chọn ${selectedServices.length}` : 'Chưa chọn loại dịch vụ'}
             >
               <ReactSelect
                 isMulti
-                options={serviceOptionsWithFallback}
+                options={serviceOptions}
                 value={selectedServices}
                 onChange={handleServiceChange}
                 getOptionLabel={(opt) => opt?.label || String(opt?.value ?? '')}
                 getOptionValue={(opt) => String(opt?.value ?? '')}
                 styles={multiSelectStyles}
                 placeholder={serviceLoading ? 'Đang tải...' : 'Chọn loại dịch vụ'}
-                isDisabled={serviceLoading || serviceOptionsWithFallback.length === 0}
+                isDisabled={serviceLoading}
                 menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
                 classNamePrefix="react-select"
               />
@@ -932,4 +925,3 @@ export default function UpdateTicketModal({ open, onClose, ticketId, onSuccess }
     </Modal>
   )
 }
-

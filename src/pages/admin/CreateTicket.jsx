@@ -675,6 +675,22 @@ export default function CreateTicket() {
 
     const ticketId = data?.result?.serviceTicketId
     if (ticketId) {
+      // Nếu có appointmentId, cập nhật trạng thái appointment thành ARRIVED
+      if (appointmentPrefill?.appointmentId) {
+        try {
+          const { error: statusError } = await appointmentAPI.updateStatus(appointmentPrefill.appointmentId, 'ARRIVED')
+          if (statusError) {
+            console.error('Update appointment status error:', statusError)
+            // Không block việc navigate, chỉ log lỗi
+          } else {
+            console.log('✓ Appointment status updated to ARRIVED')
+          }
+        } catch (err) {
+          console.error('Error updating appointment status:', err)
+          // Không block việc navigate, chỉ log lỗi
+        }
+      }
+      
       message.success('Tạo phiếu dịch vụ thành công')
       navigate(`/service-advisor/orders/${ticketId}`)
     } else {
@@ -740,11 +756,32 @@ export default function CreateTicket() {
                   <Form.Item 
                     label={<span>Họ và tên <span style={{ color: '#ff4d4f' }}>*</span></span>} 
                     name="name" 
-                    rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]} 
+                    rules={[
+                      {
+                        required: true,
+                        message: 'Vui lòng nhập họ và tên'
+                      },
+                      {
+                        validator: (_, value) => {
+                          // Không cần kiểm tra rỗng vì đã có rule required ở trên
+                          if (!value) {
+                            return Promise.resolve()
+                          }
+
+                          const trimmedValue = value.trim()
+
+                          if (trimmedValue.length > 50) {
+                            return Promise.reject(new Error('Họ tên không được vượt quá 50 ký tự'))
+                          }
+
+                          return Promise.resolve()
+                        }
+                      }
+                    ]} 
                     style={formItemStyle}
                     required={false}
                   >
-                    <Input style={inputStyle} placeholder="VD: Đặng Thị Huyền" readOnly disabled />
+                    <Input style={inputStyle} placeholder="VD: Đặng Thị Huyền" maxLength={50} showCount allowClear />
                   </Form.Item>
 
                   <Form.Item 
