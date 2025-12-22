@@ -555,17 +555,6 @@ export default function AdminAppointments() {
       const fullAppointmentData = appointmentResponse.result
       console.log('✓ Appointment data fetched:', fullAppointmentData)
 
-      // Update trạng thái lịch hẹn thành ARRIVED
-      console.log('Updating appointment status to ARRIVED...')
-      const { error: statusError } = await appointmentAPI.updateStatus(appointmentId, 'ARRIVED')
-      if (statusError) {
-        console.error('Update status error:', statusError)
-        message.error('Cập nhật trạng thái lịch hẹn thất bại')
-        setUpdatingStatus(false)
-        return
-      }
-      console.log('✓ Appointment status updated to ARRIVED')
-
       // Chuẩn bị data để pass sang CreateTicket
       const navigationState = {
         fromAppointment: true,
@@ -579,7 +568,7 @@ export default function AdminAppointments() {
       
       message.success('Đang chuyển sang trang tạo phiếu dịch vụ...')
       
-      // Clean up first
+      // Clean up
       setSelected(null)
       setSelectedFull(null)
       setUpdatingStatus(false)
@@ -589,8 +578,6 @@ export default function AdminAppointments() {
         console.log('Navigating to /service-advisor/orders/create')
         navigate('/service-advisor/orders/create', { state: navigationState })
       }, 300)
-      
-      await fetchAppointments()
 
     } catch (err) {
       console.error('Error in handleCreateTicket:', err)
