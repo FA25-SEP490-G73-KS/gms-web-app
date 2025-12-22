@@ -139,12 +139,19 @@ export default function ServiceTicketQuotation() {
             return;
         }
 
+        // Convert serviceTicketId từ string sang number để đảm bảo Spring match đúng endpoint Long
+        const ticketIdNumber = Number(serviceTicketId);
+        if (isNaN(ticketIdNumber) || ticketIdNumber <= 0) {
+            message.error('ID phiếu dịch vụ không hợp lệ');
+            return;
+        }
+
         setLoading(true);
         try {
             // Allow viewing quotation without authentication (public endpoint)
-            // Backend: GET /api/service-tickets/{serviceTicketId}/quotation
+            // Backend: GET /api/service-tickets/{serviceTicketId}/quotation (Long serviceTicketId)
             const { data: response, error } = await serviceTicketAPI.getQuotationByCode(
-                serviceTicketId,
+                ticketIdNumber,
                 { skipAuth: true }
             );
 

@@ -142,7 +142,10 @@ function App() {
         <Route path="/blog" element={<BlogList />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/appointment" element={<AppointmentService />} />
+        {/* Route với /api prefix để tương thích với URL từ Zalo */}
         <Route path="/api/service-tickets/:serviceTicketId/quotation" element={<ServiceTicketQuotation />} />
+        {/* Route không có /api prefix (URL mới) */}
+        <Route path="/service-tickets/:serviceTicketId/quotation" element={<ServiceTicketQuotation />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/enter-otp" element={<EnterOTP />} />
