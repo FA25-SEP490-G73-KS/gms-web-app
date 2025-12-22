@@ -9,8 +9,24 @@ export default function Statistics() {
   const [loading, setLoading] = useState(false)
   const [financialData, setFinancialData] = useState(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(null) // null = tất cả tháng
 
   const years = Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i)
+  const months = [
+    { value: null, label: 'Tất cả tháng' },
+    { value: 1, label: 'Tháng 1' },
+    { value: 2, label: 'Tháng 2' },
+    { value: 3, label: 'Tháng 3' },
+    { value: 4, label: 'Tháng 4' },
+    { value: 5, label: 'Tháng 5' },
+    { value: 6, label: 'Tháng 6' },
+    { value: 7, label: 'Tháng 7' },
+    { value: 8, label: 'Tháng 8' },
+    { value: 9, label: 'Tháng 9' },
+    { value: 10, label: 'Tháng 10' },
+    { value: 11, label: 'Tháng 11' },
+    { value: 12, label: 'Tháng 12' }
+  ]
 
   const summary = financialData || {
     totalRevenue: 0,
@@ -84,7 +100,7 @@ export default function Statistics() {
     const fetchFinancialOverview = async () => {
       setLoading(true)
       try {
-        const { data, error } = await dashboardAPI.getFinancialOverview(selectedYear)
+        const { data, error } = await dashboardAPI.getFinancialOverview(selectedYear, selectedMonth)
 
         if (error) {
           console.error('Error fetching financial overview:', error)
@@ -109,7 +125,7 @@ export default function Statistics() {
     }
 
     fetchFinancialOverview()
-  }, [selectedYear])
+  }, [selectedYear, selectedMonth])
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('vi-VN').format(value || 0)
@@ -127,6 +143,27 @@ export default function Statistics() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#6b7280', fontSize: 14 }}>Filter tháng và năm</span>
+            <select
+              value={selectedMonth === null ? '' : selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value === '' ? null : Number(e.target.value))}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid #d1d5db',
+                fontSize: '14px',
+                color: '#111827',
+                backgroundColor: '#fff',
+                cursor: 'pointer',
+                outline: 'none',
+                minWidth: '120px'
+              }}
+            >
+              {months.map(month => (
+                <option key={month.value === null ? 'all' : month.value} value={month.value === null ? '' : month.value}>
+                  {month.label}
+                </option>
+              ))}
+            </select>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(Number(e.target.value))}
