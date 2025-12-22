@@ -56,10 +56,15 @@ axiosClient.interceptors.request.use(
         config.url?.includes(endpoint) || config.url?.endsWith(endpoint)
     );
 
-    // Với skipAuth: true, vẫn gửi token nếu có (để backend validate)
-    // nhưng khi lỗi 401 sẽ không redirect về login
-    // Với public endpoint thực sự, không gửi token
-    if (!isPublicEndpoint) {
+    // Endpoint được xem là "public" nếu:
+    // - Nằm trong danh sách PUBLIC_ENDPOINTS, hoặc
+    // - Là các endpoint quotation public (xem báo giá, xác nhận/từ chối, hủy service ticket), hoặc
+    // - Gọi với skipAuth: true (ví dụ link public cho khách hàng)
+    const isPublicRequest =
+      isPublicEndpoint || isQuotationPublicEndpoint(config.url) || skipAuth;
+
+    // Chỉ gắn token cho các request KHÔNG phải public và không skipAuth
+    if (!isPublicRequest) {
       const token = getToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
