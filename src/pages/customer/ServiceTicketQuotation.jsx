@@ -118,7 +118,8 @@ const QUOTATION_STATUS_CONFIG = {
 };
 
 export default function ServiceTicketQuotation() {
-    const { serviceTicketCode } = useParams();
+    // Lấy ID phiếu dịch vụ từ URL (theo API: /service-tickets/{serviceTicketId}/quotation)
+    const { serviceTicketId } = useParams();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [quotationData, setQuotationData] = useState(null);
@@ -126,22 +127,26 @@ export default function ServiceTicketQuotation() {
     const [hasCancelled, setHasCancelled] = useState(false);
 
     useEffect(() => {
-        if (serviceTicketCode) {
+        if (serviceTicketId) {
             fetchQuotation();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [serviceTicketCode]);
+    }, [serviceTicketId]);
 
     const fetchQuotation = async () => {
-        if (!serviceTicketCode) {
-            message.warning('Không tìm thấy mã phiếu dịch vụ');
+        if (!serviceTicketId) {
+            message.warning('Không tìm thấy ID phiếu dịch vụ');
             return;
         }
 
         setLoading(true);
         try {
             // Allow viewing quotation without authentication (public endpoint)
-            const { data: response, error } = await serviceTicketAPI.getQuotationByCode(serviceTicketCode, { skipAuth: true });
+            // Backend: GET /api/service-tickets/{serviceTicketId}/quotation
+            const { data: response, error } = await serviceTicketAPI.getQuotationByCode(
+                serviceTicketId,
+                { skipAuth: true }
+            );
 
             if (error) {
                 message.error(error || 'Không thể tải thông tin báo giá');
