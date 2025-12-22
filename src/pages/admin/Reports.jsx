@@ -611,15 +611,14 @@ export default function Reports() {
 
           {/* Hàng đánh giá & khách hàng tiềm năng */}
            <Row gutter={16} align="stretch">
-             <Col xs={24} md={14}>
+            <Col xs={24} md={10}>
               <Card
                 title="Mức độ hài lòng"
-                extra={rating.total ? `Tổng: ${rating.total}` : ''}
-                 style={{ borderRadius: 12, height: '100%' }}
-                 bodyStyle={{ display: 'flex', flexDirection: 'column' }}
+                style={{ borderRadius: 12, height: '100%' }}
+                bodyStyle={{ display: 'flex', flexDirection: 'column', padding: 16 }}
               >
-                 <div className="chart-container" style={{ flex: 1 }}>
-                  {renderRatingRows()}
+                <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
+                  Chức năng đang được phát triển
                 </div>
               </Card>
             </Col>
