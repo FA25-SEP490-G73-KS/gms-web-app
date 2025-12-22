@@ -9,6 +9,8 @@ import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 
 const loyaltyConfig = {
   BRONZE: { color: '#C3AA5E', text: 'Đồng' },
+  // Hỗ trợ cả SLIVER (enum backend) và SILVER
+  SLIVER: { color: '#99A8BC', text: 'Bạc' },
   SILVER: { color: '#99A8BC', text: 'Bạc' },
   GOLD: { color: '#d4af37', text: 'Vàng' }
 }

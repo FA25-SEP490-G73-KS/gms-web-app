@@ -97,6 +97,16 @@ export default function ManagerLayout({ children }) {
   const isActive = (to) => location.pathname === to
   const isActiveParent = (path) => location.pathname.startsWith(path)
 
+  // Đánh dấu active cho mục "Danh sách khách hàng" cả khi đang ở trang chi tiết
+  const isActiveCustomerList = () => {
+    const path = location.pathname || ''
+    // /manager/customers hoặc /manager/customers/:id (nhưng không phải /stats)
+    return (
+      path === '/manager/customers' ||
+      (path.startsWith('/manager/customers/') && !path.includes('/stats'))
+    )
+  }
+
   const handleLogout = async () => {
     await logout()
     navigate('/login')
@@ -120,6 +130,17 @@ export default function ManagerLayout({ children }) {
     }
     if (path.startsWith('/manager/accountance/finance')) {
       return { parent: 'Thu - chi', parentPath: null, current: 'Danh sách phiếu' }
+    }
+    // Công nợ
+    if (
+      path.startsWith('/manager/accountance/debts/') &&
+      path !== '/manager/accountance/debts'
+    ) {
+      return {
+        parent: 'Công nợ',
+        parentPath: '/manager/accountance/debts',
+        current: 'Chi tiết công nợ'
+      }
     }
     if (path.startsWith('/manager/accountance/debts')) {
       return { parent: '', parentPath: null, current: 'Công nợ' }
@@ -279,7 +300,7 @@ export default function ManagerLayout({ children }) {
                   Thống kê
                 </button>
                 <button
-                  className={`submenu-item ${isActive('/manager/customers') ? 'active' : ''}`}
+                  className={`submenu-item ${isActiveCustomerList() ? 'active' : ''}`}
                   onClick={() => navigate('/manager/customers')}
                 >
                   Danh sách khách hàng
@@ -289,7 +310,7 @@ export default function ManagerLayout({ children }) {
           </div>
 
           <button
-            className={`manager-nav-item ${isActive('/manager/accountance/debts') ? 'active' : ''}`}
+            className={`manager-nav-item ${isActiveParent('/manager/accountance/debts') ? 'active' : ''}`}
             onClick={() => navigate('/manager/accountance/debts')}
           >
             <i className="bi bi-wallet2" />

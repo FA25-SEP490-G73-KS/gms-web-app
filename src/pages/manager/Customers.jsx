@@ -8,6 +8,7 @@ import { goldTableHeader } from '../../utils/tableComponents'
 
 const loyaltyConfig = {
   BRONZE: { color: '#a97155', text: 'Bronze' },
+  SLIVER: { color: '#c0c0c0', text: 'Silver' },
   SILVER: { color: '#c0c0c0', text: 'Silver' },
   GOLD: { color: '#d4af37', text: 'Gold' },
   PLATINUM: { color: '#4f8cff', text: 'Platinum' }

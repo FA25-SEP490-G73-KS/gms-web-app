@@ -9,6 +9,8 @@ import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 
 const loyaltyConfig = {
   BRONZE: { color: '#a97155', label: 'Bronze' },
+  // Backend enum đang dùng 'SLIVER' (typo), vẫn giữ 'SILVER' để tương thích cũ
+  SLIVER: { color: '#c0c0c0', label: 'Silver' },
   SILVER: { color: '#c0c0c0', label: 'Silver' },
   GOLD: { color: '#d4af37', label: 'Gold' },
   PLATINUM: { color: '#4f8cff', label: 'Platinum' },
@@ -216,8 +218,19 @@ export default function CustomerDetailForManager() {
           setVehicles(
             payload.vehicles.map((vehicle, index) => ({
               plate: vehicle.licensePlate || `Xe-${index}`,
-              brand: vehicle.brand || '—',
-              model: vehicle.model || '—',
+              // Hãng xe lấy từ brandName (fallback các field khác nếu cần)
+              brand:
+                vehicle.brandName ||
+                vehicle.brand ||
+                vehicle.brand?.name ||
+                '—',
+              // Dòng xe lấy từ vehicleModelName (fallback các field khác nếu cần)
+              model:
+                vehicle.vehicleModelName ||
+                vehicle.modelName ||
+                vehicle.model?.name ||
+                vehicle.model ||
+                '—',
               vin: vehicle.vin || '—',
               year: vehicle.year || '—',
             }))
@@ -324,7 +337,8 @@ export default function CustomerDetailForManager() {
       fullName: customer.fullName,
       phone: displayPhoneFrom84(customer.phone),
       address: customer.address,
-      customerType: customer.customerType || 'CA_NHAN',
+      // Mức độ thân thiết (loyalty level) mặc định BRONZE nếu không có
+      customerLoyaltyLevel: (customer.loyaltyLevel || 'BRONZE').toUpperCase(),
     })
     setEditVisible(true)
   }
@@ -337,12 +351,18 @@ export default function CustomerDetailForManager() {
         return
       }
       setUpdating(true)
+
+      const selectedLoyalty =
+        (values.customerLoyaltyLevel || customer.loyaltyLevel || 'BRONZE').toUpperCase()
+
       const payload = {
         customerId: customer.id,
         fullName: values.fullName?.trim(),
         phone: normalizePhoneTo84(values.phone?.trim()),
         address: values.address?.trim(),
-        customerType: values.customerType,
+        // Gửi đúng theo CustomerRequestDto ở backend
+        // (BRONZE / SILVER / GOLD)
+        customerLoyaltyLevel: selectedLoyalty,
       }
       const { error } = await customersAPI.update(customer.id, payload)
       if (error) {
@@ -353,7 +373,7 @@ export default function CustomerDetailForManager() {
         fullName: payload.fullName || prev.fullName,
         phone: payload.phone || prev.phone,
         address: payload.address || prev.address,
-        customerType: payload.customerType || prev.customerType,
+        loyaltyLevel: selectedLoyalty,
       }))
       message.success('Cập nhật khách hàng thành công')
       setEditVisible(false)
@@ -381,7 +401,7 @@ export default function CustomerDetailForManager() {
             <Row gutter={16} align="middle" style={{ marginBottom: 12 }}>
               <Col flex="auto">
                 <h2 style={{ marginBottom: 0 }}>Thông tin khách hàng</h2>
-                <div style={{ color: '#98A2B3' }}>Quản lý dữ liệu cá nhân & lịch sử dịch vụ</div>
+                <div style={{ color: '#98A2B3', marginTop: 8 }}>Quản lý dữ liệu cá nhân & lịch sử dịch vụ</div>
               </Col>
               <Col>
                 <Button type="primary" onClick={openEditModal}>
@@ -507,14 +527,15 @@ export default function CustomerDetailForManager() {
             <Input placeholder="Địa chỉ khách hàng" />
           </Form.Item>
           <Form.Item
-            label="Loại khách hàng"
-            name="customerType"
-            rules={[{ required: true, message: 'Vui lòng chọn loại khách hàng' }]}
+            label="Mức độ thân thiết"
+            name="customerLoyaltyLevel"
+            rules={[{ required: true, message: 'Vui lòng chọn mức độ thân thiết' }]}
           >
             <Select
               options={[
-                { label: 'Cá nhân', value: 'CA_NHAN' },
-                { label: 'Doanh nghiệp', value: 'DOANH_NGHIEP' },
+                { label: 'BRONZE', value: 'BRONZE' },
+                { label: 'SLIVER', value: 'SLIVER' },
+                { label: 'GOLD', value: 'GOLD' }
               ]}
             />
           </Form.Item>

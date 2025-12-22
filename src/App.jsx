@@ -52,6 +52,8 @@ import SupplierForm from './pages/manager/SupplierForm';
 import FinanceForManager from './pages/manager/accountance/Finance';
 import PaymentsForManager from './pages/manager/accountance/Payments';
 import DebtsForManager from './pages/manager/accountance/Debts';
+import ManagerDebtDetail from './pages/manager/accountance/DebtDetail';
+import ManagerDebtTicketDetail from './pages/manager/accountance/DebtTicketDetail';
 import EmployeeListForManager from './pages/manager/accountance/EmployeeList';
 import AttendanceForManager from './pages/manager/accountance/Attendance';
 import PayrollForManager from './pages/manager/accountance/Payroll';
@@ -385,6 +387,16 @@ function App() {
         <Route path="/manager/accountance/debts" element={
           <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
             <DebtsForManager />
+          </ProtectedRoute>
+        } />
+        <Route path="/manager/accountance/debts/detail" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
+            <ManagerDebtDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/manager/accountance/debts/ticket/:ticketId" element={
+          <ProtectedRoute allowedRoles={[USER_ROLES.MANAGER]}>
+            <ManagerDebtTicketDetail />
           </ProtectedRoute>
         } />
         

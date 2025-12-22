@@ -774,8 +774,13 @@ export const dashboardAPI = {
     if (month) params.append("month", month);
     return get(`/dashboard/warehouse/overview?${params.toString()}`);
   },
-  getServiceAdvisorOverview: () => {
-    return get("/dashboard/service-advisor/overview");
+  getServiceAdvisorOverview: (year) => {
+    const params = new URLSearchParams();
+    if (year) params.append("year", year);
+    const query = params.toString();
+    return get(
+      `/dashboard/service-advisor/overview${query ? `?${query}` : ""}`
+    );
   },
   getFinancialOverview: (year) => {
     const params = new URLSearchParams();
@@ -823,10 +828,16 @@ export const purchaseRequestAPI = {
     if (params.page !== undefined) queryParams.append("page", params.page);
     if (params.size !== undefined) queryParams.append("size", params.size);
     const queryString = queryParams.toString();
-    return get(`/price-quotations/available-for-purchase-request${queryString ? `?${queryString}` : ""}`);
+    return get(
+      `/price-quotations/available-for-purchase-request${
+        queryString ? `?${queryString}` : ""
+      }`
+    );
   },
-  getQuotationItems: (quotationId) => get(`/price-quotations/${quotationId}/items`),
-  createFromQuotation: (payload) => post("/purchase-requests/from-quotation", payload),
-  getQuotationItemsByPurchaseRequest: (purchaseRequestId) => 
+  getQuotationItems: (quotationId) =>
+    get(`/price-quotations/${quotationId}/items`),
+  createFromQuotation: (payload) =>
+    post("/purchase-requests/from-quotation", payload),
+  getQuotationItemsByPurchaseRequest: (purchaseRequestId) =>
     get(`/purchase-requests/${purchaseRequestId}/quotation-items`),
 };

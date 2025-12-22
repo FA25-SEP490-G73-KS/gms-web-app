@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { Table, Input, Button, Space, Tag, message, Modal, Tabs, Spin, Checkbox, DatePicker } from 'antd'
 import { SearchOutlined, FilterOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { usePayOS } from '@payos/payos-checkout'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
@@ -40,6 +40,7 @@ const formatDate = (value) => {
 
 export function AccountanceDebtsContent() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [query, setQuery] = useState('')
   const [expandedRowKeys, setExpandedRowKeys] = useState([])
   const [loading, setLoading] = useState(false)
@@ -373,7 +374,12 @@ export function AccountanceDebtsContent() {
           type="text"
           icon={<i className="bi bi-eye" />}
           onClick={() => {
-            navigate('/accountance/debts/detail', { state: { customer: record } })
+            const path = location.pathname || ''
+            const base =
+              path.startsWith('/manager/accountance')
+                ? '/manager/accountance'
+                : '/accountance'
+            navigate(`${base}/debts/detail`, { state: { customer: record } })
           }}
         />
       ),

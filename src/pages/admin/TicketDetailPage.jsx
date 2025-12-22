@@ -1223,7 +1223,7 @@ export default function TicketDetailPage() {
     const validateForm = () => {
         const newErrors = {}
 
-        replaceItems.forEach((item, index) => {
+        replaceItems.forEach((item) => {
             if (!item.category) {
                 newErrors[`replace_${item.id}_category`] = 'Trường bắt buộc'
             }
@@ -1239,41 +1239,18 @@ export default function TicketDetailPage() {
             if (!item.task) {
                 newErrors[`service_${item.id}_task`] = 'Trường bắt buộc'
             }
-            if (item.unitPrice === null || item.unitPrice === undefined || item.unitPrice === '' || Number.isNaN(item.unitPrice)) {
+            if (
+                item.unitPrice === null ||
+                item.unitPrice === undefined ||
+                item.unitPrice === '' ||
+                Number.isNaN(item.unitPrice)
+            ) {
                 newErrors[`service_${item.id}_unitPrice`] = 'Trường bắt buộc'
             }
         })
 
         setErrors(newErrors)
         return Object.keys(newErrors).length === 0
-    return { replacementItems, serviceItemsResult }
-  }
-
-  const CustomSelect = (props) => (
-    <Select
-      classNamePrefix="custom-select"
-      menuPortalTarget={menuPortalTarget}
-      styles={selectStyles}
-      components={selectComponentsOverrides}
-      {...props}
-    />
-  )
-
-  const CustomCreatableSelect = (props) => (
-    <CreatableSelect
-      classNamePrefix="custom-select"
-      menuPortalTarget={menuPortalTarget}
-      styles={props.styles || selectStyles}
-      components={selectComponentsOverrides}
-      {...props}
-    />
-  )
-
-  const parseNumericId = (value) => {
-    if (typeof value === 'number' && Number.isFinite(value)) return value
-    if (typeof value === 'string') {
-      const parsed = Number(value)
-      if (!Number.isNaN(parsed)) return parsed
     }
 
     const setQuotationDraft = async () => {
@@ -1802,7 +1779,6 @@ export default function TicketDetailPage() {
             await setQuotationDraft()
 
             const payload = {
-
                 discount: ticketData?.priceQuotation?.discount ?? 0,
                 estimateAmount: grandTotal,
                 items: buildQuotationItemsPayload(),
@@ -1815,71 +1791,6 @@ export default function TicketDetailPage() {
             if (error) {
                 throw new Error(error || 'Lưu báo giá không thành công. Vui lòng thử lại.')
             }
-            options={parts}
-            isSearchable
-            isClearable
-            isDisabled={inputsDisabled || (record.exportedQuantity > 0)}
-            isLoading={partsLoading}
-            styles={{
-              ...selectStyles,
-              control: (provided, state) => ({
-                ...provided,
-                minHeight: '42px',
-                borderRadius: '12px',
-                borderColor: state.isFocused ? '#3b82f6' : '#d0d7de',
-                boxShadow: state.isFocused ? '0 0 0 2px rgba(255, 255, 255, 0.15)' : 'none',
-                backgroundColor: (inputsDisabled || record.exportedQuantity > 0) ? '#f5f5f5' : '#fff',
-                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626',
-                cursor: (inputsDisabled || record.exportedQuantity > 0) ? 'not-allowed' : 'pointer',
-                ':hover': {
-                  borderColor: (inputsDisabled || record.exportedQuantity > 0) ? '#d0d7de' : '#3b82f6'
-                }
-              }),
-              valueContainer: (provided) => ({
-                ...provided,
-                padding: '0 12px',
-                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
-              }),
-              placeholder: (provided) => ({
-                ...provided,
-                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#9ca3af'
-              }),
-              singleValue: (provided) => ({
-                ...provided,
-                color: (inputsDisabled || record.exportedQuantity > 0) ? '#9ca3af' : '#262626'
-              })
-            }}
-            noOptionsMessage={() => partsLoading ? 'Đang tải...' : 'Không có linh kiện'}
-            onCreateOption={(inputValue) => {
-              const trimmed = inputValue?.trim()
-              if (!trimmed) return
-              addCustomPartOption(trimmed, trimmed)
-              updateReplaceItem(record.id, {
-                category: trimmed,
-                categoryLabel: trimmed,
-                partId: null,
-                unit: '',
-                unitPrice: 0,
-                unitLocked: false,
-                unitPriceLocked: false
-              })
-            }}
-            onChange={(option) => {
-              const value = option?.value || ''
-              const selectedPart =
-                parts.find(p => String(p.value) === String(value)) ||
-                partsCache[value] ||
-                null
-
-              if (value) {
-                cachePartOption(
-                  value,
-                  option?.label ||
-                    selectedPart?.label ||
-                    selectedPart?.part?.name ||
-                    ''
-                )
-              }
 
             if (!response || (response.statusCode !== 200 && !response.result)) {
                 throw new Error('Lưu báo giá không thành công. Vui lòng thử lại.')
@@ -1892,10 +1803,12 @@ export default function TicketDetailPage() {
                 if (!prev) return prev
                 return {
                     ...prev,
-                    priceQuotation: prev.priceQuotation ? {
-                        ...prev.priceQuotation,
-                        status: 'DRAFT'
-                    } : null
+                    priceQuotation: prev.priceQuotation
+                        ? {
+                            ...prev.priceQuotation,
+                            status: 'DRAFT'
+                        }
+                        : null
                 }
             })
             await fetchTicketDetail()

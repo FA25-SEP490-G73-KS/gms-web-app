@@ -367,57 +367,6 @@ export function AccountanceDebtDetailContent() {
           </span>
         )
       }
-    },
-    {
-      title: 'Thao tác',
-      key: 'action',
-      width: 80,
-      align: 'center',
-      render: (_, record) => {
-        const menuItems = [
-          {
-            key: 'view',
-            label: 'Xem chi tiết',
-            onClick: () => {
-              const serviceTicketId = record.serviceTicketId || record.id
-              navigate(`/accountance/debts/ticket/${serviceTicketId}`, {
-                state: { 
-                  ticketId: serviceTicketId,
-                  customerId: customerData?.id,
-                  customer: {
-                    name: customerInfo?.name || customerData?.customer,
-                    phone: customerInfo?.phone || customerData?.phone,
-                    licensePlate: customerInfo?.licensePlate || customerData?.licensePlate,
-                    customerId: customerData?.id
-                  }
-                }
-              })
-            }
-          },
-          {
-            key: 'updateDueDate',
-            label: 'Cập nhật ngày hẹn trả',
-            onClick: () => {
-              setSelectedDebt(record)
-              setNewDueDate(record.dueDate && record.dueDate !== '—' ? dayjs(record.dueDate, 'DD/MM/YYYY') : null)
-              setIsUpdateDueDateModalVisible(true)
-            }
-          }
-        ]
-
-        return (
-          <Dropdown
-            menu={{ items: menuItems }}
-            trigger={['click']}
-            placement="bottomRight"
-          >
-            <Button
-              type="text"
-              icon={<MoreOutlined style={{ fontSize: '18px' }} />}
-            />
-          </Dropdown>
-        )
-      }
     }
   ]
 

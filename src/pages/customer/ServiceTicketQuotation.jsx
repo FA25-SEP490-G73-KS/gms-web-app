@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Button, Table, message, Spin } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { serviceTicketAPI, priceQuotationAPI } from '../../services/api';
+import { serviceTicketAPI, priceQuotationAPI, invoiceAPI } from '../../services/api';
 import { goldTableHeader } from '../../utils/tableComponents';
 
 const formatCurrency = (amount) => {
@@ -172,39 +172,64 @@ export default function ServiceTicketQuotation() {
     };
 
     const handleConfirm = async () => {
-        const priceQuotationId = quotationData?.priceQuotation?.priceQuotationId;
-        if (!priceQuotationId) {
-            message.error('Không tìm thấy ID báo giá');
-            return;
+    const priceQuotationId = quotationData?.priceQuotation?.priceQuotationId;
+    const serviceTicketId = quotationData?.serviceTicketId;
+
+    if (!priceQuotationId) {
+      message.error('Không tìm thấy ID báo giá');
+      return;
+    }
+    if (!serviceTicketId) {
+      message.error('Không tìm thấy ID phiếu dịch vụ');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      // 1. Khách xác nhận báo giá (public endpoint)
+      const { data: response, error } = await priceQuotationAPI.confirmQuotation(
+        priceQuotationId,
+        { skipAuth: true }
+      );
+
+      if (error) {
+        message.error(error || 'Không thể xác nhận báo giá');
+        return;
+      }
+
+      // 2. Sau khi xác nhận thành công, tạo hóa đơn cho phiếu dịch vụ này
+      try {
+        const { error: invoiceError } = await invoiceAPI.create(
+          serviceTicketId,
+          priceQuotationId
+        );
+        if (invoiceError) {
+          console.error('Create invoice error:', invoiceError);
+          message.warning(
+            'Đã xác nhận báo giá nhưng tạo hóa đơn thất bại. Vui lòng liên hệ nhân viên.'
+          );
         }
+      } catch (invErr) {
+        console.error('Failed to create invoice after confirm:', invErr);
+        message.warning(
+          'Đã xác nhận báo giá nhưng chưa tạo được hóa đơn. Vui lòng liên hệ nhân viên.'
+        );
+      }
 
-        setActionLoading(true);
-        try {
-            // Allow action without authentication (public endpoint)
-            const { data: response, error } = await priceQuotationAPI.confirmQuotation(priceQuotationId, { skipAuth: true });
-
-            if (error) {
-                message.error(error || 'Không thể xác nhận báo giá');
-                return;
-            }
-
-            // Check if response indicates success
-            if (response && (response.statusCode === 200 || response.message)) {
-                message.success('Xác nhận báo giá thành công');
-                // Refresh data after confirmation to get updated status
-                await fetchQuotation();
-            } else {
-                message.success('Xác nhận báo giá thành công');
-                // Refresh data anyway
-                await fetchQuotation();
-            }
-        } catch (err) {
-            console.error('Failed to confirm quotation:', err);
-            message.error('Đã xảy ra lỗi khi xác nhận báo giá');
-        } finally {
-            setActionLoading(false);
-        }
-    };
+      // 3. Thông báo kết quả xác nhận và reload dữ liệu
+      if (response && (response.statusCode === 200 || response.message)) {
+        message.success('Xác nhận báo giá và tạo hóa đơn thành công');
+      } else {
+        message.success('Xác nhận báo giá thành công');
+      }
+      await fetchQuotation();
+    } catch (err) {
+      console.error('Failed to confirm quotation:', err);
+      message.error('Đã xảy ra lỗi khi xác nhận báo giá');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
     const handleReject = async () => {
         const priceQuotationId = quotationData?.priceQuotation?.priceQuotationId;
