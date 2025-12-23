@@ -199,7 +199,7 @@ export default function ServiceTicketQuotation() {
     setActionLoading(true);
     try {
       // 1. Khách xác nhận báo giá (public endpoint)
-      const { data: response, error } = await priceQuotationAPI.confirmQuotation(
+      const { data, error } = await priceQuotationAPI.confirmQuotation(
         priceQuotationId,
         { skipAuth: true }
       );
@@ -210,37 +210,22 @@ export default function ServiceTicketQuotation() {
       }
 
       // 2. Sau khi xác nhận thành công, tạo hóa đơn cho phiếu dịch vụ này
-      let invoiceCreated = false;
-      try {
-        const { error: invoiceError } = await invoiceAPI.create(
-          serviceTicketId,
-          priceQuotationId
-        );
-        if (invoiceError) {
-          console.error('Create invoice error:', invoiceError);
-          message.warning(
-            'Đã xác nhận báo giá nhưng tạo hóa đơn thất bại. Vui lòng liên hệ nhân viên.'
-          );
-        } else {
-          invoiceCreated = true;
-        }
-      } catch (invErr) {
-        console.error('Failed to create invoice after confirm:', invErr);
-        message.warning(
-          'Đã xác nhận báo giá nhưng chưa tạo được hóa đơn. Vui lòng liên hệ nhân viên.'
-        );
+      const { error: invoiceError } = await invoiceAPI.create(
+        serviceTicketId,
+        priceQuotationId
+      );
+
+      if (invoiceError) {
+        console.error('Error creating invoice:', invoiceError);
+        message.warning('Đã xác nhận báo giá nhưng không thể tạo phiếu thanh toán. Vui lòng thử lại.');
+      } else {
+        message.success('Đã xác nhận báo giá và tạo phiếu thanh toán thành công');
       }
 
-      // 3. Thông báo kết quả xác nhận và reload dữ liệu
-      if (invoiceCreated) {
-        message.success('Xác nhận báo giá và tạo hóa đơn thành công');
-      } else {
-        message.success('Xác nhận báo giá thành công');
-      }
       await fetchQuotation();
     } catch (err) {
-      console.error('Failed to confirm quotation:', err);
-      message.error('Đã xảy ra lỗi khi xác nhận báo giá');
+      console.error('Error confirming quotation:', err);
+      message.error('Đã xảy ra lỗi khi xác nhận');
     } finally {
       setActionLoading(false);
     }
