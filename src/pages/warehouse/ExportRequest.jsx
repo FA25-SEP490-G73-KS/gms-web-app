@@ -1,201 +1,865 @@
-import React, { useState } from 'react'
-import { Table, Input, Space, Button, DatePicker, Tag } from 'antd'
-import { SearchOutlined, CalendarOutlined, DownOutlined, UpOutlined, InboxOutlined } from '@ant-design/icons'
+﻿import React, { useState, useEffect } from 'react'
+import { Table, Input, Button, Tag, message, Modal, Select, Checkbox, DatePicker, InputNumber, Spin } from 'antd'
+import { SearchOutlined, CloseOutlined, CalendarOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
+import dayjs from 'dayjs'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
-import '../../styles/pages/warehouse/export-list.css'
+import { priceQuotationAPI, partCategoriesAPI, marketsAPI, vehiclesAPI, suppliersAPI, unitsAPI } from '../../services/api'
 
 const { Search } = Input
+const { Option } = Select
 
 export default function ExportRequest() {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFilter, setDateFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('Đang xuất hàng')
-  const [expandedRowKeys, setExpandedRowKeys] = useState(['1'])
+  const [statusFilter, setStatusFilter] = useState('Tất cả') // Đổi từ 'Chờ xác nhận' sang 'Tất cả'
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
-  // Sample data with nested parts
-  const exportRequests = [
-    {
-      id: 1,
-      code: 'STK-2025-000001',
-      customer: 'Nguyễn Văn',
-      licensePlate: '30A-12345',
-      createDate: '30/10/2025',
-      status: 'Chờ xác nhận',
-      parts: [
-        {
-          id: 1,
-          name: 'Dầu máy 5W-30',
-          quantity: 1
-        },
-        {
-          id: 2,
-          name: 'Lọc nhiên liệu',
-          quantity: 1
-        },
-        {
-          id: 3,
-          name: 'Chụp bụi, gioăng cao su',
-          quantity: 1
-        }
-      ]
-    },
-    {
-      id: 2,
-      code: 'STK-2025-000002',
-      customer: 'Mazda-v3',
-      licensePlate: 'DT Huyền - 190',
-      createDate: '30/10/2025',
-      status: 'Chờ xác nhận',
-      parts: [
-        {
-          id: 1,
-          name: 'Dầu máy 5W-30',
-          quantity: 1
-        }
-      ]
-    },
-    {
-      id: 3,
-      code: 'STK-2025-000003',
-      customer: 'Trần Văn B',
-      licensePlate: '29A-67890',
-      createDate: '29/10/2025',
-      status: 'Xác nhận',
-      parts: []
-    },
-    {
-      id: 4,
-      code: 'STK-2025-000004',
-      customer: 'Lê Văn C',
-      licensePlate: '51A-11111',
-      createDate: '29/10/2025',
-      status: 'Xác nhận',
-      parts: []
-    },
-    {
-      id: 5,
-      code: 'STK-2025-000005',
-      customer: 'Phạm Văn D',
-      licensePlate: '43A-22222',
-      createDate: '28/10/2025',
-      status: 'Chờ xác nhận',
-      parts: []
-    },
-    {
-      id: 6,
-      code: 'STK-2025-000006',
-      customer: 'Hoàng Văn E',
-      licensePlate: '92A-33333',
-      createDate: '28/10/2025',
-      status: 'Chờ xác nhận',
-      parts: []
+  const [quotations, setQuotations] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [expandedRowKeys, setExpandedRowKeys] = useState([])
+  const [dateRange, setDateRange] = useState([null, null])
+  
+  // Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedPart, setSelectedPart] = useState(null)
+  const [selectedItemId, setSelectedItemId] = useState(null) // Store priceQuotationItemId
+  const [modalLoading, setModalLoading] = useState(false)
+  const [hasExistingPart, setHasExistingPart] = useState(false) // Track nếu part đã tồn tại
+  const [partCategories, setPartCategories] = useState([]) // Danh sách loại linh kiện
+  const [markets, setMarkets] = useState([]) // Danh sách xuất xứ
+  const [brands, setBrands] = useState([]) // Danh sách hãng xe
+  const [carModels, setCarModels] = useState([]) // Danh sách dòng xe theo hãng đã chọn
+  const [suppliers, setSuppliers] = useState([]) // Danh sách nhà cung cấp
+  const [units, setUnits] = useState([]) // Danh sách đơn vị
+  const [errors, setErrors] = useState({}) // Lưu lỗi validation cho từng field
+  const [partStock, setPartStock] = useState(0) // Tồn kho thực tế
+  const [isPriceSellManuallyEdited, setIsPriceSellManuallyEdited] = useState(false) // Track xem giá bán đã được người dùng chỉnh sửa thủ công chưa
+  
+  // Form state
+  const [formData, setFormData] = useState({
+    partName: '',
+    partType: 'Dầu – Hóa chất',
+    origin: 'Motul',
+    usedForAllCars: false,
+    manufacturer: 'Petrolimex Lubricants',
+    brand: 'Vinfast',
+    carModel: 'VF3',
+    priceImport: '',
+    priceSell: '',
+    unit: 'lít',
+    note: '',
+    quantity: 0,
+    specialPart: false
+  })
+
+  useEffect(() => {
+    fetchQuotations()
+  }, [page, pageSize])
+
+  const fetchQuotations = async () => {
+    setLoading(true)
+    
+    try {
+      const { data, error } = await priceQuotationAPI.getPending(page - 1, pageSize)
+      
+      console.log('API Response:', { data, error })
+      
+      if (error) {
+        message.error('Không thể tải danh sách báo giá')
+        setLoading(false)
+        return
+      }
+
+      const result = data?.result || {}
+      const content = result.content || []
+      
+      console.log('Content from API:', content)
+      
+      if (content.length === 0) {
+        console.warn('No data returned from API')
+      }
+      
+      const transformedData = content.map((item) => ({
+        key: item.priceQuotationId,
+        id: item.priceQuotationId,
+        code: item.code,
+        serviceTicketCode: item.serviceTicketCode,
+        licensePlate: item.licensePlate,
+        customerName: item.customerName,
+        customerPhone: item.customerPhone,
+        createdBy: item.createdBy,
+        createdAt: item.createdAt || '',
+        rawStatus: item.status,
+        status: item.status, // Giữ nguyên status, getStatusConfig sẽ xử lý
+        estimateAmount: item.estimateAmount,
+        discount: item.discount,
+        // Map items từ API
+        parts: (item.items || []).map(partItem => ({
+          id: partItem.priceQuotationItemId,
+          sku: partItem.part?.sku || null,
+          name: partItem.itemName,
+          quantity: partItem.quantity,
+          unit: partItem.part?.unitName || partItem.unit || '', // Ưu tiên unitName từ part, fallback về unit
+          unitPrice: partItem.unitPrice,
+          totalPrice: partItem.totalPrice,
+          itemType: partItem.itemType,
+          inventoryStatus: partItem.inventoryStatus,
+          warehouseReviewStatus: partItem.warehouseReviewStatus,
+          warehouseNote: partItem.warehouseNote,
+          part: partItem.part // null hoặc có object
+        }))
+      }))
+
+      console.log('Transformed data:', transformedData)
+      
+      setQuotations(transformedData)
+      setTotal(result.totalElements || 0)
+      setLoading(false)
+    } catch (err) {
+      console.error('Failed to fetch quotations:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+      setLoading(false)
     }
-  ]
+
+    // Mock data (commented)
+    /*
+    setTimeout(() => {
+      const mockData = [
+        {
+          priceQuotationId: 1,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'PENDING'
+        },
+        {
+          priceQuotationId: 2,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'PENDING'
+        },
+        {
+          priceQuotationId: 3,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'PENDING'
+        },
+        {
+          priceQuotationId: 4,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'PENDING'
+        },
+        {
+          priceQuotationId: 5,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'CONFIRMED'
+        },
+        {
+          priceQuotationId: 6,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'CONFIRMED'
+        },
+        {
+          priceQuotationId: 7,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'CONFIRMED'
+        },
+        {
+          priceQuotationId: 8,
+          code: 'BG-2025-000001',
+          customerName: 'Nguyễn Văn A',
+          customerPhone: '0123456789',
+          createdBy: 'DT Huyền - 190',
+          createdAt: '2025-10-30T00:00:00',
+          status: 'CONFIRMED'
+        }
+      ]
+
+      const transformedData = mockData.map((item) => ({
+        key: item.priceQuotationId,
+        id: item.priceQuotationId,
+        code: item.code,
+        customerName: item.customerName,
+        customerPhone: item.customerPhone,
+        createdBy: item.createdBy,
+        createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : '',
+        rawStatus: item.status,
+        status: item.status === 'PENDING' || item.status === 'DRAFT' ? 'Chờ xác nhận' : 'Xác nhận',
+        // Mock parts data
+        parts: [
+          {
+            id: 1,
+            sku: 'LỌC-GIÓ-TOYOTA-CAMRY-2019',
+            name: 'Lọc gió Camry',
+            quantity: 1,
+            status: 'Xác nhận',
+            part: null // part null = chưa có phiếu mua hàng
+          },
+          {
+            id: 2,
+            sku: '---',
+            name: 'Cảm biến ABS',
+            quantity: 1,
+            status: 'Xác nhận',
+            part: { id: 123 } // part có data = đã có phiếu mua hàng
+          },
+          {
+            id: 3,
+            sku: '---',
+            name: 'Vô lăng Camry',
+            quantity: 1,
+            status: 'Xác nhận',
+            part: null
+          }
+        ]
+      }))
+
+      setQuotations(transformedData)
+      setTotal(100)
+      setLoading(false)
+    }, 500)
+    */
+  }
+
+  const getFilteredData = () => {
+    let filtered = quotations
+
+    console.log('Filter data - quotations:', quotations)
+    console.log('Filter data - statusFilter:', statusFilter)
+
+    // Lọc theo trạng thái
+    if (statusFilter !== 'Tất cả') {
+      filtered = filtered.filter(item => {
+        const displayStatus = getStatusConfig(item.status).text
+        console.log('Comparing:', displayStatus, 'with', statusFilter)
+        return displayStatus === statusFilter
+      })
+    }
+
+    console.log('Filtered result:', filtered)
+
+    // Tìm kiếm
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      filtered = filtered.filter(item =>
+        item.code?.toLowerCase().includes(term) ||
+        item.customerName?.toLowerCase().includes(term) ||
+        item.customerPhone?.toLowerCase().includes(term) ||
+        item.createdBy?.toLowerCase().includes(term)
+      )
+    }
+
+    return filtered
+  }
 
   const getStatusConfig = (status) => {
-    if (status === 'Xác nhận') {
-      return { 
-        color: '#22c55e', 
-        bgColor: '#f6ffed',
-        borderColor: '#b7eb8f',
-        text: status 
-      }
-    }
-    if (status === 'Chờ xác nhận') {
-      return { 
-        color: '#1677ff', 
-        bgColor: '#e6f4ff',
-        borderColor: '#91caff',
-        text: status 
-      }
-    }
-    return { 
-      color: '#666', 
-      bgColor: '#fafafa',
-      borderColor: '#d9d9d9',
-      text: status 
+    // Map theo enum PriceQuotationStatus
+    switch (status) {
+      case 'DRAFT':
+        return { 
+          color: '#666', 
+          bgColor: '#fafafa',
+          borderColor: '#d9d9d9',
+          text: 'Nháp'
+        }
+      case 'WAITING_WAREHOUSE_CONFIRM':
+        return { 
+          color: '#1677ff', 
+          bgColor: '#e6f4ff',
+          borderColor: '#91caff',
+          text: 'Chờ kho xác nhận'
+        }
+      case 'WAREHOUSE_CONFIRMED':
+        return { 
+          color: '#22c55e', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Kho đã xác nhận'
+        }
+      case 'WAITING_CUSTOMER_CONFIRM':
+        return { 
+          color: '#faad14', 
+          bgColor: '#fffbe6',
+          borderColor: '#ffe58f',
+          text: 'Chờ khách hàng xác nhận'
+        }
+      case 'CUSTOMER_CONFIRMED':
+        return { 
+          color: '#22c55e', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Khách hàng đã xác nhận'
+        }
+      case 'CUSTOMER_REJECTED':
+        return { 
+          color: '#ff4d4f', 
+          bgColor: '#fff2f0',
+          borderColor: '#ffccc7',
+          text: 'Khách hàng từ chối'
+        }
+      case 'COMPLETED':
+        return { 
+          color: '#52c41a', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Hoàn thành'
+        }
+      // Fallback cho các trạng thái cũ (backward compatibility)
+      case 'CONFIRMED':
+      case 'APPROVED':
+      case 'Xác nhận':
+        return { 
+          color: '#22c55e', 
+          bgColor: '#f6ffed',
+          borderColor: '#b7eb8f',
+          text: 'Xác nhận'
+        }
+      case 'PENDING':
+      case 'Chờ xác nhận':
+        return { 
+          color: '#1677ff', 
+          bgColor: '#e6f4ff',
+          borderColor: '#91caff',
+          text: 'Chờ xác nhận'
+        }
+      default:
+        return { 
+          color: '#666', 
+          bgColor: '#fafafa',
+          borderColor: '#d9d9d9',
+          text: status || 'Không rõ'
+        }
     }
   }
 
-  const handleReject = (recordId, partId) => {
-    console.log('Reject:', recordId, partId)
-    // Handle reject logic here
+  const fetchPartCategories = async () => {
+    try {
+      const { data, error } = await partCategoriesAPI.getAll()
+      if (error) {
+        console.error('Failed to fetch part categories:', error)
+        return
+      }
+      const result = data?.result || []
+      setPartCategories(result)
+    } catch (err) {
+      console.error('Error fetching part categories:', err)
+    }
   }
 
-  const handleConfirm = (recordId, partId) => {
-    console.log('Confirm:', recordId, partId)
-    // Handle confirm logic here
+  const fetchMarkets = async () => {
+    try {
+      const { data, error } = await marketsAPI.getAll()
+      if (error) {
+        console.error('Failed to fetch markets:', error)
+        return
+      }
+      const result = data?.result || []
+      setMarkets(result)
+    } catch (err) {
+      console.error('Error fetching markets:', err)
+    }
   }
 
-  // Filter data
-  const filteredData = exportRequests
-    .filter(item => {
-      const matchesSearch = !searchTerm || 
-        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.licensePlate.toLowerCase().includes(searchTerm.toLowerCase())
+  const fetchBrands = async () => {
+    try {
+      const { data, error } = await vehiclesAPI.getBrands()
+      if (error) {
+        console.error('Failed to fetch brands:', error)
+        return
+      }
+      // API trả về array trực tiếp, không có result wrapper
+      const brandsList = Array.isArray(data) ? data : (data?.result || [])
+      setBrands(brandsList)
+    } catch (err) {
+      console.error('Error fetching brands:', err)
+    }
+  }
+
+  const fetchCarModels = async (brandId) => {
+    if (!brandId) {
+      setCarModels([])
+      return
+    }
+    try {
+      console.log('Fetching car models for brandId:', brandId)
+      const { data, error } = await vehiclesAPI.getModelsByBrand(brandId)
+      if (error) {
+        console.error('Failed to fetch car models:', error)
+        setCarModels([])
+        return
+      }
+      // API trả về array trực tiếp, không có result wrapper
+      const modelsList = Array.isArray(data) ? data : (data?.result || [])
+      console.log('Car models fetched:', modelsList)
+      setCarModels(modelsList)
+    } catch (err) {
+      console.error('Error fetching car models:', err)
+      setCarModels([])
+    }
+  }
+
+  const fetchSuppliers = async () => {
+    try {
+      // Gọi API với size lớn để lấy tất cả suppliers
+      const { data, error } = await suppliersAPI.getAll(0, 1000)
+      if (error) {
+        console.error('Failed to fetch suppliers:', error)
+        return
+      }
+      // API có thể trả về array trực tiếp hoặc có result wrapper
+      const suppliersList = Array.isArray(data) ? data : (data?.result || data?.content || [])
+      setSuppliers(suppliersList)
+    } catch (err) {
+      console.error('Error fetching suppliers:', err)
+    }
+  }
+
+  const fetchUnits = async () => {
+    try {
+      // Gọi API với size lớn để lấy tất cả units
+      const { data, error } = await unitsAPI.getAll({ page: 0, size: 1000 })
+      if (error) {
+        console.error('Failed to fetch units:', error)
+        setUnits([]) // Set empty array on error
+        return
+      }
+      // API có thể trả về array trực tiếp hoặc có result wrapper với content
+      let unitsList = []
+      if (Array.isArray(data)) {
+        unitsList = data
+      } else if (data?.result) {
+        // Nếu có result wrapper, kiểm tra xem result có content không
+        unitsList = Array.isArray(data.result) ? data.result : (data.result?.content || [])
+      } else if (data?.content) {
+        unitsList = data.content
+      }
+      console.log('Fetched units:', unitsList)
+      setUnits(unitsList)
+    } catch (err) {
+      console.error('Error fetching units:', err)
+      setUnits([]) // Set empty array on error
+    }
+  }
+
+  const handleOpenModal = async (partRecord) => {
+    console.log('handleOpenModal called with partRecord:', partRecord)
+    setSelectedPart(partRecord)
+    setIsModalOpen(true)
+    setModalLoading(true)
+    setPartStock(partRecord?.part?.quantity || 0)
+    
+    try {
+      // Fetch part categories, markets, brands, suppliers, and units when opening modal
+      await Promise.all([fetchPartCategories(), fetchMarkets(), fetchBrands(), fetchSuppliers(), fetchUnits()])
+    } catch (err) {
+      console.error('Error fetching modal data:', err)
+      message.error('Không thể tải dữ liệu form')
+    }
+    
+    // Lưu priceQuotationItemId ngay từ đầu
+    const itemId = partRecord.id // partRecord.id chính là priceQuotationItemId
+    setSelectedItemId(itemId)
+    console.log('Selected item ID from partRecord:', itemId)
+    
+    // Check xem đã xác nhận/từ chối chưa để disable form
+    const isReviewed = partRecord.warehouseReviewStatus === 'Xác nhận' || 
+                       partRecord.warehouseReviewStatus === 'Đã xác nhận' ||
+                       partRecord.warehouseReviewStatus === 'Từ chối'
+    
+    try {
+      // Gọi API lấy chi tiết item bằng priceQuotationItemId
+      console.log('Loading item details for ID:', itemId)
+      const { data, error } = await priceQuotationAPI.getItemById(itemId)
       
-      let matchesDate = true
-      if (dateFilter) {
-        const filterDate = dateFilter.format('DD/MM/YYYY')
-        matchesDate = item.createDate === filterDate
+      if (error) {
+        message.error('Không thể tải chi tiết item')
+        setModalLoading(false)
+        return
+      }
+
+      const itemDetail = data?.result || {}
+      console.log('Item detail response:', itemDetail)
+      
+      if (itemDetail?.part) {
+        // Có part - fill form từ part object
+        const partData = itemDetail.part
+        console.log('Part data:', partData)
+        setPartStock(partData.quantity || partRecord?.part?.quantity || 0)
+        
+        setHasExistingPart(true) // Đánh dấu là có part tồn tại
+        
+        const importPrice = partData.purchasePrice || 0
+        const sellPrice = partData.sellingPrice || 0
+        // Nếu có giá nhập và giá bán = 0 hoặc chưa có, tự động tính giá bán = giá nhập + 10%
+        const calculatedSellPrice = importPrice > 0 ? Math.round(importPrice * 1.1) : sellPrice
+        
+        const newFormData = {
+          partName: partData.name || '',
+          partType: partData.categoryName || '',
+          origin: partData.marketName || '',
+          usedForAllCars: partData.universal === true,
+          manufacturer: partData.supplierName || '',
+          brand: partData.modelName || '',
+          carModel: partData.modelName || '',
+          priceImport: importPrice,
+          priceSell: sellPrice > 0 ? sellPrice : calculatedSellPrice, // Dùng giá bán từ DB nếu có, nếu không thì tính từ giá nhập
+          unit: partData.unitName || '',
+          note: itemDetail.warehouseNote || partData.note || '',
+          quantity: itemDetail.quantity || partRecord.quantity || 0,
+          specialPart: partData.specialPart || false,
+          isReviewed: isReviewed // Thêm flag để biết đã review chưa
+        }
+        console.log('Setting form data:', newFormData)
+        setFormData(newFormData)
+        setIsPriceSellManuallyEdited(false) // Reset flag khi mở modal
+        
+        // Nếu có brand, gọi API lấy danh sách dòng xe
+        if (newFormData.brand && !newFormData.usedForAllCars) {
+          const selectedBrand = brands.find(b => b.name === newFormData.brand)
+          console.log('Loading existing part - brand:', newFormData.brand, 'selectedBrand:', selectedBrand)
+          if (selectedBrand && selectedBrand.id) {
+            console.log('Calling fetchCarModels with brandId:', selectedBrand.id)
+            await fetchCarModels(selectedBrand.id)
+          } else {
+            console.warn('Brand not found when loading existing part:', newFormData.brand)
+          }
+        }
+      } else {
+        // Không có part - form rỗng
+        console.log('No part found, empty form')
+        setHasExistingPart(false) // Đánh dấu là không có part
+        setPartStock(partRecord?.part?.quantity || 0)
+        
+        setFormData({
+          partName: itemDetail.itemName || partRecord.name || '',
+          partType: '',
+          origin: '',
+          usedForAllCars: false,
+          manufacturer: '',
+          brand: '',
+          carModel: '',
+          priceImport: 0,
+          priceSell: 0, // Sẽ tự động tính khi người dùng nhập giá nhập
+          unit: itemDetail.unit || partRecord.unit || '',
+          note: itemDetail.warehouseNote || '',
+          quantity: itemDetail.quantity || partRecord.quantity || 0,
+          specialPart: false,
+          isReviewed: isReviewed // Thêm flag để biết đã review chưa
+        })
+        setIsPriceSellManuallyEdited(false) // Reset flag khi mở modal
+      }
+    } catch (error) {
+      console.error('Error loading item details:', error)
+      message.error('Không thể tải thông tin chi tiết')
+      // Đảm bảo modal vẫn hiển thị ngay cả khi có lỗi
+      setModalLoading(false)
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedPart(null)
+    setCarModels([]) // Reset danh sách dòng xe khi đóng modal
+    setErrors({}) // Reset errors khi đóng modal
+    setPartStock(0)
+    setIsPriceSellManuallyEdited(false) // Reset flag khi đóng modal
+  }
+
+  const handleFormChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+    // Clear error khi user thay đổi giá trị
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+  }
+
+  // Helper functions để map từ name sang ID
+  const getCategoryIdByName = (categoryName) => {
+    if (!categoryName) return 0
+    const category = partCategories.find(cat => cat.name === categoryName)
+    return category?.id || 0
+  }
+
+  const getMarketIdByName = (marketName) => {
+    if (!marketName) return 0
+    const market = markets.find(m => m.name === marketName)
+    return market?.id || 0
+  }
+
+  const getUnitIdByName = (unitName) => {
+    if (!unitName) return 0
+    const unit = units.find(u => u.name === unitName)
+    return unit?.id || 0
+  }
+
+  const getSupplierIdByName = (supplierName) => {
+    if (!supplierName) return 0
+    const supplier = suppliers.find(s => s.name === supplierName)
+    return supplier?.id || 0
+  }
+
+  const getVehicleModelIdByName = (modelName) => {
+    if (!modelName) return null
+    const model = carModels.find(m => m.name === modelName)
+    return model?.id || null
+  }
+
+  const handleConfirm = async () => {
+    if (!selectedItemId) {
+      message.error('Không tìm thấy ID của item')
+      return
+    }
+
+    // Reset errors
+    const newErrors = {}
+
+    // Validate các trường bắt buộc (có dấu *) - chỉ validate khi tạo mới hoặc cập nhật part đặc biệt
+    if (!hasExistingPart || formData.specialPart) {
+      // Case 1: Tạo mới part hoặc Case 3: Cập nhật part đặc biệt - cần tất cả các trường
+      if (!formData.partName || formData.partName.trim() === '') {
+        newErrors.partName = 'Vui lòng nhập tên linh kiện'
+      }
+
+      if (!formData.priceImport || parseFloat(formData.priceImport) <= 0) {
+        newErrors.priceImport = 'Vui lòng nhập giá nhập hợp lệ'
+      }
+
+      if (!formData.partType || formData.partType.trim() === '') {
+        newErrors.partType = 'Vui lòng chọn loại linh kiện'
+      }
+
+      if (!formData.priceSell || parseFloat(formData.priceSell) <= 0) {
+        newErrors.priceSell = 'Vui lòng nhập giá bán hợp lệ'
+      } else {
+        // Kiểm tra giá bán phải lớn hơn hoặc bằng giá nhập
+        const priceImport = parseFloat(formData.priceImport) || 0
+        const priceSell = parseFloat(formData.priceSell) || 0
+        if (priceSell < priceImport) {
+          newErrors.priceSell = 'Giá bán không được nhỏ hơn giá nhập'
+        }
+      }
+
+      if (!formData.origin || formData.origin.trim() === '') {
+        newErrors.origin = 'Vui lòng chọn xuất xứ'
+      }
+
+      if (!formData.unit || formData.unit.trim() === '') {
+        newErrors.unit = 'Vui lòng nhập đơn vị'
+      }
+
+      if (!formData.manufacturer || formData.manufacturer.trim() === '') {
+        newErrors.manufacturer = 'Vui lòng chọn nhà phân phối'
+      }
+
+      // Validate Hãng và Dòng xe nếu không dùng chung
+      if (!formData.usedForAllCars) {
+        if (!formData.brand || formData.brand.trim() === '') {
+          newErrors.brand = 'Vui lòng chọn hãng'
+        }
+        if (!formData.carModel || formData.carModel.trim() === '') {
+          newErrors.carModel = 'Vui lòng chọn dòng xe'
+        }
+      }
+    }
+
+    // Nếu có lỗi, set errors và return
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+
+    // Clear errors nếu không có lỗi
+    setErrors({})
+    
+    setModalLoading(true)
+    
+    try {
+      if (!hasExistingPart) {
+        // Case 1: part === null - Tạo mới part
+        // POST /api/quotation-items/{itemId}/confirm/create
+        const payload = {
+          name: formData.partName,
+          categoryId: getCategoryIdByName(formData.partType),
+          marketId: getMarketIdByName(formData.origin),
+          note: formData.note || '',
+          purchasePrice: parseFloat(formData.priceImport) || 0,
+          sellingPrice: parseFloat(formData.priceSell) || 0,
+          reorderLevel: 0.1,
+          specialPart: formData.specialPart || false,
+          supplierId: getSupplierIdByName(formData.manufacturer),
+          unitId: getUnitIdByName(formData.unit),
+          universal: formData.usedForAllCars || false,
+          vehicleModelId: formData.usedForAllCars ? null : getVehicleModelIdByName(formData.carModel)
+        }
+        
+        console.log('Creating new part:', selectedItemId, payload)
+        const { data, error } = await priceQuotationAPI.confirmCreateItem(selectedItemId, payload)
+        
+        if (error) {
+          message.error('Không thể tạo phiếu mua hàng')
+          setModalLoading(false)
+          return
+        }
+        
+        message.success('Tạo phiếu mua hàng thành công')
+      } else if (!formData.specialPart) {
+        // Case 2: part !== null && specialPart === false - Xác nhận đơn giản
+        // PATCH /api/quotation-items/{itemId}/confirm with note string
+        const note = formData.note || ''
+        console.log('Confirming quotation item (simple):', selectedItemId, 'Note:', note)
+        const { data, error } = await priceQuotationAPI.confirmItem(selectedItemId, note)
+        
+        if (error) {
+          message.error('Không thể xác nhận phiếu mua hàng')
+          setModalLoading(false)
+          return
+        }
+        
+        message.success('Xác nhận phiếu mua hàng thành công')
+      } else {
+        // Case 3: part !== null && specialPart === true - Cập nhật part đặc biệt
+        // PATCH /api/quotation-items/{itemId}/confirm/update
+        const payload = {
+          name: formData.partName,
+          categoryId: getCategoryIdByName(formData.partType),
+          marketId: getMarketIdByName(formData.origin),
+          note: formData.note || '',
+          purchasePrice: parseFloat(formData.priceImport) || 0,
+          sellingPrice: parseFloat(formData.priceSell) || 0,
+          reorderLevel: 0.1,
+          specialPart: true,
+          supplierId: getSupplierIdByName(formData.manufacturer),
+          unitId: getUnitIdByName(formData.unit),
+          universal: formData.usedForAllCars || false,
+          vehicleModelId: formData.usedForAllCars ? null : getVehicleModelIdByName(formData.carModel)
+        }
+        
+        console.log('Updating special part:', selectedItemId, payload)
+        const { data, error } = await priceQuotationAPI.confirmItemUpdate(selectedItemId, payload)
+        
+        if (error) {
+          message.error('Không thể cập nhật phiếu mua hàng')
+          setModalLoading(false)
+          return
+        }
+        
+        message.success('Cập nhật phiếu mua hàng thành công')
       }
       
-      const matchesStatus = statusFilter === 'Tất cả' || item.status === statusFilter
-      
-      return matchesSearch && matchesDate && matchesStatus
-    })
-    .map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
+      handleCloseModal()
+      fetchQuotations() // Refresh data
+    } catch (error) {
+      console.error('Error confirming quotation item:', error)
+      message.error('Có lỗi xảy ra, vui lòng thử lại')
+    } finally {
+      setModalLoading(false)
+    }
+  }
 
-  // Main table columns
+  const handleReject = async () => {
+    if (!selectedItemId) {
+      message.error('Không tìm thấy ID của item')
+      return
+    }
+    
+    setModalLoading(true)
+    
+    try {
+      const reason = (formData.note || '').trim()
+      
+      // PATCH /api/quotation-items/{itemId}/reject
+      console.log('Rejecting quotation item:', selectedItemId, 'Reason:', reason)
+      const { data, error } = await priceQuotationAPI.rejectItem(selectedItemId, reason)
+      
+      if (error) {
+        message.error('Không thể từ chối phiếu mua hàng')
+        setModalLoading(false)
+        return
+      }
+      
+      message.success('Đã từ chối phiếu mua hàng')
+      
+      handleCloseModal()
+      fetchQuotations() // Refresh data
+    } catch (error) {
+      console.error('Error rejecting quotation item:', error)
+      message.error('Có lỗi xảy ra, vui lòng thử lại')
+    } finally {
+      setModalLoading(false)
+    }
+  }
+
   const columns = [
     {
       title: 'STT',
-      dataIndex: 'index',
       key: 'index',
-      width: 80,
-      render: (_, __, index) => (
-        <span style={{ fontWeight: 600, color: '#111' }}>
-          {String(index + 1).padStart(2, '0')}
-        </span>
-      )
+      width: 60,
+      align: 'center',
+      render: (_, __, index) => (page - 1) * pageSize + index + 1
     },
     {
-      title: 'Code',
+      title: 'Mã phiếu',
       dataIndex: 'code',
       key: 'code',
-      width: 180,
-      render: (text) => (
-        <span style={{ fontWeight: 600, color: '#1677ff' }}>{text}</span>
-      )
+      width: 150
     },
     {
       title: 'Khách hàng',
-      dataIndex: 'customer',
       key: 'customer',
-      width: 200,
-      render: (text) => (
-        <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
+      render: (_, record) => (
+        <div>
+          <div>{record.customerName}</div>
+          <div style={{ color: '#888', fontSize: '12px' }}>{record.customerPhone}</div>
+        </div>
       )
     },
     {
-      title: 'Biển số xe',
-      dataIndex: 'licensePlate',
-      key: 'licensePlate',
-      width: 150,
-      render: (text) => (
-        <span style={{ fontWeight: 500, color: '#333', fontFamily: 'monospace' }}>
-          {text}
-        </span>
-      )
+      title: 'Người tạo',
+      dataIndex: 'createdBy',
+      key: 'createdBy',
+      width: 150
     },
     {
       title: 'Ngày tạo',
-      dataIndex: 'createDate',
-      key: 'createDate',
-      width: 150
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 120
     },
     {
       title: 'Trạng Thái',
@@ -225,249 +889,708 @@ export default function ExportRequest() {
     }
   ]
 
-  // Nested table columns for parts
   const expandedRowRender = (record) => {
-    const partsColumns = [
+    // Columns cho expanded table với quotationId từ record
+    const expandedColumnsWithActions = [
       {
         title: 'STT',
         key: 'index',
         width: 80,
-        render: (_, __, index) => (
-          <span style={{ fontWeight: 600, color: '#666' }}>
-            {String(index + 1).padStart(2, '0')}
-          </span>
-        )
+        align: 'center',
+        render: (_, __, index) => index + 1
       },
       {
-        title: 'Linh kiện',
+        title: 'Mã SKU',
+        dataIndex: 'sku',
+        key: 'sku',
+        width: 200,
+        render: (sku) => sku || '---'
+      },
+      {
+        title: 'Tên linh kiện',
         dataIndex: 'name',
-        key: 'name',
-        width: 300,
-        render: (text) => (
-          <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
-        )
+        key: 'name'
       },
       {
         title: 'Số lượng',
         dataIndex: 'quantity',
         key: 'quantity',
+        width: 100,
+        align: 'center'
+      },
+      {
+        title: 'Đơn vị',
+        dataIndex: 'unit',
+        key: 'unit',
+        width: 80,
+        align: 'center'
+      },
+      {
+        title: 'Đơn giá',
+        dataIndex: 'unitPrice',
+        key: 'unitPrice',
         width: 120,
-        align: 'center',
-        render: (value) => (
-          <span style={{ fontWeight: 600, color: '#666' }}>
-            {String(value).padStart(2, '0')}
-          </span>
-        )
+        align: 'right',
+        render: (price) => price ? `${price.toLocaleString('vi-VN')} ₫` : '---'
+      },
+      {
+        title: 'Trạng thái kho',
+        dataIndex: 'inventoryStatus',
+        key: 'inventoryStatus',
+        width: 120,
+        align: 'center'
       },
       {
         title: 'Hành động',
         key: 'action',
-        width: 250,
-        render: (_, part) => (
-          <Space>
-            <Button
+        width: 140,
+        align: 'center',
+        render: (_, partRecord) => {
+          const reviewStatus = partRecord.warehouseReviewStatus
+          
+          // Nếu đã từ chối - hiển thị tag đỏ
+          if (reviewStatus === 'Từ chối' || reviewStatus === 'REJECTED') {
+            return (
+              <Tag 
+                color="red" 
+                style={{ borderRadius: '6px', fontWeight: 500 }}
+              >
+                Từ chối
+              </Tag>
+            )
+          }
+          
+          // Nếu đã duyệt - hiển thị tag xanh "Đã duyệt"
+          if (reviewStatus === 'Đã duyệt' || reviewStatus === 'APPROVED' || reviewStatus === 'CONFIRMED') {
+            return (
+              <Tag 
+                color="green" 
+                style={{ borderRadius: '6px', fontWeight: 500 }}
+              >
+                Đã duyệt
+              </Tag>
+            )
+          }
+          
+          // Chờ duyệt hoặc chưa xem xét - hiển thị nút "Xác nhận"
+          return (
+            <Button 
               size="small"
-              onClick={() => handleReject(record.id, part.id)}
               style={{
-                background: '#fff',
-                borderColor: '#ef4444',
-                color: '#ef4444',
-                fontWeight: 500,
                 borderRadius: '6px',
-                height: '32px'
+                padding: '4px 16px'
               }}
-            >
-              Từ chối
-            </Button>
-            <Button
-              type="primary"
-              size="small"
-              onClick={() => handleConfirm(record.id, part.id)}
-              style={{
-                background: '#22c55e',
-                borderColor: '#22c55e',
-                fontWeight: 500,
-                borderRadius: '6px',
-                height: '32px'
+              onClick={(e) => {
+                e.stopPropagation()
+                handleOpenModal(partRecord)
               }}
             >
               Xác nhận
             </Button>
-          </Space>
         )
+        }
       }
     ]
 
     return (
-      <div style={{ 
-        background: 'linear-gradient(to bottom, #fafafa 0%, #fff 100%)',
-        padding: '20px 24px',
-        margin: '12px 0',
-        borderRadius: '10px',
-        border: '1px solid #e5e7eb',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px',
-          marginBottom: '16px',
-          paddingBottom: '12px',
-          borderBottom: '2px solid #f0f0f0'
-        }}>
-          <InboxOutlined style={{ color: '#1677ff', fontSize: '16px' }} />
-          <span style={{ 
-            fontWeight: 600, 
-            fontSize: '15px', 
-            color: '#111' 
-          }}>
-            Danh sách linh kiện ({record.parts?.length || 0})
-          </span>
-        </div>
-        <Table
-          columns={partsColumns}
-          dataSource={record.parts || []}
-          pagination={false}
-          size="middle"
-          components={goldTableHeader}
-          rowKey="id"
-          style={{ background: '#fff' }}
-          rowClassName={(record, index) => 
-            index % 2 === 0 ? 'parts-row-even' : 'parts-row-odd'
-          }
-        />
-      </div>
+      <Table
+        columns={expandedColumnsWithActions}
+        dataSource={record.parts || []}
+        pagination={false}
+        size="small"
+        rowKey="id"
+        style={{ margin: '0 40px' }}
+      />
     )
   }
 
   return (
     <WarehouseLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
-        <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
-            Xác nhận báo giá
-          </h1>
+      <div style={{ padding: '24px' }}>
+        {/* Heading */}
+        <h1 style={{ margin: 0, marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+          Xác nhận báo giá
+        </h1>
+        
+        {/* Bộ lọc và tìm kiếm */}
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '20px',
+          gap: '16px'
+        }}>
+          {/* Search box bên trái */}
+          <Input
+            placeholder="Tìm kiếm"
+            prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ 
+              width: '200px',
+              borderRadius: '8px'
+            }}
+          />
 
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-            <Search
-              placeholder="Tìm kiếm"
-              allowClear
-              prefix={<SearchOutlined />}
-              style={{ width: 250 }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onSearch={setSearchTerm}
-            />
-            
+          {/* Filter buttons và DatePicker */}
+          <div style={{ display: 'flex', gap: '8px', marginLeft: 'auto', alignItems: 'center' }}>
+            <Button
+              type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
+              onClick={() => setStatusFilter('Đang xuất hàng')}
+              style={{
+                borderRadius: '8px',
+                fontWeight: 500,
+                ...(statusFilter === 'Đang xuất hàng' && {
+                  background: '#C9A961',
+                  borderColor: '#C9A961',
+                  color: '#000'
+                })
+              }}
+            >
+              Đang xuất hàng
+            </Button>
+            <Button
+              type={statusFilter === 'Hoàn thành' ? 'primary' : 'default'}
+              onClick={() => setStatusFilter('Hoàn thành')}
+              style={{
+                borderRadius: '8px',
+                fontWeight: 500,
+                ...(statusFilter === 'Hoàn thành' && {
+                  background: '#C9A961',
+                  borderColor: '#C9A961',
+                  color: '#000'
+                })
+              }}
+            >
+              Hoàn thành
+            </Button>
+            <Button
+              type={statusFilter === 'Tất cả' ? 'primary' : 'default'}
+              onClick={() => setStatusFilter('Tất cả')}
+              style={{
+                borderRadius: '8px',
+                fontWeight: 500,
+                ...(statusFilter === 'Tất cả' && {
+                  background: '#C9A961',
+                  borderColor: '#C9A961',
+                  color: '#000'
+                })
+              }}
+            >
+              Tất cả
+            </Button>
+
+            {/* Date picker bên phải filter */}
             <DatePicker
               placeholder="Ngày tạo"
-              format="DD/MM/YYYY"
               suffixIcon={<CalendarOutlined />}
-              value={dateFilter}
-              onChange={setDateFilter}
-              style={{ width: 150 }}
+              value={dateRange[0]}
+              onChange={(date) => {
+                setDateRange([date, dateRange[1]])
+              }}
+              style={{ 
+                width: '150px',
+                borderRadius: '8px'
+              }}
+              format="DD/MM/YYYY"
             />
-
-            <Space>
-              <Button
-                type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Đang xuất hàng')}
-                style={{
-                  background: statusFilter === 'Đang xuất hàng' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Đang xuất hàng' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Đang xuất hàng' ? '#111' : '#666',
-                  fontWeight: 600
-                }}
-              >
-                Đang xuất hàng
-              </Button>
-              <Button
-                type={statusFilter === 'Hoàn thành' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Hoàn thành')}
-                style={{
-                  background: statusFilter === 'Hoàn thành' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Hoàn thành' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Hoàn thành' ? '#111' : '#666',
-                  fontWeight: 600
-                }}
-              >
-                Hoàn thành
-              </Button>
-              <Button
-                type={statusFilter === 'Tất cả' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Tất cả')}
-                style={{
-                  background: statusFilter === 'Tất cả' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Tất cả' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Tất cả' ? '#111' : '#666',
-                  fontWeight: 600
-                }}
-              >
-                Tất cả
-              </Button>
-            </Space>
           </div>
         </div>
 
-        <div style={{ 
-          background: '#fff', 
-          borderRadius: '12px', 
-          overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <Table
-            columns={columns}
-            dataSource={filteredData}
-            rowClassName={(record, index) => {
-              const isExpanded = expandedRowKeys.includes(record.key?.toString())
-              const baseClass = index % 2 === 0 ? 'table-row-even' : 'table-row-odd'
-              return isExpanded ? `${baseClass} table-row-expanded` : baseClass
-            }}
-            expandable={{
-              expandedRowRender,
-              expandedRowKeys,
-              onExpandedRowsChange: setExpandedRowKeys,
-              expandIcon: ({ expanded, onExpand, record }) => (
+        {/* Bảng dữ liệu */}
+        <Table 
+          columns={columns}
+          dataSource={getFilteredData()} 
+          loading={loading}
+          expandable={{
+            expandedRowRender,
+            expandedRowKeys,
+            onExpandedRowsChange: (keys) => setExpandedRowKeys(keys),
+            expandRowByClick: true,
+            expandIconColumnIndex: -1 // Di chuyển expand icon về cuối
+          }}
+          pagination={{ 
+            current: page, 
+            pageSize, 
+            total,
+            onChange: (newPage) => setPage(newPage),
+            showSizeChanger: false,
+            showTotal: (total) => `Tổng số ${total} báo giá`
+          }}
+          size="middle"
+          components={goldTableHeader}
+        />
+
+        {/* Modal Phiếu mua hàng */}
+        <Modal
+          open={isModalOpen}
+          onCancel={handleCloseModal}
+          footer={null}
+          width={700}
+          closable={false}
+          styles={{
+            header: { display: 'none' },
+            body: { padding: 0 },
+            content: { padding: 0, borderRadius: 12, overflow: 'hidden' }
+          }}
+        >
+          {/* Header */}
+          <div style={{ 
+            background: '#CBB081', 
+            padding: '16px 24px', 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            margin: 0
+          }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#000' }}>
+              THÔNG TIN CHI TIẾT
+            </h2>
+            <Button 
+              type="text" 
+              icon={<CloseOutlined />} 
+              onClick={handleCloseModal}
+              style={{ color: '#000', fontSize: 18, padding: 0, width: 24, height: 24 }}
+            />
+          </div>
+
+          <Spin spinning={modalLoading} tip="Đang tải dữ liệu...">
+            <div style={{ padding: '24px' }}>
+              {/* Status và Quantity */}
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: '1fr 1fr 1fr', 
+              gap: 16, 
+              marginBottom: 20,
+              padding: '12px 16px',
+              background: '#f5f5f5',
+              borderRadius: 8
+            }}>
+              <div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Trạng thái</div>
+                <div style={{ fontWeight: 600, color: '#000' }}>
+                  {hasExistingPart ? 'Đã có' : 'Không rõ'}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Số lượng yêu cầu</div>
+                <div style={{ fontWeight: 600, color: '#000' }}>{formData.quantity || 0}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>Tồn kho</div>
+                <div style={{ fontWeight: 600, color: '#000' }}>{partStock || 0}</div>
+              </div>
+            </div>
+
+            {/* Form Fields - Custom layout */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Hàng 1: Tên linh kiện - Giá nhập */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                    Tên linh kiện <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <Input
+                    value={formData.partName}
+                    onChange={(e) => handleFormChange('partName', e.target.value)}
+                    placeholder="Nhập tên linh kiện"
+                    disabled={hasExistingPart || formData.isReviewed}
+                    style={{ borderRadius: 8, height: 40, borderColor: errors.partName ? '#ff4d4f' : undefined }}
+                  />
+                  {errors.partName && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      {errors.partName}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                    Giá nhập <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <InputNumber
+                    value={formData.priceImport ? Number(formData.priceImport.toString().replace(/\./g, '')) : undefined}
+                    onChange={(value) => {
+                      const newPriceImport = parseFloat(value) || 0
+                      handleFormChange('priceImport', value ? value.toString() : '')
+                      
+                      // Tự động tính giá bán = giá nhập + 10% (chỉ khi chưa được chỉnh sửa thủ công)
+                      if (newPriceImport > 0 && !isPriceSellManuallyEdited) {
+                        const calculatedPriceSell = Math.round(newPriceImport * 1.1)
+                        handleFormChange('priceSell', calculatedPriceSell.toString())
+                      }
+                      
+                      // Kiểm tra lại giá bán khi thay đổi giá nhập
+                      const priceSell = parseFloat(formData.priceSell) || 0
+                      if (priceSell > 0 && newPriceImport > 0 && priceSell < newPriceImport) {
+                        setErrors(prev => ({
+                          ...prev,
+                          priceSell: 'Giá bán không được nhỏ hơn giá nhập'
+                        }))
+                      } else if (errors.priceSell && errors.priceSell.includes('nhỏ hơn')) {
+                        // Clear error nếu giá bán đã hợp lệ
+                        setErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors.priceSell
+                          return newErrors
+                        })
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Validate giá nhập khi blur
+                      const priceImport = parseFloat(formData.priceImport) || 0
+                      const priceSell = parseFloat(formData.priceSell) || 0
+                      if (priceImport > 0 && priceSell > 0 && priceSell < priceImport) {
+                        setErrors(prev => ({
+                          ...prev,
+                          priceSell: 'Giá bán không được nhỏ hơn giá nhập'
+                        }))
+                      }
+                    }}
+                    placeholder="Nhập giá nhập"
+                    disabled={hasExistingPart || formData.isReviewed}
+                    style={{ width: '100%', borderRadius: 8, height: 40, borderColor: errors.priceImport ? '#ff4d4f' : undefined }}
+                    formatter={(value) => {
+                      if (!value) return ''
+                      const onlyDigits = `${value}`.replace(/\D/g, '')
+                      return onlyDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                    }}
+                    parser={(value) => (value ? value.replace(/\./g, '') : '')}
+                    controls={false}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+                        e.preventDefault()
+                      }
+                    }}
+                    min={0}
+                  />
+                  {errors.priceImport && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      {errors.priceImport}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Hàng 2: Loại linh kiện - Giá bán */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                    Loại linh kiện <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <Select
+                    value={formData.partType || undefined}
+                    onChange={(value) => handleFormChange('partType', value)}
+                    disabled={hasExistingPart || formData.isReviewed}
+                    placeholder="Chọn loại linh kiện"
+                    style={{ width: '100%', borderRadius: 8, height: 40 }}
+                    allowClear
+                    loading={modalLoading && partCategories.length === 0}
+                    status={errors.partType ? 'error' : ''}
+                  >
+                    {partCategories.map((category) => (
+                      <Option key={category.id} value={category.name}>
+                        {category.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  {errors.partType && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      {errors.partType}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                    Giá bán <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <InputNumber
+                    value={formData.priceSell ? Number(formData.priceSell.toString().replace(/\./g, '')) : undefined}
+                    onChange={(value) => {
+                      handleFormChange('priceSell', value ? value.toString() : '')
+                      // Đánh dấu là giá bán đã được chỉnh sửa thủ công
+                      setIsPriceSellManuallyEdited(true)
+                      
+                      // Clear error khi user thay đổi giá trị
+                      if (errors.priceSell) {
+                        setErrors(prev => {
+                          const newErrors = { ...prev }
+                          delete newErrors.priceSell
+                          return newErrors
+                        })
+                      }
+                    }}
+                    onBlur={(e) => {
+                      // Validate giá bán khi blur
+                      const priceSell = parseFloat(formData.priceSell) || 0
+                      const priceImport = parseFloat(formData.priceImport) || 0
+                      if (priceSell > 0 && priceImport > 0 && priceSell < priceImport) {
+                        setErrors(prev => ({
+                          ...prev,
+                          priceSell: 'Giá bán không được nhỏ hơn giá nhập'
+                        }))
+                      }
+                    }}
+                    placeholder="Nhập giá bán"
+                    disabled={hasExistingPart || formData.isReviewed}
+                    style={{ width: '100%', borderRadius: 8, height: 40, borderColor: errors.priceSell ? '#ff4d4f' : undefined }}
+                    formatter={(value) => {
+                      if (!value) return ''
+                      const onlyDigits = `${value}`.replace(/\D/g, '')
+                      return onlyDigits.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+                    }}
+                    parser={(value) => (value ? value.replace(/\./g, '') : '')}
+                    controls={false}
+                    onKeyPress={(e) => {
+                      if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
+                        e.preventDefault()
+                      }
+                    }}
+                    min={0}
+                  />
+                  {errors.priceSell && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      {errors.priceSell}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Hàng 3: Xuất xứ - Đơn vị */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                    Xuất xứ <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <Select
+                    value={formData.origin || undefined}
+                    onChange={(value) => handleFormChange('origin', value)}
+                    disabled={hasExistingPart || formData.isReviewed}
+                    placeholder="Chọn xuất xứ"
+                    style={{ width: '100%', borderRadius: 8, height: 40 }}
+                    allowClear
+                    loading={modalLoading && markets.length === 0}
+                    status={errors.origin ? 'error' : ''}
+                  >
+                    {markets.map((market) => (
+                      <Option key={market.id} value={market.name}>
+                        {market.name}
+                      </Option>
+                    ))}
+                  </Select>
+                  {errors.origin && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      {errors.origin}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                    Đơn vị <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <Select
+                    value={formData.unit || undefined}
+                    onChange={(value) => handleFormChange('unit', value)}
+                    disabled={hasExistingPart || formData.isReviewed}
+                    placeholder="Chọn đơn vị"
+                    style={{ width: '100%', borderRadius: 8, height: 40 }}
+                    allowClear
+                    loading={modalLoading && units.length === 0}
+                    status={errors.unit ? 'error' : ''}
+                  >
+                    {Array.isArray(units) && units.map((unit) => (
+                      <Option key={unit?.id || unit?.unitId || Math.random()} value={unit?.name || ''}>
+                        {unit?.name || ''}
+                      </Option>
+                    ))}
+                  </Select>
+                  {errors.unit && (
+                    <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                      {errors.unit}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Hàng 4: Checkbox "Dùng chung tất cả dòng xe" (full width) */}
+              <div>
+                <Checkbox
+                  checked={formData.usedForAllCars}
+                  onChange={(e) => handleFormChange('usedForAllCars', e.target.checked)}
+                  disabled={hasExistingPart || formData.isReviewed}
+                >
+                  Dùng chung tất cả dòng xe
+                </Checkbox>
+              </div>
+
+              {/* Hàng 5: Hãng - Dòng xe (chỉ hiển thị khi không check "dùng chung") */}
+              {!formData.usedForAllCars && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                      Hãng
+                    </label>
+                    <Select
+                      value={formData.brand || undefined}
+                      onChange={(value) => {
+                        handleFormChange('brand', value)
+                        // Reset carModel when brand changes
+                        handleFormChange('carModel', '')
+                        // Tìm brandId từ value (brand.name) và gọi API lấy danh sách dòng xe
+                        if (value) {
+                          const selectedBrand = brands.find(b => b.name === value)
+                          console.log('Selected brand:', selectedBrand, 'from brands:', brands, 'value:', value)
+                          if (selectedBrand && selectedBrand.id) {
+                            console.log('Calling fetchCarModels with brandId:', selectedBrand.id)
+                            fetchCarModels(selectedBrand.id)
+                          } else {
+                            console.warn('Brand not found or missing id:', value, selectedBrand)
+                            setCarModels([])
+                          }
+                        } else {
+                          setCarModels([])
+                        }
+                      }}
+                      disabled={hasExistingPart || formData.isReviewed}
+                      placeholder="Chọn hãng"
+                      style={{ width: '100%', borderRadius: 8, height: 40 }}
+                      allowClear
+                      loading={modalLoading && brands.length === 0}
+                      status={errors.brand ? 'error' : ''}
+                    >
+                      {brands.map((brand) => (
+                        <Option key={brand.id} value={brand.name}>
+                          {brand.name}
+                        </Option>
+                      ))}
+                    </Select>
+                    {errors.brand && (
+                      <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                        {errors.brand}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                      Dòng xe
+                    </label>
+                    <Select
+                      value={formData.carModel || undefined}
+                      onChange={(value) => handleFormChange('carModel', value)}
+                      disabled={hasExistingPart || formData.isReviewed || !formData.brand}
+                      placeholder="Chọn dòng xe"
+                      style={{ width: '100%', borderRadius: 8, height: 40 }}
+                      allowClear
+                      loading={carModels.length === 0 && formData.brand && !modalLoading}
+                      status={errors.carModel ? 'error' : ''}
+                    >
+                      {carModels.map((model) => (
+                        <Option key={model.id} value={model.name}>
+                          {model.name}
+                        </Option>
+                      ))}
+                    </Select>
+                    {errors.carModel && (
+                      <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                        {errors.carModel}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Hàng 6: Nhà phân phối (full width) */}
+              <div>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+                  Nhà phân phối <span style={{ color: 'red' }}>*</span>
+                </label>
+                <Select
+                  value={formData.manufacturer || undefined}
+                  onChange={(value) => handleFormChange('manufacturer', value)}
+                  disabled={hasExistingPart || formData.isReviewed}
+                  placeholder="Chọn nhà cung cấp"
+                  style={{ width: '100%', borderRadius: 8, height: 40 }}
+                  allowClear
+                  loading={modalLoading && suppliers.length === 0}
+                  status={errors.manufacturer ? 'error' : ''}
+                >
+                  {suppliers.map((supplier) => (
+                    <Option key={supplier.id} value={supplier.name}>
+                      {supplier.name}
+                    </Option>
+                  ))}
+                </Select>
+                {errors.manufacturer && (
+                  <div style={{ color: '#ff4d4f', fontSize: 12, marginTop: 4 }}>
+                    {errors.manufacturer}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ghi chú - Full width */}
+            <div style={{ marginTop: 16 }}>
+    <label style={{ display: 'block', fontWeight: 600, marginBottom: 6, fontSize: 14 }}>
+      Ghi chú/Lý do
+              </label>
+              <Input.TextArea
+                value={formData.note}
+                onChange={(e) => handleFormChange('note', e.target.value)}
+                placeholder="Nhập nội dung (không bắt buộc)"
+                rows={3}
+                disabled={(hasExistingPart && formData.specialPart === true) || formData.isReviewed}
+                style={{ 
+                  borderRadius: 8,
+                  backgroundColor: ((hasExistingPart && formData.specialPart === true) || formData.isReviewed) ? '#f5f5f5' : 'white'
+                }}
+              />
+              <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+                Linh kiện đặc biệt kiểm tra thông tin
+              </div>
+            </div>
+
+            {/* Buttons */}
+            {!formData.isReviewed && (
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'flex-end', 
+                gap: 12, 
+                marginTop: 24,
+                paddingTop: 20,
+                borderTop: '1px solid #f0f0f0'
+              }}>
                 <Button
-                  type="text"
-                  icon={expanded ? <UpOutlined /> : <DownOutlined />}
-                  onClick={(e) => onExpand(record, e)}
+                  danger
+                  onClick={handleReject}
+                  loading={modalLoading}
                   style={{ 
-                    padding: '4px 8px',
-                    width: 'auto',
-                    height: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: expanded ? '#1677ff' : '#666',
-                    fontSize: '16px',
-                    fontWeight: 600
+                    minWidth: 100,
+                    height: 40,
+                    borderRadius: 8,
+                    fontWeight: 500
                   }}
-                />
-              ),
-              indentSize: 0,
-              expandRowByClick: false
-            }}
-            pagination={{
-              current: page,
-              pageSize: pageSize,
-              total: 100,
-              showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              onChange: (page, pageSize) => {
-                setPage(page)
-                setPageSize(pageSize)
-              },
-              onShowSizeChange: (current, size) => {
-                setPage(1)
-                setPageSize(size)
-              }
-            }}
-            size="middle"
-            components={goldTableHeader}
-          />
-        </div>
+                >
+                  Từ chối
+                </Button>
+                <Button
+                  type="primary"
+                  onClick={handleConfirm}
+                  loading={modalLoading}
+                  style={{ 
+                    minWidth: 100,
+                    height: 40,
+                    borderRadius: 8,
+                    backgroundColor: '#22c55e',
+                    borderColor: '#22c55e',
+                    fontWeight: 500
+                  }}
+                >
+                  Duyệt
+                </Button>
+              </div>
+            )}
+            </div>
+          </Spin>
+        </Modal>
       </div>
     </WarehouseLayout>
   )

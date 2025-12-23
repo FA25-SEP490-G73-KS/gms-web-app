@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react'
-import { Table, Input, Button, Space, Tag, Avatar } from 'antd'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Table, Input, Button, Space, Tag, Avatar, message } from 'antd'
 import { SearchOutlined, PlusOutlined, FilterOutlined } from '@ant-design/icons'
 import AccountanceLayout from '../../layouts/AccountanceLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { employeesAPI } from '../../services/api'
 import '../../styles/pages/accountance/employee-list.css'
 
 const STATUS_CONFIG = {
@@ -18,7 +19,7 @@ const statusFilters = [
   { key: 'inactive', label: 'Nghỉ phép' }
 ]
 
-const employees = [
+const fallbackEmployees = [
   {
     id: 1,
     name: 'Hoàng Thị Khánh Ly',
@@ -103,11 +104,93 @@ const employees = [
   }
 ]
 
-export default function EmployeeList() {
+const formatEmployee = (employee, index) => {
+  const safeNumber = (value) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) {
+      return 0
+    }
+    return Number(value)
+  }
+
+  const rawDate = employee.joinDate || employee.startDate || employee.createdAt
+  const joinDate = (() => {
+    if (!rawDate) return '—'
+    const date = new Date(rawDate)
+    if (Number.isNaN(date.getTime())) return rawDate
+    return date.toLocaleDateString('vi-VN')
+  })()
+
+  return {
+    id: employee.id || employee.employeeId || `emp-${index}`,
+    name: employee.fullName || employee.name || 'Không rõ',
+    phone: employee.phone || employee.phoneNumber || employee.contactNumber || '—',
+    salary: safeNumber(employee.salary || employee.baseSalary || employee.basicSalary || 0),
+    department: employee.department || employee.departmentName || '—',
+    position: employee.position || employee.jobTitle || '—',
+    joinDate,
+    status: (() => {
+      // Handle boolean status
+      if (employee.active !== undefined) {
+        return employee.active ? 'đang hoạt động' : 'nghỉ làm'
+      }
+      if (employee.status !== undefined) {
+        if (typeof employee.status === 'boolean') {
+          return employee.status ? 'đang hoạt động' : 'nghỉ làm'
+        }
+        // Handle string status
+        return String(employee.status || 'active').toLowerCase()
+      }
+      return 'active'
+    })(),
+    avatar: employee.avatarUrl || employee.avatar || undefined
+  }
+}
+
+export function AccountanceEmployeeListContent() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('all')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [employees, setEmployees] = useState(fallbackEmployees)
+  const [total, setTotal] = useState(fallbackEmployees.length)
+  const [loading, setLoading] = useState(false)
+  const didInit = useRef(false)
+
+  const fetchEmployees = useCallback(
+    async (pageIndex = 0, size = 10) => {
+      setLoading(true)
+      try {
+        const { data, error } = await employeesAPI.getAll(pageIndex, size)
+        if (error) {
+          throw new Error(error)
+        }
+        const payload = data?.result || data?.data || data
+        const list = Array.isArray(payload)
+          ? payload
+          : payload?.content || payload?.items || payload?.records || []
+        setEmployees(list.map((item, idx) => formatEmployee(item, idx)))
+        setTotal(payload?.totalElements || payload?.total || payload?.totalItems || list.length)
+        setPage(pageIndex + 1)
+        setPageSize(size)
+      } catch (err) {
+        message.error(err.message || 'Không thể tải danh sách nhân viên')
+        setEmployees(fallbackEmployees)
+        setTotal(fallbackEmployees.length)
+        setPage(1)
+        setPageSize(10)
+      } finally {
+        setLoading(false)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (!didInit.current) {
+      fetchEmployees(0, pageSize)
+      didInit.current = true
+    }
+  }, [fetchEmployees, pageSize])
 
   const filtered = useMemo(() => {
     return employees
@@ -120,7 +203,7 @@ export default function EmployeeList() {
         return matchesQuery && matchesStatus
       })
       .map((emp, index) => ({ ...emp, key: emp.id, index: index + 1 }))
-  }, [query, status])
+  }, [employees, query, status])
 
   const columns = [
     {
@@ -220,8 +303,7 @@ export default function EmployeeList() {
   ]
 
   return (
-    <AccountanceLayout>
-      <div className="employee-page">
+    <div className="employee-page">
         <div className="employee-header">
           <h1>Danh sách nhân viên</h1>
         </div>
@@ -263,23 +345,31 @@ export default function EmployeeList() {
             className="employee-table"
             columns={columns}
             dataSource={filtered}
+            loading={loading}
             pagination={{
               current: page,
               pageSize,
-              total: filtered.length,
+              total,
               showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (t) => `0 of ${t} row(s) selected.`,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (current, size) => {
-                setPage(current)
-                setPageSize(size)
+                fetchEmployees(current - 1, size)
               }
             }}
             components={goldTableHeader}
           />
         </div>
-      </div>
-    </AccountanceLayout>
+    </div>
+  )
+}
+
+export default function AccountanceEmployeeList({ Layout = AccountanceLayout }) {
+  const Wrapper = Layout || (({ children }) => <>{children}</>)
+  return (
+    <Wrapper>
+      <AccountanceEmployeeListContent />
+    </Wrapper>
   )
 }
 

@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken, getUserPhoneFromToken, getShortName } from '../utils/helpers'
+import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/warehouse-layout.css'
 
-export default function WarehouseLayout({ children }) {
+export default function WarehouseLayout({ children, breadcrumbItems }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const [openImport, setOpenImport] = useState(location.pathname.startsWith('/warehouse/import'))
+  const [openImport, setOpenImport] = useState(
+    location.pathname.startsWith('/warehouse/import') ||
+    location.pathname.startsWith('/warehouse/purchase-requests')
+  )
   const [openExport, setOpenExport] = useState(location.pathname.startsWith('/warehouse/export'))
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
@@ -17,7 +22,10 @@ export default function WarehouseLayout({ children }) {
   const isActiveParent = (path) => location.pathname.startsWith(path)
 
   useEffect(() => {
-    if (location.pathname.startsWith('/warehouse/import')) {
+    if (
+      location.pathname.startsWith('/warehouse/import') ||
+      location.pathname.startsWith('/warehouse/purchase-requests')
+    ) {
       setOpenImport(true)
     }
     if (location.pathname.startsWith('/warehouse/export')) {
@@ -44,12 +52,17 @@ export default function WarehouseLayout({ children }) {
   // Breadcrumb mapping based on route
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/warehouse/ticket/create')) {
+    if (path.startsWith('/warehouse/create-ticket')) {
       return { parent: '', current: 'Tạo phiếu' }
     } else if (path.startsWith('/warehouse/export/request')) {
-      return { parent: 'Xuất kho', current: 'Yêu cầu xuất hàng' }
+      return { parent: 'Xuất kho', current: 'Xác nhận báo giá' }
     } else if (path.startsWith('/warehouse/export/list')) {
       return { parent: 'Xuất kho', current: 'Danh sách xuất' }
+    } else if (path.match(/^\/warehouse\/purchase-requests\/\d+$/)) {
+      // Detail page: /warehouse/purchase-requests/:id
+      return { parent: 'Nhập kho', current: 'Yêu cầu mua hàng > Chi tiết' }
+    } else if (path.startsWith('/warehouse/purchase-requests')) {
+      return { parent: 'Nhập kho', current: 'Yêu cầu mua hàng' }
     } else if (path.startsWith('/warehouse/import/request')) {
       return { parent: 'Nhập kho', current: 'Yêu cầu nhập hàng' }
     } else if (path.startsWith('/warehouse/import/list')) {
@@ -77,27 +90,63 @@ export default function WarehouseLayout({ children }) {
               <i className={`bi ${sidebarCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'}`}></i>
             </button>
             <div className="breadcrumb-divider"></div>
-            {breadcrumb.parent ? (
+            {breadcrumbItems ? (
+              <div className="breadcrumb">
+                {breadcrumbItems.map((item, index) => (
+                  <React.Fragment key={index}>
+                    {index > 0 && <span className="breadcrumb-separator">&gt;</span>}
+                    {item.path ? (
+                      <span 
+                        className="breadcrumb-item breadcrumb-link"
+                        onClick={() => navigate(item.path)}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        {item.label}
+                      </span>
+                    ) : (
+                      <span className="breadcrumb-current">{item.label}</span>
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+            ) : breadcrumb.parent ? (
               <div className="breadcrumb">
                 <span className="breadcrumb-item">{breadcrumb.parent}</span>
                 <span className="breadcrumb-separator">&gt;</span>
-                <span className="breadcrumb-current">{breadcrumb.current}</span>
+                {breadcrumb.current.includes(' > ') ? (
+                  breadcrumb.current.split(' > ').map((item, index, array) => (
+                    <React.Fragment key={index}>
+                      {index > 0 && <span className="breadcrumb-separator">&gt;</span>}
+                      {index === array.length - 1 ? (
+                        <span className="breadcrumb-current">{item}</span>
+                      ) : (
+                        <span 
+                          className="breadcrumb-item breadcrumb-link"
+                          onClick={() => navigate('/warehouse/purchase-requests')}
+                          style={{ cursor: 'pointer' }}
+                        >
+                          {item}
+                        </span>
+                      )}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <span className="breadcrumb-current">{breadcrumb.current}</span>
+                )}
               </div>
             ) : (
               <span className="breadcrumb-current">{breadcrumb.current}</span>
             )}
           </div>
           <div className="warehouse-topbar-right">
-            <button className="notification-btn">
-              <i className="bi bi-bell"></i>
-            </button>
+            <NotificationBell />
           </div>
         </div>
       </header>
 
       {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/warehouse')} style={{ marginTop: '57px' }}>
+        <div className="warehouse-brand" onClick={() => navigate('/warehouse')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">
@@ -117,14 +166,6 @@ export default function WarehouseLayout({ children }) {
             <span>Danh sách linh kiện</span>
           </button>
 
-          <button
-            className={`warehouse-nav-item ${isActive('/warehouse/ticket/create') ? 'active' : ''}`}
-            onClick={() => navigate('/warehouse/ticket/create')}
-          >
-            <i className="bi bi-file-earmark-plus" />
-            <span>Tạo phiếu</span>
-          </button>
-
           <div className={`warehouse-nav-group ${openImport ? 'open' : ''}`}>
             <button
               className={`warehouse-nav-item ${isActiveParent('/warehouse/import') ? 'active' : ''}`}
@@ -138,10 +179,16 @@ export default function WarehouseLayout({ children }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button 
-                  className={`submenu-item ${isActive('/warehouse/import/list') ? 'active' : ''}`}
+                  className={`submenu-item ${location.pathname.startsWith('/warehouse/import/list') || location.pathname.startsWith('/warehouse/import-list') ? 'active' : ''}`}
                   onClick={() => navigate('/warehouse/import/list')}
                 >
                   Danh sách nhập
+                </button>
+                <button 
+                  className={`submenu-item ${location.pathname.startsWith('/warehouse/purchase-requests') ? 'active' : ''}`}
+                  onClick={() => navigate('/warehouse/purchase-requests')}
+                >
+                  Yêu cầu mua hàng
                 </button>
               </div>
             )}
@@ -160,7 +207,7 @@ export default function WarehouseLayout({ children }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button 
-                  className={`submenu-item ${isActive('/warehouse/export/list') ? 'active' : ''}`}
+                  className={`submenu-item ${location.pathname.startsWith('/warehouse/export/list') ? 'active' : ''}`}
                   onClick={() => navigate('/warehouse/export/list')}
                 >
                   Danh sách xuất
@@ -174,33 +221,34 @@ export default function WarehouseLayout({ children }) {
               </div>
             )}
           </div>
+
+          {/* Tạo phiếu */}
+          <button 
+            className={`warehouse-nav-item ${isActive('/warehouse/create-ticket') ? 'active' : ''}`}
+            onClick={() => navigate('/warehouse/create-ticket')}
+          >
+            <i className="bi bi-receipt" />
+            <span>Tạo phiếu</span>
+          </button>
         </nav>
         <div className="warehouse-spacer" />
         
         {/* User Info with Dropdown */}
         <div className="warehouse-user-menu" ref={userMenuRef} style={{ position: 'relative' }}>
           <button 
-            className="warehouse-user-info" 
+            className="warehouse-user-info"
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            <div className="warehouse-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+            <div className="warehouse-user-text">
+              <div className="warehouse-user-name">
+                {getShortName(getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A')}
+              </div>
+              <div className="warehouse-user-role">
+                {getUserPhoneFromToken() || user?.phone || ''}
+              </div>
             </div>
           </button>
           
@@ -209,18 +257,50 @@ export default function WarehouseLayout({ children }) {
               position: 'absolute',
               bottom: '100%',
               left: 0,
-              right: 0,
               marginBottom: '8px',
               background: '#fff',
               border: '1px solid #e6e8eb',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               zIndex: 1000,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              minWidth: '200px',
+              textAlign: 'left'
             }}>
               <button
+                className="warehouse-menu-item"
+                onClick={() => {
+                  setShowUserMenu(false)
+                  navigate('/auth/profile')
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontWeight: 500,
+                  color: '#333',
+                  fontSize: '14px',
+                  borderBottom: '1px solid #e6e8eb',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                <i className="bi bi-person" />
+                <span>Thông tin cá nhân</span>
+              </button>
+              <button
                 className="warehouse-logout"
-                onClick={handleLogout}
+                onClick={() => {
+                  setShowUserMenu(false)
+                  handleLogout()
+                }}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -232,8 +312,12 @@ export default function WarehouseLayout({ children }) {
                   gap: '10px',
                   fontWeight: 600,
                   color: '#d1293d',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
                 }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
               >
                 <i className="bi bi-box-arrow-right" />
                 <span>Đăng xuất</span>
@@ -246,7 +330,7 @@ export default function WarehouseLayout({ children }) {
       {/* Main Content */}
       <main className="warehouse-main">
         <div className="warehouse-content">
-          {children}
+            {children}
         </div>
       </main>
     </div>

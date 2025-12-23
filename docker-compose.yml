@@ -1,0 +1,16 @@
+services:
+  app:
+    image: taehuyn/gms-web-app:latest
+    container_name: gms_web_app
+    ports:
+      - "4173:4173"
+    env_file:
+      - .env
+      
+    restart: unless-stopped
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge

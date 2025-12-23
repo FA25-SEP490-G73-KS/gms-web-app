@@ -20,3 +20,193 @@
   background: #ffffff;
 }
 
+/* Form Modal Styles */
+.ant-modal .ant-form-item {
+  margin-bottom: 20px;
+}
+
+.ant-modal .ant-form-item-label > label {
+  font-weight: 600;
+  font-size: 14.5px; /* Subtext: 14-15px */
+  color: #374151;
+  margin-bottom: 8px;
+}
+
+.ant-modal .ant-input,
+.ant-modal .ant-input-number,
+.ant-modal .ant-select-selector {
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  transition: all 0.2s;
+  font-size: 14.5px; /* Subtext: 14-15px */
+}
+
+.ant-modal .ant-input:hover,
+.ant-modal .ant-input-number:hover,
+.ant-modal .ant-select:hover .ant-select-selector {
+  border-color: #9ca3af;
+}
+
+.ant-modal .ant-input:focus,
+.ant-modal .ant-input-number:focus,
+.ant-modal .ant-select-focused .ant-select-selector {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.ant-modal .ant-input[disabled],
+.ant-modal .ant-input-number[disabled] {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+.ant-modal .ant-textarea {
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  transition: all 0.2s;
+  font-size: 14.5px; /* Subtext: 14-15px */
+  padding: 8px 12px;
+}
+
+.ant-modal .ant-textarea:hover {
+  border-color: #9ca3af;
+}
+
+.ant-modal .ant-textarea:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+/* Ensure columns have equal height */
+.ant-modal .ant-row {
+  display: flex;
+  align-items: stretch;
+  min-height: 100%;
+}
+
+.ant-modal .ant-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.ant-modal .ant-col .ant-form-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.ant-modal .ant-col .ant-form-item:last-child {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.ant-modal .ant-col .ant-form-item .ant-form-item-control {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ant-modal .ant-col .ant-form-item .ant-form-item-control-input {
+  flex: 1;
+}
+
+/* Select dropdown styling */
+.ant-modal .ant-select {
+  width: 100%;
+}
+
+.ant-modal .ant-select-selector {
+  height: 40px;
+  padding: 4px 11px;
+}
+
+.ant-modal .ant-select-selection-item {
+  line-height: 32px;
+  font-size: 14.5px; /* Subtext: 14-15px */
+}
+
+.ant-modal .ant-select-selection-placeholder {
+  line-height: 32px;
+  font-size: 14.5px; /* Subtext: 14-15px */
+  color: #9ca3af;
+}
+
+/* Input number styling */
+.ant-modal .ant-input-number {
+  width: 100%;
+  height: 40px;
+}
+
+.ant-modal .ant-input-number-input {
+  height: 38px;
+  padding: 8px 12px;
+  font-size: 14.5px; /* Subtext: 14-15px */
+}
+
+/* Input styling */
+.ant-modal .ant-input {
+  height: 40px;
+  padding: 8px 12px;
+  font-size: 14.5px; /* Subtext: 14-15px */
+}
+
+.ant-modal .ant-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Textarea placeholder */
+.ant-modal .ant-textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Native Select styling */
+.ant-modal select {
+  width: 100%;
+  height: 40px;
+  padding: 8px 12px;
+  font-size: 14.5px; /* Subtext: 14-15px */
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  color: #262626;
+  cursor: pointer;
+  background-color: #fff;
+  transition: all 0.2s;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 12px;
+  padding-right: 36px;
+}
+
+.ant-modal select:hover {
+  border-color: #9ca3af;
+}
+
+.ant-modal select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.ant-modal select:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+  border-color: #e5e7eb;
+}
+
+.ant-modal select option {
+  padding: 8px 12px;
+  font-size: 14.5px; /* Subtext: 14-15px */
+}
+
+.ant-modal select option:first-child {
+  color: #9ca3af;
+}
+

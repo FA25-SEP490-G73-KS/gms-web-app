@@ -1,25 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken, getUserPhoneFromToken, getShortName } from '../utils/helpers'
+import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/admin-layout.css'
 
 export default function AdminLayout({ children }) {
   const navigate = useNavigate()
   const location = useLocation()
-  // Keep dropdown open if we're on any orders route
-  const isOnOrdersRoute = location.pathname.startsWith('/service-advisor/orders')
-  const [openService, setOpenService] = useState(isOnOrdersRoute)
+  // Giữ trạng thái mở/đóng của nhóm "Phiếu dịch vụ" giữa các màn service-advisor
+  const [openService, setOpenService] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const stored = window.localStorage.getItem('admin_open_service')
+    return stored ? stored === 'true' : true
+  })
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
   const userMenuRef = useRef(null)
   const { user, logout } = useAuthStore()
-  
-  // Update state when route changes
+
+  // Persist trạng thái dropdown "Phiếu dịch vụ"
   useEffect(() => {
-    if (isOnOrdersRoute) {
-      setOpenService(true)
-    }
-  }, [isOnOrdersRoute])
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem('admin_open_service', String(openService))
+  }, [openService])
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -38,7 +42,7 @@ export default function AdminLayout({ children }) {
   }
 
   const items = [
-    { key: 'dashboard', label: 'Doanh thu', to: '/service-advisor', icon: 'bi-grid' },
+    { key: 'dashboard', label: 'Báo cáo', to: '/service-advisor/reports', icon: 'bi-grid' },
     { key: 'appointments', label: 'Lịch hẹn', to: '/service-advisor/appointments', icon: 'bi-calendar3' },
   ]
 
@@ -46,22 +50,33 @@ export default function AdminLayout({ children }) {
 
   const getBreadcrumb = () => {
     const path = location.pathname
-    if (path.startsWith('/service-advisor/orders/history')) {
-      return { parent: 'Phiếu dịch vụ', current: 'Lịch sử sửa chữa' }
-    }
     if (path.startsWith('/service-advisor/orders')) {
-      return { parent: 'Phiếu dịch vụ', current: 'Danh sách phiếu' }
+      const isDetailPage = /^\/service-advisor\/orders\/\d+/.test(path)
+      const isCreatePage = path === '/service-advisor/orders/create' || path === '/service-advisor/orders/new-customer'
+      return {
+        parent: 'Phiếu dịch vụ',
+        current: isDetailPage ? 'Tạo phiếu dịch vụ' : isCreatePage ? 'Tạo phiếu dịch vụ' : 'Danh sách phiếu',
+        child: isDetailPage ? 'Chi tiết phiếu' : null
+      }
     }
     if (path.startsWith('/service-advisor/appointments')) {
-      return { parent: '', current: 'Lịch hẹn' }
+      return { parent: '', current: 'Lịch hẹn', child: null }
     }
-    if (path.startsWith('/service-advisor/warranty')) {
-      return { parent: '', current: 'Bảo hành' }
+    if (path.startsWith('/service-advisor/customers')) {
+      return { parent: '', current: 'Khách hàng', child: null }
     }
-    return { parent: '', current: 'Trang chủ' }
+    return { parent: '', current: 'Trang chủ', child: null }
   }
 
   const breadcrumb = getBreadcrumb()
+
+  const handleBreadcrumbClick = () => {
+    const path = location.pathname
+    if (path.startsWith('/service-advisor/orders')) {
+      navigate('/service-advisor/orders')
+      return
+    }
+  }
 
   return (
     <div className={`admin-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -80,23 +95,36 @@ export default function AdminLayout({ children }) {
               <div className="breadcrumb">
                 <span className="breadcrumb-item">{breadcrumb.parent}</span>
                 <span className="breadcrumb-separator">&gt;</span>
-                <span className="breadcrumb-current">{breadcrumb.current}</span>
+                <button
+                  type="button"
+                  className="breadcrumb-current breadcrumb-button"
+                  onClick={handleBreadcrumbClick}
+                  disabled={
+                    !location.pathname.startsWith('/service-advisor/orders')
+                  }
+                >
+                  {breadcrumb.current}
+                </button>
+                {breadcrumb.child ? (
+                  <>
+                    <span className="breadcrumb-separator">&gt;</span>
+                    <span className="breadcrumb-current">{breadcrumb.child}</span>
+                  </>
+                ) : null}
               </div>
             ) : (
               <span className="breadcrumb-current">{breadcrumb.current}</span>
             )}
           </div>
           <div className="admin-topbar-right">
-            <button className="notification-btn">
-              <i className="bi bi-bell"></i>
-            </button>
+            <NotificationBell />
           </div>
         </div>
       </header>
 
       {/* Sidebar - Overlay on header */}
       <aside className="admin-sidebar">
-        <div className="admin-brand" onClick={() => navigate('/service-advisor')} style={{ marginTop: '57px' }}>
+        <div className="admin-brand" onClick={() => navigate('/service-advisor')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="admin-nav">
@@ -115,10 +143,6 @@ export default function AdminLayout({ children }) {
             <button
               className={`admin-nav-item ${location.pathname.startsWith('/service-advisor/orders') ? 'active' : ''}`}
               onClick={() => {
-                // Don't allow closing if we're on an orders route
-                if (isOnOrdersRoute) {
-                  return
-                }
                 setOpenService((v) => !v)
               }}
             >
@@ -141,46 +165,45 @@ export default function AdminLayout({ children }) {
                   Danh sách phiếu
                 </button>
                 <button 
-                  className={`submenu-item ${location.pathname === '/service-advisor/orders/history' ? 'active' : ''}`}
-                  onClick={() => navigate('/service-advisor/orders/history')}
+                  className={`submenu-item ${
+                    location.pathname === '/service-advisor/orders/create' || 
+                    location.pathname === '/service-advisor/orders/new-customer' ? 'active' : ''
+                  }`}
+                  onClick={() => navigate('/service-advisor/orders/new-customer')}
                 >
-                  Lịch sử sửa chữa
+                  Tạo phiếu dịch vụ
                 </button>
               </div>
             )}
           </div>
 
-          <button className={`admin-nav-item ${isActive('/service-advisor/warranty') ? 'active' : ''}`} onClick={() => navigate('/service-advisor/warranty')}>
-            <i className="bi bi-shield-check" />
-            <span>Bảo hành</span>
+          <button 
+            className={`admin-nav-item ${isActive('/service-advisor/customers') ? 'active' : ''}`}
+            onClick={() => navigate('/service-advisor/customers')}
+          >
+            <i className="bi bi-people" />
+            <span>Khách hàng</span>
           </button>
+
         </nav>
         <div className="admin-spacer" />
         
         {/* User Info with Dropdown */}
         <div className="admin-user-menu" ref={userMenuRef} style={{ position: 'relative' }}>
-          <button 
-            className="admin-user-info" 
+          <button
+            className="admin-user-info"
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            <div className="admin-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+            <div className="admin-user-text">
+              <div className="admin-user-name">
+                {getShortName(getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A')}
+              </div>
+              <div className="admin-user-role">
+                {getUserPhoneFromToken() || user?.phone || ''}
+              </div>
             </div>
           </button>
           
@@ -189,18 +212,50 @@ export default function AdminLayout({ children }) {
               position: 'absolute',
               bottom: '100%',
               left: 0,
-              right: 0,
               marginBottom: '8px',
               background: '#fff',
               border: '1px solid #e6e8eb',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               zIndex: 1000,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              minWidth: '200px',
+              textAlign: 'left'
             }}>
               <button
+                className="admin-menu-item"
+                onClick={() => {
+                  setShowUserMenu(false)
+                  navigate('/auth/profile')
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontWeight: 500,
+                  color: '#333',
+                  fontSize: '14px',
+                  borderBottom: '1px solid #e6e8eb',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                <i className="bi bi-person" />
+                <span>Thông tin cá nhân</span>
+              </button>
+              <button
                 className="admin-logout"
-                onClick={handleLogout}
+                onClick={() => {
+                  setShowUserMenu(false)
+                  handleLogout()
+                }}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -212,8 +267,12 @@ export default function AdminLayout({ children }) {
                   gap: '10px',
                   fontWeight: 600,
                   color: '#d1293d',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
                 }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
               >
                 <i className="bi bi-box-arrow-right" />
                 <span>Đăng xuất</span>

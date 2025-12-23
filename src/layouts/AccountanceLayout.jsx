@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
+import { getUserNameFromToken, getUserPhoneFromToken, getShortName } from '../utils/helpers'
+import NotificationBell from '../components/common/NotificationBell'
 import '../styles/layout/warehouse-layout.css'
 
 export default function AccountanceLayout({ children }) {
@@ -52,7 +54,28 @@ export default function AccountanceLayout({ children }) {
       return { parent: 'Nhân sự', current: 'Ngày công' }
     }
     if (path.startsWith('/accountance/hr/payroll')) {
+      if (path !== '/accountance/hr/payroll') {
+        return {
+          parent: 'Lương',
+          parentPath: '/accountance/hr/payroll',
+          current: 'Chi tiết'
+        }
+      }
       return { parent: 'Nhân sự', current: 'Lương' }
+    }
+    if (path.startsWith('/accountance/debts/') && path !== '/accountance/debts') {
+      return {
+        parent: 'Công nợ',
+        parentPath: '/accountance/debts',
+        current: 'Chi tiết công nợ'
+      }
+    }
+    if (path.startsWith('/accountance/payments/') && path !== '/accountance/payments') {
+      return {
+        parent: 'Thanh toán',
+        parentPath: '/accountance/payments',
+        current: 'Chi tiết hóa đơn',
+      }
     }
     if (path.startsWith('/accountance/payments')) {
       return { parent: '', current: 'Thanh toán' }
@@ -62,9 +85,6 @@ export default function AccountanceLayout({ children }) {
     }
     if (path.startsWith('/accountance/inventory')) {
       return { parent: '', current: 'Kho & Vật tư' }
-    }
-    if (path.startsWith('/accountance/forms')) {
-      return { parent: '', current: 'Tạo phiếu' }
     }
     return { parent: '', current: 'Kế toán' }
   }
@@ -86,7 +106,14 @@ export default function AccountanceLayout({ children }) {
             <div className="breadcrumb-divider"></div>
             {breadcrumb.parent ? (
               <div className="breadcrumb">
-                <span className="breadcrumb-item">{breadcrumb.parent}</span>
+                <button
+                  className="breadcrumb-item"
+                  type="button"
+                  onClick={() => navigate(breadcrumb.parentPath || '/accountance')}
+                  style={{ background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                >
+                  {breadcrumb.parent}
+                </button>
                 <span className="breadcrumb-separator">&gt;</span>
                 <span className="breadcrumb-current">{breadcrumb.current}</span>
               </div>
@@ -95,16 +122,14 @@ export default function AccountanceLayout({ children }) {
             )}
           </div>
           <div className="warehouse-topbar-right">
-            <button className="notification-btn">
-              <i className="bi bi-bell"></i>
-            </button>
+            <NotificationBell />
           </div>
         </div>
       </header>
 
       {/* Sidebar - Overlay on header */}
       <aside className="warehouse-sidebar">
-        <div className="warehouse-brand" onClick={() => navigate('/accountance')} style={{ marginTop: '57px' }}>
+        <div className="warehouse-brand" onClick={() => navigate('/accountance')} style={{ marginTop: '10px' }}>
           <img src="/image/mainlogo.png" alt="Logo" />
         </div>
         <nav className="warehouse-nav">
@@ -137,19 +162,13 @@ export default function AccountanceLayout({ children }) {
               <div className="submenu">
                 <div className="submenu-line" />
                 <button
-                  className={`submenu-item ${isActive('/accountance/hr/list') ? 'active' : ''}`}
-                  onClick={() => navigate('/accountance/hr/list')}
-                >
-                  Danh sách
-                </button>
-                <button
                   className={`submenu-item ${isActive('/accountance/hr/attendance') ? 'active' : ''}`}
                   onClick={() => navigate('/accountance/hr/attendance')}
                 >
                   Ngày công
                 </button>
                 <button
-                  className={`submenu-item ${isActive('/accountance/hr/payroll') ? 'active' : ''}`}
+                  className={`submenu-item ${isActiveParent('/accountance/hr/payroll') ? 'active' : ''}`}
                   onClick={() => navigate('/accountance/hr/payroll')}
                 >
                   Lương
@@ -159,7 +178,7 @@ export default function AccountanceLayout({ children }) {
           </div>
 
           <button
-            className={`warehouse-nav-item ${isActive('/accountance/payments') ? 'active' : ''}`}
+            className={`warehouse-nav-item ${isActiveParent('/accountance/payments') ? 'active' : ''}`}
             onClick={() => navigate('/accountance/payments')}
           >
             <i className="bi bi-credit-card" />
@@ -167,7 +186,7 @@ export default function AccountanceLayout({ children }) {
           </button>
 
           <button
-            className={`warehouse-nav-item ${isActive('/accountance/debts') ? 'active' : ''}`}
+            className={`warehouse-nav-item ${isActiveParent('/accountance/debts') ? 'active' : ''}`}
             onClick={() => navigate('/accountance/debts')}
           >
             <i className="bi bi-receipt" />
@@ -181,14 +200,6 @@ export default function AccountanceLayout({ children }) {
             <i className="bi bi-box-seam" />
             <span>Kho & Vật tư</span>
           </button>
-
-          <button
-            className={`warehouse-nav-item ${isActive('/accountance/forms') ? 'active' : ''}`}
-            onClick={() => navigate('/accountance/forms')}
-          >
-            <i className="bi bi-file-earmark-text" />
-            <span>Tạo phiếu</span>
-          </button>
         </nav>
         <div className="warehouse-spacer" />
         
@@ -197,25 +208,17 @@ export default function AccountanceLayout({ children }) {
           <button 
             className="warehouse-user-info" 
             onClick={() => setShowUserMenu(!showUserMenu)}
-            style={{
-              width: '100%',
-              padding: '12px',
-              border: '1px solid #eee',
-              borderRadius: '10px',
-              background: '#fafafa',
-              cursor: 'pointer',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '4px',
-              alignItems: 'center'
-            }}
           >
-            <div style={{ fontWeight: 600, fontSize: '14px', color: '#222' }}>
-              {user?.name || user?.phone || 'Nguyễn Văn A'}
+            <div className="warehouse-user-avatar">
+              <i className="bi bi-person-fill" />
             </div>
-            <div style={{ fontSize: '12px', color: '#666' }}>
-              {user?.phone || '0123456789'}
+            <div className="warehouse-user-text">
+              <div className="warehouse-user-name">
+                {getShortName(getUserNameFromToken() || user?.name || user?.fullName || 'Nguyễn Văn A')}
+              </div>
+              <div className="warehouse-user-role">
+                {getUserPhoneFromToken() || user?.phone || ''}
+              </div>
             </div>
           </button>
           
@@ -224,18 +227,50 @@ export default function AccountanceLayout({ children }) {
               position: 'absolute',
               bottom: '100%',
               left: 0,
-              right: 0,
               marginBottom: '8px',
               background: '#fff',
               border: '1px solid #e6e8eb',
               borderRadius: '8px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
               zIndex: 1000,
-              overflow: 'hidden'
+              overflow: 'hidden',
+              minWidth: '200px',
+              textAlign: 'left'
             }}>
               <button
+                className="warehouse-menu-item"
+                onClick={() => {
+                  setShowUserMenu(false)
+                  navigate('/auth/profile')
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
+                  border: 'none',
+                  background: 'transparent',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  fontWeight: 500,
+                  color: '#333',
+                  fontSize: '14px',
+                  borderBottom: '1px solid #e6e8eb',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
+                }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
+              >
+                <i className="bi bi-person" />
+                <span>Thông tin cá nhân</span>
+              </button>
+              <button
                 className="warehouse-logout"
-                onClick={handleLogout}
+                onClick={() => {
+                  setShowUserMenu(false)
+                  handleLogout()
+                }}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -247,8 +282,12 @@ export default function AccountanceLayout({ children }) {
                   gap: '10px',
                   fontWeight: 600,
                   color: '#d1293d',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  textAlign: 'left',
+                  justifyContent: 'flex-start'
                 }}
+                onMouseEnter={(e) => e.target.style.background = '#f5f5f5'}
+                onMouseLeave={(e) => e.target.style.background = 'transparent'}
               >
                 <i className="bi bi-box-arrow-right" />
                 <span>Đăng xuất</span>

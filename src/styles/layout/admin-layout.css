@@ -1,14 +1,13 @@
 :root { 
   --gold: #CBB081; 
   --sidebar-width: 240px;
-  --sidebar-collapsed-width: 72px;
+  --sidebar-collapsed-width: 90px;
 }
 
 .admin-layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7f7f8;
   position: relative;
 }
 
@@ -49,7 +48,7 @@
 }
 
 .admin-layout.sidebar-collapsed .admin-brand img {
-  height: 60px;
+  height: 52px;
 }
 
 .admin-layout.sidebar-collapsed .admin-nav-item span,
@@ -91,9 +90,10 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  margin-top: 10px;
 }
 
-.admin-brand img { height: 120px; width: auto; }
+.admin-brand img { height: 88px; width: auto; }
 
 .admin-nav { display: flex; flex-direction: column; gap: 6px; }
 
@@ -121,7 +121,10 @@
 
 .admin-nav-group .caret { margin-left: auto; transition: transform .2s ease; }
 .admin-nav-group .caret.rot { transform: rotate(180deg); }
-.submenu { position: relative; padding-left: 24px; display: grid; gap: 8px; }
+.admin-layout.sidebar-collapsed .admin-nav-group .caret {
+  display: none;
+}
+.submenu { position: relative; padding-left: 24px; display: grid; gap: 10px; margin-top: 6px; }
 .submenu-line { position: absolute; top: 0; bottom: 0; left: 12px; width: 2px; background: #CBB081; border-radius: 2px; }
 .submenu-item { background: transparent; border: none; color: #444; padding: 8px 12px 8px 30px; text-align: left; border-radius: 8px; cursor: pointer; font-weight: 500; }
 .submenu-item:hover { background: rgba(203, 176, 129, 0.25); }
@@ -249,6 +252,22 @@
   height: 100%;
 }
 
+.breadcrumb-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.breadcrumb-button:disabled {
+  cursor: default;
+}
+
 .admin-topbar-right {
   display: flex;
   align-items: center;
@@ -284,4 +303,60 @@
 
 /* Page-specific styles have been moved to src/styles/pages/admin-appointments.css */
 
+
+/* User info at bottom (service advisor sidebar) */
+.admin-user-menu {
+  width: 100%;
+}
+
+.admin-user-info {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  background: #fafafa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #CBB081;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.admin-user-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.admin-user-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #111827;
+}
+
+.admin-user-role {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* When sidebar collapsed: only show avatar */
+.admin-layout.sidebar-collapsed .admin-user-text {
+  display: none;
+}
+
+.admin-layout.sidebar-collapsed .admin-user-info {
+  justify-content: center;
+}
 

@@ -1,0 +1,77 @@
+.suppliers-page {
+  padding: 24px;
+  min-height: 100vh;
+}
+
+.suppliers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.suppliers-title {
+  display: flex;
+  align-items: center;
+}
+
+.suppliers-title h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0;
+  color: #111;
+}
+
+.suppliers-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.suppliers-search {
+  border-radius: 8px;
+}
+
+.add-supplier-btn {
+  height: auto;
+  padding: 8px 20px;
+}
+
+.suppliers-filters {
+  margin-bottom: 24px;
+}
+
+.suppliers-filters .status-btn.active {
+  background: #d4a574;
+  border-color: #d4a574;
+  color: #fff;
+}
+
+.suppliers-table-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.suppliers-table {
+  background: #fff;
+}
+
+.suppliers-table .ant-table-thead > tr > th {
+  background: #d4a574;
+  color: #fff;
+  font-weight: 600;
+  border: none;
+}
+
+.suppliers-table .ant-table-tbody > tr:hover > td {
+  background: #fafafa;
+}
+
+.suppliers-table .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px;
+}
+
+

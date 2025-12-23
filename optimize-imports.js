@@ -102,9 +102,9 @@ let optimizedCount = 0;
 files.forEach(file => {
   if (optimizeImports(file)) {
     optimizedCount++;
-    console.log(`✓ Optimized: ${path.relative(__dirname, file)}`);
+    console.log(`Optimized: ${path.relative(__dirname, file)}`);
   }
 });
 
-console.log(`\n✨ Optimized ${optimizedCount} file(s)`);
+console.log(`Optimized ${optimizedCount} file(s)`);
 

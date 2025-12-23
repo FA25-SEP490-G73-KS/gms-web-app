@@ -1,365 +1,214 @@
 import React, { useState } from 'react'
-import { Modal, Row, Col, Divider, Select, InputNumber, Button, Tag, Input, Table, Space, Form } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
+import { Modal, Row, Col, Button, Input } from 'antd'
+import ReactSelect from 'react-select'
 
-const STATUS_OPTIONS = [
-  { label: 'Còn hàng', value: 'Còn hàng', color: 'success' },
-  { label: 'Cần hàng', value: 'Cần hàng', color: 'processing' },
-  { label: 'Hết hàng', value: 'Hết hàng', color: 'warning' },
-  { label: 'Không rõ', value: 'Không rõ', color: 'default' },
+const BRANDS = [
+  { value: 1, label: 'Vinfast' },
+  { value: 2, label: 'Toyota' },
+  { value: 3, label: 'Honda' },
+  { value: 4, label: 'Mazda' },
+]
+
+const MODELS = [
+  { value: 1, label: 'VF3' },
+  { value: 2, label: 'VF5' },
+  { value: 3, label: 'Vios' },
+  { value: 4, label: 'City' },
 ]
 
 const TECHS = [
-  'Hoàng Thị Khánh Ly - 0123456789',
-  'Phạm Đức Đạt - 0741852963',
-  'Đặng Thị Huyền - 0987654321',
-  'Nguyễn Văn B - 0909123456',
+  { value: 1, label: 'Nguyễn Văn B' },
+  { value: 2, label: 'Hoàng Văn B' },
+  { value: 3, label: 'Phạm Đức Đạt' },
+]
+
+const SERVICES = [
+  { value: 1, label: 'Thay thế phụ tùng' },
+  { value: 2, label: 'Sơn' },
+  { value: 3, label: 'Bảo dưỡng' },
 ]
 
 export default function TicketDetail({ open, onClose, data }) {
-  const [replaceItems, setReplaceItems] = useState([{ id: 1, name: 'Linh kiện A', qty: 1, status: 'Còn hàng', price: 1000000, total: 1000000 }])
-  const [paintItems, setPaintItems] = useState([{ id: 1, name: 'Linh kiện A', qty: 1, status: 'Còn hàng', price: 1000000, total: 1000000 }])
-  const [form] = Form.useForm()
+  const [selectedTechs, setSelectedTechs] = useState([])
+  const [selectedServices, setSelectedServices] = useState([])
+  const [selectedBrand, setSelectedBrand] = useState('')
+  const [selectedModel, setSelectedModel] = useState('')
 
   if (!data) return null
 
-  const getStatusTag = (status) => {
-    const option = STATUS_OPTIONS.find(opt => opt.value === status)
-    return option ? { color: option.color, text: status } : { color: 'default', text: status }
+  const formItemStyle = { marginBottom: '16px' }
+  const labelStyle = { display: 'block', marginBottom: '6px', fontWeight: 500 }
+  const inputHeight = 38
+  const selectStyle = { 
+    width: '100%', 
+    height: inputHeight, 
+    padding: '0 12px', 
+    color: '#262626', 
+    backgroundColor: '#fff', 
+    border: '1px solid #d9d9d9', 
+    borderRadius: '6px', 
+    outline: 'none',
+    cursor: 'pointer'
   }
 
-  const tagColor = data.status === 'Huỷ' ? 'red' : 
-                   data.status === 'Đang sửa chữa' ? 'blue' : 
-                   data.status === 'Chờ báo giá' ? 'orange' : 
-                   data.status === 'Không duyệt' ? 'default' : 'green'
-
-  const addReplace = () => {
-    setReplaceItems([...replaceItems, { 
-      id: Date.now(), 
-      name: `Linh kiện ${replaceItems.length + 1}`, 
-      qty: 1, 
-      status: 'Còn hàng',
-      price: 0,
-      total: 0
-    }])
+  const multiSelectStyles = {
+    control: (base, state) => ({
+      ...base,
+      minHeight: inputHeight,
+      borderRadius: 6,
+      borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
+      boxShadow: state.isFocused ? '0 0 0 2px rgba(59,130,246,0.15)' : 'none',
+      transition: 'all 0.15s ease',
+      '&:hover': { borderColor: '#3b82f6' }
+    }),
+    indicatorsContainer: (base) => ({ ...base, paddingRight: 8 }),
+    valueContainer: (base) => ({ ...base, padding: '2px 8px', gap: 4 }),
+    placeholder: (base) => ({ ...base, color: '#9ca3af', fontWeight: 400 }),
+    multiValue: (base) => ({ ...base, borderRadius: 12, backgroundColor: '#e0f2ff', border: '1px solid #bae6fd' }),
+    multiValueLabel: (base) => ({ ...base, color: '#0f172a', fontWeight: 600, padding: '2px 8px', fontSize: 13 }),
+    multiValueRemove: (base) => ({ ...base, color: '#0ea5e9', borderLeft: '1px solid #bae6fd', padding: '2px 6px', ':hover': { backgroundColor: '#bae6fd', color: '#0284c7' } }),
+    menu: (base) => ({ ...base, zIndex: 9999, borderRadius: 12 }),
+    menuPortal: (base) => ({ ...base, zIndex: 9999 })
   }
-
-  const addPaint = () => {
-    setPaintItems([...paintItems, { 
-      id: Date.now(), 
-      name: `Linh kiện ${paintItems.length + 1}`, 
-      qty: 1, 
-      status: 'Còn hàng',
-      price: 0,
-      total: 0
-    }])
-  }
-
-  const deleteReplace = (id) => {
-    setReplaceItems(replaceItems.filter(item => item.id !== id))
-  }
-
-  const deletePaint = (id) => {
-    setPaintItems(paintItems.filter(item => item.id !== id))
-  }
-
-  const updateReplaceItem = (id, field, value) => {
-    setReplaceItems(replaceItems.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, [field]: value }
-        if (field === 'qty' || field === 'price') {
-          updated.total = updated.qty * updated.price
-        }
-        return updated
-      }
-      return item
-    }))
-  }
-
-  const updatePaintItem = (id, field, value) => {
-    setPaintItems(paintItems.map(item => {
-      if (item.id === id) {
-        const updated = { ...item, [field]: value }
-        if (field === 'qty' || field === 'price') {
-          updated.total = updated.qty * updated.price
-        }
-        return updated
-      }
-      return item
-    }))
-  }
-
-  const replaceColumns = [
-    {
-      title: 'STT',
-      dataIndex: 'index',
-      key: 'index',
-      width: 60,
-      render: (_, __, index) => index + 1
-    },
-    {
-      title: 'Tên linh kiện',
-      dataIndex: 'name',
-      key: 'name',
-      render: (_, record) => (
-        <Input
-          value={record.name}
-          onChange={(e) => updateReplaceItem(record.id, 'name', e.target.value)}
-          placeholder="Tên linh kiện"
-        />
-      )
-    },
-    {
-      title: 'Số lượng',
-      dataIndex: 'qty',
-      key: 'qty',
-      width: 100,
-      render: (_, record) => (
-        <InputNumber
-          min={1}
-          value={record.qty}
-          onChange={(value) => updateReplaceItem(record.id, 'qty', value)}
-        />
-      )
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 150,
-      render: (_, record) => (
-        <Select
-          value={record.status}
-          onChange={(value) => updateReplaceItem(record.id, 'status', value)}
-          options={STATUS_OPTIONS.map(opt => ({
-            value: opt.value,
-            label: <Tag color={opt.color}>{opt.label}</Tag>
-          }))}
-          style={{ width: '100%' }}
-        />
-      )
-    },
-    {
-      title: 'Đơn giá',
-      dataIndex: 'price',
-      key: 'price',
-      width: 150,
-      render: (_, record) => (
-        <InputNumber
-          min={0}
-          value={record.price}
-          onChange={(value) => updateReplaceItem(record.id, 'price', value)}
-          formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-          style={{ width: '100%' }}
-        />
-      )
-    },
-    {
-      title: 'Thành tiền',
-      dataIndex: 'total',
-      key: 'total',
-      width: 150,
-      render: (total) => `${(total || 0).toLocaleString('vi-VN')} VND`
-    },
-    {
-      title: 'Hành động',
-      key: 'action',
-      width: 80,
-      render: (_, record) => (
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => deleteReplace(record.id)}
-        />
-      )
-    }
-  ]
-
-  const paintColumns = [
-    {
-      title: 'STT',
-      dataIndex: 'index',
-      key: 'index',
-      width: 60,
-      render: (_, __, index) => index + 1
-    },
-    {
-      title: 'Tên linh kiện',
-      dataIndex: 'name',
-      key: 'name',
-      render: (_, record) => (
-        <Input
-          value={record.name}
-          onChange={(e) => updatePaintItem(record.id, 'name', e.target.value)}
-          placeholder="Tên linh kiện"
-        />
-      )
-    },
-    {
-      title: 'Số lượng',
-      dataIndex: 'qty',
-      key: 'qty',
-      width: 100,
-      render: (_, record) => (
-        <InputNumber
-          min={1}
-          value={record.qty}
-          onChange={(value) => updatePaintItem(record.id, 'qty', value)}
-        />
-      )
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      key: 'status',
-      width: 150,
-      render: (_, record) => (
-        <Select
-          value={record.status}
-          onChange={(value) => updatePaintItem(record.id, 'status', value)}
-          options={STATUS_OPTIONS.map(opt => ({
-            value: opt.value,
-            label: <Tag color={opt.color}>{opt.label}</Tag>
-          }))}
-          style={{ width: '100%' }}
-        />
-      )
-    },
-    {
-      title: 'Đơn giá',
-      dataIndex: 'price',
-      key: 'price',
-      width: 150,
-      render: (_, record) => (
-        <InputNumber
-          min={0}
-          value={record.price}
-          onChange={(value) => updatePaintItem(record.id, 'price', value)}
-          formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-          style={{ width: '100%' }}
-        />
-      )
-    },
-    {
-      title: 'Thành tiền',
-      dataIndex: 'total',
-      key: 'total',
-      width: 150,
-      render: (total) => `${(total || 0).toLocaleString('vi-VN')} VND`
-    },
-    {
-      title: 'Hành động',
-      key: 'action',
-      width: 80,
-      render: (_, record) => (
-        <Button
-          type="text"
-          danger
-          icon={<DeleteOutlined />}
-          onClick={() => deletePaint(record.id)}
-        />
-      )
-    }
-  ]
 
   return (
     <Modal
-      title="PHIẾU DỊCH VỤ CHI TIẾT"
+      title="Thông Tin Phiếu Dịch Vụ"
       open={open}
       onCancel={onClose}
       footer={null}
-      width={1200}
+      width={650}
     >
-      <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col span={12}>
-          <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px' }}>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Tên khách hàng:</strong> Nguyễn Văn A
+      <div style={{ padding: '8px 0' }}>
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Tên khách hàng:</label>
+              <Input placeholder="Nguyễn Văn A" defaultValue={data?.customer} />
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Số điện thoại:</strong> 0123456789
+          </Col>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Số điện thoại:</label>
+              <Input placeholder="0919384239" defaultValue={data?.phone} />
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Loại xe:</strong> Mazda-v3
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Hãng xe:</label>
+              <select
+                value={selectedBrand}
+                onChange={(e) => setSelectedBrand(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">Chọn hãng</option>
+                {BRANDS.map((brand) => (
+                  <option key={brand.value} value={brand.value}>
+                    {brand.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Biển số xe:</strong> {data?.license}
+          </Col>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Loại xe:</label>
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                style={selectStyle}
+              >
+                <option value="">Chọn loại</option>
+                {MODELS.map((model) => (
+                  <option key={model.value} value={model.value}>
+                    {model.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div>
-              <strong>Số khung:</strong> 1HGCM82633A123456
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Biển số xe:</label>
+              <Input placeholder="30A-12345" defaultValue={data?.license} />
             </div>
-          </div>
-        </Col>
-        <Col span={12}>
-          <div style={{ background: '#fafafa', padding: '16px', borderRadius: '8px' }}>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Nhân viên lập báo giá:</strong> Hoàng Văn B
+          </Col>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Số khung:</label>
+              <Input placeholder="VNN1234578" />
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Ngày tạo báo giá:</strong> {data?.createdAt}
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Nhân viên lập báo giá:</label>
+              <Input disabled defaultValue="Hoàng Văn B" style={{ background: '#f5f5f5' }} />
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Kỹ thuật viên sửa chữa:</strong>
-              <Select
-                mode="multiple"
-                showSearch
-                placeholder="Tìm kiếm"
-                allowClear
-                options={TECHS.map((t) => ({ value: t, label: t }))}
-                style={{ width: '100%', marginTop: '8px' }}
+          </Col>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Ngày tiếp nhận xe:</label>
+              <Input disabled defaultValue="12/10/2025" style={{ background: '#f5f5f5' }} />
+            </div>
+          </Col>
+        </Row>
+
+        <Row gutter={[16, 16]}>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Kỹ thuật viên:</label>
+              <ReactSelect
+                isMulti
+                options={TECHS}
+                value={selectedTechs}
+                onChange={setSelectedTechs}
+                styles={multiSelectStyles}
+                placeholder="Chọn kỹ thuật viên"
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                classNamePrefix="react-select"
               />
             </div>
-            <div style={{ marginBottom: '12px' }}>
-              <strong>Loại dịch vụ:</strong> Thay thế phụ tùng
+          </Col>
+          <Col span={12}>
+            <div style={formItemStyle}>
+              <label style={labelStyle}>Loại dịch vụ:</label>
+              <ReactSelect
+                isMulti
+                options={SERVICES}
+                value={selectedServices}
+                onChange={setSelectedServices}
+                styles={multiSelectStyles}
+                placeholder="Chọn loại dịch vụ"
+                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                classNamePrefix="react-select"
+              />
             </div>
-            <div>
-              <strong>Trạng thái:</strong> <Tag color={tagColor}>{data?.status}</Tag>
-            </div>
-          </div>
-        </Col>
-      </Row>
+          </Col>
+        </Row>
 
-      <Divider orientation="left">BÁO GIÁ CHI TIẾT</Divider>
-
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>Thay thế:</strong>
-          <Button type="primary" icon={<PlusOutlined />} onClick={addReplace} size="small">
-            Thêm
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+          <Button 
+            type="primary" 
+            style={{ 
+              background: '#22c55e', 
+              borderColor: '#22c55e',
+              width: '120px',
+              height: '40px',
+              fontWeight: 600
+            }}
+          >
+            Lưu
           </Button>
         </div>
-        <Table
-          columns={replaceColumns}
-          dataSource={replaceItems.map((item, index) => ({ ...item, key: item.id, index }))}
-          pagination={false}
-          size="small"
-        />
-      </div>
-
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <strong>Sơn:</strong>
-          <Button type="primary" icon={<PlusOutlined />} onClick={addPaint} size="small">
-            Thêm
-          </Button>
-        </div>
-        <Table
-          columns={paintColumns}
-          dataSource={paintItems.map((item, index) => ({ ...item, key: item.id, index }))}
-          pagination={false}
-          size="small"
-        />
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <Button danger type="primary">Gửi</Button>
-        <Button>Lưu</Button>
-        <Button type="primary" style={{ background: '#22c55e', borderColor: '#22c55e' }}>
-          Thanh toán
-        </Button>
       </div>
     </Modal>
   )

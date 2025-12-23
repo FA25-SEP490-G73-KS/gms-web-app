@@ -6,14 +6,14 @@
 
 .home-hero { 
   background: linear-gradient(180deg, #111 0%, #1a1a1a 100%); 
-  padding: 24px 0 36px; 
+  padding: 0; 
   position: relative;
 }
 
 .hero-full { 
-  max-width: 1200px; 
-  margin: 0 auto; 
-  padding: 0 5%; 
+  width: 100%; 
+  margin: 0; 
+  padding: 0; 
 }
 
 .hero-full-img { 
@@ -100,9 +100,9 @@
   box-shadow: 0 8px 24px rgba(0,0,0,.35); 
 }
 
-.home-intro { 
-  background: #fff; 
-  padding: 48px 0;
+.home-intro {
+  background: #fff;
+  padding: clamp(32px, 6vw, 48px) 0;
   scroll-margin-top: 80px;
 }
 
@@ -132,31 +132,176 @@
 }
 
 .intro-text p { 
-  margin: 16px 0; 
+  margin: 18px 0; 
+  line-height: 1.9;
+  color: #444;
+}
+
+.intro-text p:first-of-type {
+  margin-top: 0;
 }
 
 .intro-text .gold,
 .intro-text strong.gold { 
   color: var(--gold); 
   font-weight: 700; 
+  text-shadow: 0 1px 2px rgba(203, 176, 129, 0.2);
 }
 
-.intro-quote { 
-  color: var(--gold); 
-  font-style: italic; 
-  font-weight: 700; 
-  margin: 24px 0;
-  padding: 20px;
-  background: #faf9f6;
+.intro-text h3 {
+  color: #222;
+  font-size: clamp(18px, 2.2vw, 20px);
+  margin-top: 32px !important;
+  margin-bottom: 16px !important;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gold);
+  display: inline-block;
+  width: 100%;
+}
+
+.intro-text ul {
+  margin: 16px 0;
+  padding-left: 24px;
+  list-style: none;
+}
+
+.intro-text ul li {
+  margin: 12px 0;
+  padding-left: 28px;
+  position: relative;
+  line-height: 1.8;
+  color: #444;
+}
+
+.intro-text ul li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+  font-weight: bold;
+  font-size: 18px;
+  top: -2px;
+}
+
+.intro-header {
+  text-align: left;
+  margin-bottom: 32px;
+  width: 100%;
+  padding: 24px;
+  background: linear-gradient(135deg, #faf9f6 0%, #ffffff 100%);
+  border-radius: 12px;
   border-left: 4px solid var(--gold);
-  border-radius: 8px;
-  font-size: clamp(16px, 2.5vw, 20px);
+  box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+
+.intro-title {
+  font-size: clamp(20px, 2.8vw, 24px) !important;
+  margin-bottom: 20px !important;
+  color: #111;
+  line-height: 1.5;
+  letter-spacing: 0.5px;
+}
+
+.intro-header p {
+  margin: 10px 0 !important;
+  font-size: clamp(15px, 1.8vw, 17px);
+  color: #444;
+  line-height: 1.6;
+}
+
+.intro-header p b {
+  color: #222;
+  font-weight: 600;
+}
+
+.intro-image {
+  width: 100%;
+  margin: 40px 0;
   text-align: center;
+  position: relative;
+}
+
+.intro-image::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  right: -8px;
+  bottom: -8px;
+  background: linear-gradient(135deg, var(--gold) 0%, rgba(203, 176, 129, 0.3) 100%);
+  border-radius: 16px;
+  z-index: -1;
+  opacity: 0.3;
+  filter: blur(8px);
+}
+
+.intro-main-img {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 450px;
+  object-fit: cover;
+  border-radius: 16px;
+  box-shadow: 
+    0 12px 32px rgba(0,0,0,.2),
+    0 4px 16px rgba(0,0,0,.1),
+    0 0 0 1px rgba(203, 176, 129, 0.1);
+  display: block;
+  margin: 0 auto;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.intro-main-img:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 16px 40px rgba(0,0,0,.25),
+    0 6px 20px rgba(0,0,0,.15),
+    0 0 0 1px rgba(203, 176, 129, 0.2);
+}
+
+.intro-quote {
+  color: var(--gold);
+  font-style: italic;
+  font-weight: 700;
+  margin: 32px 0;
+  padding: 28px 32px;
+  background: linear-gradient(135deg, #faf9f6 0%, #f5f3ef 100%);
+  border-left: 5px solid var(--gold);
+  border-radius: 12px;
+  font-size: clamp(18px, 2.8vw, 22px);
+  text-align: center;
+  box-shadow: 
+    0 4px 16px rgba(203, 176, 129, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  position: relative;
+  line-height: 1.6;
+}
+
+.intro-quote::before {
+  content: '"';
+  font-size: 3em;
+  color: var(--gold);
+  opacity: 0.2;
+  position: absolute;
+  top: 10px;
+  left: 20px;
+  font-family: Georgia, serif;
+}
+
+.intro-quote::after {
+  content: '"';
+  font-size: 3em;
+  color: var(--gold);
+  opacity: 0.2;
+  position: absolute;
+  bottom: 10px;
+  right: 20px;
+  font-family: Georgia, serif;
 }
 
 .home-services { 
   background: #fff; 
-  padding: 48px 0 60px;
+  padding: clamp(32px, 6vw, 48px) 0 clamp(40px, 7vw, 60px);
   scroll-margin-top: 80px;
 }
 
@@ -246,6 +391,7 @@
 @media (max-width: 960px) {
   .hero-inner { 
     grid-template-columns: 1fr; 
+    gap: 16px;
   }
   
   .hero-image img { 
@@ -257,7 +403,7 @@
   }
   
   .service-grid { 
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 20px;
   }
   
@@ -272,12 +418,39 @@
   .intro-text {
     padding: 0 4%;
   }
+  
+  .intro-image {
+    margin: 32px 0;
+  }
+  
+  .intro-main-img {
+    min-height: 350px;
+    border-radius: 12px;
+  }
+  
+  .intro-header {
+    margin-bottom: 24px;
+    padding: 20px;
+  }
+  
+  .intro-quote {
+    padding: 24px 20px;
+    margin: 28px 0;
+  }
+  
+  .intro-text h3 {
+    margin-top: 28px !important;
+  }
+  
+  .hero-full {
+    padding: 0;
+  }
 }
 
 @media (max-width: 640px) {
   .hero-full-img {
     height: 240px;
-    border-radius: 12px;
+    border-radius: 0;
   }
   
   .service-card img,
@@ -295,6 +468,71 @@
   .home-services h2,
   .home-services h3 {
     font-size: 20px;
+  }
+  
+  .service-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 0 4%;
+  }
+  
+  .home-intro {
+    padding: 24px 0;
+  }
+  
+  .home-services {
+    padding: 24px 0 40px;
+  }
+  
+  .intro-text {
+    padding: 0 4%;
+    font-size: 14px;
+  }
+  
+  .intro-image {
+    margin: 24px 0;
+  }
+  
+  .intro-main-img {
+    min-height: 280px;
+    border-radius: 10px;
+  }
+  
+  .intro-header {
+    margin-bottom: 20px;
+    padding: 16px;
+  }
+  
+  .intro-quote {
+    padding: 20px 16px;
+    margin: 24px 0;
+    font-size: 16px;
+  }
+  
+  .intro-quote::before,
+  .intro-quote::after {
+    font-size: 2em;
+    top: 5px;
+    left: 10px;
+  }
+  
+  .intro-quote::after {
+    bottom: 5px;
+    right: 10px;
+  }
+  
+  .intro-text ul {
+    padding-left: 20px;
+  }
+  
+  .intro-text ul li {
+    padding-left: 24px;
+    margin: 10px 0;
+  }
+  
+  .intro-text h3 {
+    margin-top: 24px !important;
+    font-size: 18px;
   }
 }
 

@@ -93,3 +93,24 @@
   font-weight: 600;
 }
 
+/* Equal width tabs for payment method */
+.equal-width-tabs .ant-tabs-nav-list {
+  width: 100%;
+  display: flex !important;
+  gap: 8px;
+}
+
+.equal-width-tabs .ant-tabs-tab {
+  flex: 1 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.equal-width-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin: 0 !important;
+}
+
+.equal-width-tabs .ant-tabs-ink-bar {
+  display: none !important;
+}

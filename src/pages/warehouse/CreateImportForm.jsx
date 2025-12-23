@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Form, Input, InputNumber, Select, Button, Card, Row, Col, Table, Space, message } from 'antd'
 import { PlusOutlined, CloseOutlined } from '@ant-design/icons'
+import { useLocation } from 'react-router-dom'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
 import '../../styles/pages/warehouse/create-import-form.css'
@@ -38,8 +39,32 @@ const USERS = [
 ]
 
 export default function CreateImportForm() {
+  const location = useLocation()
   const [form] = Form.useForm()
   const [components, setComponents] = useState([])
+
+  useEffect(() => {
+    // Check if navigating from PartsList with part data
+    if (location.state?.part && location.state?.ticketType === 'nhap_kho') {
+      const part = location.state.part
+      
+      // Set default ticket type
+      form.setFieldsValue({
+        ticketType: 'nhap_kho'
+      })
+
+      // Add part to components table
+      const partComponent = {
+        id: Date.now(),
+        categoryId: part.id || part.partId,
+        categoryName: part.name || '',
+        quantity: 1,
+        unit: part.unit || part.unitName || '---',
+        unitPrice: part.importPrice || part.purchasePrice || '---'
+      }
+      setComponents([partComponent])
+    }
+  }, [location.state, form])
 
   const handleAddComponent = () => {
     const newComponent = {
@@ -189,7 +214,7 @@ export default function CreateImportForm() {
 
   return (
     <WarehouseLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <Form
           form={form}
           layout="vertical"

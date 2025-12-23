@@ -1,107 +1,145 @@
-import React, { useState } from 'react'
-import { Table, Input, Space, Button, DatePicker, Tag, Card, Divider } from 'antd'
-import { SearchOutlined, CalendarOutlined, DownOutlined, UpOutlined, InboxOutlined } from '@ant-design/icons'
+import React, { useState, useEffect } from 'react'
+import { Table, Input, Space, Button, Tag, message, Dropdown, Modal, DatePicker, Radio, Checkbox } from 'antd'
+import { SearchOutlined, FilterOutlined, ReloadOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import WarehouseLayout from '../../layouts/WarehouseLayout'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { stockExportAPI } from '../../services/api'
 import '../../styles/pages/warehouse/export-list.css'
 
 const { Search } = Input
+const { RangePicker } = DatePicker
+
+// Custom styles for table header
+const customTableStyles = `
+  .export-list-table .ant-table-thead > tr > th {
+    background: #CBB081 !important;
+    color: #111 !important;
+    font-weight: 700 !important;
+    font-size: 15px !important;
+    border: none !important;
+    padding: 14px 16px !important;
+  }
+  
+  .export-list-table .ant-table-thead > tr > th::before {
+    display: none !important;
+  }
+  
+  .export-list-table .ant-table-tbody > tr > td {
+    padding: 12px 16px !important;
+    font-size: 14px !important;
+  }
+  
+  .export-list-table .ant-table-row {
+    border-bottom: 1px solid #f0f0f0;
+  }
+`
+
 
 export default function ExportList() {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState('')
-  const [dateFilter, setDateFilter] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('Đang xuất hàng')
-  const [expandedRowKeys, setExpandedRowKeys] = useState(['1'])
+  const [statusFilter, setStatusFilter] = useState('Tất cả')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [exportList, setExportList] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [total, setTotal] = useState(0)
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
+  const [dateRange, setDateRange] = useState([null, null])
+  const [tempStatuses, setTempStatuses] = useState([])
+  const [tempDateRange, setTempDateRange] = useState([null, null])
 
-  // Sample data with nested parts
-  const exportList = [
-    {
-      id: 1,
-      code: 'STK-2025-000001',
-      customer: 'Nguyễn Văn A',
-      licensePlate: '30A-12345',
-      createDate: '30/10/2025',
-      status: 'Đang xuất hàng',
-      parts: [
-        {
-          id: 1,
-          name: 'Dầu máy 5W-30',
-          needed: 30,
-          inStock: 100,
-          exported: 0
-        },
-        {
-          id: 2,
-          name: 'Lọc nhiên liệu',
-          needed: 10,
-          inStock: 50,
-          exported: 5
-        },
-        {
-          id: 3,
-          name: 'Chụp bụi gioăng cao su',
-          needed: 9,
-          inStock: 0,
-          exported: 0
-        }
-      ]
-    },
-    {
-      id: 2,
-      code: 'STK-2025-000002',
-      customer: 'Trần Văn B',
-      licensePlate: '29A-67890',
-      createDate: '30/10/2025',
-      status: 'Đang xuất hàng',
-      parts: [
-        {
-          id: 1,
-          name: 'Dầu máy 5W-30',
-          needed: 20,
-          inStock: 100,
-          exported: 0
-        }
-      ]
-    },
-    {
-      id: 3,
-      code: 'STK-2025-000003',
-      customer: 'Lê Văn C',
-      licensePlate: '51A-11111',
-      createDate: '29/10/2025',
-      status: 'Đang xuất hàng',
-      parts: []
-    },
-    {
-      id: 4,
-      code: 'STK-2025-000004',
-      customer: 'Phạm Văn D',
-      licensePlate: '43A-22222',
-      createDate: '29/10/2025',
-      status: 'Đang xuất hàng',
-      parts: []
-    },
-    {
-      id: 5,
-      code: 'STK-2025-000005',
-      customer: 'Hoàng Văn E',
-      licensePlate: '92A-33333',
-      createDate: '28/10/2025',
-      status: 'Hoàn thành',
-      parts: []
-    },
-    {
-      id: 6,
-      code: 'STK-2025-000006',
-      customer: 'Vũ Văn F',
-      licensePlate: '14A-44444',
-      createDate: '28/10/2025',
-      status: 'Hoàn thành',
-      parts: []
+  // Fetch data from API
+  useEffect(() => {
+    fetchExportList()
+  }, [page, pageSize, searchTerm, statusFilter, dateRange])
+
+  const formatDisplayDate = (value) => {
+    if (!value) return '--'
+    const str = String(value).trim()
+
+    // Nếu là ISO string, dùng Date để format
+    if (str.includes('T')) {
+      const d = new Date(str)
+      if (!Number.isNaN(d.getTime())) {
+        return d.toLocaleDateString('vi-VN')
+      }
     }
-  ]
+
+    // Trường hợp backend trả "DD/MM/YYYY HH:mm" → lấy phần ngày phía trước
+    const [datePart] = str.split(' ')
+    return datePart || str
+  }
+
+  const getStatusParam = (filter) => {
+    const statusMap = {
+      'Đang xuất hàng': 'EXPORTING',
+      'Chờ mua hàng': 'WAITING_PURCHASE',
+      'Hoàn thành': 'COMPLETED',
+      'Tất cả': null
+    }
+    return statusMap[filter]
+  }
+
+  const fetchExportList = async () => {
+    setLoading(true)
+    try {
+      const status = getStatusParam(statusFilter)
+      const fromDate = dateRange[0] ? dateRange[0].format('YYYY-MM-DD') : null
+      const toDate = dateRange[1] ? dateRange[1].format('YYYY-MM-DD') : null
+      
+      const { data, error } = await stockExportAPI.getAll(
+        page - 1, 
+        pageSize,
+        searchTerm || null,
+        status,
+        fromDate,
+        toDate
+      )
+      
+      if (error) {
+        message.error('Không thể tải danh sách xuất kho')
+        setLoading(false)
+        return
+      }
+
+      const result = data?.result || {}
+      const content = result.content || []
+      
+      // Transform API data to match UI structure
+      const transformedData = content.map((item) => ({
+        id: item.id,
+        exportCode: item.code || 'XK-000001',
+        exportType: item.reason || 'Theo báo giá',
+        createDate: item.createdAt || '--',
+        quotationCode: item.quotationCode || 'BG-000001',
+        requester: item.createdBy || 'Nguyễn Văn A',
+        status: mapExportStatus(item.status),
+        statusKey: item.status
+      }))
+
+      setExportList(transformedData)
+      setTotal(result.totalElements || 0)
+    } catch (err) {
+      console.error('Failed to fetch export list:', err)
+      message.error('Đã xảy ra lỗi khi tải dữ liệu')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const mapExportStatus = (status) => {
+    const statusMap = {
+      'WAITING_PURCHASE': 'Chờ mua hàng',
+      'COMPLETED': 'Hoàn thành',
+      'EXPORTING': 'Đang xuất hàng',
+      'PENDING': 'Chờ xử lý',
+      'APPROVED': 'Đang xuất hàng',
+      'REJECTED': 'Từ chối'
+    }
+    return statusMap[status] || 'Chờ xử lý'
+  }
 
   const getStatusConfig = (status) => {
     if (status === 'Hoàn thành') {
@@ -113,6 +151,22 @@ export default function ExportList() {
       }
     }
     if (status === 'Đang xuất hàng') {
+      return { 
+        color: '#f59e0b', 
+        bgColor: '#fef3c7',
+        borderColor: '#fcd34d',
+        text: status 
+      }
+    }
+    if (status === 'Chờ mua hàng') {
+      return { 
+        color: '#f59e0b', 
+        bgColor: '#fef3c7',
+        borderColor: '#fcd34d',
+        text: status 
+      }
+    }
+    if (status === 'Chờ xử lý') {
       return { 
         color: '#1677ff', 
         bgColor: '#e6f4ff',
@@ -128,38 +182,24 @@ export default function ExportList() {
     }
   }
 
-  const handleExportItem = (recordId, partId) => {
-    console.log('Export item:', recordId, partId)
-    // Handle export logic here
+  const handleViewDetail = (record) => {
+    navigate(`/warehouse/export/list/${record.id}`)
   }
 
-  // Filter data
-  const filteredData = exportList
-    .filter(item => {
-      const matchesSearch = !searchTerm || 
-        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.licensePlate.toLowerCase().includes(searchTerm.toLowerCase())
-      
-      let matchesDate = true
-      if (dateFilter) {
-        const filterDate = dateFilter.format('DD/MM/YYYY')
-        matchesDate = item.createDate === filterDate
-      }
-      
-      const matchesStatus = statusFilter === 'Tất cả' || item.status === statusFilter
-      
-      return matchesSearch && matchesDate && matchesStatus
-    })
-    .map((item, index) => ({ ...item, key: item.id, index: index + 1 }))
+  // Map data for table display
+  const tableData = exportList.map((item, index) => ({ 
+    ...item, 
+    key: item.id, 
+    index: index + 1 
+  }))
 
   // Main table columns
   const columns = [
     {
       title: 'STT',
-      dataIndex: 'index',
       key: 'index',
       width: 80,
+      align: 'center',
       render: (_, __, index) => (
         <span style={{ fontWeight: 600, color: '#111' }}>
           {String(index + 1).padStart(2, '0')}
@@ -167,42 +207,52 @@ export default function ExportList() {
       )
     },
     {
-      title: 'Code',
-      dataIndex: 'code',
-      key: 'code',
-      width: 180,
+      title: 'Mã phiếu',
+      dataIndex: 'exportCode',
+      key: 'exportCode',
+      width: 150,
       render: (text) => (
-        <span style={{ fontWeight: 600, color: '#1677ff' }}>{text}</span>
+        <span style={{ fontWeight: 600, color: '#111' }}>{text}</span>
       )
     },
     {
-      title: 'Khách hàng',
-      dataIndex: 'customer',
-      key: 'customer',
+      title: 'Loại xuất',
+      dataIndex: 'exportType',
+      key: 'exportType',
       width: 200,
       render: (text) => (
         <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
       )
     },
     {
-      title: 'Biển số xe',
-      dataIndex: 'licensePlate',
-      key: 'licensePlate',
-      width: 150,
-      render: (text) => (
-        <span style={{ fontWeight: 500, color: '#333', fontFamily: 'monospace' }}>
-          {text}
-        </span>
-      )
-    },
-    {
       title: 'Ngày tạo',
       dataIndex: 'createDate',
       key: 'createDate',
-      width: 150
+      width: 150,
+      render: (text) => (
+        <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
+      )
     },
     {
-      title: 'Trạng Thái',
+      title: 'Mã báo giá',
+      dataIndex: 'quotationCode',
+      key: 'quotationCode',
+      width: 180,
+      render: (text) => (
+        <span style={{ fontWeight: 600, color: '#111' }}>{text}</span>
+      )
+    },
+    {
+      title: 'Người yêu cầu',
+      dataIndex: 'requester',
+      key: 'requester',
+      width: 200,
+      render: (text) => (
+        <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
+      )
+    },
+    {
+      title: 'Trạng thái',
       dataIndex: 'status',
       key: 'status',
       width: 180,
@@ -226,198 +276,92 @@ export default function ExportList() {
           </Tag>
         )
       }
+    },
+    {
+      title: '',
+      key: 'action',
+      width: 60,
+      align: 'center',
+      render: (_, record) => {
+        const menuItems = [
+          {
+            key: 'detail',
+            label: (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                Xem chi tiết
+              </span>
+            ),
+            onClick: () => handleViewDetail(record)
+          }
+        ]
+
+        return (
+          <Dropdown
+            menu={{ items: menuItems }}
+            trigger={['click']}
+            placement="bottomRight"
+          >
+            <Button
+              type="text"
+              icon={<i className="bi bi-three-dots-vertical" style={{ fontSize: '16px' }} />}
+              style={{
+                padding: '0 8px',
+                height: 'auto',
+                color: '#666'
+              }}
+            />
+          </Dropdown>
+        )
+      }
     }
   ]
 
-  // Nested table columns for parts
-  const expandedRowRender = (record) => {
-    const partsColumns = [
-      {
-        title: 'STT',
-        key: 'index',
-        width: 80,
-        render: (_, __, index) => (
-          <span style={{ fontWeight: 600, color: '#666' }}>
-            {String(index + 1).padStart(2, '0')}
-          </span>
-        )
-      },
-      {
-        title: 'Linh kiện',
-        dataIndex: 'name',
-        key: 'name',
-        width: 250,
-        render: (text) => (
-          <span style={{ fontWeight: 500, color: '#111' }}>{text}</span>
-        )
-      },
-      {
-        title: 'Cần',
-        dataIndex: 'needed',
-        key: 'needed',
-        width: 100,
-        align: 'center',
-        render: (value) => (
-          <span style={{ fontWeight: 600, color: '#1677ff' }}>{value}</span>
-        )
-      },
-      {
-        title: 'Tồn kho',
-        dataIndex: 'inStock',
-        key: 'inStock',
-        width: 100,
-        align: 'center',
-        render: (value) => (
-          <span style={{ 
-            fontWeight: 600, 
-            color: value > 0 ? '#22c55e' : '#ef4444' 
-          }}>
-            {value}
-          </span>
-        )
-      },
-      {
-        title: 'Đã xuất',
-        dataIndex: 'exported',
-        key: 'exported',
-        width: 100,
-        align: 'center',
-        render: (value) => (
-          <span style={{ fontWeight: 600, color: '#666' }}>{value}</span>
-        )
-      },
-      {
-        title: 'Hành động',
-        key: 'action',
-        width: 150,
-        render: (_, part) => (
-          <Button
-            type="primary"
-            size="small"
-            icon={<InboxOutlined />}
-            onClick={() => handleExportItem(record.id, part.id)}
-            style={{ 
-              background: '#3b82f6', 
-              borderColor: '#3b82f6',
-              fontWeight: 500,
-              borderRadius: '6px',
-              height: '32px'
-            }}
-          >
-            Xuất hàng
-          </Button>
-        )
-      }
-    ]
-
-    return (
-      <div style={{ 
-        background: 'linear-gradient(to bottom, #fafafa 0%, #fff 100%)',
-        padding: '20px 24px',
-        margin: '12px 0',
-        borderRadius: '10px',
-        border: '1px solid #e5e7eb',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px',
-          marginBottom: '16px',
-          paddingBottom: '12px',
-          borderBottom: '2px solid #f0f0f0'
-        }}>
-          <InboxOutlined style={{ color: '#1677ff', fontSize: '16px' }} />
-          <span style={{ 
-            fontWeight: 600, 
-            fontSize: '15px', 
-            color: '#111' 
-          }}>
-            Danh sách linh kiện ({record.parts?.length || 0})
-          </span>
-        </div>
-        <Table
-          columns={partsColumns}
-          dataSource={record.parts || []}
-          pagination={false}
-          size="middle"
-          components={goldTableHeader}
-          rowKey="id"
-          style={{ background: '#fff' }}
-          rowClassName={(record, index) => 
-            index % 2 === 0 ? 'parts-row-even' : 'parts-row-odd'
-          }
-        />
-      </div>
-    )
-  }
-
   return (
     <WarehouseLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+      <style>{customTableStyles}</style>
+      
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
-            Danh sách xuất
+          {/* Heading */}
+          <h1 style={{ margin: 0, marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+            Danh sách xuất kho
           </h1>
 
-          <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-            <Search
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '20px',
+            gap: '16px'
+          }}>
+            {/* Search bên trái */}
+            <Input
               placeholder="Tìm kiếm"
-              allowClear
-              prefix={<SearchOutlined />}
-              style={{ width: 250 }}
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              style={{ width: 250, borderRadius: '8px' }}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              onSearch={setSearchTerm}
-            />
-            
-            <DatePicker
-              placeholder="Ngày tạo"
-              format="DD/MM/YYYY"
-              suffixIcon={<CalendarOutlined />}
-              value={dateFilter}
-              onChange={setDateFilter}
-              style={{ width: 150 }}
-            />
+              />
 
-            <Space>
+              {/* Filter icon button */}
               <Button
-                type={statusFilter === 'Đang xuất hàng' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Đang xuất hàng')}
+                icon={<FilterOutlined />}
+            onClick={() => {
+              // Chuẩn bị giá trị tạm thời cho modal
+              setTempStatuses(statusFilter && statusFilter !== 'Tất cả' ? [statusFilter] : [])
+              setTempDateRange(dateRange)
+              setIsFilterModalOpen(true)
+            }}
                 style={{
-                  background: statusFilter === 'Đang xuất hàng' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Đang xuất hàng' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Đang xuất hàng' ? '#111' : '#666',
-                  fontWeight: 600
+                  borderRadius: '8px',
+              borderColor: '#e6e6e6',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8
                 }}
-              >
-                Đang xuất hàng
-              </Button>
-              <Button
-                type={statusFilter === 'Hoàn thành' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Hoàn thành')}
-                style={{
-                  background: statusFilter === 'Hoàn thành' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Hoàn thành' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Hoàn thành' ? '#111' : '#666',
-                  fontWeight: 600
-                }}
-              >
-                Hoàn thành
-              </Button>
-              <Button
-                type={statusFilter === 'Tất cả' ? 'primary' : 'default'}
-                onClick={() => setStatusFilter('Tất cả')}
-                style={{
-                  background: statusFilter === 'Tất cả' ? '#CBB081' : '#fff',
-                  borderColor: statusFilter === 'Tất cả' ? '#CBB081' : '#e6e6e6',
-                  color: statusFilter === 'Tất cả' ? '#111' : '#666',
-                  fontWeight: 600
-                }}
-              >
-                Tất cả
-              </Button>
-            </Space>
+          >
+            Bộ lọc
+          </Button>
           </div>
         </div>
 
@@ -428,44 +372,18 @@ export default function ExportList() {
           boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
         }}>
           <Table
+            className="export-list-table"
             columns={columns}
-            dataSource={filteredData}
-            rowClassName={(record, index) => {
-              const isExpanded = expandedRowKeys.includes(record.key?.toString())
-              const baseClass = index % 2 === 0 ? 'table-row-even' : 'table-row-odd'
-              return isExpanded ? `${baseClass} table-row-expanded` : baseClass
-            }}
-            expandable={{
-              expandedRowRender,
-              expandedRowKeys,
-              onExpandedRowsChange: setExpandedRowKeys,
-              expandIcon: ({ expanded, onExpand, record }) => (
-                <Button
-                  type="text"
-                  icon={expanded ? <UpOutlined /> : <DownOutlined />}
-                  onClick={(e) => onExpand(record, e)}
-                  style={{ 
-                    padding: '4px 8px',
-                    width: 'auto',
-                    height: 'auto',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: expanded ? '#1677ff' : '#666',
-                    fontSize: '16px',
-                    fontWeight: 600
-                  }}
-                />
-              ),
-              indentSize: 0,
-              expandRowByClick: false
-            }}
+            dataSource={tableData}
+            rowClassName={(record, index) => 
+              index % 2 === 0 ? 'table-row-even' : 'table-row-odd'
+            }
             pagination={{
               current: page,
               pageSize: pageSize,
-              total: 100,
+              total: total,
               showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total) => `Tổng ${total} phiếu xuất kho`,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (page, pageSize) => {
                 setPage(page)
@@ -476,11 +394,127 @@ export default function ExportList() {
                 setPageSize(size)
               }
             }}
+            loading={loading}
             size="middle"
             components={goldTableHeader}
           />
         </div>
       </div>
+
+      {/* Filter Modal */}
+      <Modal
+        title="Bộ lọc"
+        open={isFilterModalOpen}
+        onCancel={() => setIsFilterModalOpen(false)}
+        footer={null}
+        width={450}
+      >
+        <div style={{ padding: '8px 0' }}>
+          {/* Trạng thái */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Trạng thái</div>
+            <Space direction="vertical" style={{ width: '100%' }}>
+              <Checkbox
+                checked={tempStatuses.includes('Đang xuất hàng')}
+                onChange={() => {
+                  setTempStatuses((prev) =>
+                    prev.includes('Đang xuất hàng') ? [] : ['Đang xuất hàng']
+                  )
+                }}
+              >
+                Đang xuất hàng
+              </Checkbox>
+              <Checkbox
+                checked={tempStatuses.includes('Chờ mua hàng')}
+                onChange={() => {
+                  setTempStatuses((prev) =>
+                    prev.includes('Chờ mua hàng') ? [] : ['Chờ mua hàng']
+                  )
+                }}
+              >
+                Chờ mua hàng
+              </Checkbox>
+              <Checkbox
+                checked={tempStatuses.includes('Hoàn thành')}
+                onChange={() => {
+                  setTempStatuses((prev) =>
+                    prev.includes('Hoàn thành') ? [] : ['Hoàn thành']
+                  )
+              }}
+            >
+                Hoàn thành
+              </Checkbox>
+            </Space>
+          </div>
+
+          {/* Khoảng ngày tạo */}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Khoảng ngày tạo</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Từ ngày</div>
+              <DatePicker
+                  placeholder="dd/mm/yyyy"
+                  style={{ width: '100%', borderRadius: 6 }}
+                  format="DD/MM/YYYY"
+                  value={tempDateRange[0]}
+                onChange={(date) => {
+                    setTempDateRange([date, tempDateRange[1]])
+                }}
+              />
+            </div>
+              <div>
+                <div style={{ fontSize: 13, marginBottom: 4 }}>Đến ngày</div>
+              <DatePicker
+                  placeholder="dd/mm/yyyy"
+                  style={{ width: '100%', borderRadius: 6 }}
+                  format="DD/MM/YYYY"
+                  value={tempDateRange[1]}
+                onChange={(date) => {
+                    setTempDateRange([tempDateRange[0], date])
+                }}
+              />
+            </div>
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 12,
+              marginTop: 24
+            }}
+          >
+            <Button
+              onClick={() => {
+                setTempStatuses([])
+                setTempDateRange([null, null])
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                // Nếu không chọn trạng thái nào => Tất cả
+                const appliedStatus = tempStatuses[0] || 'Tất cả'
+                setStatusFilter(appliedStatus)
+                setDateRange(tempDateRange)
+                setPage(1)
+                setIsFilterModalOpen(false)
+              }}
+              style={{
+                backgroundColor: '#1890ff',
+                borderColor: '#1890ff'
+              }}
+            >
+              Tìm kiếm
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </WarehouseLayout>
   )
 }

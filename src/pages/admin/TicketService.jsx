@@ -1,40 +1,95 @@
-import React, { useMemo, useState, useEffect } from 'react'
-import { Table, Input, Card, Badge, Space, message, Button, DatePicker, Row, Col } from 'antd'
-import { EyeOutlined, SearchOutlined, CalendarOutlined } from '@ant-design/icons'
+import React, { useMemo, useState, useEffect, useRef } from 'react'
+import { Table, Input, Card, Badge, Space, message, Button, Row, Col, Form, Select, Modal } from 'antd'
+import { SearchOutlined, CalendarOutlined, CloseOutlined, FilterOutlined } from '@ant-design/icons'
+import { DatePicker } from 'antd'
+import dayjs from 'dayjs'
 import AdminLayout from '../../layouts/AdminLayout'
 import TicketDetail from './modals/TicketDetail'
 import UpdateTicketModal from './modals/UpdateTicketModal'
-import { serviceTicketAPI } from '../../services/api'
+import { serviceTicketAPI, employeeAPI, customersAPI } from '../../services/api'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { goldTableHeader } from '../../utils/tableComponents'
+import { normalizePhoneTo84, displayPhoneFrom84 } from '../../utils/helpers'
 import '../../styles/pages/admin/ticketservice.css'
 
 const { Search } = Input
+const { TextArea } = Input
+const SERVICES = [
+  { label: 'Thay thế phụ tùng', value: 1 },
+  { label: 'Sơn', value: 2 },
+  { label: 'Bảo dưỡng', value: 3 }
+]
+
+
+const STATUS_MAP = {
+  CREATED: 'Đã tạo',
+  QUOTING: 'Đang báo giá',
+  QUOTE_CONFIRMED: 'Khách đã xác nhận báo giá',
+  UNDER_REPAIR: 'Đang sửa chữa',
+  WAITING_FOR_DELIVERY: 'Chờ bàn giao xe',
+  COMPLETED: 'Hoàn thành',
+  CANCELED: 'Hủy'
+}
+
+export const STATUS_COLORS = {
+  // Service Ticket
+  CREATED: '#9CA3AF',
+  QUOTING: '#3B82F6',
+  QUOTE_CONFIRMED: '#22C55E',
+  UNDER_REPAIR: '#F97316',
+  WAITING_FOR_DELIVERY: '#8B5CF6',
+  COMPLETED: '#16A34A',
+  CANCELED: '#EF4444'
+}
+
+const STATUS_LABELS = {
+  CREATED: 'Đã tạo',
+  QUOTING: 'Đang báo giá',
+  QUOTE_CONFIRMED: 'Khách đã xác nhận báo giá',
+  UNDER_REPAIR: 'Đang sửa chữa',
+  WAITING_FOR_DELIVERY: 'Chờ bàn giao xe',
+  COMPLETED: 'Hoàn thành',
+  CANCELED: 'Hủy'
+}
+
+const normalizeStatusKey = (status) => {
+  const key = (status || '').toString().trim().toUpperCase()
+  const map = {
+    'HỦY': 'CANCELED',
+    'CANCELLED': 'CANCELED',
+    'CANCELED': 'CANCELED',
+    'WAITING_FOR_QUOTATION': 'QUOTING',
+    'WAITING_QUOTE': 'QUOTING',
+    'ĐANG BÁO GIÁ': 'QUOTING',
+    'WAITING_FOR_DELIVERY': 'WAITING_FOR_DELIVERY',
+    'CHỜ BÀN GIAO XE': 'WAITING_FOR_DELIVERY',
+    'HOÀN THÀNH': 'COMPLETED',
+    'COMPLETED': 'COMPLETED',
+    'ĐÃ TẠO': 'CREATED',
+    'CREATED': 'CREATED',
+    'QUOTE_CONFIRMED': 'QUOTE_CONFIRMED',
+    'KHÁCH ĐÃ XÁC NHẬN BÁO GIÁ': 'QUOTE_CONFIRMED',
+    'UNDER_REPAIR': 'UNDER_REPAIR',
+    'ĐANG SỬA CHỮA': 'UNDER_REPAIR'
+  }
+  return map[key] || key || 'CREATED'
+}
 
 const STATUS_FILTERS = [
   { key: 'CREATED', label: 'Đã tạo' },
-  { key: 'WAITING_QUOTE', label: 'Chờ báo giá' },
-  { key: 'WAITING_HANDOVER', label: 'Chờ bàn giao xe' },
-  { key: 'CANCELLED', label: 'Hủy' },
+  { key: 'QUOTING', label: 'Đang báo giá' },
+  { key: 'QUOTE_CONFIRMED', label: 'Khách đã xác nhận báo giá' },
+  { key: 'UNDER_REPAIR', label: 'Đang sửa chữa' },
+  { key: 'WAITING_FOR_DELIVERY', label: 'Chờ bàn giao xe' },
+  { key: 'COMPLETED', label: 'Hoàn thành' },
+  { key: 'CANCELED', label: 'Hủy' }
 ]
 
 const getStatusConfig = (status) => {
-  switch (status) {
-    case 'Hủy':
-    case 'CANCELLED':
-      return { color: '#ef4444', text: 'Hủy' }
-    case 'Chờ báo giá':
-    case 'WAITING_QUOTE':
-      return { color: '#ffd65a', text: 'Chờ báo giá' }
-    case 'Chờ bàn giao xe':
-    case 'WAITING_HANDOVER':
-      return { color: '#ffd65a', text: 'Chờ bàn giao xe' }
-    case 'Đã tạo':
-    case 'CREATED':
-      return { color: '#666', text: 'Đã tạo' }
-    default:
-      return { color: '#666', text: status }
-  }
+  const normalizedKey = normalizeStatusKey(status)
+  const color = STATUS_COLORS[normalizedKey] || '#666'
+  const text = STATUS_LABELS[normalizedKey] || status || 'Đã tạo'
+  return { color, text }
 }
 
 export default function TicketService() {
@@ -50,69 +105,211 @@ export default function TicketService() {
   const [updateTicketId, setUpdateTicketId] = useState(null)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
-  const [statusFilter, setStatusFilter] = useState(isHistoryPage ? null : 'CREATED')
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
+  
+  const [statusFilter, setStatusFilter] = useState(null)
   const [dateFilter, setDateFilter] = useState(null)
+  const [filterModalOpen, setFilterModalOpen] = useState(false)
+  const [selectedStatuses, setSelectedStatuses] = useState([])
+  const [dateRange, setDateRange] = useState([null, null])
+  const [appliedStatuses, setAppliedStatuses] = useState([])
+  const [appliedDateRange, setAppliedDateRange] = useState([null, null])
+
+  const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [createForm] = Form.useForm()
+  const [createLoading, setCreateLoading] = useState(false)
+  const [selectedServices, setSelectedServices] = useState([])
+  const [selectKey, setSelectKey] = useState(0)
+  const [currentAppointmentId, setCurrentAppointmentId] = useState(null)
+  const [technicians, setTechnicians] = useState([])
+  const [techniciansLoading, setTechniciansLoading] = useState(false)
+  const [phoneOptions, setPhoneOptions] = useState([])
+  const [phoneDropdownOpen, setPhoneDropdownOpen] = useState(false)
+  const [phoneLoading, setPhoneLoading] = useState(false)
+  const [customersCache, setCustomersCache] = useState([])
+  const [phoneOptionsSource, setPhoneOptionsSource] = useState([])
+  const latestPhoneSearchRef = useRef('')
+
+  const normalizePhoneTo0 = (phone) => {
+    if (!phone) return ''
+    const str = phone.toString()
+    if (str.startsWith('84') && str.length > 2) {
+      return '0' + str.slice(2)
+    }
+    return str
+  }
+
+  const fetchAllCustomers = async () => {
+    setPhoneLoading(true)
+    try {
+      const { data: response } = await customersAPI.getAll(0, 1000)
+      const result = response?.result || response
+      const list = Array.isArray(result?.content)
+        ? result.content
+        : Array.isArray(result)
+          ? result
+          : []
+      const normalized = list.map((c) => {
+        const phoneRaw = c?.phone || c?.customerPhone
+        const phoneLocal = normalizePhoneTo0(phoneRaw)
+        const fullName = c?.fullName || c?.customerName
+        const label = fullName ? `${phoneLocal || phoneRaw} - ${fullName}` : (phoneLocal || phoneRaw)
+        const value = phoneLocal || phoneRaw
+        return value ? { label, value } : null
+      }).filter(Boolean)
+      setCustomersCache(list)
+      setPhoneOptionsSource(normalized)
+      setPhoneOptions(normalized)
+      return list
+    } catch (error) {
+      console.error('Error fetching all customers:', error)
+      return []
+    } finally {
+      setPhoneLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchAllCustomers()
+  }, [])
+
+  const onPhoneSearch = (value) => {
+    const trimmed = (value || '').trim()
+    latestPhoneSearchRef.current = trimmed
+
+    if (!trimmed || trimmed.length < 5) {
+      setPhoneOptions(phoneOptionsSource)
+      setPhoneDropdownOpen(false)
+      return
+    }
+
+    const normalizedSearch = normalizePhoneTo0(trimmed).toLowerCase()
+    const options = phoneOptionsSource.filter((opt) =>
+      (opt.value || '').toLowerCase().includes(normalizedSearch)
+    )
+    setPhoneOptions(options.length ? options : [{ label: trimmed, value: normalizePhoneTo0(trimmed) }])
+    setPhoneDropdownOpen(true)
+  }
+
+  const fillCustomerInfo = (customer) => {
+    if (!customer) return
+    const fullName = customer.fullName || customer.customerName
+    const address = customer.address || ''
+    createForm.setFieldsValue({
+      name: fullName || undefined,
+      address: address || undefined,
+      phone: normalizePhoneTo0(customer.phone || customer.customerPhone) || undefined
+    })
+  }
+
+  const onPhoneSelect = async (value) => {
+    createForm.setFieldsValue({ phone: value })
+    try {
+      setPhoneLoading(true)
+      const { data: response } = await customersAPI.getByPhone(value)
+      const customerData = response?.result || response
+      const customers = Array.isArray(customerData)
+        ? customerData
+        : Array.isArray(customerData?.content)
+          ? customerData.content
+          : customerData
+            ? [customerData]
+            : []
+      if (customers.length > 0) {
+        fillCustomerInfo(customers[0])
+      }
+    } catch (error) {
+      console.error('Error fetching customer by phone:', error)
+    } finally {
+      setPhoneLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchServiceTickets()
+  }, [page, pageSize, statusFilter, dateFilter, appliedStatuses, appliedDateRange])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchServiceTickets()
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    if (location.state?.appointmentId) {
+      const appointmentId = location.state.appointmentId
+      setCurrentAppointmentId(appointmentId)
+      setCreateModalOpen(true)
+      
+      if (location.state.customer || location.state.phone || location.state.licensePlate) {
+        createForm.setFieldsValue({
+          name: location.state.customer || '',
+          phone: displayPhoneFrom84(location.state.phone || ''),
+          plate: location.state.licensePlate || ''
+        })
+      }
+      
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+  }, [location.state])
+
 
   useEffect(() => {
     fetchServiceTickets()
   }, [])
 
+  useEffect(() => {
+    if (createModalOpen) {
+      fetchTechnicians()
+    }
+  }, [createModalOpen])
+
+  const fetchTechnicians = async () => {
+    setTechniciansLoading(true)
+    try {
+      const { data: response, error } = await employeeAPI.getTechnicians()
+      
+      if (error) {
+        console.error('Error fetching technicians:', error)
+        message.error('Không thể tải danh sách kỹ thuật viên. Vui lòng thử lại.')
+        setTechnicians([])
+        setTechniciansLoading(false)
+        return
+      }
+
+      if (response && Array.isArray(response.result)) {
+        const techList = response.result.map(tech => ({
+          value: tech.employeeId,
+          label: tech.fullName
+        }))
+        setTechnicians(techList)
+      } else if (Array.isArray(response)) {
+        const techList = response.map(tech => ({
+          value: tech.employeeId,
+          label: tech.fullName
+        }))
+        setTechnicians(techList)
+      } else {
+        setTechnicians([])
+      }
+    } catch (err) {
+      console.error('Error fetching technicians:', err)
+      message.error('Đã xảy ra lỗi khi tải danh sách kỹ thuật viên.')
+      setTechnicians([])
+    } finally {
+      setTechniciansLoading(false)
+    }
+  }
+
   const fetchServiceTickets = async () => {
     setLoading(true)
     const { data: response, error } = await serviceTicketAPI.getAll()
     setLoading(false)
-    
-    // Fallback data for testing
-    const fallbackData = [
-      {
-        id: 1,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'CREATED',
-        statusKey: 'CREATED',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-      {
-        id: 2,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'WAITING_QUOTE',
-        statusKey: 'WAITING_QUOTE',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-      {
-        id: 3,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'WAITING_HANDOVER',
-        statusKey: 'WAITING_HANDOVER',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-      {
-        id: 4,
-        code: 'STK-2025-000001',
-        customer: 'Phạm Văn A',
-        license: '25A-123456',
-        status: 'CANCELLED',
-        statusKey: 'CANCELLED',
-        createdAt: '13/10/2025',
-        total: 0,
-        rawData: {}
-      },
-    ]
-    
     if (error || !response) {
-      console.warn('API error, using fallback data:', error)
-      setData(fallbackData)
+      console.warn('API error when fetching service tickets:', error)
+      setData([])
       return
     }
     
@@ -143,72 +340,92 @@ export default function TicketService() {
       }
     }
     
-    // Use fallback if no data
+  
     if (resultArray.length === 0) {
-      console.warn('No data from API, using fallback data')
-      setData(fallbackData)
+      console.warn('No data from API')
+      setData([])
       return
     }
     
-    const transformed = resultArray.map(item => ({
+    const transformed = resultArray.map(item => {
+      const normalizedStatus = normalizeStatusKey(item.status || 'CREATED')
+      return {
       id: item.serviceTicketId,
-      code: item.code || `STK-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
+      code: item.serviceTicketCode || item.code || `DV-2025-${String(item.serviceTicketId || 0).padStart(6, '0')}`,
       customer: item.customer?.fullName || 'N/A',
       license: item.vehicle?.licensePlate || 'N/A',
-      status: item.status || 'CREATED',
-      statusKey: item.status || 'CREATED',
-      createdAt: item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN'),
+        status: item.status || normalizedStatus,
+        statusKey: normalizedStatus,
+        createdAt: item.createdAt || '',
       total: item.total || 0,
       rawData: item
-    }))
+      }
+    })
     setData(transformed)
   }
 
   const filtered = useMemo(() => {
     let result = data
-    
-    // For history page, show completed/cancelled tickets only
+   
     if (isHistoryPage) {
       result = result.filter((r) => {
-        const statusKey = r.statusKey || r.status
-        // Show completed (WAITING_HANDOVER) and cancelled tickets
-        return statusKey === 'WAITING_HANDOVER' || 
-               statusKey === 'Chờ bàn giao xe' ||
-               statusKey === 'CANCELLED' ||
-               statusKey === 'Hủy' ||
-               statusKey === 'COMPLETED' ||
-               statusKey === 'Hoàn thành'
+        const statusKey = normalizeStatusKey(r.statusKey || r.status)
+        return (
+          statusKey === 'WAITING_FOR_DELIVERY' ||
+          statusKey === 'CANCELED' ||
+          statusKey === 'COMPLETED'
+        )
       })
     }
     
-    // Filter by search query
     if (query) {
       const q = query.toLowerCase()
       result = result.filter(
         (r) => r.license.toLowerCase().includes(q) || r.customer.toLowerCase().includes(q)
       )
     }
-    
-    // Filter by status (only for ticket list page, not history)
-    if (!isHistoryPage && statusFilter) {
+  
+    // Filter by multiple statuses if applied
+    if (!isHistoryPage && appliedStatuses.length > 0) {
       result = result.filter((r) => {
-        const statusKey = r.statusKey || r.status
-        return statusKey === statusFilter || 
-               (statusFilter === 'CREATED' && (statusKey === 'CREATED' || statusKey === 'Đã tạo')) ||
-               (statusFilter === 'WAITING_QUOTE' && (statusKey === 'WAITING_QUOTE' || statusKey === 'Chờ báo giá')) ||
-               (statusFilter === 'WAITING_HANDOVER' && (statusKey === 'WAITING_HANDOVER' || statusKey === 'Chờ bàn giao xe')) ||
-               (statusFilter === 'CANCELLED' && (statusKey === 'CANCELLED' || statusKey === 'Hủy'))
+        const statusKey = normalizeStatusKey(r.statusKey || r.status)
+        return appliedStatuses.some((selectedStatus) => statusKey === normalizeStatusKey(selectedStatus))
+      })
+    } else if (!isHistoryPage && statusFilter) {
+      // Fallback to single status filter for backward compatibility
+      result = result.filter((r) => {
+        const statusKey = normalizeStatusKey(r.statusKey || r.status)
+        return statusKey === normalizeStatusKey(statusFilter)
       })
     }
     
-    // Filter by date
-    if (dateFilter) {
+    // Filter by date range if applied
+    if (appliedDateRange[0] || appliedDateRange[1]) {
+      result = result.filter((r) => {
+        if (!r.createdAt) return false
+        const recordDate = dayjs(r.createdAt, 'DD/MM/YYYY')
+        if (!recordDate.isValid()) return false
+        
+        if (appliedDateRange[0] && appliedDateRange[1]) {
+          return (
+            recordDate.isAfter(appliedDateRange[0].subtract(1, 'day')) &&
+                 recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+          )
+        } else if (appliedDateRange[0]) {
+          return recordDate.isAfter(appliedDateRange[0].subtract(1, 'day'))
+        } else if (appliedDateRange[1]) {
+          return recordDate.isBefore(appliedDateRange[1].add(1, 'day'))
+        }
+        return true
+      })
+    } else if (dateFilter) {
+      // Fallback to single date filter for backward compatibility
       const filterDate = dateFilter.format('DD/MM/YYYY')
       result = result.filter((r) => r.createdAt === filterDate)
     }
     
     return result
-  }, [query, data, statusFilter, dateFilter, isHistoryPage])
+  }, [query, data, statusFilter, dateFilter, isHistoryPage, appliedStatuses, appliedDateRange])
 
   const handleUpdate = (record) => {
     setUpdateTicketId(record.id)
@@ -219,9 +436,186 @@ export default function TicketService() {
     fetchServiceTickets()
   }
 
+  const handleStatusChange = async (ticketId, newStatus, currentStatus) => {
+    if (!ticketId || !newStatus || newStatus === currentStatus) return
+    
+    setUpdatingStatusId(ticketId)
+    try {
+      const { data, error } = await serviceTicketAPI.updateStatus(ticketId, newStatus)
+      
+      if (error) {
+        message.error('Không thể cập nhật trạng thái')
+        return
+      }
+      
+      message.success('Cập nhật trạng thái thành công')
+      await fetchServiceTickets()
+    } catch (err) {
+      console.error('Error updating ticket status:', err)
+      message.error('Đã xảy ra lỗi khi cập nhật trạng thái')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
+
+  const handleServiceSelect = (value) => {
+    if (!value) return
+    
+    const service = SERVICES.find(s => s.value === value)
+    if (service) {
+      const isAlreadySelected = selectedServices.some(s => s.value === value)
+      if (!isAlreadySelected) {
+        setSelectedServices([...selectedServices, { ...service, id: `${service.value}-${Date.now()}` }])
+        setSelectKey(prev => prev + 1)
+      }
+    }
+  }
+
+  const handleRemoveService = (id) => {
+    setSelectedServices(selectedServices.filter(s => s.id !== id))
+  }
+
+  const handleCreateTicket = async (values) => {
+    if (!selectedServices || selectedServices.length === 0) {
+      message.error('Vui lòng chọn ít nhất một loại dịch vụ')
+      return
+    }
+
+    setCreateLoading(true)
+    
+    try {
+      const appointmentId = currentAppointmentId ? parseInt(currentAppointmentId) : null
+      
+      const payload = {
+        appointmentId: appointmentId && appointmentId > 0 ? appointmentId : 0,
+        serviceTypeIds: selectedServices.map(s => s.value),
+        customer: {
+          customerId: 0,
+          fullName: values.name || '',
+          phone: normalizePhoneTo84(values.phone || ''),
+          address: values.address || '',
+          customerType: 'CA_NHAN',
+          loyaltyLevel: 'BRONZE'
+        },
+        vehicle: {
+          vehicleId: 0,
+          licensePlate: values.plate || '',
+          brandId: values.brandId || 0,
+          modelId: values.modelId || 0,
+          modelName: values.model || '',
+          vin: values.vin || '',
+          year: values.year ? parseInt(values.year) : 0
+        },
+        assignedTechnicianIds: values.techs && Array.isArray(values.techs) && values.techs.length > 0 ? values.techs : [0],
+        receiveCondition: values.note || ''
+      }
+
+      if (values.receiveDate) {
+        payload.expectedDeliveryAt = values.receiveDate.format('YYYY-MM-DD')
+      }
+
+      console.log('Creating service ticket with payload:', payload)
+
+      const { data, error } = await serviceTicketAPI.create(payload)
+      
+      if (error) {
+        console.error('Error creating service ticket:', error)
+        message.error(error || 'Tạo phiếu không thành công. Vui lòng thử lại.')
+        setCreateLoading(false)
+        return
+      }
+
+      if (data && (data.statusCode === 200 || data.statusCode === 201 || data.result)) {
+        message.success('Tạo phiếu dịch vụ thành công')
+        createForm.resetFields()
+        setSelectedServices([])
+        setCurrentAppointmentId(null)
+        setCreateModalOpen(false)
+        await fetchServiceTickets()
+      } else {
+        message.error('Tạo phiếu không thành công. Vui lòng thử lại.')
+        setCreateLoading(false)
+      }
+    } catch (err) {
+      console.error('Error creating service ticket:', err)
+      message.error('Đã xảy ra lỗi khi tạo phiếu dịch vụ.')
+      setCreateLoading(false)
+    }
+  }
+
+  const handleCreateModalClose = () => {
+    setCreateModalOpen(false)
+    createForm.resetFields()
+    setSelectedServices([])
+    setCurrentAppointmentId(null)
+  }
+
+  const historyColumns = [
+    {
+      title: 'STT',
+      key: 'index',
+      width: 80,
+      render: (_, __, index) => (
+        <span style={{ fontWeight: 600 }}>{String(index + 1).padStart(2, '0')}</span>
+      )
+    },
+    {
+      title: 'Mã phiếu',
+      dataIndex: 'code',
+      key: 'code',
+      width: 180,
+      render: (text) => <span style={{ fontWeight: 600 }}>{text}</span>
+    },
+    {
+      title: 'Khách Hàng',
+      dataIndex: 'customer',
+      key: 'customer',
+      width: 200
+    },
+    {
+      title: 'Biển Số Xe',
+      dataIndex: 'license',
+      key: 'license',
+      width: 150
+    },
+    {
+      title: 'Trạng Thái',
+      dataIndex: 'status',
+      key: 'status',
+      width: 150,
+      render: () => (
+        <span style={{ color: '#22c55e', fontWeight: 600 }}>Hoàn thành</span>
+      )
+    },
+    {
+      title: 'Ngày Giao Xe',
+      dataIndex: 'deliveryDate',
+      key: 'deliveryDate',
+      width: 150
+    },
+    {
+      title: 'Thao tác',
+      key: 'action',
+      width: 150,
+      render: (_, record) => {
+        const isDone = record.warrantyStatus === 'done'
+        return (
+          <Button
+            size="small"
+            className={`warranty-btn ${isDone ? 'done' : ''}`}
+            type="default"
+          >
+            {isDone ? 'Đã bảo hành' : 'Bảo hành'}
+          </Button>
+        )
+      }
+    }
+  ]
+
   const columns = [
     {
-      title: 'Code',
+      title: 'Mã phiếu',
       dataIndex: 'code',
       key: 'code',
       width: 180
@@ -242,10 +636,15 @@ export default function TicketService() {
       title: 'Trạng Thái',
       dataIndex: 'status',
       key: 'status',
-      width: 180,
+      width: 200,
       render: (status, record) => {
-        const config = getStatusConfig(record.statusKey || status)
-        return <span style={{ color: config.color, fontWeight: 600 }}>{config.text}</span>
+        const currentStatus = record.statusKey || status
+        const config = getStatusConfig(currentStatus)
+        return (
+          <span style={{ color: config.color, fontWeight: 600 }}>
+            {config.text}
+          </span>
+        )
       }
     },
     {
@@ -260,34 +659,40 @@ export default function TicketService() {
       width: 120,
       render: (_, record) => {
         const statusKey = record.statusKey || record.status
-        const canUpdate = statusKey === 'CREATED' || statusKey === 'Đã tạo' || 
-                         statusKey === 'WAITING_QUOTE' || statusKey === 'Chờ báo giá'
-        return canUpdate ? (
+        const isCompleted = statusKey === 'COMPLETED' || statusKey === 'Hoàn thành'
+        const isCancelled = statusKey === 'CANCELED' || statusKey === 'CANCELLED' || statusKey === 'Hủy'
+        const isDisabled = isCompleted || isCancelled
+        
+        return (
           <Button 
             type="link" 
             onClick={() => handleUpdate(record)}
-            style={{ padding: 0 }}
+            disabled={isDisabled}
+            style={{ 
+              padding: 0,
+              color: isDisabled ? '#9ca3af' : '#1890ff',
+              cursor: isDisabled ? 'not-allowed' : 'pointer'
+            }}
           >
             Cập nhật
           </Button>
-        ) : (
-          <EyeOutlined
-            style={{ fontSize: '18px', cursor: 'pointer', color: '#111' }}
-            onClick={() => setSelected(record)}
-          />
         )
       }
     }
   ]
 
   return (
-    <AdminLayout>
-      <div style={{ padding: '24px', background: '#f5f7fb', minHeight: '100vh' }}>
+        <AdminLayout>
+      <div style={{ padding: '24px', minHeight: '100vh' }}>
         <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: 0, marginBottom: '20px' }}>
+          <h1 className="h4" style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 4px 0', color: '#111' }}>
             {isHistoryPage ? 'Lịch sử sửa chữa' : 'Danh sách phiếu'}
           </h1>
-          
+          <p className="subtext" style={{ margin: '0 0 20px 0', color: '#6b7280' }}>
+            {isHistoryPage
+              ? 'Tra cứu lại các phiếu dịch vụ đã hoàn tất hoặc đã hủy theo biển số xe và ngày tạo.'
+              : 'Quản lý danh sách phiếu dịch vụ hiện tại theo trạng thái, ngày tạo và biển số xe.'}
+          </p>
           <Row gutter={16} style={{ marginBottom: '20px' }}>
             <Col flex="auto">
               <Search
@@ -304,40 +709,32 @@ export default function TicketService() {
               />
             </Col>
             <Col>
-              <DatePicker
-                placeholder="Ngày tạo"
-                format="DD/MM/YYYY"
-                suffixIcon={<CalendarOutlined />}
-                value={dateFilter}
-                onChange={setDateFilter}
-                style={{ width: '150px' }}
-              />
+              <Button
+                icon={<FilterOutlined />}
+                onClick={() => setFilterModalOpen(true)}
+                style={{
+                  height: 32,
+                  borderRadius: 8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                Bộ lọc
+              </Button>
             </Col>
-            {!isHistoryPage && (
-              <Col>
-                <Space>
-                  {STATUS_FILTERS.map((item) => (
-                    <Button
-                      key={item.key}
-                      type={statusFilter === item.key ? 'primary' : 'default'}
-                      style={{
-                        background: statusFilter === item.key ? '#ffd65a' : '#fff',
-                        borderColor: statusFilter === item.key ? '#ffd65a' : '#e6e6e6',
-                        color: statusFilter === item.key ? '#111' : '#666',
-                        fontWeight: 600
-                      }}
-                      onClick={() => setStatusFilter(item.key)}
-                    >
-                      {item.label}
-                    </Button>
-                  ))}
-                </Space>
-              </Col>
-            )}
           </Row>
         </div>
 
-        <Card style={{ borderRadius: '12px' }} bodyStyle={{ padding: 0 }}>
+        <Card 
+          style={{ 
+            borderRadius: '16px', 
+            boxShadow: '0 12px 30px rgba(15, 23, 42, 0.08)',
+            background: '#fff',
+            padding: '24px'
+          }} 
+          bodyStyle={{ padding: 0 }}
+        >
           <Table
             columns={columns}
             dataSource={filtered.map((item, index) => ({ ...item, key: item.id, index }))}
@@ -359,7 +756,7 @@ export default function TicketService() {
               pageSize: pageSize,
               total: filtered.length,
               showSizeChanger: true,
-              showTotal: (total) => `0 of ${total} row(s) selected.`,
+              showTotal: (total, range) => `${total} phiếu dịch vụ`,
               pageSizeOptions: ['10', '20', '50', '100'],
               onChange: (page, pageSize) => {
                 setPage(page)
@@ -386,6 +783,385 @@ export default function TicketService() {
         ticketId={updateTicketId}
         onSuccess={handleUpdateSuccess}
       />
+
+      <Modal
+        title={<span style={{ fontSize: '20px', fontWeight: 600 }}>Tạo phiếu dịch vụ</span>}
+        open={createModalOpen}
+        onCancel={handleCreateModalClose}
+        footer={null}
+        width={1000}
+        style={{ top: 20 }}
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          onFinish={handleCreateTicket}
+          className="create-ticket-form"
+        >
+          <Row gutter={24}>
+            <Col span={12}>
+              <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin khách hàng</h3>
+              <Form.Item
+                label={<span>Số điện thoại <span style={{ color: 'red' }}>*</span></span>}
+                name="phone"
+                rules={[{ required: true, message: 'Vui lòng nhập số điện thoại' }]}
+              >
+                <Select
+                  showSearch
+                  allowClear
+                  open={phoneDropdownOpen && phoneOptions.length > 0}
+                  placeholder="VD: 0123456789"
+                  options={phoneOptions}
+                  loading={phoneLoading}
+                  onSearch={onPhoneSearch}
+                  onSelect={onPhoneSelect}
+                  onChange={(value) => {
+                    createForm.setFieldsValue({ phone: value })
+                    setPhoneDropdownOpen(false)
+                  }}
+                  filterOption={false}
+                  optionFilterProp="label"
+                  notFoundContent={null}
+                  dropdownStyle={{ zIndex: 1200 }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label={<span>Họ và tên <span style={{ color: 'red' }}>*</span></span>}
+                name="name"
+                rules={[{ required: true, message: 'Vui lòng nhập họ và tên' }]}
+              >
+                <Input placeholder="VD: Đặng Thị Huyền" />
+              </Form.Item>
+
+              <Form.Item
+                label={<span>Địa chỉ <span style={{ color: 'red' }}>*</span></span>}
+                name="address"
+                rules={[{ required: true, message: 'Vui lòng nhập địa chỉ' }]}
+              >
+                <Input placeholder="VD: Hòa Lạc - Hà Nội" />
+              </Form.Item>
+
+              <h3 style={{ marginTop: '24px', marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Thông tin xe</h3>
+              <Form.Item
+                label="Biển số xe"
+                name="plate"
+                rules={[{ required: true, message: 'Vui lòng nhập biển số xe' }]}
+              >
+                <Input placeholder="VD: 30A-12345" />
+              </Form.Item>
+
+              <Form.Item
+                label="Hãng xe"
+                name="brand"
+                rules={[{ required: true, message: 'Vui lòng nhập hãng xe' }]}
+              >
+                <Input placeholder="VD: Mazda" />
+              </Form.Item>
+
+              <Form.Item
+                label="Loại xe"
+                name="model"
+                rules={[{ required: true, message: 'Vui lòng nhập loại xe' }]}
+              >
+                <Input placeholder="VD: Mazda 3" />
+              </Form.Item>
+
+              <Form.Item
+                label="Số khung"
+                name="vin"
+              >
+                <Input placeholder="VD: RL4XW430089206813" />
+              </Form.Item>
+            </Col>
+
+            <Col span={12}>
+              <h3 style={{ marginBottom: '16px', fontSize: '16px', fontWeight: 600 }}>Chi tiết dịch vụ</h3>
+              <Form.Item
+                label="Loại dịch vụ"
+                name="service"
+              >
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      minHeight: '40px',
+                      padding: '8px 12px',
+                      background: '#f5f5f5',
+                      borderRadius: '8px',
+                      border: '1px solid #d9d9d9',
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {selectedServices.map((service) => (
+                      <div
+                        key={service.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          background: '#e8e8e8',
+                          borderRadius: '6px',
+                          padding: '4px 8px',
+                          height: '28px'
+                        }}
+                      >
+                        <span style={{ fontSize: '14px', color: '#333', whiteSpace: 'nowrap' }}>
+                          {service.label}
+                        </span>
+                        <CloseOutlined
+                          style={{
+                            fontSize: '12px',
+                            color: '#666',
+                            cursor: 'pointer',
+                            marginLeft: '2px'
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemoveService(service.id)
+                          }}
+                        />
+                      </div>
+                    ))}
+                    <div style={{ flex: 1, minWidth: '150px' }}>
+                      <Select
+                        key={selectKey}
+                        placeholder={selectedServices.length === 0 ? "Chọn loại dịch vụ" : ""}
+                        style={{ 
+                          width: '100%'
+                        }}
+                        className="service-type-select"
+                        value={null}
+                        onChange={handleServiceSelect}
+                        options={SERVICES.filter(s => !selectedServices.some(ss => ss.value === s.value))}
+                        showSearch
+                        filterOption={(input, option) =>
+                          (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                        }
+                        bordered={false}
+                        dropdownStyle={{ zIndex: 1050 }}
+                        allowClear={false}
+                      />
+                      <style>{`
+                        .service-type-select .ant-select-selector {
+                          border: none !important;
+                          background: transparent !important;
+                          box-shadow: none !important;
+                          padding: 0 !important;
+                          height: auto !important;
+                        }
+                        .service-type-select .ant-select-selection-placeholder {
+                          color: #999;
+                        }
+                        .service-type-select:hover .ant-select-selector {
+                          border: none !important;
+                        }
+                        .service-type-select.ant-select-focused .ant-select-selector {
+                          border: none !important;
+                          box-shadow: none !important;
+                        }
+                      `}</style>
+                    </div>
+                  </div>
+                </div>
+              </Form.Item>
+
+              <Form.Item
+                label="Kỹ thuật viên sửa chữa"
+                name="techs"
+              >
+                <Select
+                  mode="multiple"
+                  options={technicians}
+                  placeholder={techniciansLoading ? 'Đang tải...' : 'Chọn kỹ thuật viên'}
+                  loading={techniciansLoading}
+                  disabled={techniciansLoading}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Ngày dự đoán nhận xe"
+                name="receiveDate"
+              >
+                <input
+                  type="date"
+                  style={{
+                    width: '100%',
+                    height: 32,
+                    borderRadius: 8,
+                    border: '1px solid #d9d9d9',
+                    padding: '4px 8px',
+                    fontSize: 14
+                  }}
+                  value={createForm.getFieldValue('receiveDate') || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    createForm.setFieldsValue({ receiveDate: value })
+                  }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                label="Ghi chú"
+                name="note"
+              >
+                <TextArea rows={6} placeholder="Nhập ghi chú..." />
+              </Form.Item>
+
+              <Row justify="end" style={{ marginTop: '32px' }}>
+                <Space>
+                  <Button onClick={handleCreateModalClose}>Hủy</Button>
+                  <Button type="primary" htmlType="submit" loading={createLoading} style={{ background: '#22c55e', borderColor: '#22c55e' }}>
+                    Tạo phiếu
+                  </Button>
+                </Space>
+              </Row>
+            </Col>
+          </Row>
+        </Form>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        title="Bộ lọc"
+        open={filterModalOpen}
+        onCancel={() => setFilterModalOpen(false)}
+        footer={null}
+        width={400}
+      >
+        <div style={{ padding: '8px 0' }}>
+          {/* Status Filter Section */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Trạng thái
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {STATUS_FILTERS.map((item) => (
+                <label
+                  key={item.key}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    color: '#374151'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStatuses.includes(item.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedStatuses([...selectedStatuses, item.key])
+                      } else {
+                        setSelectedStatuses(selectedStatuses.filter(s => s !== item.key))
+                      }
+                    }}
+                    style={{
+                      marginRight: '8px',
+                      width: '16px',
+                      height: '16px',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Date Range Section */}
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ 
+              fontSize: '14px', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              color: '#374151'
+            }}>
+              Khoảng ngày tạo
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                  Từ ngày
+                </div>
+                <DatePicker
+                  value={dateRange[0]}
+                  onChange={(date) => setDateRange([date, dateRange[1]])}
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+              <div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>
+                  Đến ngày
+                </div>
+                <DatePicker
+                  value={dateRange[1]}
+                  onChange={(date) => setDateRange([dateRange[0], date])}
+                  format="DD/MM/YYYY"
+                  style={{ width: '100%' }}
+                  placeholder="dd/mm/yyyy"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: '12px',
+            paddingTop: '16px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <Button
+              onClick={() => {
+                setSelectedStatuses([])
+                setDateRange([null, null])
+                setAppliedStatuses([])
+                setAppliedDateRange([null, null])
+                setStatusFilter(null)
+                setDateFilter(null)
+              }}
+              style={{
+                borderRadius: '6px'
+              }}
+            >
+              Đặt lại
+            </Button>
+            <Button
+              type="primary"
+              onClick={() => {
+                // Apply filters
+                setAppliedStatuses([...selectedStatuses])
+                setAppliedDateRange([dateRange[0], dateRange[1]])
+                
+                // Clear old single filters
+                setStatusFilter(null)
+                setDateFilter(null)
+                
+                setFilterModalOpen(false)
+              }}
+              style={{
+                background: '#1677ff',
+                borderColor: '#1677ff',
+                borderRadius: '6px'
+              }}
+            >
+              Áp dụng
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AdminLayout>
   )
 }
