@@ -282,6 +282,8 @@ export const appointmentAPI = {
   updateStatus: (id, status) =>
     patch(`/appointments/${id}/status?status=${status}`),
   getTimeSlots: (date) => get(`/appointments/time-slots?date=${date}`),
+  confirmFromReminder: (token) => 
+    patch(`/appointments/reminder/${token}/confirm`),
 };
 
 export const serviceTicketAPI = {

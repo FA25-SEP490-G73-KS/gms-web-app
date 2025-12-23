@@ -36,6 +36,7 @@ export default function ExportRequest() {
   const [units, setUnits] = useState([]) // Danh sách đơn vị
   const [errors, setErrors] = useState({}) // Lưu lỗi validation cho từng field
   const [partStock, setPartStock] = useState(0) // Tồn kho thực tế
+  const [isPriceSellManuallyEdited, setIsPriceSellManuallyEdited] = useState(false) // Track xem giá bán đã được người dùng chỉnh sửa thủ công chưa
   
   // Form state
   const [formData, setFormData] = useState({
@@ -514,6 +515,11 @@ export default function ExportRequest() {
         
         setHasExistingPart(true) // Đánh dấu là có part tồn tại
         
+        const importPrice = partData.purchasePrice || 0
+        const sellPrice = partData.sellingPrice || 0
+        // Nếu có giá nhập và giá bán = 0 hoặc chưa có, tự động tính giá bán = giá nhập + 10%
+        const calculatedSellPrice = importPrice > 0 ? Math.round(importPrice * 1.1) : sellPrice
+        
         const newFormData = {
           partName: partData.name || '',
           partType: partData.categoryName || '',
@@ -522,8 +528,8 @@ export default function ExportRequest() {
           manufacturer: partData.supplierName || '',
           brand: partData.modelName || '',
           carModel: partData.modelName || '',
-          priceImport: partData.purchasePrice || 0,
-          priceSell: partData.sellingPrice || 0,
+          priceImport: importPrice,
+          priceSell: sellPrice > 0 ? sellPrice : calculatedSellPrice, // Dùng giá bán từ DB nếu có, nếu không thì tính từ giá nhập
           unit: partData.unitName || '',
           note: itemDetail.warehouseNote || partData.note || '',
           quantity: itemDetail.quantity || partRecord.quantity || 0,
@@ -532,6 +538,7 @@ export default function ExportRequest() {
         }
         console.log('Setting form data:', newFormData)
         setFormData(newFormData)
+        setIsPriceSellManuallyEdited(false) // Reset flag khi mở modal
         
         // Nếu có brand, gọi API lấy danh sách dòng xe
         if (newFormData.brand && !newFormData.usedForAllCars) {
@@ -559,13 +566,14 @@ export default function ExportRequest() {
           brand: '',
           carModel: '',
           priceImport: 0,
-          priceSell: 0,
+          priceSell: 0, // Sẽ tự động tính khi người dùng nhập giá nhập
           unit: itemDetail.unit || partRecord.unit || '',
           note: itemDetail.warehouseNote || '',
           quantity: itemDetail.quantity || partRecord.quantity || 0,
           specialPart: false,
           isReviewed: isReviewed // Thêm flag để biết đã review chưa
         })
+        setIsPriceSellManuallyEdited(false) // Reset flag khi mở modal
       }
     } catch (error) {
       console.error('Error loading item details:', error)
@@ -583,6 +591,7 @@ export default function ExportRequest() {
     setCarModels([]) // Reset danh sách dòng xe khi đóng modal
     setErrors({}) // Reset errors khi đóng modal
     setPartStock(0)
+    setIsPriceSellManuallyEdited(false) // Reset flag khi đóng modal
   }
 
   const handleFormChange = (field, value) => {
@@ -1201,10 +1210,17 @@ export default function ExportRequest() {
                   <InputNumber
                     value={formData.priceImport ? Number(formData.priceImport.toString().replace(/\./g, '')) : undefined}
                     onChange={(value) => {
+                      const newPriceImport = parseFloat(value) || 0
                       handleFormChange('priceImport', value ? value.toString() : '')
+                      
+                      // Tự động tính giá bán = giá nhập + 10% (chỉ khi chưa được chỉnh sửa thủ công)
+                      if (newPriceImport > 0 && !isPriceSellManuallyEdited) {
+                        const calculatedPriceSell = Math.round(newPriceImport * 1.1)
+                        handleFormChange('priceSell', calculatedPriceSell.toString())
+                      }
+                      
                       // Kiểm tra lại giá bán khi thay đổi giá nhập
                       const priceSell = parseFloat(formData.priceSell) || 0
-                      const newPriceImport = parseFloat(value) || 0
                       if (priceSell > 0 && newPriceImport > 0 && priceSell < newPriceImport) {
                         setErrors(prev => ({
                           ...prev,
@@ -1291,6 +1307,9 @@ export default function ExportRequest() {
                     value={formData.priceSell ? Number(formData.priceSell.toString().replace(/\./g, '')) : undefined}
                     onChange={(value) => {
                       handleFormChange('priceSell', value ? value.toString() : '')
+                      // Đánh dấu là giá bán đã được chỉnh sửa thủ công
+                      setIsPriceSellManuallyEdited(true)
+                      
                       // Clear error khi user thay đổi giá trị
                       if (errors.priceSell) {
                         setErrors(prev => {
