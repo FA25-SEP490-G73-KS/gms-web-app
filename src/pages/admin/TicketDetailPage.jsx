@@ -2268,6 +2268,28 @@ export default function TicketDetailPage() {
                                     type="number"
                                     inputMode="decimal"
                                     value={displayValue}
+                                    onKeyPress={(e) => {
+                                        // Chặn ký tự không hợp lệ: chỉ cho phép số, dấu phẩy (,) và dấu chấm (.)
+                                        const char = e.key
+                                        const isNumber = /[0-9]/.test(char)
+                                        const isDecimalSeparator = char === ',' || char === '.'
+                                        
+                                        // Nếu không phải số, không phải dấu thập phân, và không phải các phím điều hướng/xóa
+                                        if (!isNumber && !isDecimalSeparator && 
+                                            char !== 'Backspace' && char !== 'Delete' && 
+                                            char !== 'ArrowLeft' && char !== 'ArrowRight' &&
+                                            char !== 'Tab' && char !== 'Enter') {
+                                            e.preventDefault()
+                                        }
+                                        
+                                        // Nếu là dấu thập phân, kiểm tra xem đã có dấu thập phân chưa
+                                        if (isDecimalSeparator) {
+                                            const currentValue = e.target.value || ''
+                                            if (currentValue.includes(',') || currentValue.includes('.')) {
+                                                e.preventDefault() // Đã có dấu thập phân rồi, không cho thêm
+                                            }
+                                        }
+                                    }}
                                     onChange={(e) => {
                                         // Xử lý input số lượng khi người dùng đang gõ
                                         let value = e.target.value || ''
@@ -2449,6 +2471,19 @@ export default function TicketDetailPage() {
                                 ? record.unitPrice.toLocaleString('vi-VN')
                                 : ''
                         }
+                        onKeyPress={(e) => {
+                            // Chặn ký tự không hợp lệ: chỉ cho phép số (đơn giá không cho phép dấu thập phân)
+                            const char = e.key
+                            const isNumber = /[0-9]/.test(char)
+                            
+                            // Nếu không phải số và không phải các phím điều hướng/xóa
+                            if (!isNumber && 
+                                char !== 'Backspace' && char !== 'Delete' && 
+                                char !== 'ArrowLeft' && char !== 'ArrowRight' &&
+                                char !== 'Tab' && char !== 'Enter') {
+                                e.preventDefault()
+                            }
+                        }}
                         onChange={(e) => {
                             // Xử lý input đơn giá khi người dùng đang gõ
                             // Loại bỏ tất cả ký tự không phải số (đơn giá chỉ cho phép số nguyên)
@@ -2632,6 +2667,19 @@ export default function TicketDetailPage() {
                 ? record.unitPrice.toLocaleString('vi-VN')
                 : ''
             }
+            onKeyPress={(e) => {
+              // Chặn ký tự không hợp lệ: chỉ cho phép số (đơn giá không cho phép dấu thập phân)
+              const char = e.key
+              const isNumber = /[0-9]/.test(char)
+              
+              // Nếu không phải số và không phải các phím điều hướng/xóa
+              if (!isNumber && 
+                  char !== 'Backspace' && char !== 'Delete' && 
+                  char !== 'ArrowLeft' && char !== 'ArrowRight' &&
+                  char !== 'Tab' && char !== 'Enter') {
+                e.preventDefault()
+              }
+            }}
             onChange={(e) => {
               const sanitized = e.target.value.replace(/[^\d]/g, '')
               const newPrice = sanitized === '' ? 0 : parseInt(sanitized, 10)
