@@ -2189,25 +2189,37 @@ export default function TicketDetailPage() {
                   return <FileTextOutlined style={{ fontSize: 16, color }} />
               })()}
             </span>
-            {!isHistoryPage && !inputsDisabled && record.exportedQuantity === 0 && (
+            {!isHistoryPage && ticketStatusKey === 'QUOTING' && normalizedQuotationStatus === 'DRAFT' && (
               record.priceQuotationItemId ? (
                 <Popconfirm
                   title="Xóa mục báo giá"
                   description="Bạn có chắc chắn muốn xóa mục này?"
-                  onConfirm={() => deleteReplaceItem(record.id, record.priceQuotationItemId)}
+                  onConfirm={() => {
+                    if (!inputsDisabled) {
+                      deleteReplaceItem(record.id, record.priceQuotationItemId)
+                    }
+                  }}
                   okText="Xác nhận"
                   cancelText="Hủy"
                 >
-              <DeleteOutlined
-                style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                title="Xóa dòng"
-              />
+                  <DeleteOutlined
+                    style={{ 
+                      color: inputsDisabled ? '#9ca3af' : '#ef4444', 
+                      cursor: inputsDisabled ? 'not-allowed' : 'pointer', 
+                      fontSize: 16 
+                    }}
+                    title={inputsDisabled ? 'Không thể xóa' : 'Xóa dòng'}
+                  />
                 </Popconfirm>
               ) : (
                 <DeleteOutlined
-                  style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                  onClick={() => deleteReplaceItem(record.id, null)}
-                  title="Xóa dòng"
+                  style={{ 
+                    color: inputsDisabled ? '#9ca3af' : '#ef4444', 
+                    cursor: inputsDisabled ? 'not-allowed' : 'pointer', 
+                    fontSize: 16 
+                  }}
+                  onClick={() => !inputsDisabled && deleteReplaceItem(record.id, null)}
+                  title={inputsDisabled ? 'Không thể xóa' : 'Xóa dòng'}
                 />
               )
             )}
