@@ -349,6 +349,18 @@ export default function TicketDetailPage() {
         ticketStatusKey !== 'WAITING_FOR_DELIVERY' &&
         ticketStatusKey !== 'COMPLETED' &&
         ticketStatusKey !== 'CANCELED'
+    // Kiểm tra xem có item nào chưa xuất đủ kho không (exportedQuantity < quantity)
+    const hasIncompleteExportedItems = useMemo(() => {
+        const items = ticketData?.priceQuotation?.items || []
+        return items.some(item => {
+            // Chỉ kiểm tra các item loại PART
+            if (item.itemType !== 'PART') return false
+            const exportedQty = item.exportedQuantity ?? 0
+            const requiredQty = item.quantity ?? 0
+            return exportedQty < requiredQty
+        })
+    }, [ticketData?.priceQuotation?.items])
+
     const canHandover =
         !isHistoryPage &&
         !isTicketCancelled &&
@@ -356,7 +368,8 @@ export default function TicketDetailPage() {
         ticketStatusKey === 'UNDER_REPAIR' &&
         ticketStatusKey !== 'WAITING_FOR_DELIVERY' &&
         ticketStatusKey !== 'COMPLETED' &&
-        ticketStatusKey !== 'CANCELED'
+        ticketStatusKey !== 'CANCELED' &&
+        !hasIncompleteExportedItems  // Disable nếu có item chưa xuất đủ kho
 
     const disabledDeliveryDate = (current) => {
         if (!current) return false

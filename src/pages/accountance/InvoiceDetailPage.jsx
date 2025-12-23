@@ -1400,10 +1400,24 @@ export default function InvoiceDetailPage() {
                             onChange={(e) => {
                               if (paymentTab === "QR") {
                                 const value = e.target.value.replace(/[^\d]/g, "");
-                                setPaymentAmount(value); // Cho phép xóa hết (value = "")
-                                // Xóa lỗi khi người dùng bắt đầu nhập
-                                if (paymentAmountError && value.trim() !== "") {
-                                  setPaymentAmountError(false);
+                                const numValue = Number(value) || 0;
+                                
+                                // Giới hạn không được vượt quá Thành tiền (finalAmount)
+                                if (value === "" || numValue === 0) {
+                                  setPaymentAmount(value); // Cho phép xóa hết hoặc nhập 0
+                                  if (paymentAmountError) {
+                                    setPaymentAmountError(false);
+                                  }
+                                } else if (numValue > finalAmount) {
+                                  // Nếu vượt quá finalAmount, giới hạn ở finalAmount
+                                  setPaymentAmount(finalAmount.toString());
+                                  message.warning(`Số tiền không được vượt quá ${finalAmount.toLocaleString("vi-VN")} đ`);
+                                } else {
+                                  setPaymentAmount(value);
+                                  // Xóa lỗi khi người dùng nhập đúng
+                                  if (paymentAmountError) {
+                                    setPaymentAmountError(false);
+                                  }
                                 }
                               }
                             }}
@@ -1613,7 +1627,7 @@ export default function InvoiceDetailPage() {
                             Thu hưởng
                           </label>
                           <Input
-                            value={paymentData?.bankAccountName || "HOANG ANH TUAN"}
+                            value={paymentData?.bankAccountName || "HOANG ANH DAT"}
                             disabled
                             style={{
                               height: "40px",
