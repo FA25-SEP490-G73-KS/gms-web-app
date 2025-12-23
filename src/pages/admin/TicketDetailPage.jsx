@@ -1380,13 +1380,7 @@ export default function TicketDetailPage() {
             return
         }
 
-        if (!expectedDate) {
-            // Mở popup ở chế độ LƯU
-            setDateModalAction('SAVE')
-            setShowDateModal(true)
-        } else {
-            confirmSendQuote()
-        }
+        confirmSendQuote()
     }
 
     const sendQuotationToCustomer = async () => {
@@ -1749,11 +1743,6 @@ export default function TicketDetailPage() {
     }
 
     const confirmSendQuote = async () => {
-        if (!expectedDate) {
-            message.error('Vui lòng chọn ngày dự đoán giao xe')
-            return
-        }
-
         if (actionLoading) {
             return
         }
@@ -1767,12 +1756,14 @@ export default function TicketDetailPage() {
         const hide = message.loading('Đang gửi báo giá...', 0)
         setActionLoading(true)
         try {
-            // Bước 1: Cập nhật ngày dự kiến giao xe trước
-            const dateStr = expectedDate.format('YYYY-MM-DD')
-            const { error: deliveryError } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
+            // Bước 1: Cập nhật ngày dự kiến giao xe nếu có
+            if (expectedDate) {
+                const dateStr = expectedDate.format('YYYY-MM-DD')
+                const { error: deliveryError } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
 
-            if (deliveryError) {
-                throw new Error(deliveryError || 'Cập nhật ngày giao xe không thành công')
+                if (deliveryError) {
+                    throw new Error(deliveryError || 'Cập nhật ngày giao xe không thành công')
+                }
             }
 
             // Bước 2: Lưu báo giá (setQuotationDraft)
@@ -2875,7 +2866,7 @@ export default function TicketDetailPage() {
             </Modal>
 
             <Modal
-                title="Ngày dự đoán nhận xe"
+                title="Ngày dự đoán giao xe"
                 open={showDateModal}
                 onCancel={() => setShowDateModal(false)}
                 footer={null}

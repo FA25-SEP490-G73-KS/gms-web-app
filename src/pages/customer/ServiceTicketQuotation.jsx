@@ -210,6 +210,7 @@ export default function ServiceTicketQuotation() {
       }
 
       // 2. Sau khi xác nhận thành công, tạo hóa đơn cho phiếu dịch vụ này
+      let invoiceCreated = false;
       try {
         const { error: invoiceError } = await invoiceAPI.create(
           serviceTicketId,
@@ -220,6 +221,8 @@ export default function ServiceTicketQuotation() {
           message.warning(
             'Đã xác nhận báo giá nhưng tạo hóa đơn thất bại. Vui lòng liên hệ nhân viên.'
           );
+        } else {
+          invoiceCreated = true;
         }
       } catch (invErr) {
         console.error('Failed to create invoice after confirm:', invErr);
@@ -229,7 +232,7 @@ export default function ServiceTicketQuotation() {
       }
 
       // 3. Thông báo kết quả xác nhận và reload dữ liệu
-      if (response && (response.statusCode === 200 || response.message)) {
+      if (invoiceCreated) {
         message.success('Xác nhận báo giá và tạo hóa đơn thành công');
       } else {
         message.success('Xác nhận báo giá thành công');
