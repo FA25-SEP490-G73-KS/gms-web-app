@@ -139,12 +139,19 @@ export default function ServiceTicketQuotation() {
             return;
         }
 
+        // Convert serviceTicketId từ string sang number để đảm bảo Spring match đúng endpoint Long
+        const ticketIdNumber = Number(serviceTicketId);
+        if (isNaN(ticketIdNumber) || ticketIdNumber <= 0) {
+            message.error('ID phiếu dịch vụ không hợp lệ');
+            return;
+        }
+
         setLoading(true);
         try {
             // Allow viewing quotation without authentication (public endpoint)
-            // Backend: GET /api/service-tickets/{serviceTicketId}/quotation
+            // Backend: GET /api/service-tickets/{serviceTicketId}/quotation (Long serviceTicketId)
             const { data: response, error } = await serviceTicketAPI.getQuotationByCode(
-                serviceTicketId,
+                ticketIdNumber,
                 { skipAuth: true }
             );
 
@@ -192,7 +199,7 @@ export default function ServiceTicketQuotation() {
     setActionLoading(true);
     try {
       // 1. Khách xác nhận báo giá (public endpoint)
-      const { data: response, error } = await priceQuotationAPI.confirmQuotation(
+      const { data, error } = await priceQuotationAPI.confirmQuotation(
         priceQuotationId,
         { skipAuth: true }
       );
@@ -203,34 +210,22 @@ export default function ServiceTicketQuotation() {
       }
 
       // 2. Sau khi xác nhận thành công, tạo hóa đơn cho phiếu dịch vụ này
-      try {
-        const { error: invoiceError } = await invoiceAPI.create(
-          serviceTicketId,
-          priceQuotationId
-        );
-        if (invoiceError) {
-          console.error('Create invoice error:', invoiceError);
-          message.warning(
-            'Đã xác nhận báo giá nhưng tạo hóa đơn thất bại. Vui lòng liên hệ nhân viên.'
-          );
-        }
-      } catch (invErr) {
-        console.error('Failed to create invoice after confirm:', invErr);
-        message.warning(
-          'Đã xác nhận báo giá nhưng chưa tạo được hóa đơn. Vui lòng liên hệ nhân viên.'
-        );
+      const { error: invoiceError } = await invoiceAPI.create(
+        serviceTicketId,
+        priceQuotationId
+      );
+
+      if (invoiceError) {
+        console.error('Error creating invoice:', invoiceError);
+        message.warning('Đã xác nhận báo giá nhưng không thể tạo phiếu thanh toán. Vui lòng thử lại.');
+      } else {
+        message.success('Đã xác nhận báo giá và tạo phiếu thanh toán thành công');
       }
 
-      // 3. Thông báo kết quả xác nhận và reload dữ liệu
-      if (response && (response.statusCode === 200 || response.message)) {
-        message.success('Xác nhận báo giá và tạo hóa đơn thành công');
-      } else {
-        message.success('Xác nhận báo giá thành công');
-      }
       await fetchQuotation();
     } catch (err) {
-      console.error('Failed to confirm quotation:', err);
-      message.error('Đã xảy ra lỗi khi xác nhận báo giá');
+      console.error('Error confirming quotation:', err);
+      message.error('Đã xảy ra lỗi khi xác nhận');
     } finally {
       setActionLoading(false);
     }

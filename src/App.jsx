@@ -145,6 +145,8 @@ function App() {
         <Route path="/appointment" element={<AppointmentService />} />
         <Route path="/appointment/reminder/:id" element={<AppointmentConfirmSuccess />} />
         <Route path="/api/service-tickets/:serviceTicketId/quotation" element={<ServiceTicketQuotation />} />
+        {/* Route không có /api prefix (URL mới) */}
+        <Route path="/service-tickets/:serviceTicketId/quotation" element={<ServiceTicketQuotation />} />
         <Route path="/login" element={<Login />} />
         <Route path="/auth/forgot-password" element={<ForgotPassword />} />
         <Route path="/auth/enter-otp" element={<EnterOTP />} />

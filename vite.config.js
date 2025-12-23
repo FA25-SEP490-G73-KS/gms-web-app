@@ -13,6 +13,14 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
+        // Bypass route quotation khỏi proxy để React Router xử lý
+        bypass: (req) => {
+          // Nếu là route quotation, không proxy (trả về undefined)
+          // React Router sẽ xử lý route này
+          if (req.url?.match(/^\/api\/service-tickets\/\d+\/quotation/)) {
+            return undefined; // Không proxy, để React Router xử lý
+          }
+        },
       },
       "/ws": {
         target: "http://localhost:8080",

@@ -1607,13 +1607,7 @@ export default function TicketDetailPage() {
             return
         }
 
-        if (!expectedDate) {
-            // Mở popup ở chế độ LƯU
-            setDateModalAction('SAVE')
-            setShowDateModal(true)
-        } else {
-            confirmSendQuote()
-        }
+        confirmSendQuote()
     }
 
     const sendQuotationToCustomer = async () => {
@@ -1976,11 +1970,6 @@ export default function TicketDetailPage() {
     }
 
     const confirmSendQuote = async () => {
-        if (!expectedDate) {
-            message.error('Vui lòng chọn ngày dự đoán giao xe')
-            return
-        }
-
         if (actionLoading) {
             return
         }
@@ -1994,12 +1983,14 @@ export default function TicketDetailPage() {
         const hide = message.loading('Đang gửi báo giá...', 0)
         setActionLoading(true)
         try {
-            // Bước 1: Cập nhật ngày dự kiến giao xe trước
-            const dateStr = expectedDate.format('YYYY-MM-DD')
-            const { error: deliveryError } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
+            // Bước 1: Cập nhật ngày dự kiến giao xe nếu có
+            if (expectedDate) {
+                const dateStr = expectedDate.format('YYYY-MM-DD')
+                const { error: deliveryError } = await serviceTicketAPI.updateDeliveryAt(id, dateStr)
 
-            if (deliveryError) {
-                throw new Error(deliveryError || 'Cập nhật ngày giao xe không thành công')
+                if (deliveryError) {
+                    throw new Error(deliveryError || 'Cập nhật ngày giao xe không thành công')
+                }
             }
 
             // Bước 2: Lưu báo giá (setQuotationDraft)
@@ -2587,25 +2578,37 @@ export default function TicketDetailPage() {
                   return <FileTextOutlined style={{ fontSize: 16, color }} />
               })()}
             </span>
-            {!isHistoryPage && !inputsDisabled && (
+            {!isHistoryPage && ticketStatusKey === 'QUOTING' && normalizedQuotationStatus === 'DRAFT' && (
               record.priceQuotationItemId ? (
                 <Popconfirm
                   title="Xóa mục báo giá"
                   description="Bạn có chắc chắn muốn xóa mục này?"
-                  onConfirm={() => deleteReplaceItem(record.id, record.priceQuotationItemId)}
+                  onConfirm={() => {
+                    if (!inputsDisabled) {
+                      deleteReplaceItem(record.id, record.priceQuotationItemId)
+                    }
+                  }}
                   okText="Xác nhận"
                   cancelText="Hủy"
                 >
-              <DeleteOutlined
-                style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                title="Xóa dòng"
-              />
+                  <DeleteOutlined
+                    style={{ 
+                      color: inputsDisabled ? '#9ca3af' : '#ef4444', 
+                      cursor: inputsDisabled ? 'not-allowed' : 'pointer', 
+                      fontSize: 16 
+                    }}
+                    title={inputsDisabled ? 'Không thể xóa' : 'Xóa dòng'}
+                  />
                 </Popconfirm>
               ) : (
                 <DeleteOutlined
-                  style={{ color: '#ef4444', cursor: 'pointer', fontSize: 16 }}
-                  onClick={() => deleteReplaceItem(record.id, null)}
-                  title="Xóa dòng"
+                  style={{ 
+                    color: inputsDisabled ? '#9ca3af' : '#ef4444', 
+                    cursor: inputsDisabled ? 'not-allowed' : 'pointer', 
+                    fontSize: 16 
+                  }}
+                  onClick={() => !inputsDisabled && deleteReplaceItem(record.id, null)}
+                  title={inputsDisabled ? 'Không thể xóa' : 'Xóa dòng'}
                 />
               )
             )}
@@ -3295,7 +3298,7 @@ export default function TicketDetailPage() {
             </Modal>
 
             <Modal
-                title="Ngày dự đoán nhận xe"
+                title="Ngày dự đoán giao xe"
                 open={showDateModal}
                 onCancel={() => setShowDateModal(false)}
                 footer={null}
