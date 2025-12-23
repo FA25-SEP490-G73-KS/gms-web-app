@@ -243,6 +243,14 @@ export default function TicketDetailPage() {
         option: (base, state) => ({ ...base, backgroundColor: state.isSelected ? '#dbeafe' : state.isFocused ? '#f8fafc' : 'white', color: '#0f172a', fontWeight: state.isSelected ? 600 : 500 })
     }
 
+    // ============================================
+    // CONSTANTS - Giới hạn nhập liệu để tránh số quá lớn gây lỗi DB
+    // ============================================
+    const MAX_QTY_LENGTH = 9 // 9 chữ số cho số lượng (tối đa 999,999,999)
+    const MAX_PRICE_LENGTH = 12 // 12 chữ số cho đơn giá (tối đa 999,999,999,999)
+    const MAX_DECIMALS_FOR_LITER = 3 // Tối đa 3 chữ số thập phân cho đơn vị "lít"
+    const MAX_TOTAL = 1000000000000 // 1000 tỷ - giới hạn thành tiền (số lượng × đơn giá)
+
     const techOptionsStable = useMemo(() => techOptions, [techOptions])
     const serviceOptionsStable = useMemo(() => serviceOptions, [serviceOptions])
 
@@ -360,6 +368,132 @@ export default function TicketDetailPage() {
         if (inputsDisabled) return
         setDeliveryPickerValue(expectedDate || dayjs())
         setDeliveryPickerVisible(true)
+    }
+
+    /**
+     * Kiểm tra đơn vị có phải "lít" không
+     * - Mục đích: Xác định có cho phép nhập số thập phân hay không
+     * - Nếu là "lít": cho phép nhập số thập phân (ví dụ: 1.5 lít)
+     * - Nếu không phải "lít": chỉ cho phép số nguyên (ví dụ: 5 cái)
+     * @param {string|number} unit - Đơn vị cần kiểm tra
+     * @returns {boolean} - true nếu là đơn vị "lít", false nếu không
+     */
+    const isLiterUnit = (unit) => {
+        if (!unit) return false
+
+        const u = String(unit).trim().toLowerCase()
+
+        // Trường hợp value/code lưu trực tiếp dạng 'l', 'lit', 'lít'
+        if (u === 'l' || u === 'lit' || u === 'lít') return true
+
+        // Tìm trong unitOptions theo value / code / label
+        const matched = unitOptions.find(opt =>
+            String(opt.value).trim().toLowerCase() === u ||
+            (opt.code && String(opt.code).trim().toLowerCase() === u) ||
+            (opt.label && String(opt.label).trim().toLowerCase() === u)
+        )
+
+        if (!matched) return false
+
+        const label = String(matched.label || '').trim().toLowerCase()
+        return label === 'lít' || label === 'lit'
+    }
+
+    /**
+     * Chuẩn hóa số lượng dựa trên đơn vị
+     * - Mục đích: Xử lý số lượng theo đơn vị (cho phép thập phân nếu là "lít", chỉ số nguyên nếu không)
+     * - Xử lý: Tách phần nguyên và phần thập phân, giới hạn độ dài để tránh số quá lớn
+     * @param {string|number} quantity - Số lượng cần chuẩn hóa
+     * @param {string|number} unit - Đơn vị (để xác định có cho phép thập phân không)
+     * @returns {number} - Số lượng đã được chuẩn hóa
+     */
+    const normalizeQuantityByUnit = (quantity, unit) => {
+        const text = String(quantity ?? '').replace(/,/g, '.') // Đổi dấu phẩy thành dấu chấm
+
+        if (isLiterUnit(unit)) {
+            // Đơn vị là "lít" → cho phép số thập phân
+            // Tách chuỗi, KHÔNG dùng Number() trực tiếp để tránh mất dấu khi người dùng vừa gõ
+            const [rawInt = '0', rawDec = ''] = text.split('.')
+
+            // Xử lý phần nguyên: loại bỏ ký tự không phải số, loại bỏ số 0 đầu, giới hạn độ dài
+            const intPart =
+                rawInt.replace(/\D/g, '').replace(/^0+/, '').slice(0, MAX_QTY_LENGTH) || '0'
+
+            // Xử lý phần thập phân: loại bỏ ký tự không phải số, giới hạn tối đa 3 chữ số
+            const decPart =
+                rawDec.replace(/\D/g, '').slice(0, MAX_DECIMALS_FOR_LITER)
+
+            // Kết hợp phần nguyên và phần thập phân
+            const combined = decPart ? `${intPart}.${decPart}` : intPart
+            const value = parseFloat(combined)
+
+            return Number.isFinite(value) ? value : 0
+        }
+
+        // Đơn vị KHÔNG phải lít → ép số nguyên, tối đa MAX_QTY_LENGTH chữ số
+        const intOnly = text.replace(/\D/g, '').slice(0, MAX_QTY_LENGTH)
+        const value = parseInt(intOnly || '0', 10)
+
+        return Number.isFinite(value) ? value : 0
+    }
+
+    /**
+     * Làm sạch input số lượng (loại bỏ ký tự không hợp lệ, giới hạn độ dài)
+     * - Mục đích: Xử lý input từ người dùng, chỉ giữ lại số và dấu thập phân (nếu cho phép)
+     * - Xử lý: Loại bỏ ký tự không phải số, giới hạn độ dài, xử lý dấu thập phân
+     * @param {string} raw - Input thô từ người dùng
+     * @param {boolean} allowDecimal - Có cho phép số thập phân không
+     * @returns {{text: string, value: number}} - Text đã làm sạch và giá trị số
+     */
+    const sanitizeQuantityInput = (raw, allowDecimal) => {
+        if (!allowDecimal) {
+            // Không cho phép thập phân → chỉ giữ số nguyên
+            const digits = raw.replace(/\D/g, '') // Loại bỏ tất cả ký tự không phải số
+            const trimmed = digits.replace(/^0+/, '') // Loại bỏ số 0 ở đầu
+            const limited = trimmed.slice(0, MAX_QTY_LENGTH) // Giới hạn độ dài
+            const text = limited || '0'
+            return {
+                text,
+                value: parseInt(text, 10) || 0
+            }
+        }
+
+        // Cho phép số thập phân (cho đơn vị "lít")
+        let text = raw
+            .replace(/[^\d.,]/g, '') // chỉ giữ số, dấu , và .
+            .replace(/,/g, '.')      // đổi , -> . (chuẩn hóa dấu thập phân)
+
+        // Chỉ cho phép 1 dấu chấm (xử lý trường hợp người dùng nhập nhiều dấu chấm)
+        const firstDotIndex = text.indexOf('.')
+        if (firstDotIndex !== -1) {
+            const intPart = text.slice(0, firstDotIndex) // Phần nguyên
+            let decPart = text.slice(firstDotIndex + 1).replace(/\./g, '') // Phần thập phân, loại bỏ dấu chấm thừa
+            decPart = decPart.slice(0, MAX_DECIMALS_FOR_LITER) // Giới hạn 3 chữ số thập phân
+
+            const safeInt = intPart.replace(/^0+/, '').slice(0, MAX_QTY_LENGTH) || '0'
+            text = decPart ? `${safeInt}.${decPart}` : `${safeInt}.` // Giữ dấu chấm nếu đang gõ
+        } else {
+            text = text.replace(/^0+/, '').slice(0, MAX_QTY_LENGTH) || '0'
+        }
+
+        return {
+            text,
+            value: parseFloat(text) || 0
+        }
+    }
+
+    /**
+     * Làm sạch input đơn giá (loại bỏ ký tự không hợp lệ, giới hạn độ dài)
+     * - Mục đích: Xử lý input đơn giá từ người dùng, chỉ giữ lại số nguyên
+     * - Xử lý: Loại bỏ tất cả ký tự không phải số, giới hạn độ dài tối đa 12 chữ số
+     * @param {string} raw - Input thô từ người dùng
+     * @returns {{text: string, value: number}} - Text đã làm sạch và giá trị số
+     */
+    const sanitizeMoneyInput = (raw) => {
+        const digits = raw.replace(/[^\d]/g, '') // Loại bỏ tất cả ký tự không phải số
+        const limited = digits.slice(0, MAX_PRICE_LENGTH) // Giới hạn độ dài tối đa 12 chữ số
+        const value = limited ? parseInt(limited, 10) : 0
+        return { text: limited, value }
     }
 
     const closeDeliveryPicker = () => {
@@ -520,6 +654,7 @@ export default function TicketDetailPage() {
                     categoryLabel: item.itemName || item.partName || item.partCode || '',
                     partId: item.partId || item.part?.partId || null,
                     quantity: item.quantity ?? 1,
+                    quantityText: String(item.quantity ?? 1),
                     unit: item.unit || '',
                     unitPrice: item.unitPrice || 0,
                     total: item.totalPrice || 0,
@@ -1018,6 +1153,7 @@ export default function TicketDetailPage() {
             categoryLabel: '',
             partId: null,
             quantity: 1,
+            quantityText: '1',
             unit: '',
             unitPrice: 0,
             total: 0,
@@ -1185,44 +1321,122 @@ export default function TicketDetailPage() {
         }
     }
 
+    /**
+     * Cập nhật item trong bảng "Thay thế" (bảng 1)
+     * - Mục đích: Cập nhật thông tin của một item (số lượng, đơn giá, đơn vị, v.v.)
+     * - Xử lý: Tính lại thành tiền, validate thành tiền không vượt quá 1000 tỷ
+     * @param {string|number} id - ID của item cần cập nhật
+     * @param {object} updates - Object chứa các trường cần cập nhật (quantity, unitPrice, unit, v.v.)
+     */
     const updateReplaceItem = (id, updates = {}) => {
         setReplaceItems(prev =>
             prev.map(item => {
                 if (item.id !== id) return item
                 const updated = { ...item, ...updates }
-                if ('quantity' in updates || 'unitPrice' in updates) {
-                    updated.total = (updated.quantity || 0) * (updated.unitPrice || 0)
+
+                // Tính thành tiền: ưu tiên quantityText (khi đang gõ) nếu có, fallback về quantity
+                const qtyForTotal =
+                    updated.quantityText !== undefined && updated.quantityText !== null && updated.quantityText !== ''
+                        ? Number(updated.quantityText)
+                        : updated.quantity
+
+                const calculatedTotal = (Number(qtyForTotal) || 0) * (updated.unitPrice || 0)
+                
+                // Validate thành tiền không được vượt quá 1000 tỷ
+                if (calculatedTotal > MAX_TOTAL) {
+                    // Set error để hiển thị thông báo lỗi
+                    setErrors(prev => ({
+                        ...prev,
+                        [`replace_${id}_total`]: `Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`
+                    }))
+                    // Giới hạn thành tiền ở mức tối đa để tránh lỗi DB
+                    updated.total = MAX_TOTAL
+                } else {
+                    updated.total = calculatedTotal
+                    // Clear error nếu thành tiền hợp lệ
+                    if (errors[`replace_${id}_total`]) {
+                        setErrors(prev => {
+                            const newErrors = { ...prev }
+                            delete newErrors[`replace_${id}_total`]
+                            return newErrors
+                        })
+                    }
                 }
+                
                 return updated
             })
         )
+        // Clear error của các trường khác (không phải total) khi đã được cập nhật
         Object.keys(updates).forEach(field => {
-            if (errors[`replace_${id}_${field}`]) {
+            if (errors[`replace_${id}_${field}`] && field !== 'total') {
                 setErrors(prev => ({ ...prev, [`replace_${id}_${field}`]: null }))
             }
         })
     }
 
+    /**
+     * Cập nhật item trong bảng "Dịch vụ" (bảng 2)
+     * - Mục đích: Cập nhật thông tin của một service item (task, đơn giá, v.v.)
+     * - Xử lý: Tính lại thành tiền khi cập nhật quantity hoặc unitPrice, validate thành tiền không vượt quá 1000 tỷ
+     * @param {string|number} id - ID của item cần cập nhật
+     * @param {string} field - Tên trường cần cập nhật ('task', 'unitPrice', 'quantity')
+     * @param {any} value - Giá trị mới
+     */
     const updateServiceItem = (id, field, value) => {
         setServiceItems(serviceItems.map(item => {
-            if (item.id === id) {
-                const updated = { ...item, [field]: value }
-                if (field === 'quantity' || field === 'unitPrice') {
-                    updated.total = (updated.quantity || 0) * (updated.unitPrice || 0)
+            if (item.id !== id) return item
+            const updated = { ...item, [field]: value }
+            
+            // Nếu cập nhật số lượng hoặc đơn giá → tính lại thành tiền
+            if (field === 'quantity' || field === 'unitPrice') {
+                const calculatedTotal = (updated.quantity || 0) * (updated.unitPrice || 0)
+                
+                // Validate thành tiền không được vượt quá 1000 tỷ
+                if (calculatedTotal > MAX_TOTAL) {
+                    // Set error để hiển thị thông báo lỗi
+                    setErrors(prev => ({
+                        ...prev,
+                        [`service_${id}_total`]: `Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`
+                    }))
+                    // Giới hạn thành tiền ở mức tối đa để tránh lỗi DB
+                    updated.total = MAX_TOTAL
+                } else {
+                    updated.total = calculatedTotal
+                    // Clear error nếu thành tiền hợp lệ
+                    if (errors[`service_${id}_total`]) {
+                        setErrors(prev => {
+                            const newErrors = { ...prev }
+                            delete newErrors[`service_${id}_total`]
+                            return newErrors
+                        })
+                    }
                 }
-                return updated
             }
-            return item
+            
+            return updated
         }))
-        // Clear error for this field
-        if (errors[`service_${id}_${field}`]) {
-            setErrors({ ...errors, [`service_${id}_${field}`]: null })
+        // Clear error của trường vừa cập nhật (không phải total) khi đã được cập nhật
+        if (errors[`service_${id}_${field}`] && field !== 'total') {
+            setErrors(prev => {
+                const newErrors = { ...prev }
+                delete newErrors[`service_${id}_${field}`]
+                return newErrors
+            })
         }
     }
 
+    /**
+     * Validate form trước khi lưu báo giá
+     * - Mục đích: Kiểm tra tất cả các trường bắt buộc và validate thành tiền
+     * - Xử lý: 
+     *   + Kiểm tra các trường bắt buộc (category, unit, unitPrice cho bảng 1; task, unitPrice cho bảng 2)
+     *   + Validate thành tiền không vượt quá 1000 tỷ cho cả 2 bảng
+     * @returns {boolean} - true nếu form hợp lệ, false nếu có lỗi
+     */
     const validateForm = () => {
         const newErrors = {}
 
+        // Validate bảng 1: Thay thế (linh kiện)
         replaceItems.forEach((item) => {
             if (!item.category) {
                 newErrors[`replace_${item.id}_category`] = 'Trường bắt buộc'
@@ -1233,8 +1447,15 @@ export default function TicketDetailPage() {
             if (!item.unitPrice || item.unitPrice === 0) {
                 newErrors[`replace_${item.id}_unitPrice`] = 'Trường bắt buộc'
             }
+            
+            // Validate thành tiền không vượt quá 1000 tỷ
+            const total = item.total || 0
+            if (total > MAX_TOTAL) {
+                newErrors[`replace_${item.id}_total`] = `Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`
+            }
         })
 
+        // Validate bảng 2: Dịch vụ
         serviceItems.forEach((item) => {
             if (!item.task) {
                 newErrors[`service_${item.id}_task`] = 'Trường bắt buộc'
@@ -1246,6 +1467,12 @@ export default function TicketDetailPage() {
                 Number.isNaN(item.unitPrice)
             ) {
                 newErrors[`service_${item.id}_unitPrice`] = 'Trường bắt buộc'
+            }
+            
+            // Validate thành tiền không vượt quá 1000 tỷ
+            const total = item.total || 0
+            if (total > MAX_TOTAL) {
+                newErrors[`service_${item.id}_total`] = `Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`
             }
         })
 
@@ -1938,8 +2165,17 @@ export default function TicketDetailPage() {
                                 updates.partId = parseNumericId(value)
                             }
 
-                            // Kiểm tra xem linh kiện này đã tồn tại trong các dòng khác chưa
+                            // ============================================
+                            // LOGIC CỘNG DỒN SỐ LƯỢNG KHI CHỌN CÙNG LINH KIỆN
+                            // ============================================
+                            // Mục đích: Khi người dùng chọn một linh kiện đã tồn tại ở dòng khác,
+                            //           thay vì tạo dòng mới, hệ thống sẽ cộng dồn số lượng vào dòng đã có
+                            //           và xóa dòng hiện tại (nếu là dòng mới chưa lưu)
+                            
+                            // Tìm item hiện tại (dòng đang được chọn)
                             const currentItem = replaceItems.find(item => item.id === record.id)
+                            
+                            // Tìm item đã tồn tại có cùng linh kiện (category hoặc partId giống nhau)
                             const existingItem = replaceItems.find(item =>
                                 item.id !== record.id &&
                                 (String(item.category) === String(value) ||
@@ -1947,24 +2183,39 @@ export default function TicketDetailPage() {
                             )
 
                             if (existingItem) {
-                                // Nếu đã tồn tại, cộng dồn số lượng vào dòng đó
-                                const currentQuantity = currentItem?.quantity || 1
-                                const newQuantity = (existingItem.quantity || 0) + currentQuantity
+                                // Nếu đã tồn tại → cộng dồn số lượng vào dòng đó
+                                
+                                // Lấy số lượng hiện tại từ quantityText (khi đang gõ) hoặc quantity (đã lưu)
+                                const currentQtyText = currentItem?.quantityText
+                                const currentQuantity = currentQtyText !== undefined && currentQtyText !== null && currentQtyText !== ''
+                                    ? (isLiterUnit(existingItem.unit) 
+                                        ? parseFloat(String(currentQtyText).replace(',', '.')) || 1 // Nếu là lít → parse số thập phân
+                                        : parseInt(String(currentQtyText).replace(/[^\d]/g, ''), 10) || 1) // Nếu không phải lít → parse số nguyên
+                                    : (currentItem?.quantity || 1) // Fallback về quantity nếu không có quantityText
+                                
+                                // Tính số lượng mới = số lượng dòng đã tồn tại + số lượng dòng hiện tại
+                                const existingQuantity = existingItem.quantity || 0
+                                const newQuantity = existingQuantity + currentQuantity
+                                
+                                // Tính lại thành tiền = số lượng mới × đơn giá
                                 const newTotal = newQuantity * (existingItem.unitPrice || 0)
 
-                                // Cập nhật dòng đã tồn tại với số lượng mới
+                                // Cập nhật dòng đã tồn tại với số lượng mới và xóa dòng hiện tại
                                 setReplaceItems(prev =>
                                     prev.map(item => {
+                                        // Cập nhật dòng đã tồn tại
                                         if (item.id === existingItem.id) {
                                             return {
                                                 ...item,
                                                 quantity: newQuantity,
+                                                quantityText: String(newQuantity), // Cập nhật cả quantityText để UI hiển thị đúng
                                                 total: newTotal
                                             }
                                         }
                                         return item
                                     }).filter(item => {
                                         // Xóa dòng hiện tại nếu là dòng mới (chưa có priceQuotationItemId)
+                                        // Nếu dòng đã lưu (có priceQuotationItemId) thì không xóa
                                         if (item.id === record.id && !item.priceQuotationItemId) {
                                             return false
                                         }
@@ -1972,7 +2223,7 @@ export default function TicketDetailPage() {
                                     })
                                 )
                             } else {
-                                // Nếu chưa tồn tại, cập nhật như bình thường
+                                // Nếu chưa tồn tại → cập nhật như bình thường (tạo dòng mới hoặc cập nhật dòng hiện tại)
                                 updateReplaceItem(record.id, updates)
                             }
                         }}
@@ -2001,24 +2252,92 @@ export default function TicketDetailPage() {
                     Number.isFinite(partQuantity) &&
                     currentQuantity > partQuantity
 
+                const allowDecimal = isLiterUnit(record.unit)
+
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <input
-                            type="number"
-                            min={1}
-                            value={record.quantity ?? 1}
-                            onChange={(e) =>
-                                updateReplaceItem(record.id, {
-                                    quantity: Number(e.target.value) || 1
-                                })
-                            }
-                            style={{
-                                ...baseInputStyle
-                            }}
-                            onFocus={handleInputFocus}
-                            onBlur={handleInputBlur}
-                            disabled={inputsDisabled}
-                        />
+                        {(() => {
+                            const displayValue =
+                                record.quantityText !== undefined
+                                    ? record.quantityText
+                                    : (record.quantity !== null && record.quantity !== undefined
+                                        ? String(record.quantity)
+                                        : '')
+                            return (
+                                <input
+                                    type="number"
+                                    inputMode="decimal"
+                                    value={displayValue}
+                                    onChange={(e) => {
+                                        // Xử lý input số lượng khi người dùng đang gõ
+                                        let value = e.target.value || ''
+                                        
+                                        // Cho phép chỉ số và 1 dấu . hoặc , (cho đơn vị "lít")
+                                        value = value.replace(/[^\d.,]/g, '') // Loại bỏ ký tự không phải số, dấu chấm, dấu phẩy
+                                        const firstDot = value.search(/[.,]/) // Tìm vị trí dấu thập phân đầu tiên
+                                        if (firstDot !== -1) {
+                                            // Nếu có dấu thập phân → tách phần nguyên và phần thập phân
+                                            const intPart = value.slice(0, firstDot) // Phần nguyên
+                                            const decPart = value.slice(firstDot + 1).replace(/[.,]/g, '') // Phần thập phân (loại bỏ dấu thập phân thừa)
+                                            value = intPart + value[firstDot] + decPart // Kết hợp lại, giữ 1 dấu thập phân
+                                        }
+                                        
+                                        // Validate thành tiền trước khi update để tránh nhập số quá lớn
+                                        const tempQty = value ? (isLiterUnit(record.unit) 
+                                            ? parseFloat(value.replace(',', '.')) // Nếu là lít → parse số thập phân
+                                            : parseInt(value.replace(/[^\d]/g, ''), 10)) // Nếu không phải lít → parse số nguyên
+                                            : 0
+                                        const tempTotal = (tempQty || 0) * (record.unitPrice || 0)
+                                        
+                                        // Nếu thành tiền vượt quá 1000 tỷ → hiển thị cảnh báo và không cho update
+                                        if (tempTotal > MAX_TOTAL) {
+                                            message.warning(`Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`)
+                                            return
+                                        }
+                                        
+                                        // Cập nhật quantityText (chưa normalize) để người dùng có thể tiếp tục gõ
+                                        updateReplaceItem(record.id, {
+                                            quantityText: value
+                                        })
+                                    }}
+                                    onBlur={() => {
+                                        // Xử lý khi người dùng rời khỏi ô input (blur)
+                                        // Mục đích: Chuẩn hóa số lượng dựa trên đơn vị
+                                        let text = record.quantityText || ''
+
+                                        // Nếu rỗng hoặc chỉ có dấu . / , => đưa về 1 (giá trị mặc định)
+                                        if (!text || text === '.' || text === ',') {
+                                            updateReplaceItem(record.id, {
+                                                quantity: 1,
+                                                quantityText: '1'
+                                            })
+                                            return
+                                        }
+
+                                        // Chuẩn hóa dấu phẩy thành dấu chấm
+                                        const normalized = text.replace(',', '.')
+                                        
+                                        // Chuẩn hóa số lượng dựa trên đơn vị (cho phép thập phân nếu là "lít")
+                                        const safeValue = normalizeQuantityByUnit(normalized, record.unit)
+
+                                        // Cập nhật cả quantity (số) và quantityText (chuỗi) để UI hiển thị đúng
+                                        updateReplaceItem(record.id, {
+                                            quantity: safeValue,
+                                            // Với đơn vị Lít: giữ nguyên chuỗi người dùng nhập (sau khi đã normalize dấu phẩy/chấm)
+                                            // Với đơn vị khác: hiển thị số nguyên đã chuẩn hóa
+                                            quantityText: isLiterUnit(record.unit)
+                                                ? normalized // Giữ nguyên để hiển thị số thập phân
+                                                : String(safeValue) // Chuyển về số nguyên
+                                        })
+                                    }}
+                                    style={{
+                                        ...baseInputStyle
+                                    }}
+                                    onFocus={handleInputFocus}
+                                    disabled={inputsDisabled}
+                                />
+                            )
+                        })()}
                     </div>
                 )
             }
@@ -2036,9 +2355,20 @@ export default function TicketDetailPage() {
                         options={unitOptions}
                         isClearable
                         isDisabled={inputsDisabled || record.unitLocked}
-                        onChange={(option) =>
-                            updateReplaceItem(record.id, { unit: option?.value || '' })
-                        }
+                        onChange={(option) => {
+                            const newUnit = option?.value || ''
+                            const sourceText =
+                                record.quantityText !== undefined && record.quantityText !== null
+                                    ? record.quantityText
+                                    : record.quantity
+
+                            const safeQty = normalizeQuantityByUnit(sourceText, newUnit)
+                            updateReplaceItem(record.id, {
+                                unit: newUnit,
+                                quantity: safeQty,
+                                quantityText: String(safeQty)
+                            })
+                        }}
                         styles={{
                             control: (base, state) => ({
                                 ...base,
@@ -2120,9 +2450,31 @@ export default function TicketDetailPage() {
                                 : ''
                         }
                         onChange={(e) => {
+                            // Xử lý input đơn giá khi người dùng đang gõ
+                            // Loại bỏ tất cả ký tự không phải số (đơn giá chỉ cho phép số nguyên)
                             const sanitized = e.target.value.replace(/[^\d]/g, '')
+                            const newPrice = sanitized ? parseInt(sanitized, 10) : 0
+                            
+                            // Validate thành tiền trước khi update để tránh nhập số quá lớn
+                            // Lấy số lượng hiện tại từ quantityText (khi đang gõ) hoặc quantity (đã lưu)
+                            const currentQty = record.quantityText !== undefined && record.quantityText !== null && record.quantityText !== ''
+                                ? (isLiterUnit(record.unit) 
+                                    ? parseFloat(String(record.quantityText).replace(',', '.')) // Nếu là lít → parse số thập phân
+                                    : parseInt(String(record.quantityText).replace(/[^\d]/g, ''), 10)) // Nếu không phải lít → parse số nguyên
+                                : (record.quantity || 0) // Fallback về quantity nếu không có quantityText
+                            
+                            // Tính thành tiền tạm thời = số lượng × đơn giá mới
+                            const tempTotal = (currentQty || 0) * newPrice
+                            
+                            // Nếu thành tiền vượt quá 1000 tỷ → hiển thị cảnh báo và không cho update
+                            if (tempTotal > MAX_TOTAL) {
+                                message.warning(`Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`)
+                                return
+                            }
+                            
+                            // Cập nhật đơn giá (sẽ tự động tính lại thành tiền trong updateReplaceItem)
                             updateReplaceItem(record.id, {
-                                unitPrice: sanitized ? parseInt(sanitized, 10) : 0
+                                unitPrice: newPrice
                             })
                         }}
                         style={{
@@ -2149,11 +2501,22 @@ export default function TicketDetailPage() {
             render: (_, record) => {
                 const value = record.total ?? 0
                 const text = value ? value.toLocaleString('vi-VN') + ' đ' : '--'
+                const hasError = errors[`replace_${record.id}_total`]
                 return (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
-              {text}
-            </span>
+                        <span style={{ 
+                            minHeight: 40, 
+                            display: 'inline-flex', 
+                            alignItems: 'center',
+                            color: hasError ? '#ef4444' : '#111'
+                        }}>
+                            {text}
+                        </span>
+                        {hasError && (
+                            <div className="td-error-placeholder" style={{ fontSize: '11px', marginTop: '2px', textAlign: 'center' }}>
+                                {hasError}
+                            </div>
+                        )}
                     </div>
                 )
             }
@@ -2189,7 +2552,7 @@ export default function TicketDetailPage() {
                   return <FileTextOutlined style={{ fontSize: 16, color }} />
               })()}
             </span>
-            {!isHistoryPage && !inputsDisabled && record.exportedQuantity === 0 && (
+            {!isHistoryPage && !inputsDisabled && (
               record.priceQuotationItemId ? (
                 <Popconfirm
                   title="Xóa mục báo giá"
@@ -2271,8 +2634,18 @@ export default function TicketDetailPage() {
             }
             onChange={(e) => {
               const sanitized = e.target.value.replace(/[^\d]/g, '')
-              const value = sanitized === '' ? 0 : parseInt(sanitized, 10)
-              updateServiceItem(record.id, 'unitPrice', Number.isNaN(value) ? 0 : value)
+              const newPrice = sanitized === '' ? 0 : parseInt(sanitized, 10)
+              
+              // Validate thành tiền trước khi update
+              const currentQty = record.quantity || 1
+              const tempTotal = currentQty * newPrice
+              
+              if (tempTotal > MAX_TOTAL) {
+                message.warning(`Thành tiền không được vượt quá ${(MAX_TOTAL / 1000000000).toLocaleString('vi-VN')} tỷ`)
+                return
+              }
+              
+              updateServiceItem(record.id, 'unitPrice', Number.isNaN(newPrice) ? 0 : newPrice)
             }}
             style={{
               ...baseInputStyle,
@@ -2298,15 +2671,26 @@ export default function TicketDetailPage() {
       render: (_, record) => {
         const value = record.total ?? 0
         const text = value ? value.toLocaleString('vi-VN') + ' đ' : '--'
+        const hasError = errors[`service_${record.id}_total`]
         return (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}>
+            <span style={{ 
+              minHeight: 40, 
+              display: 'inline-flex', 
+              alignItems: 'center',
+              color: hasError ? '#ef4444' : '#111'
+            }}>
               {text}
             </span>
-                    </div>
-                )
-            }
-        },
+            {hasError && (
+              <div className="td-error-placeholder" style={{ fontSize: '11px', marginTop: '2px', textAlign: 'center' }}>
+                {hasError}
+              </div>
+            )}
+          </div>
+        )
+      }
+    },
         {
             title: '',
             key: 'action',

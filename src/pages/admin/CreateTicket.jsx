@@ -596,29 +596,100 @@ export default function CreateTicket() {
   const handleCreate = async (values) => {
     // same logic as original file, but uses form values which we've synced from react-select
     let expectedDeliveryAt = null
-    if (values.receiveDate) {
-      if (values.receiveDate instanceof Date) expectedDeliveryAt = dayjs(values.receiveDate).format('YYYY-MM-DD')
-      else if (typeof values.receiveDate === 'string') expectedDeliveryAt = values.receiveDate
-      else if (values.receiveDate.format) expectedDeliveryAt = values.receiveDate.format('YYYY-MM-DD')
-    } else if (appointmentPrefill.expectedDeliveryAt) expectedDeliveryAt = appointmentPrefill.expectedDeliveryAt
+    
+    // Try to get date from multiple sources
+    const receiveDateValue = values.receiveDate || form.getFieldValue('receiveDate') || selectedDate || appointmentPrefill.expectedDeliveryAt
+    
+    if (receiveDateValue) {
+      if (receiveDateValue instanceof Date) {
+        expectedDeliveryAt = dayjs(receiveDateValue).format('YYYY-MM-DD')
+      } else if (typeof receiveDateValue === 'string') {
+        // Try to parse if it's a string
+        const parsed = dayjs(receiveDateValue)
+        if (parsed.isValid()) {
+          expectedDeliveryAt = parsed.format('YYYY-MM-DD')
+        } else {
+          expectedDeliveryAt = receiveDateValue
+        }
+      } else if (receiveDateValue.format) {
+        expectedDeliveryAt = receiveDateValue.format('YYYY-MM-DD')
+      }
+    }
 
-    const finalBrandId = selectedBrandId || values.brand || appointmentPrefill.vehicle?.brandId || null
-    const finalModelId = selectedModelId || values.model || appointmentPrefill.vehicle?.modelId || null
+    // Get brand and model IDs from multiple sources
+    const finalBrandId = selectedBrandId || values.brand || form.getFieldValue('brand') || appointmentPrefill.vehicle?.brandId || null
+    const finalModelId = selectedModelId || values.model || form.getFieldValue('model') || appointmentPrefill.vehicle?.modelId || null
     const selectedBrand = brands.find(b => b.id === Number(finalBrandId))
     const selectedModel = models.find(m => m.id === Number(finalModelId))
 
-    const appointmentVehicleId = appointmentPrefill.vehicle?.vehicleId
-    const finalVehicleId = (appointmentVehicleId !== null && appointmentVehicleId !== undefined && appointmentVehicleId !== '') ? Number(appointmentVehicleId) : ''
+    // Get vehicle ID from multiple sources
+    const vehicleIdFromPrefill = appointmentPrefill.vehicle?.vehicleId
+    const vehicleIdFromAPI = appointmentDataFromAPI?.vehicle?.vehicleId || appointmentDataFromAPI?.vehicleId
+    const appointmentVehicleId = vehicleIdFromAPI || vehicleIdFromPrefill
+    
+    let finalVehicleId = null
+    if (appointmentVehicleId !== null && appointmentVehicleId !== undefined && appointmentVehicleId !== '' && String(appointmentVehicleId).trim() !== '') {
+      finalVehicleId = Number(appointmentVehicleId)
+    }
+    
+    // Get plate from form (needed for vehicle lookup)
+    const plateValue = values.plate || form.getFieldValue('plate') || ''
+    const vinValue = values.vin || form.getFieldValue('vin') || ''
+
+    // Get year from form or state
+    const yearValue = values.year || form.getFieldValue('year')
+    const finalYear = (yearValue !== null && yearValue !== undefined && yearValue !== '' && String(yearValue).trim() !== '')
+      ? Number(yearValue)
+      : null
+
+    // plate check and try to get vehicleId if not found
+    if (plateValue && !finalVehicleId) {
+      try {
+        // First check plate ownership
+        const { data: checkRes, error: checkError } = await vehiclesAPI.checkPlate(plateValue, customerId)
+        if (!checkError) {
+          const status = checkRes?.result?.status || checkRes?.message
+          const owner = checkRes?.result?.owner || checkRes?.result?.customer
+          if (status === 'OWNED_BY_OTHER' && owner?.customerId && owner.customerId !== customerId) {
+            message.error(`Biển số này đã thuộc khách hàng khác: ${owner.fullName || ''} – ${owner.phone || ''}. Vui lòng kiểm tra lại.`)
+            return
+          }
+          
+          // Try to get vehicleId from checkPlate response if available
+          const vehicleFromCheck = checkRes?.result?.vehicle || checkRes?.result
+          if (vehicleFromCheck?.vehicleId && !finalVehicleId) {
+            finalVehicleId = Number(vehicleFromCheck.vehicleId)
+          }
+        }
+        
+        // If still no vehicleId, try to get by license plate
+        if (!finalVehicleId) {
+          try {
+            const { data: vehicleRes, error: vehicleError } = await vehiclesAPI.getByLicensePlate(plateValue)
+            if (!vehicleError && vehicleRes?.result) {
+              const vehicle = Array.isArray(vehicleRes.result) ? vehicleRes.result[0] : vehicleRes.result
+              if (vehicle?.vehicleId) {
+                finalVehicleId = Number(vehicle.vehicleId)
+              }
+            }
+          } catch (err) {
+            console.warn('Get vehicle by plate exception:', err)
+          }
+        }
+      } catch (err) {
+        console.warn('Check plate exception:', err)
+      }
+    }
 
     const vehiclePayload = {
       brandId: finalBrandId ? Number(finalBrandId) : null,
       brandName: selectedBrand?.name || (finalBrandId ? 'string' : ''),
-      licensePlate: values.plate ? String(values.plate).toUpperCase() : '',
+      licensePlate: plateValue ? String(plateValue).toUpperCase().trim() : '',
       modelId: finalModelId ? Number(finalModelId) : null,
       modelName: selectedModel?.name || (finalModelId ? 'string' : ''),
       vehicleId: finalVehicleId,
-      vin: values.vin ? String(values.vin).trim() : null,
-      year: values.year ? Number(values.year) : (values.year === 0 ? 0 : (values.year === '' || values.year === undefined ? null : 2020))
+      vin: vinValue ? String(vinValue).trim() : null,
+      year: finalYear
     }
 
     const createPayload = {
@@ -637,24 +708,6 @@ export default function CreateTicket() {
       receiveCondition: values.note || '',
       serviceTypeIds: (values.service || []).map((id) => Number(id)),
       vehicle: vehiclePayload
-    }
-
-    // plate check (same as original)
-    const plate = values.plate || form.getFieldValue('plate')
-    if (plate) {
-      try {
-        const { data: checkRes, error: checkError } = await vehiclesAPI.checkPlate(plate, customerId)
-        if (!checkError) {
-          const status = checkRes?.result?.status || checkRes?.message
-          const owner = checkRes?.result?.owner || checkRes?.result?.customer
-          if (status === 'OWNED_BY_OTHER' && owner?.customerId && owner.customerId !== customerId) {
-            message.error(`Biển số này đã thuộc khách hàng khác: ${owner.fullName || ''} – ${owner.phone || ''}. Vui lòng kiểm tra lại.`)
-            return
-          }
-        }
-      } catch (err) {
-        console.warn('Check plate exception:', err)
-      }
     }
 
     setLoading(true)
